@@ -1,0 +1,17 @@
+# Build output
+build/
+
+# macOS
+.DS_Store
+._*
+
+# Xcode (arrives once examples exist)
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.dSYM/
+
+# NOT ignored, deliberately:
+#   libs/glm/                 vendored, must ship — see libs/VENDORED.md
+#   tests/vectors/*.vec       generated, but committed alongside the code
+#                             change that motivated it
