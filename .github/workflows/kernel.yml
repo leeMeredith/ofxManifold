@@ -1,0 +1,104 @@
+name: kernel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: macos-latest
+            name: macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          c++ --version
+          python3 --version
+          uname -sm
+
+      - name: Floating-point characteristics
+        run: |
+          cat > /tmp/fp.cpp <<'EOF'
+          #include <cstdio>
+          #include <cfloat>
+          #include <cmath>
+          int main() {
+              printf("FLT_EPSILON = %.6e\n", (double)FLT_EPSILON);
+              float ux=0.1f, uy=0.1f, vx=0.4f, vy=0.4f, wx=0.7f, wy=0.7f;
+              float area2 = (vx-ux)*(wy-uy) - (wx-ux)*(vy-uy);
+              printf("collinear area2 = %.12e\n", (double)area2);
+              printf("FMA contraction = %s\n", area2 == 0.0f ? "no" : "YES");
+              printf("vs kAreaEpsilon 1e-6 : %s\n",
+                     std::fabs(area2) < 1e-6f ? "rejected (correct)"
+                                              : "ACCEPTED (bug)");
+              return 0;
+          }
+          EOF
+          c++ -std=c++17 -O2 -o /tmp/fp /tmp/fp.cpp && /tmp/fp
+
+      - name: Vectors are reproducible from the reference
+        run: |
+          cp tests/vectors/triangle.vec /tmp/committed.vec
+          make vectors
+          if ! diff -u /tmp/committed.vec tests/vectors/triangle.vec; then
+              echo "::error::triangle.vec does not match a fresh run of reference.py"
+              exit 1
+          fi
+          echo "vectors reproduce byte-for-byte"
+
+      - name: Conformance
+        run: make test
+
+  mutation:
+    name: suite-can-fail
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Baseline must be green
+        run: make test
+
+      - name: Transposed sub-area argument must be caught
+        run: |
+          sed -i 's|signedArea2(p, c, a)|signedArea2(p, a, c)|' src/core/ofxManifoldTriangle.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldTriangle.h
+
+      - name: Unrenormalized bias must be caught
+        run: |
+          sed -i 's|r.w\[i\] = scaled\[i\] \* inv;|r.w[i] = scaled[i];|' src/core/ofxManifoldTriangle.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldTriangle.h
+
+      - name: Epsilon too small must be caught
+        run: |
+          sed -i 's|kAreaEpsilon = 1e-6f|kAreaEpsilon = 1e-9f|' src/core/ofxManifoldTypes.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldTypes.h
+
+      - name: Epsilon too large must be caught
+        run: |
+          sed -i 's|kAreaEpsilon = 1e-6f|kAreaEpsilon = 1e-3f|' src/core/ofxManifoldTypes.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldTypes.h
+
+      - name: Restored tree must be green
+        run: |
+          make clean
+          make test
