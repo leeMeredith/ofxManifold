@@ -97,7 +97,20 @@ def blend(a, b, t, curve_name="linear"):
 
 
 def fmt(x):
-    return f"{x:.17g}"
+    """
+    Ten significant digits, deliberately not seventeen.
+
+    IEEE-754 requires sqrt to be correctly rounded, so it is identical on every
+    platform. It requires NOTHING of sin and cos, and libm implementations
+    differ by about one unit in the last place. At 17 significant digits that
+    difference is visible, so a vector file generated on one platform did not
+    regenerate byte-for-byte on another and CI failed the drift check -- on a
+    file whose values were fine.
+
+    Ten digits resolve to about 1e-10, four orders below the 1e-6 comparison
+    tolerance, and absorb the last-place divergence. See DECISIONS.md D-006.
+    """
+    return f"{x:.10g}"
 
 
 def wv(v):

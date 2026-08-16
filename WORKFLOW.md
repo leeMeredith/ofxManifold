@@ -125,6 +125,22 @@ mostly `ANALYTIC`. The runner prints the split for exactly that reason.
 
 ---
 
+## 6.1 Precision in emitted vectors
+
+References emit **10 significant digits**, via the shared `fmt()` in each file.
+Not 17.
+
+`sqrt` is correctly rounded per IEEE-754 and reproduces bit-for-bit anywhere.
+`sin` and `cos` are not, and platform libm implementations differ by about one
+unit in the last place — enough to break byte-exact regeneration at 17 digits,
+which is exactly how it was found (DECISIONS.md D-006).
+
+Ten digits resolve to about 1e-10 against a 1e-6 comparison tolerance, so the
+precision loss cannot affect any assertion. Any new reference should use the
+same `fmt()`.
+
+---
+
 ## 7. Adding a new capability
 
 The order is fixed, and it is the Gray-Scott order: simulate, then implement.
@@ -172,6 +188,39 @@ Three faults have been verified as caught:
 The first is the important one. It produced weights of 3.49 and −2.49 for a
 point genuinely inside the triangle — a fault that in a live system would look
 like a tracking bug rather than a maths bug.
+
+---
+
+## 8.1 Continuous integration
+
+`.github/workflows/kernel.yml` runs on every push and pull request.
+
+**Job `test`** — matrix over `ubuntu-latest` (x86_64) and `macos-latest`
+(arm64), `fail-fast: false` so one platform never masks the other. Steps:
+
+1. record the toolchain and architecture
+2. record floating-point characteristics: `FLT_EPSILON`, the collinear doubled
+   area, and whether the compiler contracted the expression into an FMA
+3. assert the committed `.vec` reproduces byte-for-byte from `make vectors`
+4. `make test`
+
+Step 2 exists because D-001 was a floating-point difference between platforms.
+If a future failure has that shape, the evidence is already in the log rather
+than needing a reproduction.
+
+Step 3 exists because nothing else stops `reference.py` being edited without
+regenerating. The suite would keep passing against stale expected values, which
+is the same failure as a reference that agrees with the implementation by
+construction.
+
+**Job `mutation`** — introduces four known faults and requires each to be
+caught: transposed sub-area argument, unrenormalized bias, `kAreaEpsilon` too
+small, `kAreaEpsilon` too large. Linux only, since it tests the suite rather
+than the platform.
+
+The last two are a pair on purpose. Too small accepts degenerate triangles; too
+large eats legitimate fine-mesh topology. Checking only one direction leaves a
+threshold that can drift the other way unopposed.
 
 ---
 

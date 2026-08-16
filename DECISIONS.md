@@ -244,3 +244,129 @@ test will reveal. The mutation was not caught by adding cases; it was caught by
 asking what a broken implementation could still pass. That question is the only
 reliable way to find this class of gap, and it should be asked of every new
 suite before the suite is trusted.
+
+
+---
+
+## D-005 — A vector generator must replay calls, not results
+
+**Date:** 2026-08-16
+**Status:** gap found by mutation testing, closed
+**Files:** `tests/ref/reference_mapping.py`
+
+### The gap
+
+A vector was written to cover the rule that binding the same node to the same
+target twice **accumulates** the link weight rather than replacing it. The
+mutation that changes `+=` to `=` still passed with the suite green.
+
+The vector was not weak. It did not exist.
+
+### The cause
+
+The Python fixture accumulated the duplicate bind into its own link table as the
+fixture was built, and the emitter then wrote out the **accumulated table**:
+
+    BIND 0 out.1 1.0
+
+instead of the two calls that produced it:
+
+    BIND 0 out.1 0.5
+    BIND 0 out.1 0.5
+
+So the vector file contained no duplicate, the C++ runner never called `bind()`
+twice on the same pair, and the rule under test was never reached. The file
+described a fixture that had already had the interesting operation applied to it.
+
+### The fix
+
+The fixture keeps a raw log of `bind()` calls in order, and the emitter replays
+the log rather than serializing the resulting table. All eleven mapping
+mutations were then re-run, since the change affects every fixture in the file.
+
+### Pattern
+
+This is a different failure from D-004 and worth separating.
+
+D-004 was a suite that could not **see** a class of bug: the vectors were real,
+they simply could not distinguish identity from position.
+
+D-005 was a suite that quietly did not **run** the operation at all. The vector
+had a name, a class, a comment explaining what it guarded, and expected values
+that were correct — and it exercised nothing.
+
+The general rule: **a generator that records the state of a fixture rather than
+the operations performed on it will silently omit any operation whose effect is
+idempotent in the recording.** Duplicate binds, repeated inserts, and
+order-dependent accumulation are all invisible this way.
+
+Only mutation testing distinguishes a vector that passes from a vector that runs.
+A green suite reports both identically.
+
+
+---
+
+## D-006 — Vector files emit 10 significant digits, not 17
+
+**Date:** 2026-08-16
+**Status:** CI failure on macOS, fixed
+**Files:** all four references in `tests/ref/`
+
+### What happened
+
+CI went red on `macos-arm64` only. All four suites passed on both platforms.
+What failed was the drift check: the committed `interpretation.vec` did not
+regenerate byte-for-byte when the reference was re-run on macOS.
+
+The values were correct. The file was not reproducible.
+
+### Cause
+
+IEEE-754 requires `sqrt` to be **correctly rounded**, so it returns bit-identical
+results on every conforming platform. It requires nothing of the sort for `sin`
+and `cos`. Those come from the platform's libm, and implementations differ by
+about one unit in the last place.
+
+    sin(pi/4) on this machine   0.70710678118654746
+    one ULP away                0.70710678118654757
+
+At 17 significant digits those are different strings. At 10 they are the same.
+
+Only `reference_interpretation.py` emits trigonometric results, which is why it
+alone failed. The other three use arithmetic and `sqrt`, both exactly
+reproducible — so they were correct by luck, not by design.
+
+### Fix
+
+All four references now emit 10 significant digits. Applied to all four rather
+than only the one that failed, because the next reference to reach for a
+transcendental function should not have to rediscover this.
+
+Ten digits resolve to about 1e-10. The comparison tolerance is 1e-6, so there
+are four orders of headroom: the precision loss cannot affect any assertion.
+
+Regeneration is now idempotent on this platform, and all 26 mutation gates were
+re-run afterwards to confirm the reduced precision had not blunted any check.
+
+### Residual risk
+
+Byte-exact comparison of rounded values can still diverge if a value sits within
+one ULP of a rounding boundary at the tenth digit. That is roughly a one in a
+million chance per emitted value, and about a hundred values are emitted.
+
+Accepted for now, because byte-exact comparison is a much simpler and stronger
+statement of "you forgot to run `make vectors`" than a numeric diff would be. If
+it ever fires, the fix is to compare the files numerically with a tolerance
+rather than to reduce precision further.
+
+### Pattern
+
+Second platform divergence in this project, and the same shape as D-001: an
+assumption about floating-point behaviour that was never measured. There the
+epsilon was chosen below the noise floor; here the output precision was chosen
+above the reproducibility floor.
+
+Also worth noting what the dual-platform matrix bought. The failure was not in
+the mathematics and would never have appeared on a single-platform run. It says
+something narrow but real: **a file is only reproducible to the precision its
+least reproducible function supports.**

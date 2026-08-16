@@ -7,15 +7,15 @@
 # explicit lerp. Where sqrt is simply sqrt, the vectors are ANALYTIC
 # and state their expected values by hand.
 
-TOL 9.9999999999999995e-07
+TOL 1e-06
 
 # linear is the identity. Anything else means apply() is not
 # leaving the weights alone.
-CURVE linear_is_identity ANALYTIC linear IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.5 2=0.29999999999999999
+CURVE linear_is_identity ANALYTIC linear IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
 
 # sqrt(0.25) is exactly 0.5 and sqrt(0.75) is not -- an
 # asymmetric input so a swapped pair cannot pass
-CURVE equalpower_quarter ANALYTIC equalPower IN 0=0.25 1=0.75 OUT 0=0.5 1=0.8660254037844386
+CURVE equalpower_quarter ANALYTIC equalPower IN 0=0.25 1=0.75 OUT 0=0.5 1=0.8660254038
 
 # both endpoints are fixed points of every curve: fn(0)==0 and
 # fn(1)==1. blend relies on this for its endpoint identities.
@@ -23,7 +23,7 @@ CURVE endpoints_linear ANALYTIC linear IN 0=0 1=1 OUT 0=0 1=1
 CURVE endpoints_equalPower ANALYTIC equalPower IN 0=0 1=1 OUT 0=0 1=1
 CURVE endpoints_cosine ANALYTIC cosine IN 0=0 1=1 OUT 0=0 1=1
 
-CURVE cosine_half ANALYTIC cosine IN 0=0.5 1=0.5 OUT 0=0.70710678118654746 1=0.70710678118654746
+CURVE cosine_half ANALYTIC cosine IN 0=0.5 1=0.5 OUT 0=0.7071067812 1=0.7071067812
 
 # Non-contiguous, non-zero-based node IDs. Every other vector
 # here uses 0,1,2, which an implementation that REINDEXES its
@@ -31,10 +31,10 @@ CURVE cosine_half ANALYTIC cosine IN 0=0.5 1=0.5 OUT 0=0.70710678118654746 1=0.7
 # whole architecture is built to retain, so it gets a case
 # where losing it is visible.
 CURVE identity_sparse_ids ANALYTIC linear IN 5=0.25 2=0.5 9=0.25 OUT 5=0.25 2=0.5 9=0.25
-CURVE equalpower_sparse_ids CROSS equalPower IN 5=0.25 2=0.5 9=0.25 OUT 5=0.5 2=0.70710678118654757 9=0.5
+CURVE equalpower_sparse_ids CROSS equalPower IN 5=0.25 2=0.5 9=0.25 OUT 5=0.5 2=0.7071067812 9=0.5
 
-CURVE equalpower_three CROSS equalPower IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.44721359549995793 1=0.70710678118654757 2=0.54772255750516607
-CURVE cosine_three CROSS cosine IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.30901699437494745 1=0.70710678118654757 2=0.4539904997395468
+CURVE equalpower_three CROSS equalPower IN 0=0.2 1=0.5 2=0.3 OUT 0=0.4472135955 1=0.7071067812 2=0.5477225575
+CURVE cosine_three CROSS cosine IN 0=0.2 1=0.5 2=0.3 OUT 0=0.3090169944 1=0.7071067812 2=0.4539904997
 
 # Constant power. For a TWO-node vector summing to one, both
 # equalPower and cosine produce gains whose squares sum to one.
@@ -47,14 +47,14 @@ POWER power_equalpower_asym ANALYTIC equalPower IN 0=0.25 1=0.75 SUMSQ 1.0
 # For THREE nodes the two curves diverge -- equalPower still
 # sums its squares to one, cosine does not. They are different
 # instruments, not two spellings of one.
-POWER power_equalpower_three ANALYTIC equalPower IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 SUMSQ 1.0
-POWER power_cosine_three CROSS cosine IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 SUMSQ 0.80159887666628982
+POWER power_equalpower_three ANALYTIC equalPower IN 0=0.2 1=0.5 2=0.3 SUMSQ 1.0
+POWER power_cosine_three CROSS cosine IN 0=0.2 1=0.5 2=0.3 SUMSQ 0.8015988767
 
 # A curve must NOT renormalize. equalPower on a vector summing
 # to one gives a sum well above one, and that is correct: it
 # preserves power instead. Renormalizing here would undo the
 # only thing the curve was for.
-SUM sum_after_equalpower SPEC equalPower IN 0=0.5 1=0.5 SUM 1.4142135623730951
+SUM sum_after_equalpower SPEC equalPower IN 0=0.5 1=0.5 SUM 1.414213562
 
 # normalize() restores partition of unity when a caller
 # explicitly asks, discarding the power property to do it
@@ -62,73 +62,73 @@ NORMALIZE normalize_after_curve SPEC equalPower IN 0=0.5 1=0.5 OUT 0=0.5 1=0.5
 
 # spread 0 is the identity, and preserves sparsity: the common
 # case must cost nothing
-SPREAD spread_zero ANALYTIC 0.0 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.5 2=0.29999999999999999
+SPREAD spread_zero ANALYTIC 0.0 5 IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
 
 # spread 1 is uniform over every node in the map, regardless of
 # what the point was doing
-SPREAD spread_full ANALYTIC 1.0 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.20000000000000001 2=0.20000000000000001 3=0.20000000000000001 4=0.20000000000000001
+SPREAD spread_full ANALYTIC 1.0 5 IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.2 2=0.2 3=0.2 4=0.2
 
 # halfway: the localized part halved, plus a uniform floor
-SPREAD spread_half CROSS 0.5 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.34999999999999998 2=0.25 3=0.10000000000000001 4=0.10000000000000001
+SPREAD spread_half CROSS 0.5 5 IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.35 2=0.25 3=0.1 4=0.1
 SPREAD spread_quarter CROSS 0.25 4 IN 0=0.5 1=0.5 OUT 0=0.4375 1=0.4375 2=0.0625 3=0.0625
 
 # spread must preserve partition of unity at every amount --
 # it is a linear interpolation between two vectors that each
 # sum to one, so the result does too
-SPREADSUM spreadsum_0_1 ANALYTIC 0.10000000000000001 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 SUM 1.0
-SPREADSUM spreadsum_0_33 ANALYTIC 0.33000000000000002 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 SUM 1.0
-SPREADSUM spreadsum_0_5 ANALYTIC 0.5 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 SUM 1.0
-SPREADSUM spreadsum_0_9 ANALYTIC 0.90000000000000002 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 SUM 1.0
+SPREADSUM spreadsum_0_1 ANALYTIC 0.1 5 IN 0=0.2 1=0.5 2=0.3 SUM 1.0
+SPREADSUM spreadsum_0_33 ANALYTIC 0.33 5 IN 0=0.2 1=0.5 2=0.3 SUM 1.0
+SPREADSUM spreadsum_0_5 ANALYTIC 0.5 5 IN 0=0.2 1=0.5 2=0.3 SUM 1.0
+SPREADSUM spreadsum_0_9 ANALYTIC 0.9 5 IN 0=0.2 1=0.5 2=0.3 SUM 1.0
 
 # sparse IDs through spread: the localized part must land on
 # the nodes it names, not on the first few slots
-SPREAD spread_sparse_ids CROSS 0.4 12 IN 7=0.59999999999999998 3=0.40000000000000002 OUT 0=0.033333333333333333 1=0.033333333333333333 2=0.033333333333333333 3=0.27333333333333332 4=0.033333333333333333 5=0.033333333333333333 6=0.033333333333333333 7=0.39333333333333331 8=0.033333333333333333 9=0.033333333333333333 10=0.033333333333333333 11=0.033333333333333333
+SPREAD spread_sparse_ids CROSS 0.4 12 IN 7=0.6 3=0.4 OUT 0=0.03333333333 1=0.03333333333 2=0.03333333333 3=0.2733333333 4=0.03333333333 5=0.03333333333 6=0.03333333333 7=0.3933333333 8=0.03333333333 9=0.03333333333 10=0.03333333333 11=0.03333333333
 
 # amounts outside [0,1] clamp rather than extrapolating into
 # negative weights
-SPREAD spread_clamps_high SPEC 1.5 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.20000000000000001 2=0.20000000000000001 3=0.20000000000000001 4=0.20000000000000001
-SPREAD spread_clamps_low SPEC -0.5 5 IN 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.5 2=0.29999999999999999
+SPREAD spread_clamps_high SPEC 1.5 5 IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.2 2=0.2 3=0.2 4=0.2
+SPREAD spread_clamps_low SPEC -0.5 5 IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
 
 # blend endpoints are identities for every curve, because every
 # curve fixes 0 and 1
-BLEND blend_t0_linear ANALYTIC 0.0 linear A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.59999999999999998 1=0.40000000000000002
-BLEND blend_t1_linear ANALYTIC 1.0 linear A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 2=0.29999999999999999 3=0.69999999999999996
-BLEND blend_t0_equalPower ANALYTIC 0.0 equalPower A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.59999999999999998 1=0.40000000000000002
-BLEND blend_t1_equalPower ANALYTIC 1.0 equalPower A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 2=0.29999999999999999 3=0.69999999999999996
-BLEND blend_t0_cosine ANALYTIC 0.0 cosine A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.59999999999999998 1=0.40000000000000002
-BLEND blend_t1_cosine ANALYTIC 1.0 cosine A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 2=0.29999999999999999 3=0.69999999999999996
+BLEND blend_t0_linear ANALYTIC 0.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.6 1=0.4
+BLEND blend_t1_linear ANALYTIC 1.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 2=0.3 3=0.7
+BLEND blend_t0_equalPower ANALYTIC 0.0 equalPower A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.6 1=0.4
+BLEND blend_t1_equalPower ANALYTIC 1.0 equalPower A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 2=0.3 3=0.7
+BLEND blend_t0_cosine ANALYTIC 0.0 cosine A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.6 1=0.4
+BLEND blend_t1_cosine ANALYTIC 1.0 cosine A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 2=0.3 3=0.7
 
 # disjoint node sets, which is the normal case when the two
 # vectors come from two different manifolds
-BLEND blend_disjoint_half CROSS 0.5 linear A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.29999999999999999 1=0.20000000000000001 2=0.14999999999999999 3=0.34999999999999998
+BLEND blend_disjoint_half CROSS 0.5 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.3 1=0.2 2=0.15 3=0.35
 
 # overlapping node sets: shared nodes accumulate rather than
 # one input winning
-BLEND blend_overlap CROSS 0.5 linear A 0=0.59999999999999998 1=0.40000000000000002 B 1=0.5 2=0.5 OUT 0=0.29999999999999999 1=0.45000000000000001 2=0.25
+BLEND blend_overlap CROSS 0.5 linear A 0=0.6 1=0.4 B 1=0.5 2=0.5 OUT 0=0.3 1=0.45 2=0.25
 
 # blending a vector with itself must return it unchanged at any
 # t under the linear curve -- a merge that dropped or doubled
 # shared nodes fails here and nowhere else
-BLEND blend_self_0_25 ANALYTIC 0.25 linear A 0=0.20000000000000001 1=0.5 2=0.29999999999999999 B 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.5 2=0.29999999999999999
-BLEND blend_self_0_5 ANALYTIC 0.5 linear A 0=0.20000000000000001 1=0.5 2=0.29999999999999999 B 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.5 2=0.29999999999999999
-BLEND blend_self_0_75 ANALYTIC 0.75 linear A 0=0.20000000000000001 1=0.5 2=0.29999999999999999 B 0=0.20000000000000001 1=0.5 2=0.29999999999999999 OUT 0=0.20000000000000001 1=0.5 2=0.29999999999999999
+BLEND blend_self_0_25 ANALYTIC 0.25 linear A 0=0.2 1=0.5 2=0.3 B 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
+BLEND blend_self_0_5 ANALYTIC 0.5 linear A 0=0.2 1=0.5 2=0.3 B 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
+BLEND blend_self_0_75 ANALYTIC 0.75 linear A 0=0.2 1=0.5 2=0.3 B 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
 
 # constant-power crossfade: with equalPower the two gains'
 # squares sum to one, so a source moving between two maps holds
 # its power through the transition
-BLEND blend_equalpower_half CROSS 0.5 equalPower A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.42426406871192851 1=0.28284271247461906 2=0.21213203435596426 3=0.49497474683058329
-BLEND blend_cosine_third CROSS 0.3333333333333333 cosine A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.51961524227066325 1=0.34641016151377552 2=0.14999999999999997 3=0.34999999999999992
+BLEND blend_equalpower_half CROSS 0.5 equalPower A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.4242640687 1=0.2828427125 2=0.2121320344 3=0.4949747468
+BLEND blend_cosine_third CROSS 0.3333333333333333 cosine A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.5196152423 1=0.3464101615 2=0.15 3=0.35
 
 # a linear blend of two vectors that each sum to one also sums
 # to one; an equal-power blend does NOT, and must not be
 # corrected into doing so
-BLENDSUM blendsum_linear ANALYTIC 0.5 linear A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 SUM 1.0
-BLENDSUM blendsum_equalpower SPEC 0.5 equalPower A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 SUM 1.4142135623730951
+BLENDSUM blendsum_linear ANALYTIC 0.5 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 SUM 1.0
+BLENDSUM blendsum_equalpower SPEC 0.5 equalPower A 0=0.6 1=0.4 B 2=0.3 3=0.7 SUM 1.414213562
 
 # sparse IDs through blend, including one node shared between
 # the two inputs at a non-zero index
-BLEND blend_sparse_ids CROSS 0.5 linear A 4=0.59999999999999998 8=0.40000000000000002 B 8=0.5 1=0.5 OUT 4=0.29999999999999999 8=0.45000000000000001 1=0.25
+BLEND blend_sparse_ids CROSS 0.5 linear A 4=0.6 8=0.4 B 8=0.5 1=0.5 OUT 4=0.3 8=0.45 1=0.25
 
 # t outside [0,1] clamps
-BLEND blend_clamps_high SPEC 2.0 linear A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 2=0.29999999999999999 3=0.69999999999999996
-BLEND blend_clamps_low SPEC -1.0 linear A 0=0.59999999999999998 1=0.40000000000000002 B 2=0.29999999999999999 3=0.69999999999999996 OUT 0=0.59999999999999998 1=0.40000000000000002
+BLEND blend_clamps_high SPEC 2.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 2=0.3 3=0.7
+BLEND blend_clamps_low SPEC -1.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.6 1=0.4
