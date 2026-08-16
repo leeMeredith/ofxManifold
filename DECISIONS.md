@@ -92,3 +92,65 @@ Second pattern, worth naming separately: **a passing test on one platform is one
 data point, not a proof.** The x86 pass and the ARM fail came from identical
 source. Cross-platform CI is not bureaucracy here; it is the only thing that
 would have caught this before hardware did.
+
+
+---
+
+## D-002 — `positionOf()` must undo the per-node bias before combining
+
+**Date:** 2026-08-15
+**Status:** decided at implementation time
+**Files:** `src/core/ofxManifold2D.h`, `tests/ref/reference_manifold.py`
+
+### The trap
+
+Architecture document section 8.5 describes the inverse as "the weighted sum of
+node positions." That description is correct only for a manifold whose per-node
+biases are all 1.
+
+Forward evaluation applies the bias and renormalizes:
+
+    b_i = raw_i * nw_i / SUM_j (raw_j * nw_j)
+
+so the weights that come out of `evaluate()` are **not** the barycentric
+coordinates of the point. Combining node positions against them directly lands
+somewhere else, and does so silently — the result is a plausible position inside
+the region, just the wrong one.
+
+### The fix
+
+The bias is exactly invertible. `raw_i` is proportional to `b_i / nw_i`, so
+dividing through and renormalizing recovers the true coordinates before the
+positions are combined. `positionOf()` does that first.
+
+This is why the round-trip vector on the biased manifold (`weighted_nodes /
+rt_biased_centroid`) is classed ANALYTIC rather than CROSS: forward-then-inverse
+must return the input point, and that is knowable without either implementation.
+
+### Where it is not invertible
+
+A bias at or near zero genuinely destroys its component — `b_i` is zero
+regardless of `raw_i`, and no inverse exists. `positionOf()` returns
+`wellPosed == false` and falls back to the naive combination, so the caller
+still gets a position and is told not to trust it.
+
+### The `wellPosed` flag is load-bearing, not decorative
+
+`fan / inv_spans_disjoint_regions` is the case that proves it. Weights of 0.5 on
+N and 0.5 on S sum to one and recover a position of exactly (0.5, 0.5) — the
+centre node O, a real point in the manifold that looks entirely reasonable.
+
+But N and S share no region: Q0 holds N, Q2 holds S. The blend describes a
+mixture across disjoint parts of the manifold, and the position it recovers
+means nothing. **Only the flag distinguishes it from a valid result.**
+
+That vector was added after a mutation test showed the `sharesRegion()` check
+could be deleted with the suite still green. Nothing else in the suite had
+weights that summed correctly while spanning disjoint regions. A check with no
+vector behind it is decoration, and this one nearly stayed decoration.
+
+### Pattern
+
+Same shape as D-001 in a different place: the architecture document stated a
+behaviour in the simple case and the simple case was not the general one. Worth
+reading section 8.5 as a description of intent rather than a specification.

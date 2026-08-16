@@ -496,7 +496,14 @@ never needs it: the point *is* the interface, and it comes from a fader, a
 trajectory, or a tracker.
 
 When the manifold is used for morphing rather than panning, the mixture is often
-known before the position is. The inverse is the weighted sum of node positions:
+known before the position is.
+
+**[v2] It is not simply the weighted sum of node positions.** Forward evaluation
+applies per-node bias (§6.3) and renormalizes, so the emitted weights are no
+longer the barycentric coordinates of the point. Summing directly against them
+lands elsewhere, silently, on any biased manifold. The bias is exactly
+invertible — `raw` is proportional to `b / nodeWeight` — so `positionOf()` undoes
+it before combining. See DECISIONS.md D-002.
 
 ```cpp
 struct InversePosition {

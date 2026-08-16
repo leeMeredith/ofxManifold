@@ -183,6 +183,41 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
+      - name: positionOf must un-bias
+        run: |
+          sed -i 's|out.position += (raw\[i\] / rawTotal) \* nodes_\[w\[i\].id\].position;|out.position += w[i].weight * nodes_[w[i].id].position;|' src/core/ofxManifold2D.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: wellPosed must not be unconditional
+        run: |
+          sed -i 's|&& sharesRegion(w);|\&\& true;|' src/core/ofxManifold2D.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: setNodePosition must refuse sign flips
+        run: |
+          sed -i 's|sign != regions_\[r\].constructionSign()|false|' src/core/ofxManifold2D.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: Evaluator must use its hint
+        run: |
+          sed -i 's|manifold_->evaluate(p, lastRegion_)|manifold_->evaluate(p, InvalidRegion)|' src/core/ofxManifoldEvaluator.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldEvaluator.h
+
+      - name: Evaluator must clear a stale hint
+        run: |
+          sed -i 's|lastRegion_ = e.inside ? e.regionID : InvalidRegion;|if (e.inside) lastRegion_ = e.regionID;|' src/core/ofxManifoldEvaluator.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldEvaluator.h
+
       - name: Restored tree must be green
         run: |
           make clean

@@ -10,7 +10,7 @@
 //   CROSS     from the Python reference
 //   SPEC      a rule we invented; green means self-consistent, not correct
 
-#include "../src/core/ofxManifold2D.h"
+#include "../src/core/ofxManifoldEvaluator.h"
 
 #include <cmath>
 #include <fstream>
@@ -191,6 +191,156 @@ void runTopology(Fixture& fx, std::istringstream& in) {
     record(cls, "topology", false, d.str());
 }
 
+// Forward, then inverse, back to the same point. Neither direction serves as
+// the authority for the other, which is what makes this worth having.
+void runRoundTrip(Fixture& fx, std::istringstream& in) {
+    std::string name, cls, tok;
+    float px, py;
+    in >> name >> cls >> px >> py >> tok;
+
+    const Evaluation e = fx.manifold.evaluate({px, py});
+
+    if (tok == "NONE") {
+        record(cls, name, !e.inside, "expected outside the hull");
+        return;
+    }
+    float ex = std::stof(tok), ey; int wantWellPosed;
+    in >> ey >> wantWellPosed;
+
+    if (!e.inside) {
+        record(cls, name, false, "forward evaluation reported outside");
+        return;
+    }
+
+    const Manifold2D::InversePosition ip = fx.manifold.positionOf(e.weights);
+
+    std::ostringstream d;
+    bool ok = true;
+    if (!close(ip.position.x, ex) || !close(ip.position.y, ey)) {
+        ok = false;
+        d << "expected position (" << std::fixed << std::setprecision(9)
+          << ex << ", " << ey << ")\n      got      (" << ip.position.x
+          << ", " << ip.position.y << ")";
+    }
+    // The round trip must also return to the point it started from. Agreeing
+    // with the reference while both drift from the input would pass the check
+    // above and mean nothing.
+    if (!close(ip.position.x, px) || !close(ip.position.y, py)) {
+        ok = false;
+        d << "\n      did not return to the input point (" << px << ", "
+          << py << ")";
+    }
+    if (ip.wellPosed != (wantWellPosed != 0)) {
+        ok = false;
+        d << "\n      wellPosed expected " << (wantWellPosed != 0)
+          << ", got " << ip.wellPosed;
+    }
+    record(cls, name, ok, d.str());
+}
+
+void runInverse(Fixture& fx, std::istringstream& in) {
+    std::string name, cls, tok;
+    float ex, ey; int wantWellPosed;
+    in >> name >> cls >> ex >> ey >> wantWellPosed;
+
+    std::vector<WeightedNode> w;
+    while (in >> tok) {
+        const std::size_t eq = tok.find('=');
+        if (eq == std::string::npos) continue;
+        w.push_back(WeightedNode{fx.manifold.findNode(tok.substr(0, eq)),
+                                 std::stof(tok.substr(eq + 1))});
+    }
+
+    const Manifold2D::InversePosition ip = fx.manifold.positionOf(w);
+
+    std::ostringstream d;
+    bool ok = true;
+    if (!close(ip.position.x, ex) || !close(ip.position.y, ey)) {
+        ok = false;
+        d << "expected (" << std::fixed << std::setprecision(9) << ex << ", "
+          << ey << ")\n      got      (" << ip.position.x << ", "
+          << ip.position.y << ")";
+    }
+    if (ip.wellPosed != (wantWellPosed != 0)) {
+        ok = false;
+        d << "\n      wellPosed expected " << (wantWellPosed != 0)
+          << ", got " << ip.wellPosed;
+    }
+    record(cls, name, ok, d.str());
+}
+
+// setNodePosition, restored afterwards so record order does not matter.
+void runMove(Fixture& fx, std::istringstream& in) {
+    std::string name, cls, nodeName;
+    float nx, ny; int wantAccept;
+    in >> name >> cls >> nodeName >> nx >> ny >> wantAccept;
+
+    const NodeID id = fx.manifold.findNode(nodeName);
+    if (id == InvalidNode) {
+        record(cls, name, false, "no such node: " + nodeName);
+        return;
+    }
+    const glm::vec2 before = fx.manifold.node(id).position;
+    const bool accepted = fx.manifold.setNodePosition(id, {nx, ny});
+
+    std::ostringstream d;
+    bool ok = accepted == (wantAccept != 0);
+    if (!ok) {
+        d << (wantAccept ? "expected the move to be accepted, it was refused"
+                         : "expected the move to be refused, it was accepted");
+    } else if (accepted) {
+        // An accepted move must actually have moved the node.
+        const glm::vec2 now = fx.manifold.node(id).position;
+        if (!close(now.x, nx) || !close(now.y, ny)) {
+            ok = false;
+            d << "accepted, but the node did not move";
+        }
+    } else {
+        // A refused move must leave the node exactly where it was.
+        const glm::vec2 now = fx.manifold.node(id).position;
+        if (!close(now.x, before.x) || !close(now.y, before.y)) {
+            ok = false;
+            d << "refused, but the node moved anyway";
+        }
+    }
+    fx.manifold.setNodePosition(id, before);
+    record(cls, name, ok, d.str());
+}
+
+// A source walked through a sequence of points on ONE Evaluator. This is what
+// distinguishes the hint from a plain scan: in an overlap the answer depends
+// on where the source came from, and that is the intended behaviour.
+void runTrack(Fixture& fx, std::istringstream& in) {
+    std::string name, cls;
+    in >> name >> cls;
+
+    Evaluator ev(fx.manifold);
+    std::ostringstream d;
+    bool ok = true;
+    int step = 0;
+
+    float px, py;
+    std::string want;
+    while (in >> px >> py >> want) {
+        const Evaluation e = ev.evaluate({px, py});
+        const std::string got = e.inside ? fx.regionName(e.regionID) : "NONE";
+        if (got != want) {
+            ok = false;
+            d << "\n      step " << step << " at (" << px << ", " << py
+              << "): expected " << want << ", got " << got;
+        }
+        // Leaving the hull must clear the hint. A stale hint would make
+        // re-entry depend on where the source left, which no author asked for.
+        if (!e.inside && ev.hint() != InvalidRegion) {
+            ok = false;
+            d << "\n      step " << step << ": outside the hull but the hint"
+                 " was not cleared";
+        }
+        ++step;
+    }
+    record(cls, name, ok, d.str());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -238,6 +388,14 @@ int main(int argc, char** argv) {
             fx.regionNames.push_back(rname);
         } else if (kind == "QUERY") {
             runQuery(fx, in);
+        } else if (kind == "ROUNDTRIP") {
+            runRoundTrip(fx, in);
+        } else if (kind == "INVERSE") {
+            runInverse(fx, in);
+        } else if (kind == "MOVE") {
+            runMove(fx, in);
+        } else if (kind == "TRACK") {
+            runTrack(fx, in);
         } else if (kind == "TOPOLOGY") {
             runTopology(fx, in);
         } else if (kind == "END") {

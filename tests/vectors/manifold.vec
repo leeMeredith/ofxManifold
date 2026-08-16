@@ -23,6 +23,22 @@ QUERY interior CROSS 0.45000000000000001 0.40000000000000002 T0 A=0.417218543046
 # outside the hull: inside == false, empty weights, no clamping
 QUERY outside_left ANALYTIC 0.02 0.5 NONE
 QUERY outside_below ANALYTIC 0.5 0.02 NONE
+# forward then inverse must return the same point. Neither direction is the authority for the other
+ROUNDTRIP rt_centroid ANALYTIC 0.48333333333333334 0.43333333333333335 0.48333333333333328 0.43333333333333335 1
+ROUNDTRIP rt_interior CROSS 0.45000000000000001 0.40000000000000002 0.44999999999999996 0.40000000000000002 1
+ROUNDTRIP rt_near_vertex CROSS 0.20999999999999999 0.20999999999999999 0.20999999999999999 0.20999999999999999 1
+# an explicit even blend must land on the centroid
+INVERSE inv_equal_thirds CROSS 0.48333333333333334 0.43333333333333335 1 A=0.33333333333333331 B=0.33333333333333331 C=0.33333333333333331
+# all weight on one node lands on that node, but A alone belongs to a region only together with B and C, so this is still well posed
+INVERSE inv_single_node ANALYTIC 0.20000000000000001 0.20000000000000001 1 A=1
+# weights summing to 0.8 are not well posed; a position is still returned and the caller decides
+INVERSE inv_sum_not_one SPEC 0.38125000000000003 0.29375000000000001 0 A=0.5 B=0.20000000000000001 C=0.10000000000000001
+# a small move inside the region keeps the winding: accepted
+MOVE move_small ANALYTIC A 0.22 0.22 1
+# A dragged past edge B-C inverts the triangle: refused
+MOVE move_across ANALYTIC A 0.65000000000000002 0.80000000000000004 0
+# A moved onto the line through B and C flattens the region: refused
+MOVE move_onto_edge ANALYTIC A 0.625 0.55000000000000004 0
 TOPOLOGY ANALYTIC 0 0 0
 END
 
@@ -98,7 +114,35 @@ QUERY q3 CROSS 0.38 0.62 Q3 O=0.40000000000000013 W=0.29999999999999993 N=0.2999
 QUERY at_centre SPEC 0.5 0.5 Q0 O=1 N=-0 E=-0
 # beyond the diamond hull: inside == false
 QUERY outside_corner ANALYTIC 0.94999999999999996 0.94999999999999996 NONE
+# all three nodes belong to Q0: well posed
+INVERSE inv_within_one_region CROSS 0.59999999999999998 0.59999999999999998 1 O=0.5 N=0.25 E=0.25
+# N and S share NO region -- Q0 holds N, Q2 holds S. The weights sum to one and the recovered position lands exactly on O, which looks entirely plausible. Only the flag distinguishes it. This is the case that makes wellPosed worth having rather than decorative
+INVERSE inv_spans_disjoint_regions ANALYTIC 0.5 0.5 0 N=0.5 S=0.5
+# the other diagonal: same fault, same plausible-looking centre
+INVERSE inv_opposite_rim ANALYTIC 0.5 0.5 0 E=0.5 W=0.5
 TOPOLOGY ANALYTIC 0 0 0
+END
+
+# T0 and T1 overlap by design. Topology counts here are SPEC, not ANALYTIC: overlap produces incidental T-junctions that are a consequence of the construction rather than a hand-known fault.
+MANIFOLD overlap
+NODE A 0.050000000000000003 0.050000000000000003 1
+NODE B 0.55000000000000004 0.050000000000000003 1
+NODE C 0.29999999999999999 0.55000000000000004 1
+NODE D 0.29999999999999999 0.050000000000000003 1
+NODE E 0.80000000000000004 0.050000000000000003 1
+NODE F 0.55000000000000004 0.55000000000000004 1
+TRI T0 A B C
+TRI T1 D E F
+# no hint: first-hit gives T0
+QUERY fresh_in_overlap SPEC 0.40000000000000002 0.14999999999999999 T0 A=0.19999999999999993 B=0.60000000000000009 C=0.19999999999999998
+QUERY exclusive_to_t1 CROSS 0.65000000000000002 0.14999999999999999 T1 D=0.19999999999999993 E=0.60000000000000009 F=0.19999999999999998
+# entering through T1's exclusive zone and moving into the overlap must hold T1 throughout -- hysteresis
+TRACK track_enters_t1_then_overlap SPEC 0.65000000000000002 0.14999999999999999 T1 0.5 0.14999999999999999 T1 0.40000000000000002 0.14999999999999999 T1
+# the mirror case: entering through T0 holds T0 in the same overlap
+TRACK track_enters_t0_then_overlap SPEC 0.14999999999999999 0.14999999999999999 T0 0.29999999999999999 0.14999999999999999 T0 0.40000000000000002 0.14999999999999999 T0
+# leaving the hull clears the hint, so re-entry falls back to first-hit rather than inheriting a stale region
+TRACK track_leaves_and_returns SPEC 0.65000000000000002 0.14999999999999999 T1 0.94999999999999996 0.45000000000000001 NONE 0.40000000000000002 0.14999999999999999 T0
+TOPOLOGY SPEC 2 0 0
 END
 
 # node A biased 2.0: the bias must survive the manifold layer
@@ -110,5 +154,8 @@ TRI T0 A B C
 # equal raw coordinates, so the result is the normalized bias vector
 QUERY centroid_biased SPEC 0.48333333333333334 0.43333333333333335 T0 A=0.5 B=0.24999999999999992 C=0.25
 QUERY interior_biased SPEC 0.45000000000000001 0.40000000000000002 T0 A=0.58878504672897192 B=0.21028037383177564 C=0.20093457943925239
+# THE case for un-biasing in positionOf. A naive weighted sum of node positions against biased weights lands elsewhere; only undoing the bias first returns the original point
+ROUNDTRIP rt_biased_centroid ANALYTIC 0.48333333333333334 0.43333333333333335 0.48333333333333328 0.43333333333333335 1
+ROUNDTRIP rt_biased_interior CROSS 0.45000000000000001 0.40000000000000002 0.44999999999999996 0.40000000000000002 1
 TOPOLOGY ANALYTIC 0 0 0
 END

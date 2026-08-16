@@ -79,6 +79,84 @@ def biased(w, nw):
     return tuple(s / total for s in scaled)
 
 
+BIAS_EPS = 1e-6
+WEIGHT_SUM_EPS = 1e-4
+
+
+def position_of(m, weights):
+    """
+    Weights -> position, undoing the per-node bias first.
+
+    Forward evaluation applies bias and renormalizes, so the emitted weights
+    are NOT the barycentric coordinates of the point. Summing node positions
+    against them directly lands somewhere else on any biased manifold. The bias
+    is exactly invertible -- raw_i is proportional to b_i / nw_i -- so it is
+    undone here before combining.
+
+    Returns (x, y, well_posed).
+    """
+    if not weights:
+        return (0.0, 0.0, False)
+
+    total = sum(w for _, w in weights)
+
+    raw = []
+    invertible = True
+    for name, w in weights:
+        i = m.names.index(name)
+        nw = m.wt[i]
+        if abs(nw) < BIAS_EPS:
+            invertible = False
+            break
+        raw.append(w / nw)
+
+    if not invertible or abs(sum(raw)) < BIAS_EPS:
+        x = sum(w * m.pos[m.names.index(n)][0] for n, w in weights)
+        y = sum(w * m.pos[m.names.index(n)][1] for n, w in weights)
+        return (x, y, False)
+
+    rt = sum(raw)
+    x = sum((r / rt) * m.pos[m.names.index(n)][0]
+            for r, (n, _) in zip(raw, weights))
+    y = sum((r / rt) * m.pos[m.names.index(n)][1]
+            for r, (n, _) in zip(raw, weights))
+
+    ok = abs(total - 1.0) <= WEIGHT_SUM_EPS and shares_region(m, weights)
+    return (x, y, ok)
+
+
+def shares_region(m, weights):
+    idx = [m.names.index(n) for n, _ in weights]
+    for ids in m.tris:
+        if all(i in ids for i in idx):
+            return True
+    return False
+
+
+def would_accept_move(m, node_name, to):
+    """
+    Would setNodePosition succeed? True unless the move flattens or inverts a
+    region the node belongs to. Sign is compared against the winding recorded
+    when the region was constructed.
+    """
+    i = m.names.index(node_name)
+    old = m.pos[i]
+    m.pos[i] = to
+    ok = True
+    for r, (ia, ib, ic) in enumerate(m.tris):
+        if i not in (ia, ib, ic):
+            continue
+        area2 = cross(m.pos[ia][0], m.pos[ia][1],
+                      m.pos[ib][0], m.pos[ib][1],
+                      m.pos[ic][0], m.pos[ic][1])
+        sign = 1 if area2 > 0 else -1
+        if abs(area2) < 1e-6 or sign != m.signs[r]:
+            ok = False
+            break
+    m.pos[i] = old
+    return ok
+
+
 def on_segment_interior(a, b, n):
     abx, aby = b[0] - a[0], b[1] - a[1]
     anx, any_ = n[0] - a[0], n[1] - a[1]
@@ -104,6 +182,7 @@ class Manifold:
         self.wt = []
         self.tris = []          # list of (ia, ib, ic)
         self.tri_names = []
+        self.signs = []         # winding sign at construction
 
     def add_node(self, name, x, y, w=1.0):
         self.names.append(name)
@@ -114,9 +193,29 @@ class Manifold:
     def add_tri(self, name, a, b, c):
         ia, ib, ic = (self.names.index(a), self.names.index(b),
                       self.names.index(c))
+        area2 = cross(self.pos[ia][0], self.pos[ia][1],
+                      self.pos[ib][0], self.pos[ib][1],
+                      self.pos[ic][0], self.pos[ic][1])
         self.tris.append((ia, ib, ic))
         self.tri_names.append(name)
+        self.signs.append(1 if area2 > 0 else -1)
         return len(self.tris) - 1
+
+    def evaluate_hinted(self, p, hint):
+        """As evaluate(), but the hint region is tested first."""
+        order = ([hint] if hint is not None else []) + \
+                [r for r in range(len(self.tris)) if r != hint]
+        for r in order:
+            ia, ib, ic = self.tris[r]
+            if contains_edge_sign(self.pos[ia], self.pos[ib], self.pos[ic], p):
+                w = barycentric(self.pos[ia], self.pos[ib], self.pos[ic], p)
+                if w is None:
+                    continue
+                w = biased(w, (self.wt[ia], self.wt[ib], self.wt[ic]))
+                return (r, [(self.names[ia], w[0]),
+                            (self.names[ib], w[1]),
+                            (self.names[ic], w[2])])
+        return None
 
     def evaluate(self, p):
         """First hit in insertion order. Returns (region_index, weights) or None."""
@@ -165,7 +264,53 @@ def fmt(x):
     return f"{x:.17g}"
 
 
-def emit_manifold(out, name, m, queries, topo_class="ANALYTIC", note=""):
+def emit_extras(out, m, roundtrips, inverses, moves, tracks):
+    for qname, cls, p, qnote in roundtrips:
+        res = m.evaluate(p)
+        if qnote:
+            out.append(f"# {qnote}")
+        if res is None:
+            out.append(f"ROUNDTRIP {qname} {cls} {fmt(p[0])} {fmt(p[1])} NONE")
+            continue
+        _, ws = res
+        x, y, ok = position_of(m, ws)
+        out.append(f"ROUNDTRIP {qname} {cls} {fmt(p[0])} {fmt(p[1])} "
+                   f"{fmt(x)} {fmt(y)} {1 if ok else 0}")
+
+    for qname, cls, weights, qnote in inverses:
+        x, y, ok = position_of(m, weights)
+        if qnote:
+            out.append(f"# {qnote}")
+        line = f"INVERSE {qname} {cls} {fmt(x)} {fmt(y)} {1 if ok else 0}"
+        for n, w in weights:
+            line += f" {n}={fmt(w)}"
+        out.append(line)
+
+    for qname, cls, node, to, qnote in moves:
+        ok = would_accept_move(m, node, to)
+        if qnote:
+            out.append(f"# {qnote}")
+        out.append(f"MOVE {qname} {cls} {node} {fmt(to[0])} {fmt(to[1])} "
+                   f"{1 if ok else 0}")
+
+    for qname, cls, path, qnote in tracks:
+        hint = None
+        parts = []
+        for p in path:
+            res = m.evaluate_hinted(p, hint)
+            if res is None:
+                hint = None
+                parts.append(f"{fmt(p[0])} {fmt(p[1])} NONE")
+            else:
+                hint = res[0]
+                parts.append(f"{fmt(p[0])} {fmt(p[1])} {m.tri_names[hint]}")
+        if qnote:
+            out.append(f"# {qnote}")
+        out.append(f"TRACK {qname} {cls} " + " ".join(parts))
+
+
+def emit_manifold(out, name, m, queries, topo_class="ANALYTIC", note="",
+                  roundtrips=(), inverses=(), moves=(), tracks=()):
     out.append("")
     if note:
         out.append(f"# {note}")
@@ -191,6 +336,8 @@ def emit_manifold(out, name, m, queries, topo_class="ANALYTIC", note=""):
         if qnote:
             out.append(f"# {qnote}")
         out.append(line)
+
+    emit_extras(out, m, roundtrips, inverses, moves, tracks)
 
     tj, orphans, dup = m.validate()
     out.append(f"TOPOLOGY {topo_class} {len(tj)} {len(orphans)} {len(dup)}")
@@ -227,7 +374,34 @@ def build():
         ("outside_left", "ANALYTIC", (0.02, 0.50),
          "outside the hull: inside == false, empty weights, no clamping"),
         ("outside_below", "ANALYTIC", (0.50, 0.02), ""),
-    ], note="one triangle, clean topology")
+    ], note="one triangle, clean topology",
+       roundtrips=[
+        ("rt_centroid", "ANALYTIC", (cx, cy),
+         "forward then inverse must return the same point. Neither direction"
+         " is the authority for the other"),
+        ("rt_interior", "CROSS", (0.45, 0.40), ""),
+        ("rt_near_vertex", "CROSS", (0.21, 0.21), ""),
+       ],
+       inverses=[
+        ("inv_equal_thirds", "CROSS",
+         [("A", 1/3), ("B", 1/3), ("C", 1/3)],
+         "an explicit even blend must land on the centroid"),
+        ("inv_single_node", "ANALYTIC", [("A", 1.0)],
+         "all weight on one node lands on that node, but A alone belongs to"
+         " a region only together with B and C, so this is still well posed"),
+        ("inv_sum_not_one", "SPEC",
+         [("A", 0.5), ("B", 0.2), ("C", 0.1)],
+         "weights summing to 0.8 are not well posed; a position is still"
+         " returned and the caller decides"),
+       ],
+       moves=[
+        ("move_small", "ANALYTIC", "A", (0.22, 0.22),
+         "a small move inside the region keeps the winding: accepted"),
+        ("move_across", "ANALYTIC", "A", (0.65, 0.80),
+         "A dragged past edge B-C inverts the triangle: refused"),
+        ("move_onto_edge", "ANALYTIC", "A", (0.625, 0.55),
+         "A moved onto the line through B and C flattens the region: refused"),
+       ])
 
     # -- 2. two triangles sharing an edge ----------------------------------
     # Quad A B C D split along B-C. Weight continuity across the shared edge
@@ -313,7 +487,57 @@ def build():
          "the shared vertex: every region contains it, first-hit gives Q0"),
         ("outside_corner", "ANALYTIC", (0.95, 0.95),
          "beyond the diamond hull: inside == false"),
-    ], note="four triangles fanned around O, conforming, clean")
+    ], note="four triangles fanned around O, conforming, clean",
+       inverses=[
+        ("inv_within_one_region", "CROSS",
+         [("O", 0.5), ("N", 0.25), ("E", 0.25)],
+         "all three nodes belong to Q0: well posed"),
+        ("inv_spans_disjoint_regions", "ANALYTIC",
+         [("N", 0.5), ("S", 0.5)],
+         "N and S share NO region -- Q0 holds N, Q2 holds S. The weights sum"
+         " to one and the recovered position lands exactly on O, which looks"
+         " entirely plausible. Only the flag distinguishes it. This is the"
+         " case that makes wellPosed worth having rather than decorative"),
+        ("inv_opposite_rim", "ANALYTIC",
+         [("E", 0.5), ("W", 0.5)],
+         "the other diagonal: same fault, same plausible-looking centre"),
+       ])
+
+    # -- 6b. overlapping regions, for hint hysteresis -----------------------
+    # Two triangles overlapping in a lens-shaped zone. A source that entered
+    # through T1's exclusive area must STAY in T1 while crossing the overlap,
+    # even though a fresh evaluation would report T0 by insertion order. That
+    # difference is the whole point of the hint living on the source.
+    m = Manifold()
+    m.add_node("A", 0.05, 0.05)
+    m.add_node("B", 0.55, 0.05)
+    m.add_node("C", 0.30, 0.55)
+    m.add_node("D", 0.30, 0.05)
+    m.add_node("E", 0.80, 0.05)
+    m.add_node("F", 0.55, 0.55)
+    m.add_tri("T0", "A", "B", "C")
+    m.add_tri("T1", "D", "E", "F")
+    emit_manifold(out, "overlap", m, [
+        ("fresh_in_overlap", "SPEC", (0.40, 0.15),
+         "no hint: first-hit gives T0"),
+        ("exclusive_to_t1", "CROSS", (0.65, 0.15), ""),
+    ], topo_class="SPEC",
+       note="T0 and T1 overlap by design. Topology counts here are SPEC, not "
+            "ANALYTIC: overlap produces incidental T-junctions that are a "
+            "consequence of the construction rather than a hand-known fault.",
+       tracks=[
+        ("track_enters_t1_then_overlap", "SPEC",
+         [(0.65, 0.15), (0.50, 0.15), (0.40, 0.15)],
+         "entering through T1's exclusive zone and moving into the overlap "
+         "must hold T1 throughout -- hysteresis"),
+        ("track_enters_t0_then_overlap", "SPEC",
+         [(0.15, 0.15), (0.30, 0.15), (0.40, 0.15)],
+         "the mirror case: entering through T0 holds T0 in the same overlap"),
+        ("track_leaves_and_returns", "SPEC",
+         [(0.65, 0.15), (0.95, 0.45), (0.40, 0.15)],
+         "leaving the hull clears the hint, so re-entry falls back to "
+         "first-hit rather than inheriting a stale region"),
+       ])
 
     # -- 7. per-node weight at manifold level -------------------------------
     m = Manifold()
@@ -325,7 +549,14 @@ def build():
         ("centroid_biased", "SPEC", (cx, cy),
          "equal raw coordinates, so the result is the normalized bias vector"),
         ("interior_biased", "SPEC", (0.45, 0.40), ""),
-    ], note="node A biased 2.0: the bias must survive the manifold layer")
+    ], note="node A biased 2.0: the bias must survive the manifold layer",
+       roundtrips=[
+        ("rt_biased_centroid", "ANALYTIC", (cx, cy),
+         "THE case for un-biasing in positionOf. A naive weighted sum of node"
+         " positions against biased weights lands elsewhere; only undoing the"
+         " bias first returns the original point"),
+        ("rt_biased_interior", "CROSS", (0.45, 0.40), ""),
+       ])
 
     return out
 
@@ -339,9 +570,15 @@ def main():
     counts = {}
     for line in out:
         parts = line.split()
-        if parts and parts[0] in ("QUERY", "TOPOLOGY"):
-            counts[parts[2] if parts[0] == "QUERY" else parts[1]] = \
-                counts.get(parts[2] if parts[0] == "QUERY" else parts[1], 0) + 1
+        if not parts:
+            continue
+        if parts[0] in ("QUERY", "ROUNDTRIP", "INVERSE", "MOVE", "TRACK"):
+            cls = parts[2]
+        elif parts[0] == "TOPOLOGY":
+            cls = parts[1]
+        else:
+            continue
+        counts[cls] = counts.get(cls, 0) + 1
 
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

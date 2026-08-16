@@ -29,6 +29,15 @@ namespace ofxManifold {
 // that close to an edge is on it for every practical purpose.
 static constexpr float kCollinearEpsilon = 1e-5f;
 
+// Below this, a per-node bias is treated as annihilating its component: the
+// forward map destroyed the information and positionOf() cannot recover it.
+static constexpr float kBiasEpsilon = 1e-6f;
+
+// How far a weight vector may stray from summing to one before the inverse
+// stops calling itself well posed. Looser than kEdgeEpsilon because these
+// weights have been through a normalization and a bias, each rounding.
+static constexpr float kWeightSumEpsilon = 1e-4f;
+
 // A node that lies on the interior of an edge it is not a vertex of. Weights
 // jump discontinuously as the point crosses such an edge, because the edge is
 // shared by position but not by topology.
@@ -57,6 +66,7 @@ public:
                    float weight = 1.0f) {
         const NodeID id = static_cast<NodeID>(nodes_.size());
         nodes_.push_back(Node{name, position, weight});
+        nodeRegions_.emplace_back();
         byName_[name] = id;
         return id;
     }
@@ -79,7 +89,15 @@ public:
             return InvalidRegion;
         }
         regions_.push_back(t);
-        return static_cast<RegionID>(regions_.size() - 1);
+        const RegionID id = static_cast<RegionID>(regions_.size() - 1);
+
+        // Incidence is derived from TOPOLOGY, not from positions, so caching
+        // it does not violate the 8.6 rule against position-derived caches.
+        // It is invalidated by addTriangle alone, which is where it is built.
+        nodeRegions_[a].push_back(id);
+        nodeRegions_[b].push_back(id);
+        nodeRegions_[c].push_back(id);
+        return id;
     }
 
     // ---- access ---------------------------------------------------------
@@ -124,6 +142,118 @@ public:
             }
         }
         return e;                              // inside == false, empty
+    }
+
+    // ---- inverse evaluation ---------------------------------------------
+
+    // A position recovered from a weight vector, plus whether the recovery was
+    // meaningful (architecture doc 8.5).
+    struct InversePosition {
+        glm::vec2 position{0.0f, 0.0f};
+        bool      wellPosed = false;
+    };
+
+    // Weights -> position. The inverse of evaluate().
+    //
+    // NOT simply the weighted sum of node positions. Forward evaluation applies
+    // per-node bias and renormalizes, so the weights that come out are no
+    // longer the barycentric coordinates of the point. Summing them directly
+    // would land somewhere else entirely on any manifold with a bias other
+    // than 1, and would do so silently.
+    //
+    // The bias is exactly invertible, because
+    //
+    //     b_i = raw_i * nw_i / SUM_j (raw_j * nw_j)
+    //
+    // so raw_i is proportional to b_i / nw_i, and renormalizing recovers it.
+    // That inversion is undone here before the positions are combined, which
+    // is what makes the round trip hold on a biased manifold.
+    //
+    // wellPosed is false when the recovery is not trustworthy:
+    //   - the weights do not sum to one
+    //   - a contributing node has a bias at or near zero, in which case the
+    //     forward map genuinely destroyed information and no inverse exists
+    //   - the weighted nodes do not all belong to one common region, so the
+    //     combination does not describe a point in any single region
+    //
+    // The position is still returned in those cases. The caller decides.
+    InversePosition positionOf(const std::vector<WeightedNode>& w) const {
+        InversePosition out;
+        if (w.empty()) return out;
+
+        float sum = 0.0f;
+        for (const auto& n : w) {
+            if (n.id >= nodes_.size()) return out;
+            sum += n.weight;
+        }
+
+        // Un-bias, then renormalize.
+        std::vector<float> raw(w.size(), 0.0f);
+        float rawTotal = 0.0f;
+        bool  invertible = true;
+        for (std::size_t i = 0; i < w.size(); ++i) {
+            const float nw = nodes_[w[i].id].weight;
+            if (std::fabs(nw) < kBiasEpsilon) {
+                invertible = false;   // forward map destroyed this component
+                break;
+            }
+            raw[i] = w[i].weight / nw;
+            rawTotal += raw[i];
+        }
+
+        if (invertible && std::fabs(rawTotal) >= kBiasEpsilon) {
+            for (std::size_t i = 0; i < w.size(); ++i) {
+                out.position += (raw[i] / rawTotal) * nodes_[w[i].id].position;
+            }
+        } else {
+            // Fall back to the naive combination so the caller still gets a
+            // position, but never claim it is well posed.
+            for (const auto& n : w) {
+                out.position += n.weight * nodes_[n.id].position;
+            }
+            return out;
+        }
+
+        out.wellPosed = std::fabs(sum - 1.0f) <= kWeightSumEpsilon
+                     && sharesRegion(w);
+        return out;
+    }
+
+    // ---- mutation -------------------------------------------------------
+
+    // Move a node, refusing the move if it would invert or flatten any region
+    // the node belongs to (architecture doc 8.6).
+    //
+    // Weights vary continuously as nodes move, with exactly one failure mode:
+    // a node travelling far enough to turn a region inside out drives the
+    // signed area through zero, and the weights diverge on the way. Comparing
+    // against the winding sign recorded at construction makes that checkable
+    // instead of discovered.
+    //
+    // Returns false and leaves the node where it was if the move is refused.
+    bool setNodePosition(NodeID id, glm::vec2 to) {
+        if (id >= nodes_.size()) return false;
+
+        const glm::vec2 from = nodes_[id].position;
+        nodes_[id].position = to;
+
+        for (RegionID r : nodeRegions_[id]) {
+            const auto& ids = regions_[r].ids();
+            const float area2 = signedArea2(nodes_[ids[0]].position,
+                                            nodes_[ids[1]].position,
+                                            nodes_[ids[2]].position);
+            const int sign = (area2 > 0.0f) ? 1 : -1;
+            if (std::fabs(area2) < kAreaEpsilon
+                || sign != regions_[r].constructionSign()) {
+                nodes_[id].position = from;   // refuse, restore
+                return false;
+            }
+        }
+        return true;
+    }
+
+    const std::vector<RegionID>& regionsAt(NodeID id) const {
+        return nodeRegions_[id];
     }
 
     // ---- validation -----------------------------------------------------
@@ -180,6 +310,25 @@ public:
 private:
     bool validNode(NodeID id) const { return id < nodes_.size(); }
 
+    // Do all of these nodes belong to one common region? If not, the weights
+    // describe a blend across disjoint parts of the manifold, and the position
+    // recovered from them lies in no single region.
+    bool sharesRegion(const std::vector<WeightedNode>& w) const {
+        if (w.empty()) return false;
+        for (RegionID r : nodeRegions_[w[0].id]) {
+            const auto& ids = regions_[r].ids();
+            bool all = true;
+            for (const auto& n : w) {
+                if (n.id != ids[0] && n.id != ids[1] && n.id != ids[2]) {
+                    all = false;
+                    break;
+                }
+            }
+            if (all) return true;
+        }
+        return false;
+    }
+
     bool containsRegion(RegionID r, glm::vec2 p) const {
         const auto& ids = regions_[r].ids();
         return regions_[r].contains(nodes_[ids[0]].position,
@@ -228,6 +377,7 @@ private:
 
     std::vector<Node>     nodes_;
     std::vector<Triangle> regions_;
+    std::vector<std::vector<RegionID>> nodeRegions_;   // topology-derived
     std::unordered_map<std::string, NodeID> byName_;
 };
 
