@@ -374,13 +374,28 @@ equivalent of a corrupted identity buffer: correct-looking output over a broken
 foundation, discovered during a performance.
 
 ```cpp
+struct TJunction {
+    NodeID   node;                  // the offending node
+    RegionID region;
+    NodeID   edgeA, edgeB;          // the edge it sits on
+};
+
 struct TopologyReport {
-    std::vector<EdgeRef> tJunctions;
-    std::vector<RegionID> degenerate;
-    std::vector<NodeID> orphaned;      // in no region
+    std::vector<TJunction> tJunctions;
+    std::vector<NodeID>    orphans;      // in no region
+    std::vector<RegionID>  duplicates;   // same three nodes as an earlier region
     bool clean() const;
 };
 ```
+
+**[v2]** `degenerate` is gone: degeneracy is refused at `addTriangle()`, so a
+constructed manifold cannot contain one and a field reporting them would always
+be empty. `duplicates` replaces it. Two regions over the same three nodes make
+first-hit order the only thing distinguishing them, which is a coin flip dressed
+as a decision.
+
+A T-junction record names the node, the region, and the edge, rather than an
+opaque edge reference. The author needs to know which node to move.
 
 ---
 

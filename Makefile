@@ -9,28 +9,53 @@ CXX      ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wpedantic -Ilibs
 
 BUILD    := build
-RUNNER   := $(BUILD)/run_vectors
-VECTORS  := tests/vectors/triangle.vec
 
-.PHONY: all test vectors clean
+TRI_RUN  := $(BUILD)/run_vectors
+MAN_RUN  := $(BUILD)/run_manifold
+
+TRI_VEC  := tests/vectors/triangle.vec
+MAN_VEC  := tests/vectors/manifold.vec
+
+CORE     := src/core/ofxManifoldTypes.h \
+            src/core/ofxManifoldTriangle.h \
+            src/core/ofxManifold2D.h
+
+.PHONY: all test test-triangle test-manifold vectors clean
 
 all: test
 
-# Regenerate vectors from the Python reference, then run them. Kept as separate
-# targets so CI can assert the checked-in vectors match a fresh generation —
-# a reference that drifts from its own output is worse than no reference.
-test: $(RUNNER) $(VECTORS)
-	@./$(RUNNER) $(VECTORS)
+# Both suites must pass. They are run as separate targets rather than one
+# binary so a failure names which layer broke: the solve, or the manifold.
+test: test-triangle test-manifold
+	@echo ""
+	@echo "all suites green"
 
+test-triangle: $(TRI_RUN) $(TRI_VEC)
+	@./$(TRI_RUN) $(TRI_VEC)
+
+test-manifold: $(MAN_RUN) $(MAN_VEC)
+	@./$(MAN_RUN) $(MAN_VEC)
+
+# Regenerate vectors from the Python references. Kept as a separate target so
+# CI can assert the checked-in vectors match a fresh generation — a reference
+# that drifts from its own output is worse than no reference.
 vectors:
 	@python3 tests/ref/reference.py
+	@python3 tests/ref/reference_manifold.py
 
-$(RUNNER): tests/run_vectors.cpp src/core/ofxManifoldTriangle.h src/core/ofxManifoldTypes.h
+$(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ tests/run_vectors.cpp
 
-$(VECTORS): tests/ref/reference.py
+$(MAN_RUN): tests/run_manifold.cpp $(CORE)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_manifold.cpp
+
+$(TRI_VEC): tests/ref/reference.py
 	@python3 tests/ref/reference.py
+
+$(MAN_VEC): tests/ref/reference_manifold.py
+	@python3 tests/ref/reference_manifold.py
 
 clean:
 	@rm -rf $(BUILD)
