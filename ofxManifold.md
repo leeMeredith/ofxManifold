@@ -590,10 +590,24 @@ where constant-power is meaningless or wrong.
 
 ```cpp
 namespace curve {
-    WeightVector apply(const WeightVector&, CurveFn);
-    // sqrtCurve, cosineCurve, linearCurve, custom
+    float linear(float);      // identity, for parameter positions
+    float equalPower(float);  // sqrt, constant acoustic power
+    float cosine(float);      // SpaceMap's original shape
+
+    WeightVector apply(const WeightVector&, Fn);
 }
+
+WeightVector normalize(const WeightVector&);   // explicit, never automatic
+float power(const WeightVector&);              // sum of squares
+float sum(const WeightVector&);
 ```
+
+**[v2] A curve does not preserve partition of unity and must not renormalize.**
+Barycentric weights sum to one; equal-power gains preserve the sum of *squares*
+instead. Renormalizing after a curve would undo precisely the property the curve
+exists to create, turning it into an expensive identity function. `normalize()`
+is available for callers who want the sum back and accept losing the power
+property. See DECISIONS.md D-003.
 
 ## 9.2 Spread
 

@@ -73,7 +73,12 @@ jobs:
         run: |
           cp tests/vectors/triangle.vec /tmp/committed_tri.vec
           cp tests/vectors/manifold.vec /tmp/committed_man.vec
+          cp tests/vectors/interpretation.vec /tmp/committed_int.vec
           make vectors
+          if ! diff -u /tmp/committed_int.vec tests/vectors/interpretation.vec; then
+              echo "::error::interpretation.vec does not match a fresh run of its reference"
+              exit 1
+          fi
           if ! diff -u /tmp/committed_man.vec tests/vectors/manifold.vec; then
               echo "::error::manifold.vec does not match a fresh run of reference_manifold.py"
               exit 1
@@ -217,6 +222,49 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldEvaluator.h
+
+      - name: A curve must not renormalize
+        run: |
+          sed -i 's|    return out;\n}|XX|' src/interpretation/ofxManifoldCurves.h || true
+          python3 - <<'PYEOF'
+          p='src/interpretation/ofxManifoldCurves.h'
+          s=open(p).read()
+          s=s.replace("        out.push_back(WeightedNode{wn.id, fn(wn.weight)});\n    }\n    return out;",
+                      "        out.push_back(WeightedNode{wn.id, fn(wn.weight)});\n    }\n    return normalize(out);",1)
+          open(p,'w').write(s)
+          PYEOF
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldCurves.h
+
+      - name: Curves must retain node identity
+        run: |
+          sed -i 's|out.push_back(WeightedNode{wn.id, fn(wn.weight)});|out.push_back(WeightedNode{static_cast<NodeID>(out.size()), fn(wn.weight)});|' src/interpretation/ofxManifoldCurves.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldCurves.h
+
+      - name: Spread must honour its amount
+        run: |
+          sed -i 's|out\[wn.id\].weight += (1.0f - amount) \* wn.weight;|out[wn.id].weight += wn.weight;|' src/interpretation/ofxManifoldSpread.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldSpread.h
+
+      - name: Blend must curve its gains
+        run: |
+          sed -i 's|const float ga = fn(1.0f - t);|const float ga = 1.0f - t;|' src/interpretation/ofxManifoldBlend.h
+          sed -i 's|const float gb = fn(t);|const float gb = t;|' src/interpretation/ofxManifoldBlend.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldBlend.h
+
+      - name: Blend must accumulate shared nodes
+        run: |
+          sed -i 's|it->weight += wn.weight \* gb;|it->weight = wn.weight * gb;|' src/interpretation/ofxManifoldBlend.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldBlend.h
 
       - name: Restored tree must be green
         run: |

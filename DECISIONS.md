@@ -154,3 +154,93 @@ vector behind it is decoration, and this one nearly stayed decoration.
 Same shape as D-001 in a different place: the architecture document stated a
 behaviour in the simple case and the simple case was not the general one. Worth
 reading section 8.5 as a description of intent rather than a specification.
+
+
+---
+
+## D-003 — Curves must not renormalize, and normalize() stays explicit
+
+**Date:** 2026-08-16
+**Status:** decided at implementation time
+**Files:** `src/interpretation/ofxManifoldCurves.h`
+
+### The decision
+
+`curve::apply()` reshapes each weight and returns. It does not restore partition
+of unity, and there is no option to make it.
+
+### Why it is tempting to do the opposite
+
+Every other stage in the pipeline preserves the sum. Barycentric coordinates sum
+to one. `spread()` sums to one. A linear `blend()` of two vectors that each sum
+to one sums to one. `curve::apply()` is the only operation that breaks the
+invariant, which makes it look like a bug.
+
+It is not. Equal-power gains preserve the sum of SQUARES, not the sum. For a
+two-node vector summing to one, `sqrt` produces gains whose squares sum to one
+and whose plain sum is about 1.414. Renormalizing would divide that away and
+leave weights that sum to one again — which is exactly the property the curve
+existed to replace.
+
+A curve that renormalized would be an expensive identity function on any input
+that already summed to one. That is the whole failure, and it would look correct
+in a weight readout.
+
+### What the vectors assert
+
+- `sum_after_equalpower` requires the sum to be ~1.414 and not 1. Classed SPEC,
+  because "do not renormalize" is our rule.
+- `power_equalpower_two`, `power_cosine_two`, `power_equalpower_asym` require the
+  sum of squares to be exactly 1. Classed ANALYTIC — this is the definition of
+  constant power, not an opinion.
+- `power_cosine_three` records that cosine does NOT hold power for three nodes
+  while equalPower does. The two curves are different instruments rather than
+  two spellings of one, and a triangular manifold is in the three-node case most
+  of the time.
+
+`normalize()` exists for callers who want the sum back, and it returns its input
+unchanged rather than emitting NaN when the sum is too near zero to divide by. A
+silently NaN weight vector downstream is the identity-buffer failure again:
+everything looks structured, nothing is valid.
+
+---
+
+## D-004 — Identity vectors need non-contiguous node IDs
+
+**Date:** 2026-08-16
+**Status:** gap found by mutation testing, closed
+**Files:** `tests/ref/reference_interpretation.py`
+
+### The gap
+
+Every interpretation vector originally used node IDs 0, 1, 2. Mutation testing
+then showed that `curve::apply()` could be changed to **reindex its output** —
+emitting `0, 1, 2` regardless of what came in — with all 42 vectors still green.
+
+The same hole existed in `blend()`.
+
+Node identity is the property the entire architecture is built to retain. It is
+what separates this from an anonymous array of floats, and it was the one thing
+the suite could not see.
+
+### The cause
+
+Sequential IDs starting at zero are indistinguishable from positional indices. A
+vector written with them cannot tell the two apart, however many of them there
+are. Adding more vectors of the same shape would not have helped.
+
+### The fix
+
+Vectors with sparse, non-zero-based IDs: `identity_sparse_ids` (5, 2, 9),
+`equalpower_sparse_ids`, `spread_sparse_ids` (7, 3 within 12 nodes), and
+`blend_sparse_ids` (4, 8 against 8, 1, sharing node 8 at a non-zero index).
+
+Both reindexing mutations are now caught, and both are CI gates.
+
+### Pattern
+
+A test suite can be uniformly wrong in a way that no amount of the same kind of
+test will reveal. The mutation was not caught by adding cases; it was caught by
+asking what a broken implementation could still pass. That question is the only
+reliable way to find this class of gap, and it should be asked of every new
+suite before the suite is trusted.
