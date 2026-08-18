@@ -1,355 +1,204 @@
-name: kernel
-
-# The kernel has no openFrameworks dependency, so CI needs nothing but a
-# compiler, python3, and make. That is the point of the core/wrapper split.
+# ofxManifold kernel CI.
 #
-# Both platforms are load-bearing, not ceremonial. See DECISIONS.md D-001:
-# identical source produced 19/19 green on x86 Linux and 17/19 red on Apple
-# Silicon, because clang contracted a*b - c*d into a single FMA and left a
-# 4.17e-09 residual where x86 returned exact zero. The Linux green was wrong.
-# A single-platform matrix would have shipped that bug.
+# Mutation gates call tests/mutate.py, not sed. Mutation patterns are C++
+# fragments full of characters sed treats as syntax -- || collides with the
+# s|...|...| delimiter, [ ] are bracket expressions, & in a replacement means
+# the whole match. Two failures in this project came from that escaping
+# rather than from the code under test.
+#
+# mutate.py exits 2 when an anchor is not found, and refuses an anchor that
+# appears more than once. A sed that fails to match exits 0 and changes
+# nothing, which makes a gate that never ran look exactly like a gate that
+# passed.
 
-on:
+name: kernel
+true:
   push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
-
+    branches:
+    - main
+  pull_request: null
+  workflow_dispatch: null
 jobs:
   test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false        # both results always, never one masking the other
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            name: linux-x86_64
-          - os: macos-latest
-            name: macos-arm64
-
+        - os: ubuntu-latest
+          name: linux-x86_64
+        - os: macos-latest
+          name: macos-arm64
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
+    - name: Toolchain
+      run: 'echo "--- compiler ---"
 
-      - name: Toolchain
-        run: |
-          echo "--- compiler ---"
-          c++ --version
-          echo "--- python ---"
-          python3 --version
-          echo "--- arch ---"
-          uname -sm
+        c++ --version
 
-      # Floating-point behaviour is the thing under test, so record what the
-      # platform actually does rather than assuming. If a future failure looks
-      # like D-001, this block is where the evidence will already be.
-      - name: Floating-point characteristics
-        run: |
-          cat > /tmp/fp.cpp <<'EOF'
-          #include <cstdio>
-          #include <cfloat>
-          #include <cmath>
-          int main() {
-              printf("FLT_EPSILON = %.6e\n", (double)FLT_EPSILON);
-              // Exactly collinear. Zero in exact arithmetic; nonzero if the
-              // compiler contracts the expression into an FMA.
-              float ux=0.1f, uy=0.1f, vx=0.4f, vy=0.4f, wx=0.7f, wy=0.7f;
-              float area2 = (vx-ux)*(wy-uy) - (wx-ux)*(vy-uy);
-              printf("collinear area2 = %.12e\n", (double)area2);
-              printf("FMA contraction = %s\n", area2 == 0.0f ? "no" : "YES");
-              printf("vs kAreaEpsilon 1e-6 : %s\n",
-                     std::fabs(area2) < 1e-6f ? "rejected (correct)"
-                                              : "ACCEPTED (bug)");
-              return 0;
-          }
-          EOF
-          c++ -std=c++17 -O2 -o /tmp/fp /tmp/fp.cpp && /tmp/fp
+        echo "--- python ---"
 
-      # The reference must reproduce its own committed output. Without this,
-      # reference.py could be edited without regenerating, and the suite would
-      # keep passing against stale expected values -- which is the same failure
-      # as a reference that agrees with the implementation by construction.
-      - name: Vectors are reproducible from the reference
-        run: |
-          cp tests/vectors/triangle.vec /tmp/committed_tri.vec
-          cp tests/vectors/manifold.vec /tmp/committed_man.vec
-          cp tests/vectors/interpretation.vec /tmp/committed_int.vec
-          cp tests/vectors/mapping.vec /tmp/committed_map.vec
-          cp tests/vectors/serialize.vec /tmp/committed_ser.vec
-          make vectors
-          if ! diff -u /tmp/committed_ser.vec tests/vectors/serialize.vec; then
-              echo "::error::serialize.vec does not match a fresh run of its reference"
-              exit 1
-          fi
-          if ! diff -u /tmp/committed_map.vec tests/vectors/mapping.vec; then
-              echo "::error::mapping.vec does not match a fresh run of its reference"
-              exit 1
-          fi
-          if ! diff -u /tmp/committed_int.vec tests/vectors/interpretation.vec; then
-              echo "::error::interpretation.vec does not match a fresh run of its reference"
-              exit 1
-          fi
-          if ! diff -u /tmp/committed_man.vec tests/vectors/manifold.vec; then
-              echo "::error::manifold.vec does not match a fresh run of reference_manifold.py"
-              exit 1
-          fi
-          if ! diff -u /tmp/committed_tri.vec tests/vectors/triangle.vec; then
-              echo ""
-              echo "::error::tests/vectors/triangle.vec does not match a fresh"
-              echo "run of tests/ref/reference.py. Run 'make vectors' and commit"
-              echo "the result in the same commit as the reference change."
-              exit 1
-          fi
-          echo "vectors reproduce byte-for-byte"
+        python3 --version
 
-      - name: Headers are self-contained
-        run: make headers
+        echo "--- arch ---"
 
-      - name: Conformance
-        run: make test
+        uname -sm
 
-  # A green suite that cannot go red is an assertion, not a check. This job
-  # introduces known faults and requires each to be caught. It runs on Linux
-  # only -- it is testing the suite, not the platform.
+        '
+    - name: Floating-point characteristics
+      run: "cat > /tmp/fp.cpp <<'EOF'\n#include <cstdio>\n#include <cfloat>\n#include <cmath>\nint main() {\n    printf(\"\
+        FLT_EPSILON = %.6e\\n\", (double)FLT_EPSILON);\n    // Exactly collinear. Zero in exact arithmetic; nonzero if the\n\
+        \    // compiler contracts the expression into an FMA.\n    float ux=0.1f, uy=0.1f, vx=0.4f, vy=0.4f, wx=0.7f, wy=0.7f;\n\
+        \    float area2 = (vx-ux)*(wy-uy) - (wx-ux)*(vy-uy);\n    printf(\"collinear area2 = %.12e\\n\", (double)area2);\n\
+        \    printf(\"FMA contraction = %s\\n\", area2 == 0.0f ? \"no\" : \"YES\");\n    printf(\"vs kAreaEpsilon 1e-6 : %s\\\
+        n\",\n           std::fabs(area2) < 1e-6f ? \"rejected (correct)\"\n                                    : \"ACCEPTED\
+        \ (bug)\");\n    return 0;\n}\nEOF\nc++ -std=c++17 -O2 -o /tmp/fp /tmp/fp.cpp && /tmp/fp\n"
+    - name: Vectors are reproducible from the reference
+      run: "cp tests/vectors/triangle.vec /tmp/committed_tri.vec\ncp tests/vectors/manifold.vec /tmp/committed_man.vec\ncp\
+        \ tests/vectors/interpretation.vec /tmp/committed_int.vec\ncp tests/vectors/mapping.vec /tmp/committed_map.vec\ncp\
+        \ tests/vectors/serialize.vec /tmp/committed_ser.vec\nmake vectors\nif ! diff -u /tmp/committed_ser.vec tests/vectors/serialize.vec;\
+        \ then\n    echo \"::error::serialize.vec does not match a fresh run of its reference\"\n    exit 1\nfi\nif ! diff\
+        \ -u /tmp/committed_map.vec tests/vectors/mapping.vec; then\n    echo \"::error::mapping.vec does not match a fresh\
+        \ run of its reference\"\n    exit 1\nfi\nif ! diff -u /tmp/committed_int.vec tests/vectors/interpretation.vec; then\n\
+        \    echo \"::error::interpretation.vec does not match a fresh run of its reference\"\n    exit 1\nfi\nif ! diff -u\
+        \ /tmp/committed_man.vec tests/vectors/manifold.vec; then\n    echo \"::error::manifold.vec does not match a fresh\
+        \ run of reference_manifold.py\"\n    exit 1\nfi\nif ! diff -u /tmp/committed_tri.vec tests/vectors/triangle.vec;\
+        \ then\n    echo \"\"\n    echo \"::error::tests/vectors/triangle.vec does not match a fresh\"\n    echo \"run of\
+        \ tests/ref/reference.py. Run 'make vectors' and commit\"\n    echo \"the result in the same commit as the reference\
+        \ change.\"\n    exit 1\nfi\necho \"vectors reproduce byte-for-byte\"\n"
+    - name: Headers are self-contained
+      run: make headers
+    - name: Conformance
+      run: make test
   mutation:
     name: suite-can-fail
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
+    - name: Baseline must be green
+      run: make test
+    - name: Transposed sub-area argument must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifoldTriangle.h \\\n  \"const float sB = signedArea2(p, c, a);\" \\\n \
+        \ \"const float sB = signedArea2(p, a, c);\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1;\
+        \ fi\ngit checkout -- src/core/ofxManifoldTriangle.h\n"
+    - name: Unrenormalized bias must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifoldTriangle.h \\\n  \"r.w[i] = scaled[i] * inv;\" \\\n  \"r.w[i] = scaled[i];\"\
+        \nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifoldTriangle.h\n"
+    - name: Epsilon below the float noise floor must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifoldTypes.h \\\n  \"kAreaEpsilon = 1e-6f\" \\\n  \"kAreaEpsilon = 1e-9f\"\
+        \nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifoldTypes.h\n"
+    - name: Epsilon large enough to eat valid topology must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifoldTypes.h \\\n  \"kAreaEpsilon = 1e-6f\" \\\n  \"kAreaEpsilon = 1e-3f\"\
+        \nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifoldTypes.h\n"
+    - name: T-junction detection disabled must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifold2D.h \\\n  \"rep.tJunctions.push_back(TJunction{n, r, ia, ib});\"\
+        \ \\\n  \"(void)0;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifold2D.h\n"
+    - name: Orphan detection disabled must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifold2D.h \\\n  \"if (!used[n]) rep.orphans.push_back(n);\" \\\n  \"(void)used;\"\
+        \nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifold2D.h\n"
+    - name: Node identity rotated in the result must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifold2D.h \\\n  \"e.weights.push_back(WeightedNode{ids[i], br.w[i]});\"\
+        \ \\\n  \"e.weights.push_back(WeightedNode{ids[(i+1)%3], br.w[i]});\"\nmake clean\nif make test; then echo \"::error::not\
+        \ caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifold2D.h\n"
+    - name: positionOf skips the un-bias must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifold2D.h \\\n  \"out.position += (raw[i] / rawTotal) * nodes_[w[i].id].position;\"\
+        \ \\\n  \"out.position += w[i].weight * nodes_[w[i].id].position;\"\nmake clean\nif make test; then echo \"::error::not\
+        \ caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifold2D.h\n"
+    - name: sharesRegion check dropped must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifold2D.h \\\n  \"&& sharesRegion(w);\" \\\n  \"&& true;\"\nmake clean\n\
+        if make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifold2D.h\n"
+    - name: setNodePosition ignores sign flip must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifold2D.h \\\n  \"|| sign != regions_[r].constructionSign()\" \\\n  \"\
+        || false\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/core/ofxManifold2D.h\n"
+    - name: Evaluator ignores its hint must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifoldEvaluator.h \\\n  \"manifold_->evaluate(p, lastRegion_)\" \\\n  \"\
+        manifold_->evaluate(p, InvalidRegion)\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\n\
+        git checkout -- src/core/ofxManifoldEvaluator.h\n"
+    - name: Evaluator keeps a stale hint must be caught
+      run: "python3 tests/mutate.py src/core/ofxManifoldEvaluator.h \\\n  \"lastRegion_ = e.inside ? e.regionID : InvalidRegion;\"\
+        \ \\\n  \"if (e.inside) lastRegion_ = e.regionID;\"\nmake clean\nif make test; then echo \"::error::not caught\";\
+        \ exit 1; fi\ngit checkout -- src/core/ofxManifoldEvaluator.h\n"
+    - name: Curve renormalizes must be caught
+      run: "python3 tests/mutate.py --nl src/interpretation/ofxManifoldCurves.h \\\n  \"    }\\n    return out;\\n}\\n\\n}\
+        \ // namespace curve\" \\\n  \"    }\\n    return normalize(out);\\n}\\n\\n} // namespace curve\"\nmake clean\nif\
+        \ make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/interpretation/ofxManifoldCurves.h\n"
+    - name: Curve loses node identity must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldCurves.h \\\n  \"out.push_back(WeightedNode{wn.id, fn(wn.weight)});\"\
+        \ \\\n  \"out.push_back(WeightedNode{static_cast<NodeID>(out.size()), fn(wn.weight)});\"\nmake clean\nif make test;\
+        \ then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/interpretation/ofxManifoldCurves.h\n"
+    - name: Wrong equal-power curve must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldCurves.h \\\n  \"return (w <= 0.0f) ? 0.0f : std::sqrt(w);\"\
+        \ \\\n  \"return w * 0.5f;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout\
+        \ -- src/interpretation/ofxManifoldCurves.h\n"
+    - name: Wrong cosine quadrant must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldCurves.h \\\n  \"return std::sin(w * 1.57079632679489661923f);\"\
+        \ \\\n  \"return std::cos(w * 1.57079632679489661923f);\"\nmake clean\nif make test; then echo \"::error::not caught\"\
+        ; exit 1; fi\ngit checkout -- src/interpretation/ofxManifoldCurves.h\n"
+    - name: Spread ignores its amount must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldSpread.h \\\n  \"out[wn.id].weight += (1.0f - amount) *\
+        \ wn.weight;\" \\\n  \"out[wn.id].weight += wn.weight;\"\nmake clean\nif make test; then echo \"::error::not caught\"\
+        ; exit 1; fi\ngit checkout -- src/interpretation/ofxManifoldSpread.h\n"
+    - name: Spread does not clamp must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldSpread.h \\\n  \"if (amount > 1.0f) amount = 1.0f;\" \\\n\
+        \  \"// mutant: no clamp\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout\
+        \ -- src/interpretation/ofxManifoldSpread.h\n"
+    - name: Blend gains not curved must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldBlend.h \\\n  \"const float ga = fn(1.0f - t);\" \\\n  \"\
+        const float ga = 1.0f - t;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout\
+        \ -- src/interpretation/ofxManifoldBlend.h\n"
+    - name: Blend overwrites shared nodes must be caught
+      run: "python3 tests/mutate.py src/interpretation/ofxManifoldBlend.h \\\n  \"it->weight += wn.weight * gb;\" \\\n  \"\
+        it->weight = wn.weight * gb;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout\
+        \ -- src/interpretation/ofxManifoldBlend.h\n"
+    - name: Mapping links not normalized within the node must be caught
+      run: "python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \\\n  \"acc[l.id] += wn.weight * (l.weight / linkTotal);\"\
+        \ \\\n  \"acc[l.id] += wn.weight * l.weight;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit\
+        \ 1; fi\ngit checkout -- src/mapping/ofxManifoldMapping.h\n"
+    - name: Duplicate bind replaces instead of accumulating must be caught
+      run: "python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \\\n  \"if (l.id == target) { l.weight += weight; return;\
+        \ }\" \\\n  \"if (l.id == target) { l.weight = weight; return; }\"\nmake clean\nif make test; then echo \"::error::not\
+        \ caught\"; exit 1; fi\ngit checkout -- src/mapping/ofxManifoldMapping.h\n"
+    - name: Dense arity follows contributions not targets must be caught
+      run: "python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \\\n  \"std::vector<float> dense(targetNames_.size(),\
+        \ 0.0f);\" \\\n  \"std::vector<float> dense(resolve(w).targets.size(), 0.0f);\"\nmake clean\nif make test; then echo\
+        \ \"::error::not caught\"; exit 1; fi\ngit checkout -- src/mapping/ofxManifoldMapping.h\n"
+    - name: Power aggregator skips the root must be caught
+      run: "python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \\\n  \"v = (v <= 0.0f) ? 0.0f : std::sqrt(v);\" \\\n\
+        \  \"v = v;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/mapping/ofxManifoldMapping.h\n"
+    - name: Null node redistributes instead of discarding must be caught
+      run: "python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \\\n  \"                continue;                   //\
+        \ null node: weight discarded\" \\\n  \"                for (auto& a : acc) a += wn.weight / acc.size(); continue;\"\
+        \nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/mapping/ofxManifoldMapping.h\n"
+    - name: JSON exponents not parsed must be caught
+      run: "python3 tests/mutate.py src/io/ofxManifoldJSON.h \\\n  \"if (i < s.size() && (s[i] == 'e' || s[i] == 'E')) {\"\
+        \ \\\n  \"if (false) {\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout --\
+        \ src/io/ofxManifoldJSON.h\n"
+    - name: JSON duplicate keys last-wins must be caught
+      run: "python3 tests/mutate.py src/io/ofxManifoldJSON.h \\\n  \"if (o.find(key) != o.end()) return fail(\\\"duplicate\
+        \ key: \\\" + key);\" \\\n  \"(void)0;\"\nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\n\
+        git checkout -- src/io/ofxManifoldJSON.h\n"
+    - name: JSON write precision below float round-trip must be caught
+      run: "python3 tests/mutate.py src/io/ofxManifoldJSON.h \\\n  \"\\\"%.9g\\\"\" \\\n  \"\\\"%.7g\\\"\"\nmake clean\nif\
+        \ make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/io/ofxManifoldJSON.h\n"
+    - name: Loader accepts an unknown space must be caught
+      run: "python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \\\n  \"res.error = \\\"unsupported space: \\\" + root[\\\
+        \"space\\\"].asString();\\n        return res;\" \\\n  \"res.error = \\\"unsupported space\\\";\"\nmake clean\nif\
+        \ make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/io/ofxManifoldSerialize.h\n"
+    - name: Loader accepts a dangling triangle reference must be caught
+      run: "python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \\\n  \"res.error = \\\"triangle references unknown\
+        \ node: \\\" + nm;\\n                    return res;\" \\\n  \"continue;\"\nmake clean\nif make test; then echo \"\
+        ::error::not caught\"; exit 1; fi\ngit checkout -- src/io/ofxManifoldSerialize.h\n"
+    - name: Mapping written by NodeID instead of name must be caught
+      run: "python3 tests/mutate.py src/io/ofxManifoldSerialize.h \\\n  \"json::quote(m.node(id).name)\" \\\n  \"json::quote(std::to_string(id))\"\
+        \nmake clean\nif make test; then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/io/ofxManifoldSerialize.h\n"
+    - name: Mapping target written by id instead of name must be caught
+      run: "python3 tests/mutate.py src/io/ofxManifoldSerialize.h \\\n  \"<< \\\", \\\\\\\"target\\\\\\\": \\\" << json::quote(mp.targetName(l.id))\"\
+        \ \\\n  \"<< \\\", \\\\\\\"target\\\\\\\": \\\" << json::quote(std::to_string(l.id))\"\nmake clean\nif make test;\
+        \ then echo \"::error::not caught\"; exit 1; fi\ngit checkout -- src/io/ofxManifoldSerialize.h\n"
+    - name: Restored tree must be green
+      run: 'make clean
 
-      - name: Baseline must be green
-        run: make test
+        make test
 
-      - name: Transposed sub-area argument must be caught
-        run: |
-          sed -i 's|signedArea2(p, c, a)|signedArea2(p, a, c)|' \
-              src/core/ofxManifoldTriangle.h
-          make clean
-          if make test; then
-              echo "::error::suite passed with a transposed sub-area argument"
-              exit 1
-          fi
-          git checkout -- src/core/ofxManifoldTriangle.h
-
-      - name: Unrenormalized bias must be caught
-        run: |
-          sed -i 's|r.w\[i\] = scaled\[i\] \* inv;|r.w[i] = scaled[i];|' \
-              src/core/ofxManifoldTriangle.h
-          make clean
-          if make test; then
-              echo "::error::suite passed with bias left unnormalized"
-              exit 1
-          fi
-          git checkout -- src/core/ofxManifoldTriangle.h
-
-      # Both directions. An epsilon too small accepts degenerate triangles;
-      # too large eats legitimate fine-mesh topology. A one-sided suite would
-      # catch only the first.
-      - name: Epsilon too small must be caught
-        run: |
-          sed -i 's|kAreaEpsilon = 1e-6f|kAreaEpsilon = 1e-9f|' \
-              src/core/ofxManifoldTypes.h
-          make clean
-          if make test; then
-              echo "::error::suite passed with kAreaEpsilon below the float noise floor"
-              exit 1
-          fi
-          git checkout -- src/core/ofxManifoldTypes.h
-
-      - name: Epsilon too large must be caught
-        run: |
-          sed -i 's|kAreaEpsilon = 1e-6f|kAreaEpsilon = 1e-3f|' \
-              src/core/ofxManifoldTypes.h
-          make clean
-          if make test; then
-              echo "::error::suite passed with an epsilon that rejects valid topology"
-              exit 1
-          fi
-          git checkout -- src/core/ofxManifoldTypes.h
-
-      - name: T-junction detection must be caught if disabled
-        run: |
-          sed -i 's|rep.tJunctions.push_back(TJunction{n, r, ia, ib});|(void)0;|' src/core/ofxManifold2D.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: Orphan detection must be caught if disabled
-        run: |
-          sed -i 's|if (!used\[n\]) rep.orphans.push_back(n);|(void)used;|' src/core/ofxManifold2D.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: Swapped node identity must be caught
-        run: |
-          sed -i 's|e.weights.push_back(WeightedNode{ids\[i\], br.w\[i\]});|e.weights.push_back(WeightedNode{ids[(i+1)%3], br.w[i]});|' src/core/ofxManifold2D.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: Clamping outside the hull must be caught
-        run: |
-          python3 - <<'PYEOF'
-          p='src/core/ofxManifold2D.h'
-          s=open(p).read()
-          old="        return e;                              // inside == false, empty"
-          s=s.replace(old,"        if (!regions_.empty()) { fill(e, 0, p); }\n        return e;")
-          open(p,'w').write(s)
-          PYEOF
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: positionOf must un-bias
-        run: |
-          sed -i 's|out.position += (raw\[i\] / rawTotal) \* nodes_\[w\[i\].id\].position;|out.position += w[i].weight * nodes_[w[i].id].position;|' src/core/ofxManifold2D.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: wellPosed must not be unconditional
-        run: |
-          sed -i 's|&& sharesRegion(w);|\&\& true;|' src/core/ofxManifold2D.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: setNodePosition must refuse sign flips
-        run: |
-          sed -i 's|sign != regions_\[r\].constructionSign()|false|' src/core/ofxManifold2D.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifold2D.h
-
-      - name: Evaluator must use its hint
-        run: |
-          sed -i 's|manifold_->evaluate(p, lastRegion_)|manifold_->evaluate(p, InvalidRegion)|' src/core/ofxManifoldEvaluator.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifoldEvaluator.h
-
-      - name: Evaluator must clear a stale hint
-        run: |
-          sed -i 's|lastRegion_ = e.inside ? e.regionID : InvalidRegion;|if (e.inside) lastRegion_ = e.regionID;|' src/core/ofxManifoldEvaluator.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/core/ofxManifoldEvaluator.h
-
-      - name: A curve must not renormalize
-        run: |
-          sed -i 's|    return out;\n}|XX|' src/interpretation/ofxManifoldCurves.h || true
-          python3 - <<'PYEOF'
-          p='src/interpretation/ofxManifoldCurves.h'
-          s=open(p).read()
-          s=s.replace("        out.push_back(WeightedNode{wn.id, fn(wn.weight)});\n    }\n    return out;",
-                      "        out.push_back(WeightedNode{wn.id, fn(wn.weight)});\n    }\n    return normalize(out);",1)
-          open(p,'w').write(s)
-          PYEOF
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/interpretation/ofxManifoldCurves.h
-
-      - name: Curves must retain node identity
-        run: |
-          sed -i 's|out.push_back(WeightedNode{wn.id, fn(wn.weight)});|out.push_back(WeightedNode{static_cast<NodeID>(out.size()), fn(wn.weight)});|' src/interpretation/ofxManifoldCurves.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/interpretation/ofxManifoldCurves.h
-
-      - name: Spread must honour its amount
-        run: |
-          sed -i 's|out\[wn.id\].weight += (1.0f - amount) \* wn.weight;|out[wn.id].weight += wn.weight;|' src/interpretation/ofxManifoldSpread.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/interpretation/ofxManifoldSpread.h
-
-      - name: Blend must curve its gains
-        run: |
-          sed -i 's|const float ga = fn(1.0f - t);|const float ga = 1.0f - t;|' src/interpretation/ofxManifoldBlend.h
-          sed -i 's|const float gb = fn(t);|const float gb = t;|' src/interpretation/ofxManifoldBlend.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/interpretation/ofxManifoldBlend.h
-
-      - name: Blend must accumulate shared nodes
-        run: |
-          sed -i 's|it->weight += wn.weight \* gb;|it->weight = wn.weight * gb;|' src/interpretation/ofxManifoldBlend.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/interpretation/ofxManifoldBlend.h
-
-      - name: Links must normalize within the node
-        run: |
-          sed -i 's|acc\[l.id\] += wn.weight \* (l.weight / linkTotal);|acc[l.id] += wn.weight * l.weight;|' src/mapping/ofxManifoldMapping.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/mapping/ofxManifoldMapping.h
-
-      - name: Duplicate bind must accumulate
-        run: |
-          sed -i 's|if (l.id == target) { l.weight += weight; return; }|if (l.id == target) { l.weight = weight; return; }|' src/mapping/ofxManifoldMapping.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/mapping/ofxManifoldMapping.h
-
-      - name: Dense arity must follow the target count
-        run: |
-          sed -i 's|std::vector<float> dense(targetNames_.size(), 0.0f);|std::vector<float> dense(resolve(w).targets.size(), 0.0f);|' src/mapping/ofxManifoldMapping.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/mapping/ofxManifoldMapping.h
-
-      - name: Power aggregator must take the root
-        run: |
-          sed -i 's|v = (v <= 0.0f) ? 0.0f : std::sqrt(v);|v = v;|' src/mapping/ofxManifoldMapping.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/mapping/ofxManifoldMapping.h
-
-      - name: JSON must parse exponents
-        run: |
-          sed -i "s|if (i < s.size() \&\& (s\[i\] == 'e' || s\[i\] == 'E')) {|if (false) {|" src/io/ofxManifoldJSON.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/io/ofxManifoldJSON.h
-
-      - name: JSON must reject duplicate keys
-        run: |
-          sed -i 's|if (o.find(key) != o.end()) return fail("duplicate key: " + key);|(void)0;|' src/io/ofxManifoldJSON.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/io/ofxManifoldJSON.h
-
-      - name: JSON must write nine significant digits
-        run: |
-          sed -i 's|"%.9g"|"%.7g"|' src/io/ofxManifoldJSON.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/io/ofxManifoldJSON.h
-
-      - name: Loader must refuse an unknown space
-        run: |
-          python3 - <<'PYEOF'
-          p='src/io/ofxManifoldSerialize.h'
-          s=open(p).read()
-          old='    if (root.has("space") && root["space"].asString() != "normalized") {'
-          i=s.index(old)
-          j=s.index('    }', i)+6
-          open(p,'w').write(s[:i]+'    (void)0;\n'+s[j:])
-          PYEOF
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/io/ofxManifoldSerialize.h
-
-      - name: Mapping must be written by node and target NAME
-        run: |
-          sed -i 's|json::quote(m.node(id).name)|json::quote(std::to_string(id))|' src/io/ofxManifoldSerialize.h
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
-          git checkout -- src/io/ofxManifoldSerialize.h
-
-      - name: Restored tree must be green
-        run: |
-          make clean
-          make test
+        '
