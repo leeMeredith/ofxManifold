@@ -102,6 +102,9 @@ jobs:
           fi
           echo "vectors reproduce byte-for-byte"
 
+      - name: Headers are self-contained
+        run: make headers
+
       - name: Conformance
         run: make test
 

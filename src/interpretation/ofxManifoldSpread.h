@@ -25,6 +25,8 @@
 
 #include "ofxManifoldCurves.h"
 
+#include <cstddef>
+
 namespace ofxManifold {
 
 // Spread `in` toward uniform coverage of `totalNodes` nodes.

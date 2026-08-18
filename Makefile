@@ -21,6 +21,11 @@ MAN_VEC  := tests/vectors/manifold.vec
 INT_VEC  := tests/vectors/interpretation.vec
 MAP_VEC  := tests/vectors/mapping.vec
 SER_VEC  := tests/vectors/serialize.vec
+# Sentinel for the generated fixture directory. Without this as a real
+# prerequisite, a tree with the .vec file but no fixtures fails to run rather
+# than regenerating -- and the runner's exit code for that is indistinguishable
+# from a compile failure.
+SER_FIX  := tests/fixtures/simple.json
 
 CORE     := src/core/ofxManifoldTypes.h \
             src/core/ofxManifoldTriangle.h \
@@ -36,16 +41,30 @@ MAPPING  := src/mapping/ofxManifoldMapping.h
 IO       := src/io/ofxManifoldJSON.h \
             src/io/ofxManifoldSerialize.h
 
-.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize vectors clean
+.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize headers vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: test-triangle test-manifold test-interpretation test-mapping \
+test: headers test-triangle test-manifold test-interpretation test-mapping \
       test-serialize
 	@echo ""
 	@echo "all suites green"
+
+# Every header must compile ALONE, as the first thing in a translation unit.
+# A header that relies on a transitive include compiles for whoever wrote it
+# and fails for the next person, on a compiler whose standard library happens
+# to nest things differently. That is not a portability nicety here: the whole
+# point of src/core is that a stranger can drop it into their own project.
+headers:
+	@mkdir -p $(BUILD)
+	@for h in $(CORE) $(INTERP) $(MAPPING) $(IO); do \
+		printf '#include "%s"\nint main(){return 0;}\n' "$$h" > $(BUILD)/solo.cpp; \
+		$(CXX) $(CXXFLAGS) -I. -fsyntax-only $(BUILD)/solo.cpp \
+			|| { echo "  $$h does not compile standalone"; exit 1; }; \
+	done
+	@echo "all headers self-contained"
 
 test-triangle: $(TRI_RUN) $(TRI_VEC)
 	@./$(TRI_RUN) $(TRI_VEC)
@@ -59,7 +78,7 @@ test-interpretation: $(INT_RUN) $(INT_VEC)
 test-mapping: $(MAP_RUN) $(MAP_VEC)
 	@./$(MAP_RUN) $(MAP_VEC)
 
-test-serialize: $(SER_RUN) $(SER_VEC)
+test-serialize: $(SER_RUN) $(SER_VEC) $(SER_FIX)
 	@./$(SER_RUN) $(SER_VEC) tests/fixtures
 
 # Regenerate vectors from the Python references. Kept as a separate target so
@@ -98,7 +117,7 @@ $(SER_RUN): tests/run_serialize.cpp $(CORE) $(MAPPING) $(IO)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ tests/run_serialize.cpp
 
-$(SER_VEC): tests/ref/reference_serialize.py
+$(SER_VEC) $(SER_FIX): tests/ref/reference_serialize.py
 	@python3 tests/ref/reference_serialize.py
 
 $(TRI_VEC): tests/ref/reference.py

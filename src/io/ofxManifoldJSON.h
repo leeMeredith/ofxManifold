@@ -22,6 +22,8 @@
 // hand, which is a bad hour for someone whose show opens tonight.
 
 #include <cctype>
+#include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <memory>

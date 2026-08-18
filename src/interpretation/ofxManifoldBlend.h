@@ -19,6 +19,7 @@
 #include "ofxManifoldCurves.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ofxManifold {
 

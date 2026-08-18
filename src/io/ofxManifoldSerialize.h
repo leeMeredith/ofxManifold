@@ -21,6 +21,10 @@
 #include "../core/ofxManifold2D.h"
 #include "../mapping/ofxManifoldMapping.h"
 
+#include <cstddef>
+#include <sstream>
+#include <string>
+
 namespace ofxManifold {
 namespace io {
 
