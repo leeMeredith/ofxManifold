@@ -41,16 +41,21 @@ MAPPING  := src/mapping/ofxManifoldMapping.h
 IO       := src/io/ofxManifoldJSON.h \
             src/io/ofxManifoldSerialize.h
 
-.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize headers vectors clean
+.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize headers workflow vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: headers test-triangle test-manifold test-interpretation test-mapping \
+test: headers workflow test-triangle test-manifold test-interpretation test-mapping \
       test-serialize
 	@echo ""
 	@echo "all suites green"
+
+# The CI workflow must stay loadable by GitHub. Cheap, and it catches the
+# YAML 1.1 'on' -> true trap that silently invalidates the whole file.
+workflow:
+	@python3 tests/check_workflow.py
 
 # Every header must compile ALONE, as the first thing in a translation unit.
 # A header that relies on a transitive include compiles for whoever wrote it

@@ -454,3 +454,70 @@ the right outcome, and were satisfied by the wrong cause.**
 All three are invisible in a green run. The only question that finds any of them
 is what a broken implementation could still pass, asked deliberately, of every
 check, before the suite is trusted.
+
+
+---
+
+## D-008 — The CI workflow is hand-written, not round-tripped through YAML
+
+**Date:** 2026-08-17
+**Status:** CI rejected the workflow entirely, fixed
+**Files:** `.github/workflows/kernel.yml`, `tests/check_workflow.py`
+
+### What happened
+
+GitHub refused to run the workflow at all:
+
+    Invalid workflow file
+    (Line: 15, Col: 1): Unexpected value 'true'
+
+Not a failing job. The file would not parse.
+
+### Cause
+
+YAML 1.1 reads the bare word `on` as the boolean **true**. GitHub Actions parses
+with YAML 1.2, where it stays a string, so a hand-written `on:` trigger is
+correct and works.
+
+PyYAML is a 1.1 parser. Regenerating the mutation gates by loading the file with
+`yaml.safe_load`, editing the structure, and writing it back with
+`yaml.safe_dump` turned the trigger key into `true:`. Every job, every gate,
+every step was intact — and the file was worthless, because it no longer had a
+trigger.
+
+### The trap inside the trap
+
+The obvious check fails a good file.
+
+`yaml.safe_load` reports `True` as a key for a **perfectly valid** workflow,
+because that is what a 1.1 parser does with `on`. So asking the parsed structure
+whether the trigger survived cannot work: it answers `True` either way. Only the
+raw text distinguishes them.
+
+The first validation written here made exactly that mistake and reported FAIL on
+the repaired file.
+
+### What changed
+
+The trigger block is hand-written and carries a comment saying so. The mutation
+steps below it are still generated, but the generator now splices rather than
+round-trips.
+
+`tests/check_workflow.py` asserts the literal characters `on:` at column zero,
+that no literal `true:` key exists, that every job has steps, and that every
+mutation gate names a file that actually exists. It runs as part of `make test`,
+so a broken workflow is caught before a push rather than by GitHub.
+
+### Pattern
+
+Every other decision in this log is about the manifold. This one is about the
+tooling around it, and it is the same shape as all of them: a representation
+that looked equivalent was not, and the difference was invisible until something
+downstream refused it.
+
+Worth stating plainly, since it is now the third time in this project: **a
+generated artifact should be diffed against what it replaced, not assumed
+equivalent because the generator ran without error.** D-005 was a generator that
+serialized state instead of calls. D-006 was a generator emitting more precision
+than was reproducible. This is a generator that silently dropped the one key the
+file existed for.

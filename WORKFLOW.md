@@ -96,6 +96,8 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make test` | rebuild and run all vectors |
 | `make vectors` | regenerate `tests/vectors/triangle.vec` from the Python reference |
 | `make clean` | remove `build/` |
+| `make headers` | assert every header compiles standalone |
+| `make workflow` | assert the CI workflow is still valid |
 
 `make vectors` is run only when cases are added or changed. The regenerated
 `.vec` file is committed in the **same commit** as the code change that
@@ -212,6 +214,12 @@ Step 3 exists because nothing else stops `reference.py` being edited without
 regenerating. The suite would keep passing against stale expected values, which
 is the same failure as a reference that agrees with the implementation by
 construction.
+
+The workflow file's `on:` trigger is **hand-written and must stay that way**.
+YAML 1.1 reads the bare word `on` as a boolean, so loading the file with PyYAML
+and dumping it back rewrites the key as `true:` and GitHub rejects the whole
+workflow. `make test` runs `tests/check_workflow.py`, which asserts the literal
+key survives. See DECISIONS.md D-008.
 
 **Job `mutation`** — introduces four known faults and requires each to be
 caught: transposed sub-area argument, unrenormalized bias, `kAreaEpsilon` too

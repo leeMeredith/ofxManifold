@@ -12,12 +12,18 @@
 # passed.
 
 name: kernel
-true:
+
+# NOTE: this block is hand-written and must stay that way.
+#
+# YAML 1.1 reads the bare word `on` as the boolean true, so loading this file
+# with a YAML library and dumping it back writes `true:` here and GitHub
+# rejects the workflow. The mutation steps below are generated; the trigger is
+# not. See DECISIONS.md D-008.
+on:
   push:
-    branches:
-    - main
-  pull_request: null
-  workflow_dispatch: null
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 jobs:
   test:
     name: ${{ matrix.name }}
