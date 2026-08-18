@@ -74,7 +74,17 @@ jobs:
           cp tests/vectors/triangle.vec /tmp/committed_tri.vec
           cp tests/vectors/manifold.vec /tmp/committed_man.vec
           cp tests/vectors/interpretation.vec /tmp/committed_int.vec
+          cp tests/vectors/mapping.vec /tmp/committed_map.vec
+          cp tests/vectors/serialize.vec /tmp/committed_ser.vec
           make vectors
+          if ! diff -u /tmp/committed_ser.vec tests/vectors/serialize.vec; then
+              echo "::error::serialize.vec does not match a fresh run of its reference"
+              exit 1
+          fi
+          if ! diff -u /tmp/committed_map.vec tests/vectors/mapping.vec; then
+              echo "::error::mapping.vec does not match a fresh run of its reference"
+              exit 1
+          fi
           if ! diff -u /tmp/committed_int.vec tests/vectors/interpretation.vec; then
               echo "::error::interpretation.vec does not match a fresh run of its reference"
               exit 1
@@ -265,6 +275,76 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldBlend.h
+
+      - name: Links must normalize within the node
+        run: |
+          sed -i 's|acc\[l.id\] += wn.weight \* (l.weight / linkTotal);|acc[l.id] += wn.weight * l.weight;|' src/mapping/ofxManifoldMapping.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Duplicate bind must accumulate
+        run: |
+          sed -i 's|if (l.id == target) { l.weight += weight; return; }|if (l.id == target) { l.weight = weight; return; }|' src/mapping/ofxManifoldMapping.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Dense arity must follow the target count
+        run: |
+          sed -i 's|std::vector<float> dense(targetNames_.size(), 0.0f);|std::vector<float> dense(resolve(w).targets.size(), 0.0f);|' src/mapping/ofxManifoldMapping.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Power aggregator must take the root
+        run: |
+          sed -i 's|v = (v <= 0.0f) ? 0.0f : std::sqrt(v);|v = v;|' src/mapping/ofxManifoldMapping.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: JSON must parse exponents
+        run: |
+          sed -i "s|if (i < s.size() \&\& (s\[i\] == 'e' || s\[i\] == 'E')) {|if (false) {|" src/io/ofxManifoldJSON.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldJSON.h
+
+      - name: JSON must reject duplicate keys
+        run: |
+          sed -i 's|if (o.find(key) != o.end()) return fail("duplicate key: " + key);|(void)0;|' src/io/ofxManifoldJSON.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldJSON.h
+
+      - name: JSON must write nine significant digits
+        run: |
+          sed -i 's|"%.9g"|"%.7g"|' src/io/ofxManifoldJSON.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldJSON.h
+
+      - name: Loader must refuse an unknown space
+        run: |
+          python3 - <<'PYEOF'
+          p='src/io/ofxManifoldSerialize.h'
+          s=open(p).read()
+          old='    if (root.has("space") && root["space"].asString() != "normalized") {'
+          i=s.index(old)
+          j=s.index('    }', i)+6
+          open(p,'w').write(s[:i]+'    (void)0;\n'+s[j:])
+          PYEOF
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Mapping must be written by node and target NAME
+        run: |
+          sed -i 's|json::quote(m.node(id).name)|json::quote(std::to_string(id))|' src/io/ofxManifoldSerialize.h
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Restored tree must be green
         run: |

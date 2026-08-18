@@ -1,0 +1,1 @@
+{ "version": 1, "aggregators": [{"name":"x","mode":"quadratic","sources":["A"]}] }

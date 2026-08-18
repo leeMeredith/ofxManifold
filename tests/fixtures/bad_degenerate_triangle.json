@@ -1,0 +1,1 @@
+{ "version": 1, "nodes": [{"id":"A","position":[0.1,0.1]},{"id":"B","position":[0.4,0.4]},{"id":"C","position":[0.7,0.7]}], "triangles": [["A","B","C"]] }

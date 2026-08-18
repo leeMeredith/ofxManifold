@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "bindings": [
+    {
+      "node": "A",
+      "target": "out.1",
+      "weight": 1.0
+    },
+    {
+      "node": "B",
+      "target": "out.2",
+      "weight": 1.0
+    },
+    {
+      "node": "C",
+      "target": "corner.NW",
+      "weight": 3.0
+    },
+    {
+      "node": "C",
+      "target": "corner.NE",
+      "weight": 1.0
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "sub.house",
+      "mode": "linear",
+      "sources": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "name": "sub.power",
+      "mode": "power",
+      "sources": [
+        "A",
+        "B"
+      ]
+    }
+  ]
+}

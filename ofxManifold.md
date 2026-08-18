@@ -648,21 +648,32 @@ Mapping resolves node identity onto external targets. It is the only layer that
 knows what anything means.
 
 ```cpp
-struct TargetLink { TargetID target; float weight; };
-
 class Mapping {
 public:
+    TargetID addTarget(const std::string& name);
+
     void bind(NodeID, TargetID, float weight = 1.0f);   // repeatable
     void unbind(NodeID, TargetID);
 
-    void addAggregator(const std::string& name,
-                       std::vector<NodeID> sources,
-                       SumMode mode);
+    std::size_t addAggregator(const std::string& name,
+                              std::vector<NodeID> sources,
+                              SumMode mode = SumMode::Linear);
 
     Resolved resolve(const WeightVector&) const;
     std::vector<float> toDenseVector(const WeightVector&) const;
 };
 ```
+
+**[v2] Three rules settled during implementation:**
+
+- A node's share divides among its links **normalized within the node**, so a
+  composite node's total contribution does not change with how many targets it
+  feeds. The division is linear; power is the curve layer's business.
+- A duplicate `bind()` of the same node and target **accumulates** the link
+  weight. A caller assembling bindings from two sources must not silently lose
+  one. (This rule was untested for one round — see DECISIONS.md D-005.)
+- A null node's weight is **discarded, not redistributed**, so resolved targets
+  sum to less than one near one. That shortfall is the fade.
 
 `bind` being repeatable per node covers terminal, null, and composite nodes with
 no type switch. Zero binds is a null node. One bind is terminal. Many binds is
@@ -837,7 +848,20 @@ Mapping is a separate file:
 
 The `version` field is present from the first release. The `space` field is
 present so that a future non-normalized variant is detectable rather than
-silently misread.
+silently misread — a loader that meets an unknown space **refuses** rather than
+assuming normalized, since reading pixel coordinates as normalized would place
+every node within a fraction of the origin and look like a collapsed map.
+
+**[v2] Implementation notes.** No JSON library is vendored: `src/core` may
+depend on glm alone, and the schema is small enough that a minimal parser in
+`src/io` costs less than carrying twenty-five thousand lines to every consumer.
+The openFrameworks wrapper is free to use `ofJson` instead. Floats are written
+with nine significant digits, the minimum that round-trips a 32-bit float
+exactly, so save → load → save is byte-stable and a reloaded manifold evaluates
+bit-identically. Duplicate keys are an error rather than last-wins. The Python
+reference parses the same fixtures with the standard-library `json` module,
+which makes this the strongest cross-check in the project. See DECISIONS.md
+D-007.
 
 Neither file embeds SuperCollider-specific or openFrameworks-specific behavior.
 

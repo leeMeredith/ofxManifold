@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "quote\"inside",
+      "position": [
+        0.2,
+        0.2
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "back\\slash",
+      "position": [
+        0.8,
+        0.25
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "plain",
+      "position": [
+        0.45,
+        0.85
+      ],
+      "weight": 1.0
+    }
+  ],
+  "triangles": [
+    [
+      "quote\"inside",
+      "back\\slash",
+      "plain"
+    ]
+  ]
+}

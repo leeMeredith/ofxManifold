@@ -370,3 +370,87 @@ Also worth noting what the dual-platform matrix bought. The failure was not in
 the mathematics and would never have appeared on a single-platform run. It says
 something narrow but real: **a file is only reproducible to the precision its
 least reproducible function supports.**
+
+
+---
+
+## D-007 — Three serialization vectors that passed without testing anything
+
+**Date:** 2026-08-16
+**Status:** gaps found by mutation testing, closed
+**Files:** `tests/ref/reference_serialize.py`, `tests/run_serialize.cpp`
+
+Serialization went green at 35/35 on the first run. Mutation testing then found
+four checks that could be deleted with the suite still green. Three of them are
+distinct failure modes worth naming separately.
+
+### 1. Passing on a coincidence
+
+`bad_duplicate_key.json` was `{ "version": 1, "version": 2, "nodes": [] }`,
+written to prove that duplicate keys are refused rather than resolved last-wins.
+
+A last-wins parser reads `version` as 2, which is an unsupported version, and
+refuses the file anyway. The vector asserted only that the file was refused, so
+it passed identically with the check present or absent. It was testing the
+version guard while claiming to test duplicate-key handling.
+
+The fixture now duplicates `"triangles"` with two valid values, so a last-wins
+parser loads it happily and only the real check refuses it.
+
+### 2. Right verdict, wrong reason
+
+Removing the dangling-node check from triangle loading did not turn the suite
+red. The file was still refused — the invalid `NodeID` fell through to
+`addTriangle()`, which rejected it as a construction error.
+
+Correct verdict, wrong diagnosis. The error message changed from "triangle
+references unknown node: B" to "triangle rejected: degenerate or repeated
+vertex", and the person reading that message would go looking for a geometry
+problem in a file whose actual fault is a typo in a node name.
+
+Every rejection vector now asserts a **substring of the error**, not just the
+verdict. The message is what someone actually reads when a map will not load
+half an hour before a cue.
+
+### 3. Values that survived the wrong precision by accident
+
+`json::number` writes `%.9g` because nine significant digits is the minimum that
+round-trips a 32-bit float exactly. Cutting it to six, seven, or eight did not
+turn the suite red.
+
+Every position in every fixture was a short decimal — 0.2, 0.45, 0.85 — and all
+of those survive six digits. The precision guarantee was untested because no
+fixture value needed it.
+
+`precision.json` now uses positions verified by round-trip to survive nine
+significant digits and to be **lost at seven and eight**: 0.103641056,
+0.906023036, 0.505853565 and similar. All three precision mutations are now
+caught.
+
+### 4. Counting instead of naming
+
+`MAPPING_TARGETS` asserted the target count. Writing numeric IDs in place of
+target names produced a file that reloaded into four targets called "0" through
+"3": count correct, byte stability intact, and every OSC address in the show
+wrong.
+
+`MAPPING_NAMES` now asserts the names themselves, after a save/load cycle so it
+covers the writer as well as the reader.
+
+### One mutation left uncaught on purpose
+
+Returning a partial string on EOF instead of failing is unobservable **inside**
+any object or array, because the enclosing container fails first regardless.
+The only place it shows is an unterminated string as the whole document, which
+`bad_unterminated_string.json` now covers. Worth recording that the reachability
+of a fault can depend on where in the grammar it sits.
+
+### Pattern
+
+D-004 was a suite that could not see a class of bug. D-005 was a suite that did
+not run the code. D-007 is a third kind: **vectors that ran the code, observed
+the right outcome, and were satisfied by the wrong cause.**
+
+All three are invisible in a green run. The only question that finds any of them
+is what a broken implementation could still pass, asked deliberately, of every
+check, before the suite is trusted.

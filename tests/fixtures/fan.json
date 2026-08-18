@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "space": "normalized",
+  "nodes": [
+    {
+      "id": "O",
+      "position": [
+        0.5,
+        0.5
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "N",
+      "position": [
+        0.5,
+        0.9
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "E",
+      "position": [
+        0.9,
+        0.5
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "S",
+      "position": [
+        0.5,
+        0.1
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "W",
+      "position": [
+        0.1,
+        0.5
+      ],
+      "weight": 1.0
+    }
+  ],
+  "triangles": [
+    [
+      "O",
+      "N",
+      "E"
+    ],
+    [
+      "O",
+      "E",
+      "S"
+    ],
+    [
+      "O",
+      "S",
+      "W"
+    ],
+    [
+      "O",
+      "W",
+      "N"
+    ]
+  ]
+}
