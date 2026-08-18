@@ -148,6 +148,42 @@ The signature consequence: interpretation is closed over weight vectors. Its
 input and output are the same type. That is what allows curves, spread, and
 inter-manifold blending to compose in any order.
 
+## 3.1 Three products, not one
+
+**[v2]** v1 treated mapping as the only consumer of a weight vector. There are
+three, and a fourth deliberately outside the kernel:
+
+```text
+                      POINT
+                        │
+                        ▼
+                    MANIFOLD          relationship: point → weights
+                        │
+                        ▼
+                     WEIGHTS
+                   /    │    \
+                  /     │     \
+                 ▼      ▼      ▼
+       interpolation  motion  mapping
+                 │      │      │
+                 ▼      ▼      ▼
+             values dynamics targets
+```
+
+| Product | Operation | Lives in |
+|---|---|---|
+| Relationship | point → weights | core |
+| Interpolation | weights + values → value | interpretation (§9.4) |
+| Mapping | weights → targets | mapping (§10) |
+| Motion | weights(t) → d/dt | **outside the kernel** — a temporal consumer |
+
+Motion stays out because the evaluator is stateless by design, and a derivative
+needs history. §12's smoothing is the same concern seen from the other side.
+
+Naming the three explains an omission that survived five layers: the addon's own
+one-line description promises a weighted blend of *values*, and until §9.4 no
+function did that. See DECISIONS.md D-009.
+
 ---
 
 # 4. Core Concept
@@ -333,6 +369,28 @@ public:
 
 `Triangle` implements it in v1. A polygon or tetrahedron can implement it later
 without touching `Manifold2D`.
+
+## 7.0 Affine invariance
+
+**[v2]** Transform a triangle and a point by the same affine map and the
+barycentric weights are unchanged. This follows from the coordinates being
+*ratios* of areas: an affine map scales every area by the same determinant, and
+the ratios survive.
+
+Two consequences worth stating.
+
+First, it is the mathematical justification for §5. The manifold's meaning lives
+in relationships, not in any particular embedding, so the renderer may place the
+same manifold anywhere without changing what it means. Geometry can be
+presentation; the barycentric relationship is the data.
+
+Second, it makes an unusually strong test, and one that costs nothing. Nine
+`AFFINE` vectors transform the canonical triangle by translation, uniform and
+non-uniform scale, an awkward rotation, a shear, a reflection, a combination,
+and scales three orders either side of the normalized range. The reflection is
+the sharpest: a negative determinant flips the winding and the sign of every
+sub-area, and the weights must come out identical. An implementation using
+unsigned areas passes every other vector in the suite and fails that one.
 
 ## 7.1 Triangle evaluation
 
@@ -608,6 +666,35 @@ instead. Renormalizing after a curve would undo precisely the property the curve
 exists to create, turning it into an expensive identity function. `normalize()`
 is available for callers who want the sum back and accept losing the power
 property. See DECISIONS.md D-003.
+
+## 9.4 Interpolation
+
+**[v2] Was missing entirely.** Weights plus values give a blended value.
+
+```cpp
+template <typename T>
+T interpolate(const WeightVector&, const std::vector<T>& values);
+
+template <typename T, typename Lookup>
+T interpolateWith(const WeightVector&, Lookup);
+
+float coverage(const WeightVector&, std::size_t valueCount);
+```
+
+`T` needs `T * float` and `T + T`, which covers float, `glm::vec2/3/4`, and most
+colour and parameter types.
+
+**Weights are used as given; there is no internal normalization.** Straight from
+`evaluate()` they sum to one and the result is a true affine combination. Where
+a null node holds part of the weight the sum falls below one and the result
+scales toward zero — which is the fade a null node exists to produce, and
+normalizing here would silently remove it. `coverage()` reports how much weight
+actually landed on a value, so a consumer that wants to fade to silence rather
+than to the zero value has the master gain it needs.
+
+Applying a curve before interpolating is almost always wrong: curve gains are
+not blend coefficients, and the sum rises above one. Recorded as a vector rather
+than prevented.
 
 ## 9.2 Spread
 

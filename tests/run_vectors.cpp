@@ -206,6 +206,44 @@ void runAccept(std::istringstream& in) {
     record(cls, name, false, d.str());
 }
 
+// Affine invariance. The triangle and point in the record are ALREADY
+// transformed; the expected weights are those of the untransformed original.
+// If the solve depends on anything but the ratios of areas, this fails.
+void runAffine(std::istringstream& in) {
+    std::string name, cls;
+    float ax, ay, bx, by, cx, cy, px, py, ea, eb, ec;
+    in >> name >> cls >> ax >> ay >> bx >> by >> cx >> cy >> px >> py
+       >> ea >> eb >> ec;
+
+    const BarycentricResult r =
+        solveRaw({ax, ay}, {bx, by}, {cx, cy}, {px, py});
+
+    if (!r.valid) {
+        record(cls, name, false,
+               "the transformed triangle was reported degenerate");
+        return;
+    }
+
+    const bool match = close(r.w[0], ea) && close(r.w[1], eb)
+                    && close(r.w[2], ec);
+    const float sum = r.w[0] + r.w[1] + r.w[2];
+    const bool unity = std::fabs(sum - 1.0f) <= tolerance;
+
+    if (match && unity) { record(cls, name, true, ""); return; }
+
+    std::ostringstream d;
+    if (!match) {
+        d << "weights changed under an affine map"
+          << "\n      untransformed " << triple(ea, eb, ec)
+          << "\n      transformed   " << triple(r.w[0], r.w[1], r.w[2]);
+    }
+    if (!unity) {
+        if (!match) d << "\n      ";
+        d << "weights sum to " << std::fixed << std::setprecision(12) << sum;
+    }
+    record(cls, name, false, d.str());
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -234,6 +272,8 @@ int main(int argc, char** argv) {
             in >> tolerance;
         } else if (kind == "TRI") {
             runTri(in);
+        } else if (kind == "AFFINE") {
+            runAffine(in);
         } else if (kind == "PAIR") {
             runPair(in);
         } else if (kind == "DEGENERATE") {

@@ -96,6 +96,19 @@ def blend(a, b, t, curve_name="linear"):
     return [(i, acc[i]) for i in order if abs(acc[i]) >= 1e-9]
 
 
+def interp(w, values):
+    """Affine combination. Weights used as given, never normalized."""
+    acc = 0.0
+    for i, x in w:
+        if i < len(values):
+            acc += values[i] * x
+    return acc
+
+
+def coverage(w, n):
+    return sum(x for i, x in w if i < n)
+
+
 def fmt(x):
     """
     Ten significant digits, deliberately not seventeen.
@@ -309,6 +322,86 @@ def build():
     sb = [(8, 0.5), (1, 0.5)]
     out.append(f"BLEND blend_sparse_ids CROSS 0.5 linear "
                f"A {wv(sa)} B {wv(sb)} OUT {wv(blend(sa, sb, 0.5))}")
+    out.append("")
+    # ---- interpolation ---------------------------------------------------
+    out.append("")
+    out.append("# INTERPOLATION: weights + values -> value. The operation the")
+    out.append("# addon's own one-line description promises, and the one that")
+    out.append("# was missing from the first five layers because the")
+    out.append("# architecture treated mapping as the only consumer of a")
+    out.append("# weight vector. See DECISIONS.md D-009.")
+    out.append("")
+
+    vals = [10.0, 20.0, 30.0]
+    out.append("# at a vertex the result is exactly that vertex's value")
+    for i in range(3):
+        wv_i = [(i, 1.0)]
+        out.append(f"INTERP interp_vertex_{i} ANALYTIC IN {wv(wv_i)} "
+                   f"VALUES {' '.join(fmt(v) for v in vals)} "
+                   f"OUT {fmt(vals[i])}")
+    out.append("")
+    third = [(0, 1/3), (1, 1/3), (2, 1/3)]
+    out.append("# at the centroid, exactly the mean: (10+20+30)/3 = 20")
+    out.append(f"INTERP interp_centroid ANALYTIC IN {wv(third)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} OUT {fmt(20.0)}")
+    out.append("")
+    half = [(0, 0.5), (2, 0.5)]
+    out.append("# half of the first and half of the third: exactly 20")
+    out.append(f"INTERP interp_half ANALYTIC IN {wv(half)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} OUT {fmt(20.0)}")
+    out.append("")
+    out.append("# an ordinary interior blend")
+    out.append(f"INTERP interp_uneven CROSS IN {wv(three)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} "
+               f"OUT {fmt(interp(three, vals))}")
+    out.append("")
+    out.append("# sparse, non-zero-based ids, indexing into a longer value")
+    out.append("# array. An implementation that walked the values positionally")
+    out.append("# instead of by node id would pass every case above and fail")
+    out.append("# here (D-004)")
+    long_vals = [0.0, 100.0, 200.0, 300.0, 400.0, 500.0,
+                 600.0, 700.0, 800.0, 900.0]
+    sp = [(5, 0.25), (2, 0.5), (9, 0.25)]
+    out.append(f"INTERP interp_sparse_ids CROSS IN {wv(sp)} "
+               f"VALUES {' '.join(fmt(v) for v in long_vals)} "
+               f"OUT {fmt(interp(sp, long_vals))}")
+    out.append("")
+    out.append("# weights summing BELOW one, as a null node produces. The")
+    out.append("# result scales toward zero, which is the fade a null node")
+    out.append("# exists to create. Normalizing internally would silently")
+    out.append("# remove it, so interpolate() does not.")
+    short = [(0, 0.3), (1, 0.3)]
+    out.append(f"INTERP interp_short_sum SPEC IN {wv(short)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} "
+               f"OUT {fmt(interp(short, vals))}")
+    out.append(f"COVERAGE coverage_short ANALYTIC IN {wv(short)} N 3 "
+               f"OUT {fmt(0.6)}")
+    out.append(f"COVERAGE coverage_full ANALYTIC IN {wv(three)} N 3 "
+               f"OUT {fmt(1.0)}")
+    out.append("")
+    out.append("# a node id past the end of the value array contributes")
+    out.append("# nothing rather than reading past it")
+    oob = [(0, 0.5), (99, 0.5)]
+    out.append(f"INTERP interp_out_of_range SPEC IN {wv(oob)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} "
+               f"OUT {fmt(interp(oob, vals))}")
+    out.append(f"COVERAGE coverage_out_of_range ANALYTIC IN {wv(oob)} N 3 "
+               f"OUT {fmt(0.5)}")
+    out.append("")
+    out.append("# THE FOOTGUN, recorded rather than prevented. equalPower")
+    out.append("# turns weights into gains whose squares sum to one, so the")
+    out.append("# sum rises above one and the interpolated result is scaled")
+    out.append("# up. Almost never wanted: curve gains are not blend")
+    out.append("# coefficients. normalize() first, or do not curve weights")
+    out.append("# you intend to interpolate with.")
+    curved = apply_curve(two, "equalPower")
+    out.append(f"INTERP interp_after_curve SPEC IN {wv(curved)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} "
+               f"OUT {fmt(interp(curved, vals))}")
+    out.append("# and normalizing first restores the affine result")
+    out.append(f"INTERP interp_curve_normalized SPEC IN {wv(normalize(curved))} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} "
+               f"OUT {fmt(interp(normalize(curved), vals))}")
     out.append("")
     out.append("# t outside [0,1] clamps")
     out.append(f"BLEND blend_clamps_high SPEC 2.0 linear "

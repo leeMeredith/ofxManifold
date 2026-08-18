@@ -542,3 +542,77 @@ equivalent because the generator ran without error.** D-005 was a generator that
 serialized state instead of calls. D-006 was a generator emitting more precision
 than was reproducible. This is a generator that silently dropped the one key the
 file existed for.
+
+
+---
+
+## D-009 — interpolate() was missing for five layers
+
+**Date:** 2026-08-17
+**Status:** gap found by review, closed
+**Files:** `src/interpretation/ofxManifoldInterpolate.h`
+
+### The omission
+
+§1.1 states the addon's purpose in one line: *place your presets as nodes, drag
+a point, get a weighted blend.*
+
+Core, interpretation, mapping and io were all complete and green, with 182
+vectors and 32 mutation gates, and **no function anywhere blended weights with
+values.** `resolve()` maps weights onto targets. Nothing produced a blended
+value. The headline use case had no implementation, and the
+`example-parameter-morphing` example could not have been written.
+
+### Why it stayed hidden
+
+The architecture named one consumer of a weight vector. Mapping was built,
+tested, and the layer was called done.
+
+There are three:
+
+    relationship   point -> weights            core
+    interpolation  weights + values -> value   missing
+    mapping        weights -> targets          built
+
+Plus motion — `weights(t) -> d/dt` — which correctly stays outside the kernel,
+because the evaluator is stateless and a derivative needs history.
+
+No test could have found this. Every vector checked that implemented behaviour
+was correct, and the missing product had no code to be wrong. It took reading
+the top-line description against the file list.
+
+### The design decision inside it
+
+`interpolate()` does **not** normalize. Three cases, one rule:
+
+- from `evaluate()`, weights sum to one and the result is a true affine
+  combination
+- with a null node holding weight, the sum is below one and the result scales
+  toward zero — that shortfall **is** the fade, and normalizing would remove it
+- after a curve, the sum exceeds one and the result is scaled up, which is
+  almost never wanted
+
+`coverage()` reports how much weight landed on a value, so a consumer that wants
+to fade to silence rather than to the zero value has the gain it needs. The
+curve case is recorded as a SPEC vector rather than prevented: the layer's job
+is to be predictable, not to guess.
+
+### Also added: affine invariance vectors
+
+Nine ANALYTIC vectors asserting that weights survive an affine transform of the
+triangle and point together. Free, since it follows from the definition, and it
+exercises geometry nothing else in the suite visits — awkward rotations, shears,
+a negative determinant, scales three orders either side of the normalized range.
+
+A solve using unsigned areas passes every other vector in the project and fails
+the reflection case alone.
+
+### Pattern
+
+Different from every other entry here. D-004, D-005 and D-007 were tests that
+looked like they worked. This was a **feature that was never written**, in a
+codebase whose tests all passed, found by comparing the README's first sentence
+against the source tree.
+
+Tests verify what exists. Nothing in a test suite asks whether the thing it
+tests is the thing that was promised.

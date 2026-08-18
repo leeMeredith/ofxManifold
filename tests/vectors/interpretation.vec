@@ -129,6 +129,56 @@ BLENDSUM blendsum_equalpower SPEC 0.5 equalPower A 0=0.6 1=0.4 B 2=0.3 3=0.7 SUM
 # the two inputs at a non-zero index
 BLEND blend_sparse_ids CROSS 0.5 linear A 4=0.6 8=0.4 B 8=0.5 1=0.5 OUT 4=0.3 8=0.45 1=0.25
 
+
+# INTERPOLATION: weights + values -> value. The operation the
+# addon's own one-line description promises, and the one that
+# was missing from the first five layers because the
+# architecture treated mapping as the only consumer of a
+# weight vector. See DECISIONS.md D-009.
+
+# at a vertex the result is exactly that vertex's value
+INTERP interp_vertex_0 ANALYTIC IN 0=1 VALUES 10 20 30 OUT 10
+INTERP interp_vertex_1 ANALYTIC IN 1=1 VALUES 10 20 30 OUT 20
+INTERP interp_vertex_2 ANALYTIC IN 2=1 VALUES 10 20 30 OUT 30
+
+# at the centroid, exactly the mean: (10+20+30)/3 = 20
+INTERP interp_centroid ANALYTIC IN 0=0.3333333333 1=0.3333333333 2=0.3333333333 VALUES 10 20 30 OUT 20
+
+# half of the first and half of the third: exactly 20
+INTERP interp_half ANALYTIC IN 0=0.5 2=0.5 VALUES 10 20 30 OUT 20
+
+# an ordinary interior blend
+INTERP interp_uneven CROSS IN 0=0.2 1=0.5 2=0.3 VALUES 10 20 30 OUT 21
+
+# sparse, non-zero-based ids, indexing into a longer value
+# array. An implementation that walked the values positionally
+# instead of by node id would pass every case above and fail
+# here (D-004)
+INTERP interp_sparse_ids CROSS IN 5=0.25 2=0.5 9=0.25 VALUES 0 100 200 300 400 500 600 700 800 900 OUT 450
+
+# weights summing BELOW one, as a null node produces. The
+# result scales toward zero, which is the fade a null node
+# exists to create. Normalizing internally would silently
+# remove it, so interpolate() does not.
+INTERP interp_short_sum SPEC IN 0=0.3 1=0.3 VALUES 10 20 30 OUT 9
+COVERAGE coverage_short ANALYTIC IN 0=0.3 1=0.3 N 3 OUT 0.6
+COVERAGE coverage_full ANALYTIC IN 0=0.2 1=0.5 2=0.3 N 3 OUT 1
+
+# a node id past the end of the value array contributes
+# nothing rather than reading past it
+INTERP interp_out_of_range SPEC IN 0=0.5 99=0.5 VALUES 10 20 30 OUT 5
+COVERAGE coverage_out_of_range ANALYTIC IN 0=0.5 99=0.5 N 3 OUT 0.5
+
+# THE FOOTGUN, recorded rather than prevented. equalPower
+# turns weights into gains whose squares sum to one, so the
+# sum rises above one and the interpolated result is scaled
+# up. Almost never wanted: curve gains are not blend
+# coefficients. normalize() first, or do not curve weights
+# you intend to interpolate with.
+INTERP interp_after_curve SPEC IN 0=0.7071067812 1=0.7071067812 VALUES 10 20 30 OUT 21.21320344
+# and normalizing first restores the affine result
+INTERP interp_curve_normalized SPEC IN 0=0.5 1=0.5 VALUES 10 20 30 OUT 15
+
 # t outside [0,1] clamps
 BLEND blend_clamps_high SPEC 2.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 2=0.3 3=0.7
 BLEND blend_clamps_low SPEC -1.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.6 1=0.4

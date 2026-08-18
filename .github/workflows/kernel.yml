@@ -390,6 +390,42 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
+      - name: Interpolate ignores node identity must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldInterpolate.h \
+            'acc = acc + values[wn.id] * wn.weight;' \
+            'acc = acc + values[&wn - &w[0]] * wn.weight;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldInterpolate.h
+
+      - name: Interpolate drops the weight must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldInterpolate.h \
+            'acc = acc + values[wn.id] * wn.weight;' \
+            'acc = acc + values[wn.id];'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldInterpolate.h
+
+      - name: Coverage counts out-of-range nodes must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldInterpolate.h \
+            '        if (wn.id < valueCount) total += wn.weight;' \
+            '        total += wn.weight;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldInterpolate.h
+
+      - name: Solve using unsigned areas must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldTriangle.h \
+            '    const float sA = signedArea2(p, b, c);' \
+            '    const float sA = std::fabs(signedArea2(p, b, c));'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldTriangle.h
+
       - name: Restored tree must be green
         run: |
           make clean

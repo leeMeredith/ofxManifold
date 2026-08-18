@@ -170,6 +170,72 @@ def build():
     return rows
 
 
+def affine(m, p):
+    """Apply [[m00, m01], [m10, m11]] + (tx, ty) to a point."""
+    m00, m01, m10, m11, tx, ty = m
+    return (m00 * p[0] + m01 * p[1] + tx,
+            m10 * p[0] + m11 * p[1] + ty)
+
+
+def build_affine():
+    """
+    Affine invariance: transform a triangle and a point by the SAME affine map
+    and the barycentric weights are unchanged.
+
+    This is ANALYTIC. It follows from the definition -- barycentric coordinates
+    are ratios of areas, and an affine map scales every area by the same
+    determinant, so the ratios survive. No reference implementation is needed
+    to know the answer, only to compute the transformed coordinates.
+
+    It is worth having as a vector because it exercises the solve on geometry
+    unlike anything else in this file. Every other case here sits in a similar
+    range with roughly axis-aligned edges. A rotation by an awkward angle, a
+    shear, or a reflection produces coordinates that no other vector visits.
+
+    The reflection case is the interesting one: a negative determinant flips
+    the winding and the SIGN of every sub-area, and the weights must still come
+    out identical because only the ratios matter.
+    """
+    a, b, c = TRI
+    p = (0.45, 0.40)
+    w = barycentric(a, b, c, p)
+
+    import math
+    ang = 0.7  # not a nice fraction of pi, on purpose
+    cs, sn = math.cos(ang), math.sin(ang)
+
+    cases = [
+        ("translate",      (1, 0, 0, 1, 0.37, -0.22),
+         "translation alone"),
+        ("uniform_scale",  (2.5, 0, 0, 2.5, 0, 0),
+         "uniform scale: every area scales by the determinant, ratios survive"),
+        ("nonuniform",     (3.0, 0, 0, 0.4, 0, 0),
+         "non-uniform scale, which changes every angle in the triangle"),
+        ("rotate",         (cs, -sn, sn, cs, 0, 0),
+         "rotation by 0.7 radians, deliberately not a nice fraction of pi"),
+        ("shear",          (1, 0.8, 0, 1, 0, 0),
+         "shear"),
+        ("reflect",        (-1, 0, 0, 1, 0, 0),
+         "reflection: the determinant is negative, so the winding and every "
+         "signed sub-area flip. The weights must be IDENTICAL, because only "
+         "the ratios matter"),
+        ("combined",       (cs * 2.0, -sn * 0.5, sn * 2.0, cs * 0.5,
+                            -0.6, 1.4),
+         "rotate, scale non-uniformly, and translate at once"),
+        ("tiny",           (0.002, 0, 0, 0.002, 0, 0),
+         "scaled down until the triangle is near the construction epsilon"),
+        ("huge",           (800.0, 0, 0, 800.0, 0, 0),
+         "scaled far outside the normalized range the addon expects"),
+    ]
+
+    rows = []
+    for name, m, note in cases:
+        ta, tb, tc = affine(m, a), affine(m, b), affine(m, c)
+        tp = affine(m, p)
+        rows.append((name, m, (ta, tb, tc), tp, w, note))
+    return rows
+
+
 def build_pair():
     """
     Shared-edge agreement. Two triangles ABC and BCD share edge B-C. A point on
@@ -242,6 +308,27 @@ def main():
                 fmt(ea), fmt(eb), fmt(ec),
             ])
         )
+        out.append("")
+
+    out.append("# AFFINE INVARIANCE. Transform triangle and point by the same")
+    out.append("# affine map; the weights must be unchanged. ANALYTIC -- it")
+    out.append("# follows from barycentric coordinates being ratios of areas,")
+    out.append("# and an affine map scaling every area by the same determinant.")
+    out.append("#")
+    out.append("# This is also the only place the solve meets geometry unlike")
+    out.append("# the rest of this file: awkward rotations, shears, a negative")
+    out.append("# determinant, and scales three orders either side of the")
+    out.append("# normalized range.")
+    out.append("")
+    for name, m, tri, tp, w, note in build_affine():
+        (ax, ay), (bx, by), (cx, cy) = tri
+        out.append(f"# {note}")
+        out.append("AFFINE " + " ".join([
+            f"affine_{name}", "ANALYTIC",
+            fmt(ax), fmt(ay), fmt(bx), fmt(by), fmt(cx), fmt(cy),
+            fmt(tp[0]), fmt(tp[1]),
+            fmt(w[0]), fmt(w[1]), fmt(w[2]),
+        ]))
         out.append("")
 
     (ax, ay), (bx, by), (cx, cy) = pair["abc"]
@@ -318,7 +405,7 @@ def main():
     counts = {}
     for r in rows:
         counts[r["class"]] = counts.get(r["class"], 0) + 1
-    counts["ANALYTIC"] = counts.get("ANALYTIC", 0) + 6  # pair + 2 degenerate + 3 accept
+    counts["ANALYTIC"] = counts.get("ANALYTIC", 0) + 6 + 9  # pair, degenerate, accept, affine
 
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

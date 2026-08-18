@@ -34,7 +34,8 @@ CORE     := src/core/ofxManifoldTypes.h \
 
 INTERP   := src/interpretation/ofxManifoldCurves.h \
             src/interpretation/ofxManifoldSpread.h \
-            src/interpretation/ofxManifoldBlend.h
+            src/interpretation/ofxManifoldBlend.h \
+            src/interpretation/ofxManifoldInterpolate.h
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 

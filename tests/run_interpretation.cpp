@@ -8,6 +8,7 @@
 // exercised, not just described.
 
 #include "../src/interpretation/ofxManifoldBlend.h"
+#include "../src/interpretation/ofxManifoldInterpolate.h"
 #include "../src/interpretation/ofxManifoldSpread.h"
 
 #include <cmath>
@@ -218,6 +219,38 @@ int main(int argc, char** argv) {
             if (!ok) d << "expected sum " << std::fixed << std::setprecision(9)
                        << want << ", got " << got
                        << "\n      spread must preserve partition of unity";
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "INTERP") {
+            expectKeyword(in, "IN");
+            const WeightVector input = readVector(in);
+            expectKeyword(in, "VALUES");
+            std::vector<float> values; float v;
+            std::streampos mark;
+            while (true) {
+                mark = in.tellg();
+                if (!(in >> v)) { in.clear(); in.seekg(mark); break; }
+                values.push_back(v);
+            }
+            expectKeyword(in, "OUT");
+            float want; in >> want;
+            const float got = interpolate(input, values);
+            const bool ok = close(got, want);
+            if (!ok) d << "expected " << std::fixed << std::setprecision(9)
+                       << want << ", got " << got;
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "COVERAGE") {
+            expectKeyword(in, "IN");
+            const WeightVector input = readVector(in);
+            expectKeyword(in, "N");
+            std::size_t n; in >> n;
+            expectKeyword(in, "OUT");
+            float want; in >> want;
+            const float got = coverage(input, n);
+            const bool ok = close(got, want);
+            if (!ok) d << "expected coverage " << std::fixed
+                       << std::setprecision(9) << want << ", got " << got;
             record(cls, name, ok, d.str());
 
         } else if (kind == "BLEND") {
