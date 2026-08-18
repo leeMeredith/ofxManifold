@@ -508,6 +508,27 @@ that no literal `true:` key exists, that every job has steps, and that every
 mutation gate names a file that actually exists. It runs as part of `make test`,
 so a broken workflow is caught before a push rather than by GitHub.
 
+### Follow-up: two more faults in the same repair
+
+The first fix repaired the trigger but left two problems, both found by CI
+rather than by me.
+
+**PyYAML is not installed on the GitHub macOS runner.** The check written to
+guard against this trap imported `yaml` and failed to run at all. It no longer
+imports anything outside the standard library — which is also the right answer
+on principle, since a parser is the wrong instrument here. PyYAML reports `True`
+as a key for a perfectly valid workflow, so the parsed structure cannot
+distinguish a good file from a broken one. Only the raw text can.
+
+**The dumped file was unreadable.** `yaml.safe_dump` collapsed every `run` block
+into a single escaped string:
+
+    run: "python3 tests/mutate.py src/... \\\n  \"const float sB = ...\" ..."
+
+Valid YAML, and impossible to read or diff. The workflow is now generated as
+plain text with block scalars, so a gate can be read at a glance and a change to
+one shows up as a change to one.
+
 ### Pattern
 
 Every other decision in this log is about the manifold. This one is about the
