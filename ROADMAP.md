@@ -32,19 +32,25 @@ D-010). It is checked for typos against a stub and judged by eye.
 
 ---
 
-## Next, before publication
+## Publication
 
-1. **Node label collision.** Two labels stack when nodes are close — visible as
-   `MC` in the T-junction fixture. Offset by index, or hide labels below a
-   spacing threshold.
-2. **README screenshot.** The single most useful thing for someone deciding
-   whether to install this.
+Done:
+
+- node label collision — labels step aside rather than stack
+- README rewritten with lineage and attribution
+- screenshot and ofxaddons thumbnail
+- MIT LICENSE
+
+Remaining:
+
+1. **Make the repository public**, add topics, tag `v1.0.0`.
+2. **Submit to ofxaddons.com.**
 3. **Larger mesh sanity check.** Everything so far is five to nine nodes. A
    thirty-node map would show whether the renderer stays legible and whether
-   the Evaluator hint earns its keep. Cheap to try, and it might change the
-   renderer.
-4. **ofxaddons submission**, topics, and a `v1.0.0` tag. Last, and only after
-   the above.
+   the Evaluator hint earns its keep. Deliberately *after* the tag: it may
+   change the renderer, and the renderer is the layer with no tests behind it,
+   so a change there wants its own release rather than riding along with the
+   first one.
 
 ---
 

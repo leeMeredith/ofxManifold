@@ -4,6 +4,13 @@
 
 Place your presets as nodes. Drag a point between them. Get a weighted blend.
 
+![ofxManifold example-mapping](docs/screenshot.png)
+
+*`example-mapping`: the point sits out among the null nodes ringing the edge.
+The node weights still sum to 1.000, but the resolved targets total only 0.303
+— the missing 0.697 is held by nodes bound to nothing. That shortfall is the
+fade, and it is the reason silent nodes were invented.*
+
 ```cpp
 ofxManifold::Manifold2D m;
 auto a = m.addNode("calm",   {0.2f, 0.8f});
