@@ -616,3 +616,64 @@ against the source tree.
 
 Tests verify what exists. Nothing in a test suite asks whether the thing it
 tests is the thing that was promised.
+
+
+---
+
+## D-010 — The wrapper cannot be proved, only checked
+
+**Date:** 2026-08-18
+**Status:** boundary reached, recorded
+**Files:** `src/ofx/`, `tests/stub/ofMain.h`, `example-*/`
+
+### What changed at this layer
+
+Every layer below `src/ofx` is proved against an independent implementation:
+two solves, two containment tests, two JSON parsers, agreeing to a tolerance.
+182 vectors, 36 mutation gates, two architectures.
+
+A renderer has none of that. There is no second implementation of "does this
+manifold look right", and no reference to disagree with. The wrapper carries
+design weight instead of test weight, and it is judged on screen.
+
+### What the stub does and does not do
+
+`tests/stub/ofMain.h` declares the thirty or so openFrameworks calls the wrapper
+uses, so `make wrapper` can syntax-check the renderer and both examples on a
+machine with no openFrameworks install.
+
+**It has already been wrong.** It declared `ofBuffer(const std::string&)`, which
+oF 0.12.1 does not have. The wrapper syntax-checked clean and failed to compile
+on a real machine at `ofApp.cpp:119`. The stub was corrected FROM that failure,
+not before it.
+
+So the stub asserts a guess about every signature until a real compile says
+otherwise. `make wrapper` green means "no typos". It does not mean "this
+builds", and treating it as more than that is how the next `ofBuffer` ships.
+
+### What screen testing caught that no test could
+
+- A weight bar drawn behind the readout text overlapped it. The number is the
+  truth and the point-to-node line already carries magnitude, so the bar was
+  removed.
+- The fan fixture was offered as a demonstration of hysteresis, and has no
+  overlapping regions, so there was nothing to see. A dedicated overlap fixture
+  was added.
+- The T-junction fixture showed the fault to the detector but not to the eye:
+  crossing near the offending node reads as an ordinary region change unless
+  you know to watch one node's weight jump from about 0.5 to 0. Per-fixture
+  guidance text now says what to look for.
+
+None of these are bugs a vector could express. Two of them were demonstrations
+that demonstrated nothing, which is the same failure as D-005 in a different
+medium: the thing ran, and it showed the wrong thing.
+
+### Pattern
+
+The project's discipline was: prove it, then look at it. That holds until the
+proving runs out. Past this line the order reverses -- look at it, and encode
+whatever the looking teaches, knowing the encoding is weaker than what came
+before.
+
+Worth being explicit rather than letting the test count imply a confidence the
+wrapper has not earned.

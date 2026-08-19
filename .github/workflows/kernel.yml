@@ -89,6 +89,12 @@ jobs:
       - name: Headers are self-contained
         run: make headers
 
+      # Syntax only. The stub has already been wrong once -- it declared an
+      # ofBuffer constructor oF 0.12.1 does not have, which passed here and
+      # failed on a real machine. Green means no typos, not "this builds".
+      - name: Wrapper and examples syntax-check
+        run: make wrapper
+
       - name: Conformance
         run: make test
 

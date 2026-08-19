@@ -42,16 +42,31 @@ MAPPING  := src/mapping/ofxManifoldMapping.h
 IO       := src/io/ofxManifoldJSON.h \
             src/io/ofxManifoldSerialize.h
 
-.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize headers workflow vectors clean
+.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: headers workflow test-triangle test-manifold test-interpretation test-mapping \
+test: headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize
 	@echo ""
 	@echo "all suites green"
+
+# Syntax-check the wrapper and examples against a minimal oF stub.
+#
+# This CANNOT prove the wrapper builds -- the stub has already been wrong once,
+# declaring an ofBuffer constructor oF 0.12.1 does not have, which passed here
+# and failed on a real machine. It catches typos and argument-count errors
+# before anyone opens Xcode. Green here means "no typos", not "this builds".
+wrapper:
+	@$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
+		-fsyntax-only src/ofx/ofxManifoldRenderer.cpp
+	@for ex in example-basic example-parameter-morphing example-mapping; do \
+		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
+			-I$$ex/src -fsyntax-only $$ex/src/ofApp.cpp || exit 1; \
+	done
+	@echo "wrapper and examples: syntax ok (stub, not real oF)"
 
 # The CI workflow must stay loadable by GitHub. Cheap, and it catches the
 # YAML 1.1 'on' -> true trap that silently invalidates the whole file.
@@ -65,6 +80,12 @@ workflow:
 # point of src/core is that a stranger can drop it into their own project.
 headers:
 	@mkdir -p $(BUILD)
+	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO); do \
+		if grep -qE '^[[:space:]]*#[[:space:]]*include.*ofMain\.h' $$f; then \
+			echo "  $$f includes ofMain.h -- src/ofx is the only place that may"; \
+			exit 1; \
+		fi; \
+	done
 	@for h in $(CORE) $(INTERP) $(MAPPING) $(IO); do \
 		printf '#include "%s"\nint main(){return 0;}\n' "$$h" > $(BUILD)/solo.cpp; \
 		$(CXX) $(CXXFLAGS) -I. -fsyntax-only $(BUILD)/solo.cpp \
