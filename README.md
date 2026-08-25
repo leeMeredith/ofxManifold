@@ -67,13 +67,35 @@ Convention in 2014, and generalized it considerably in the process. His paper
 and externals are at **[zacharyseldess.com](https://www.zacharyseldess.com)**,
 and anyone working in Max or Pd should go there rather than here.
 
-Two things in MIAP shaped this addon directly. Seldess made the response curve
-selectable — cosine, square root, linear — specifically because the resulting
-weights might be driving plugin parameters or lighting-board faders rather than
-audio, where constant-power is meaningless or actively wrong. And he made the
-case for *non-centricity*: unlike VBAP or Ambisonics, the map need not be a
-projection of physical space and need not assume a listener at the origin. Two
-nodes adjacent on the map may be the two most distant outputs in the room.
+Three things in MIAP shaped this addon directly.
+
+**It generalized the approach past panning.** MIAP interpolates between HRTFs,
+between reverb impulse responses, across VST parameter sets — the weights are
+treated as influence over *whatever* sits at each node, and speaker gain is one
+case among several. Seldess has said the non-panning use cases were a large part
+of why he committed to the project, alongside making the manifold approach known
+outside the small circle of theatrical sound designers working on very expensive
+systems. That generalization is the premise this addon starts from rather than
+something it arrived at.
+
+**The response curve is selectable** — cosine, square root, linear — precisely
+because the weights might be driving plugin parameters or lighting-board faders
+rather than audio, where constant-power is meaningless or actively wrong.
+
+**Non-centricity.** Unlike VBAP or Ambisonics, the map need not be a projection
+of physical space and need not assume a listener at the origin. Two nodes
+adjacent on the map may be the two most distant outputs in the room.
+
+MIAP has since generalized further, from triangles to **polysets** of N ≥ 3
+nodes using **mean-value coordinates** — a generalized barycentric scheme that
+reduces exactly to ordinary barycentric coordinates at N = 3.
+
+> **Try it:** Seldess's [interactive demo](https://www.zacharyseldess.com/miap/panning.html)
+> lets you drag a source through a polyset and watch each node's influence
+> resolve in real time. It is the fastest way to understand what a manifold
+> does, and it shows the idea through speaker gains. ofxManifold isolates the
+> step before that — the weights themselves — and leaves what they mean to
+> whatever consumes them.
 
 **Scot Gresham-Lancaster's** Tibetan Yantra map, described in Ellison's
 article, is the clearest demonstration that the geometry is genuinely
@@ -85,17 +107,22 @@ planes of sound collapsing into points rather than movement from A to B.
 
 ## How this differs
 
-Not better — differently scoped, and honest about it. MIAP is a mature audio
-tool. This is not an audio tool at all.
+Not better, and not a wider scope — MIAP already generalized past panning. The
+differences are of host, packaging, and where the seams fall.
 
-**The weight vector is the product.** SpaceMap and MIAP produce loudspeaker
-gains, with the geometry serving that end. Here the geometry produces a weight
-vector, and audio gain is one of several things to do with it. There is no
-audio code anywhere in this addon.
+**Different host.** MIAP is a set of Max/MSP and Pd externals. This is a C++
+library for openFrameworks, usable from any C++ project. If you are working in
+Max or Pd, MIAP is the mature tool and you should use it.
+
+**No audio at all.** MIAP interpolates non-audio parameters, but it lives in an
+audio environment and panning is first-class in it. There is no audio code
+anywhere in this addon, and the square-root conversion to constant-power gains
+is one optional curve among several rather than the default path.
 
 **Blending arbitrary values is a first-class operation.** `interpolate()` takes
-weights and *any* type supporting `+` and `* float` — a colour, a struct of
-parameters, a `glm::vec3`. A weighted blend of values, not only of gains.
+weights and *any* C++ type supporting `+` and `* float` — a colour, a struct of
+parameters, a `glm::vec3` — so a blended value comes back in the consumer's own
+type rather than as a list of gains to distribute.
 
 **The node taxonomy collapses to cardinality.** MIAP has Speaker, Silent,
 Virtual and Derived node types. Here the kernel has **no node type field at
@@ -112,6 +139,11 @@ against a second implementation written in Python from a *different
 formulation* — Cramer's rule against signed sub-areas, edge-sign containment
 against barycentric non-negativity, the standard library's JSON parser against
 a hand-written one. Agreement is evidence rather than a tautology.
+
+**Triangles only, for now.** MIAP's mean-value coordinates handle polygons of
+any size; this handles triangles. `Region` is an interface so a second
+coordinate kernel can be added without touching anything downstream, but that
+is future work rather than a claim (see `ROADMAP.md`).
 
 **A manifold and a mapping are separate files.** A manifold is portable; a
 mapping is installation-specific. That split is what lets a recorded path

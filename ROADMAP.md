@@ -70,6 +70,11 @@ historical answer to three dimensions, layered 2D rather than tetrahedra.
 **Spread (§9.2).** One slider from pinpoint to wash. Trivial to demonstrate and
 immediately legible; currently invisible.
 
+Worth thinking of alongside MIAP's `barycentricpower`: both are transformations
+of the influence weights themselves, applied before anyone decides what the
+weights mean. Neither is an audio feature, and neither belongs in the
+evaluator.
+
 **Smoothing (§12).** Named in the architecture, unbuilt. A `WeightSmoother` with
 per-frame slew limiting. Matters the moment a real control source is jittery,
 which is every real control source.
@@ -101,13 +106,52 @@ preventing it.
 derivable from what is already returned. API surface with no new information.
 If a diagnostic needs it, the renderer can compute it.
 
-**Polygonal regions.** Seldess's own future work, and worth doing eventually.
-Generalized barycentric coordinates over an n-gon — Wachspress, mean value — are
-a DIFFERENT ALGORITHM, not a parameter of the triangle solve, with different
-degeneracy behaviour and cost. The `Region` interface (§7) exists so this can be
-added without touching `Manifold2D`. Writing the triangle case as though a
-polygon case were a parameter of it would produce a worse triangle
-implementation and would not actually generalize.
+**A second coordinate kernel: mean-value coordinates over polygons.**
+
+Not "triangles but with more vertices". A second generalized-barycentric
+algorithm, sitting alongside the triangle solve and producing the same weight
+vector, so that everything downstream is untouched.
+
+MIAP already works this way: a **polyset** of N ≥ 3 nodes, weights from
+**mean-value coordinates**, which reduce exactly to ordinary barycentric
+coordinates at N = 3. That reduction is what makes it a clean extension rather
+than a replacement — the existing triangle vectors would still have to pass.
+
+References: M. S. Floater (2003), "Mean value coordinates", *CAGD* 20(1),
+19–27; K. Hormann & M. S. Floater (2006), "Mean value coordinates for arbitrary
+planar polygons", *ACM TOG* 25(4), 1424–1441.
+
+### The invariant this must preserve
+
+    coordinate algorithm      triangle, or MVC polygon, or something later
+            |
+            v
+    normalized weight vector  <-- the contract. Nothing above this line is
+            |                     visible below it.
+            v
+    interpretation            curves, spread, blend, interpolate
+            |
+            v
+    mapping / io              targets, aggregators, files
+
+Adding MVC must require **no change** to `interpretation`, `mapping` or `io`.
+That is already close to true: those three layers reference no 2D type at all
+(§3.1), because a `WeightedNode` is a node id and a float. If an MVC kernel
+turned out to need changes there, the contract would be wrong and that would be
+the finding, not an inconvenience.
+
+### Why it is not v1
+
+The triangle solve is the foundation and it is stable — 31 vectors including
+nine on affine invariance, and every mutation caught. MVC has different
+degeneracy behaviour, different cost, and different edge cases at the polygon
+boundary, and it needs its own reference implementation and its own vectors
+before it is trusted.
+
+Writing the triangle case as though a polygon case were a parameter of it would
+produce a worse triangle implementation and would not actually generalize. The
+`Region` interface (§7) exists so the second kernel can be added later without
+touching `Manifold2D`, which is the whole point of having built it that way.
 
 **`Manifold3D`.** Would be a sibling class taking `glm::vec3`, not a subclass.
 Everything downstream of the weight vector is already dimension-free —
