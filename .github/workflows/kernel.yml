@@ -495,6 +495,60 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
+      - name: Velocity must divide by the span actually used must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        return (pointAt(b) - pointAt(a)) / span;   // units per unit of t' \
+            '        return (pointAt(b) - pointAt(a)) / (2.0f * window);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Velocity must be a central difference must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        const float b = std::min(1.0f, t + window);' \
+            '        const float b = t;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Finalize must record the duration must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        duration_ = (span > 0.0f) ? span : 0.0f;' \
+            '        duration_ = 0.0f;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: pointAtSeconds must divide by the duration must be caught
+        run: |
+          python3 tests/mutate.py --nl src/sources/ofxManifoldTrajectory.h \
+            '        const float d = (duration_ > 0.0f) ? duration_ : 1.0f;\n        return pointAt(seconds / d);' \
+            '        return pointAt(seconds);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Duration must survive a save must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '        o << "  \"duration\": " << json::number(tr.duration()) << ",\n";' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Duration must survive a load must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    const float dur = root.has("duration") ? root["duration"].asFloat() : 0.0f;' \
+            '    const float dur = 0.0f;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
       - name: Restored tree must be green
         run: |
           make clean

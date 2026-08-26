@@ -47,8 +47,16 @@ private:
     bool   recording = false;
     bool   playing   = false;
     float  recordStart = 0.0f;
-    float  phase = 0.0f;          // normalized position along the path
-    float  rate  = 0.25f;         // path lengths per second
+
+    // Playback position in the recording's OWN seconds, not a normalized
+    // phase. That is the difference between "play this back" and "play this
+    // back the way I performed it".
+    float  elapsed = 0.0f;
+    float  rate    = 1.0f;        // 1.0 = the tempo it was recorded at
+    bool   realTime = true;       // false falls back to a fixed phase sweep
+
+    glm::vec2 velocity{0.0f, 0.0f};
+    float     speed = 0.0f;
     int    venue = 1;
     std::string venueName;
 };

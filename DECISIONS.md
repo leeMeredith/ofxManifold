@@ -792,3 +792,71 @@ Most entries here are about a test that looked like it worked. This one is about
 a tool that refused to let a test stop working, and the refusal being loud enough
 to act on. Worth recording as evidence that the exit-code decision earned its
 keep rather than as a fault.
+
+
+---
+
+## D-013 — Duration alongside the normalized parameter, not instead of it
+
+**Date:** 2026-08-25
+**Status:** decided, prompted by prior art
+**Files:** `src/sources/ofxManifoldTrajectory.h`, `src/io/ofxManifoldSerialize.h`
+
+### Where it came from
+
+Zach Lieberman's `timePointRecorder` (drawingWithTime, 2010) stores each sample
+in seconds and exposes `getDuration()` and `getVelocityForTime()`. Reading it
+made two omissions obvious.
+
+**Duration was being thrown away.** `finalize()` rescaled recorded times to
+[0, 1] and discarded the span, so "replay at the speed it was performed" — the
+default a performer actually wants — was not expressible without the caller
+remembering the number separately.
+
+The fix keeps both. Normalized times make a path portable between maps and
+replayable at any rate; the duration makes the original tempo recoverable.
+Lieberman keeps seconds *instead of* a normalized parameter, which is right for
+a drawing that never leaves its canvas and wrong for a path that has to replay
+in another room.
+
+`duration` is optional in the file. Absent means unknown rather than one, so a
+path assembled programmatically does not claim a tempo it never had, and files
+written before the field existed still load.
+
+### Velocity, and why it does not break the layering
+
+Section 3.1 keeps MOTION outside the kernel: the evaluator is stateless and a
+derivative needs history.
+
+A trajectory **is** history — a stored path, complete before anyone asks — so a
+derivative over it is a pure function of data already in hand rather than a
+stateful accumulator. `velocityAt()` belongs on `Trajectory`; `d(weight)/dt` on
+a live source still does not, and still has no home in the kernel.
+
+### The endpoint correction
+
+Lieberman looks *backward* by a fixed 0.05 seconds, which is what a performer
+feels: where did I just come from. For a stored path there is no reason to
+prefer the past, so this uses a central difference.
+
+That introduces a trap. At t = 0 the window clips to half its width. Dividing by
+the **requested** window would report half the true speed — a stroke that began
+fast reading as beginning slowly, which is precisely backwards. Dividing by the
+span **actually used** gives the right answer at both ends, and `vel_start` and
+`vel_end` assert exactly 1.0 on an evenly traversed path to hold it there.
+
+### Two gaps mutation testing found
+
+Dropping the duration on save, and dropping it on load, both passed the whole
+suite. The `ROUNDTRIP` record compared bytes and positions — and a save/load
+pair that agrees on discarding a field is byte-stable and position-perfect. The
+duration is now asserted explicitly, plus a `FILEDURATION` record for a file
+that carries one and a file that does not.
+
+### One equivalent mutant, recorded rather than papered over
+
+Removing the `window <= 0.0f` guard changes nothing: with a zero or negative
+window the computed span is zero or negative and the span check returns zero
+anyway. Verified directly rather than assumed. The guard stays because it states
+the intent at the top of the function, but no vector can distinguish it and none
+pretends to.

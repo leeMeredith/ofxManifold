@@ -1,6 +1,7 @@
 {
   "version": 1,
   "space": "normalized",
+  "duration": 3.0,
   "samples": [
     {
       "t": 0.0,

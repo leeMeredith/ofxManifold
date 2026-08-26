@@ -163,6 +163,63 @@ int main(int argc, char** argv) {
             }
             record(cls, name, ok, d.str());
 
+        } else if (kind == "DURATION") {
+            // Calls addSample() and finalize(), so the duration is derived
+            // rather than handed over (D-011).
+            Trajectory tr;
+            std::string tok;
+            float want = 0.0f;
+            bool inExpect = false;
+            while (in >> tok) {
+                if (tok == "EXPECT") { inExpect = true; continue; }
+                if (inExpect) { want = std::stof(tok); continue; }
+                const TrajectorySample s2 = parseSample(tok);
+                tr.addSample(s2.t, s2.position);
+            }
+            tr.finalize();
+            const bool ok = close(tr.duration(), want);
+            if (!ok) d << "expected duration " << std::fixed
+                       << std::setprecision(6) << want << ", got "
+                       << tr.duration();
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "SECONDS") {
+            Trajectory tr;
+            std::string tok;
+            float at = 0.0f, ex = 0.0f, ey = 0.0f;
+            int stage = 0;
+            while (in >> tok) {
+                if (tok == "AT")     { stage = 1; continue; }
+                if (tok == "EXPECT") { stage = 2; continue; }
+                if (stage == 0) {
+                    const TrajectorySample s2 = parseSample(tok);
+                    tr.addSample(s2.t, s2.position);
+                } else if (stage == 1) {
+                    at = std::stof(tok);
+                } else {
+                    if (ex == 0.0f && ey == 0.0f) ex = std::stof(tok);
+                    else ey = std::stof(tok);
+                }
+            }
+            tr.finalize();
+            const glm::vec2 p = tr.pointAtSeconds(at);
+            const bool ok = close(p.x, ex) && close(p.y, ey);
+            if (!ok) d << "at " << at << " expected (" << std::fixed
+                       << std::setprecision(6) << ex << ", " << ey
+                       << "), got (" << p.x << ", " << p.y << ")";
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "VEL") {
+            std::string traj; float t, window, ex, ey;
+            in >> traj >> t >> window >> ex >> ey;
+            const glm::vec2 v = trajectories[traj].velocityAt(t, window);
+            const bool ok = close(v.x, ex) && close(v.y, ey);
+            if (!ok) d << "expected velocity (" << std::fixed
+                       << std::setprecision(6) << ex << ", " << ey
+                       << "), got (" << v.x << ", " << v.y << ")"
+                       << "\n      at t=" << t << " window=" << window;
+            record(cls, name, ok, d.str());
+
         } else if (kind == "TOUR") {
             std::string traj; float t, ex, ey;
             in >> traj >> t >> ex >> ey;
@@ -289,6 +346,14 @@ int main(int argc, char** argv) {
 
             bool ok = (s1 == s2);
             if (!ok) d << "save -> load -> save is not byte stable";
+            // Byte stability and matching positions are both satisfied by a
+            // pair of save/load functions that agree on dropping the duration.
+            // Asserting it explicitly is what catches that.
+            if (ok && !close(t1.duration(), t2.duration())) {
+                ok = false;
+                d << "duration did not survive the round trip: "
+                  << t1.duration() << " -> " << t2.duration();
+            }
             if (ok) {
                 for (int i = 0; i <= 40 && ok; ++i) {
                     const float t = static_cast<float>(i) / 40.0f;
@@ -298,6 +363,22 @@ int main(int argc, char** argv) {
                     }
                 }
             }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "FILEDURATION") {
+            std::string file; float want;
+            in >> file >> want;
+            std::string text;
+            if (!slurp(file, text)) {
+                record(cls, name, false, "missing " + file); continue;
+            }
+            Trajectory tr;
+            const io::LoadResult r = io::loadTrajectory(text, tr);
+            bool ok = r.ok && close(tr.duration(), want);
+            if (!r.ok) d << "load failed: " << r.error;
+            else if (!ok) d << "expected duration " << std::fixed
+                            << std::setprecision(6) << want << ", got "
+                            << tr.duration();
             record(cls, name, ok, d.str());
 
         } else if (kind == "REJECT") {

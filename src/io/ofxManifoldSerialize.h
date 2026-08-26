@@ -295,6 +295,12 @@ inline std::string saveTrajectory(const Trajectory& tr) {
     o << "{\n";
     o << "  \"version\": " << kFormatVersion << ",\n";
     o << "  \"space\": \"normalized\",\n";
+    // Optional. Absent means the original timing is unknown, which is what a
+    // path assembled programmatically has. A reader from before this field
+    // existed ignores it, and a file without it still loads.
+    if (tr.duration() > 0.0f) {
+        o << "  \"duration\": " << json::number(tr.duration()) << ",\n";
+    }
     o << "  \"samples\": [\n";
     for (std::size_t i = 0; i < tr.sampleCount(); ++i) {
         const TrajectorySample& s = tr.sample(i);
@@ -355,7 +361,12 @@ inline LoadResult loadTrajectory(const std::string& text, Trajectory& out) {
                          s["p"].asArray()[1].asFloat())});
     }
 
-    out.setSamples(std::move(samples));
+    const float dur = root.has("duration") ? root["duration"].asFloat() : 0.0f;
+    if (dur < 0.0f) {
+        res.error = "duration is negative";
+        return res;
+    }
+    out.setSamples(std::move(samples), dur);
     res.ok = true;
     return res;
 }

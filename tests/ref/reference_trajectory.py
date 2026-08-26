@@ -44,6 +44,34 @@ def finalize(samples):
     return [((t - t0) / span, p) for t, p in samples]
 
 
+def duration_of(raw):
+    """Original span, or 0 when unknown."""
+    if len(raw) < 2:
+        return 0.0
+    span = raw[-1][0] - raw[0][0]
+    return span if span > 0.0 else 0.0
+
+
+def velocity_at(samples, t, window):
+    """
+    Central difference, clipped at the ends and divided by the span ACTUALLY
+    used rather than the requested window.
+
+    Dividing by the requested window would halve the reported speed at t = 0
+    and t = 1, so a stroke that began fast would read as beginning slowly.
+    """
+    if len(samples) < 2 or window <= 0.0:
+        return (0.0, 0.0)
+    a = max(0.0, t - window)
+    b = min(1.0, t + window)
+    span = b - a
+    if span <= 0.0:
+        return (0.0, 0.0)
+    pa = point_at(samples, a)
+    pb = point_at(samples, b)
+    return ((pb[0] - pa[0]) / span, (pb[1] - pa[1]) / span)
+
+
 def point_at(samples, t):
     """Linear walk rather than the C++'s binary search."""
     if not samples:
@@ -226,6 +254,96 @@ def build():
                "EXPECT 0 0.5 0.5 1")
     out.append("")
 
+    # ---- duration and time-based playback --------------------------------
+    out.append("# DURATION. finalize() normalizes the times AND remembers how")
+    out.append("# long the recording took. Keeping both is the point: the")
+    out.append("# normalized parameter makes a path portable and replayable at")
+    out.append("# any speed, the duration makes it replayable at the speed it")
+    out.append("# was PERFORMED -- which is the default a performer wants and")
+    out.append("# which normalizing alone would silently discard.")
+    out.append("")
+
+    def dur(name, cls, raw, note):
+        out.append(f"# {note}")
+        out.append(f"DURATION {name} {cls} "
+                   + " ".join(f"{fmt(t)}:{fmt(p[0])},{fmt(p[1])}"
+                              for t, p in raw)
+                   + f" EXPECT {fmt(duration_of(raw))}")
+        out.append("")
+
+    dur("duration_two_seconds", "ANALYTIC",
+        [(0.0, (0.1, 0.1)), (1.0, (0.5, 0.9)), (2.0, (0.9, 0.1))],
+        "a two-unit recording reports a duration of 2")
+    dur("duration_offset", "ANALYTIC",
+        [(17.5, (0.1, 0.1)), (19.5, (0.9, 0.1))],
+        "started at 17.5, ended at 19.5: duration 2, not 19.5")
+    dur("duration_single", "ANALYTIC", [(4.0, (0.5, 0.5))],
+        "one sample has no duration")
+    dur("duration_coincident", "SPEC",
+        [(3.0, (0.2, 0.2)), (3.0, (0.8, 0.8))],
+        "every sample at one instant: duration unknown, reported as 0 rather "
+        "than invented")
+
+    out.append("# pointAtSeconds divides by the duration, so a path recorded")
+    out.append("# over ten units is queried in those same units")
+    ten = [(0.0, (0.0, 0.0)), (10.0, (1.0, 0.0))]
+    tenf = finalize(ten)
+    for nm, secs, ex in (("secs_start", 0.0, 0.0), ("secs_mid", 5.0, 0.5),
+                         ("secs_end", 10.0, 1.0), ("secs_quarter", 2.5, 0.25)):
+        out.append(f"SECONDS {nm} ANALYTIC "
+                   + " ".join(f"{fmt(t)}:{fmt(p[0])},{fmt(p[1])}"
+                              for t, p in ten)
+                   + f" AT {fmt(secs)} EXPECT {fmt(ex)} {fmt(0.0)}")
+    out.append("")
+
+    # ---- velocity --------------------------------------------------------
+    out.append("# VELOCITY. The manifold keeps motion outside the kernel")
+    out.append("# because the evaluator is stateless and a derivative needs")
+    out.append("# history. A trajectory IS history, so a derivative over it is")
+    out.append("# a pure function of stored data rather than a stateful")
+    out.append("# accumulator. That is why it lives on Trajectory and")
+    out.append("# d(weight)/dt does not.")
+    out.append("")
+
+    # A path that moves at a constant rate: velocity is knowable by hand.
+    line = finalize([(0.0, (0.0, 0.0)), (1.0, (1.0, 0.0))])
+    out.append("TRAJ line " + " ".join(
+        f"{fmt(t)}:{fmt(p[0])},{fmt(p[1])}" for t, p in line))
+    out.append("# a straight path traversed evenly has velocity (1, 0)")
+    out.append("# everywhere in normalized units, including at both ends")
+    for nm, t in (("vel_start", 0.0), ("vel_mid", 0.5), ("vel_end", 1.0)):
+        out.append(f"VEL {nm} ANALYTIC line {fmt(t)} {fmt(0.05)} "
+                   f"{fmt(1.0)} {fmt(0.0)}")
+    out.append("")
+    out.append("# THE ENDPOINT CORRECTION. At t = 0 the window is clipped to")
+    out.append("# half its width. Dividing by the REQUESTED window would report")
+    out.append("# (0.5, 0) here -- a stroke that began fast reading as")
+    out.append("# beginning slowly, which is precisely backwards. Dividing by")
+    out.append("# the span actually used gives (1, 0), as above.")
+    out.append("")
+
+    # A path with a pause: velocity must fall to zero inside the held span.
+    pv = finalize([(0.0, (0.0, 0.5)), (2.0, (0.5, 0.5)),
+                   (8.0, (0.5, 0.5)), (10.0, (1.0, 0.5))])
+    out.append("TRAJ pausevel " + " ".join(
+        f"{fmt(t)}:{fmt(p[0])},{fmt(p[1])}" for t, p in pv))
+    out.append("# inside the pause the source is not moving, so velocity is")
+    out.append("# zero. A path resampled uniformly would report steady motion")
+    out.append("# here instead -- the D-011 fault, visible from another angle.")
+    v = velocity_at(pv, 0.5, 0.05)
+    out.append(f"VEL vel_in_pause ANALYTIC pausevel {fmt(0.5)} {fmt(0.05)} "
+               f"{fmt(0.0)} {fmt(0.0)}")
+    for nm, t in (("vel_before_pause", 0.1), ("vel_after_pause", 0.9)):
+        v = velocity_at(pv, t, 0.05)
+        out.append(f"VEL {nm} CROSS pausevel {fmt(t)} {fmt(0.05)} "
+                   f"{fmt(v[0])} {fmt(v[1])}")
+    out.append("")
+    out.append("# a zero or negative window yields zero rather than dividing")
+    out.append("# by it")
+    out.append(f"VEL vel_zero_window SPEC line {fmt(0.5)} {fmt(0.0)} "
+               f"{fmt(0.0)} {fmt(0.0)}")
+    out.append("")
+
     # ---- degenerate recordings ------------------------------------------
     single = finalize([(5.0, (0.33, 0.44))])
     out.append("# a single sample: every t returns it, no division by zero")
@@ -306,6 +424,7 @@ def build():
     ])
     traj_json = {
         "version": 1, "space": "normalized",
+        "duration": 3.0,
         "samples": [{"t": t, "p": list(p)} for t, p in tour],
     }
     write("tour.json", json.dumps(traj_json, indent=2) + "\n")
@@ -342,8 +461,22 @@ def build():
     out.append("")
 
     # ---- serialization ---------------------------------------------------
-    out.append("# round trip through the trajectory file format")
+    out.append("# round trip through the trajectory file format. The")
+    out.append("# duration is checked explicitly: an earlier version of this")
+    out.append("# record compared bytes and positions only, and dropping the")
+    out.append("# duration on either save or load passed it untouched.")
     out.append("ROUNDTRIP roundtrip_tour ANALYTIC tour.json")
+    out.append("# tour.json carries a duration of 3; it must survive the load")
+    out.append("FILEDURATION file_duration ANALYTIC tour.json 3")
+    write("traj_no_duration.json", json.dumps({
+        "version": 1, "space": "normalized",
+        "samples": [{"t": 0.0, "p": [0.1, 0.1]},
+                    {"t": 1.0, "p": [0.9, 0.9]}],
+    }, indent=2) + "\n")
+    out.append("# a file without a duration loads with duration 0 -- unknown,")
+    out.append("# not invented. Files written before the field existed still")
+    out.append("# load.")
+    out.append("FILEDURATION file_no_duration SPEC traj_no_duration.json 0")
     out.append("")
     write("bad_traj_backwards.json", json.dumps({
         "version": 1,
@@ -384,7 +517,8 @@ def main():
     for line in out:
         p = line.split()
         if p and p[0] in ("AT", "TOUR", "PORTABLE", "DIFFERS", "ROUNDTRIP",
-                          "REJECT"):
+                          "REJECT", "RECORD", "RECORDBACK", "DURATION", "FILEDURATION",
+                          "SECONDS", "VEL"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

@@ -55,9 +55,25 @@ void ofApp::update() {
     renderer->setViewport(ofRectangle(24, 24, side, side));
 
     if (playing && path.sampleCount() > 1) {
-        phase += rate / 60.0f;
-        while (phase > 1.0f) phase -= 1.0f;   // loop
-        point = path.pointAt(phase);
+        const float dur = path.duration();
+
+        if (realTime && dur > 0.0f) {
+            // Real seconds. rate 1.0 replays at the tempo it was performed,
+            // pauses included, because finalize() kept the sample spacing.
+            elapsed += (1.0f / 60.0f) * rate;
+            while (elapsed > dur) elapsed -= dur;
+            point    = path.pointAtSeconds(elapsed);
+            velocity = path.velocityAtSeconds(elapsed);
+        } else {
+            // No duration known -- a path loaded from an older file, or one
+            // whose samples arrived already normalized. Sweep the parameter
+            // instead so playback still works.
+            elapsed += (1.0f / 60.0f) * rate * 0.25f;
+            while (elapsed > 1.0f) elapsed -= 1.0f;
+            point    = path.pointAt(elapsed);
+            velocity = path.velocityAt(elapsed);
+        }
+        speed = glm::length(velocity);
     }
 
     evaluation = evaluator->evaluate(point);
@@ -97,7 +113,14 @@ void ofApp::draw() {
                            + " samples", x, y);
     } else if (playing) {
         ofSetColor(120, 200, 160);
-        ofDrawBitmapString("playing     " + ofToString(phase, 3), x, y);
+        const float dur = path.duration();
+        if (realTime && dur > 0.0f) {
+            ofDrawBitmapString("playing     " + ofToString(elapsed, 2) + " / "
+                               + ofToString(dur, 2) + " s", x, y);
+        } else {
+            ofDrawBitmapString("playing     phase " + ofToString(elapsed, 3),
+                               x, y);
+        }
     } else if (path.sampleCount() > 1) {
         ofSetColor(180, 186, 200);
         ofDrawBitmapString("ready       " + ofToString(path.sampleCount())
@@ -106,6 +129,33 @@ void ofApp::draw() {
         ofSetColor(140, 146, 160);
         ofDrawBitmapString("no path yet", x, y);
     }
+    y += 28.0f;
+
+    // Duration is the thing normalization would have thrown away. A path with
+    // no duration replays at an arbitrary speed; a path with one replays as it
+    // was performed.
+    ofSetColor(180, 186, 200);
+    ofDrawBitmapString("duration    "
+                       + (path.duration() > 0.0f
+                          ? ofToString(path.duration(), 2) + " s"
+                          : std::string("unknown")), x, y);
+    y += 16.0f;
+    ofDrawBitmapString("rate        " + ofToString(rate, 2) + " x", x, y);
+    y += 16.0f;
+
+    // Speed is a derivative of stored data, not a stateful accumulator. The
+    // architecture keeps MOTION outside the kernel because the evaluator is
+    // stateless -- but a recorded path IS history, complete before anyone
+    // asks, so a derivative over it is a pure function.
+    ofDrawBitmapString("speed       " + ofToString(speed, 3), x, y);
+    y += 16.0f;
+
+    // The pause is visible here and nowhere else. Hold still while recording,
+    // and on playback the dot stops while the clock keeps running -- speed
+    // drops to zero and stays there. Uniform resampling would have replayed it
+    // as steady motion (D-011).
+    ofSetColor(speed < 0.02f ? ofColor(255, 214, 90) : ofColor(140, 146, 160));
+    ofDrawBitmapString(speed < 0.02f ? "            (holding)" : "", x, y);
     y += 28.0f;
 
     ofSetColor(235, 238, 245);
@@ -129,6 +179,8 @@ void ofApp::draw() {
     ofDrawBitmapString("space    play / pause, looping", x, y);   y += 16.0f;
     ofDrawBitmapString("1 2      swap venue, MID-PLAYBACK", x, y);y += 16.0f;
     ofDrawBitmapString("[ ]      slower / faster", x, y);         y += 16.0f;
+    ofDrawBitmapString(std::string("t        real seconds: ")
+                       + (realTime ? "on" : "off"), x, y);        y += 16.0f;
     ofDrawBitmapString("s l      save / load path.json", x, y);   y += 32.0f;
 
     ofSetColor(150, 190, 220);
@@ -146,7 +198,10 @@ void ofApp::draw() {
     ofDrawBitmapString("pixels: a path in pixels could not", x, y);y += 15.0f;
     ofDrawBitmapString("survive a change of window, let alone", x, y);
     y += 15.0f;
-    ofDrawBitmapString("of room.", x, y);
+    ofDrawBitmapString("of room.", x, y);                        y += 24.0f;
+    ofDrawBitmapString("Pause while recording. On playback the", x, y);
+    y += 15.0f;
+    ofDrawBitmapString("dot stops and the clock keeps running.", x, y);
 }
 
 void ofApp::mousePressed(int x, int y, int) {
@@ -178,15 +233,20 @@ void ofApp::keyPressed(int key) {
             recordStart = ofGetElapsedTimef();
         } else {
             recording = false;
-            path.finalize();     // rescales recorded times to [0, 1]
-            phase = 0.0f;
+            // Rescales sample times to [0, 1] AND captures the duration
+            // before doing so. Without that capture, the tempo would be gone.
+            path.finalize();
+            elapsed = 0.0f;
+            ofLogNotice() << "recorded " << path.sampleCount()
+                          << " samples over " << path.duration() << "s";
         }
     }
     if (key == ' ' && path.sampleCount() > 1) playing = !playing;
     if (key == '1' && venue != 1) buildVenueA();
     if (key == '2' && venue != 2) buildVenueB();
-    if (key == '[') rate = std::max(0.02f, rate * 0.8f);
-    if (key == ']') rate = std::min(4.00f, rate * 1.25f);
+    if (key == '[') rate = std::max(0.05f, rate * 0.8f);
+    if (key == ']') rate = std::min(8.00f, rate * 1.25f);
+    if (key == 't') { realTime = !realTime; elapsed = 0.0f; }
 
     if (key == 's' && path.sampleCount() > 1) {
         ofBuffer buf;
@@ -200,7 +260,7 @@ void ofApp::keyPressed(int key) {
         const io::LoadResult r = io::loadTrajectory(buf.getText(), loaded);
         if (r.ok) {
             path = loaded;
-            phase = 0.0f;
+            elapsed = 0.0f;
             ofLogNotice() << "loaded " << path.sampleCount() << " samples";
         } else {
             ofLogError() << "load failed: " << r.error;

@@ -58,6 +58,64 @@ RECORD record_irregular CROSS 0:0.2,0.2 0.3:0.4,0.5 2.9:0.6,0.3 3.1:0.8,0.7 7:0.
 # be able to corrupt the bracketing search downstream.
 RECORDBACK record_backwards SPEC 0:0.1,0.1 5:0.5,0.5 3:0.9,0.9 10:0.2,0.8 EXPECT 0 0.5 0.5 1
 
+# DURATION. finalize() normalizes the times AND remembers how
+# long the recording took. Keeping both is the point: the
+# normalized parameter makes a path portable and replayable at
+# any speed, the duration makes it replayable at the speed it
+# was PERFORMED -- which is the default a performer wants and
+# which normalizing alone would silently discard.
+
+# a two-unit recording reports a duration of 2
+DURATION duration_two_seconds ANALYTIC 0:0.1,0.1 1:0.5,0.9 2:0.9,0.1 EXPECT 2
+
+# started at 17.5, ended at 19.5: duration 2, not 19.5
+DURATION duration_offset ANALYTIC 17.5:0.1,0.1 19.5:0.9,0.1 EXPECT 2
+
+# one sample has no duration
+DURATION duration_single ANALYTIC 4:0.5,0.5 EXPECT 0
+
+# every sample at one instant: duration unknown, reported as 0 rather than invented
+DURATION duration_coincident SPEC 3:0.2,0.2 3:0.8,0.8 EXPECT 0
+
+# pointAtSeconds divides by the duration, so a path recorded
+# over ten units is queried in those same units
+SECONDS secs_start ANALYTIC 0:0,0 10:1,0 AT 0 EXPECT 0 0
+SECONDS secs_mid ANALYTIC 0:0,0 10:1,0 AT 5 EXPECT 0.5 0
+SECONDS secs_end ANALYTIC 0:0,0 10:1,0 AT 10 EXPECT 1 0
+SECONDS secs_quarter ANALYTIC 0:0,0 10:1,0 AT 2.5 EXPECT 0.25 0
+
+# VELOCITY. The manifold keeps motion outside the kernel
+# because the evaluator is stateless and a derivative needs
+# history. A trajectory IS history, so a derivative over it is
+# a pure function of stored data rather than a stateful
+# accumulator. That is why it lives on Trajectory and
+# d(weight)/dt does not.
+
+TRAJ line 0:0,0 1:1,0
+# a straight path traversed evenly has velocity (1, 0)
+# everywhere in normalized units, including at both ends
+VEL vel_start ANALYTIC line 0 0.05 1 0
+VEL vel_mid ANALYTIC line 0.5 0.05 1 0
+VEL vel_end ANALYTIC line 1 0.05 1 0
+
+# THE ENDPOINT CORRECTION. At t = 0 the window is clipped to
+# half its width. Dividing by the REQUESTED window would report
+# (0.5, 0) here -- a stroke that began fast reading as
+# beginning slowly, which is precisely backwards. Dividing by
+# the span actually used gives (1, 0), as above.
+
+TRAJ pausevel 0:0,0.5 0.2:0.5,0.5 0.8:0.5,0.5 1:1,0.5
+# inside the pause the source is not moving, so velocity is
+# zero. A path resampled uniformly would report steady motion
+# here instead -- the D-011 fault, visible from another angle.
+VEL vel_in_pause ANALYTIC pausevel 0.5 0.05 0 0
+VEL vel_before_pause CROSS pausevel 0.1 0.05 2.5 0
+VEL vel_after_pause CROSS pausevel 0.9 0.05 2.5 0
+
+# a zero or negative window yields zero rather than dividing
+# by it
+VEL vel_zero_window SPEC line 0.5 0 0 0
+
 # a single sample: every t returns it, no division by zero
 TRAJ single 0:0.33,0.44
 AT single_zero ANALYTIC single 0 0.33 0.44
@@ -114,8 +172,17 @@ PORTABLE portable_positions ANALYTIC tour venue_a.json venue_b.json
 # the same venue and the test proves nothing
 DIFFERS weights_differ ANALYTIC tour venue_a.json venue_b.json
 
-# round trip through the trajectory file format
+# round trip through the trajectory file format. The
+# duration is checked explicitly: an earlier version of this
+# record compared bytes and positions only, and dropping the
+# duration on either save or load passed it untouched.
 ROUNDTRIP roundtrip_tour ANALYTIC tour.json
+# tour.json carries a duration of 3; it must survive the load
+FILEDURATION file_duration ANALYTIC tour.json 3
+# a file without a duration loads with duration 0 -- unknown,
+# not invented. Files written before the field existed still
+# load.
+FILEDURATION file_no_duration SPEC traj_no_duration.json 0
 
 # time running backwards would make the bracketing search
 # meaningless, and the failure would look like a jittering
