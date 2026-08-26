@@ -20,6 +20,7 @@
 #include "ofxManifoldJSON.h"
 #include "../core/ofxManifold2D.h"
 #include "../mapping/ofxManifoldMapping.h"
+#include "../sources/ofxManifoldTrajectory.h"
 
 #include <cstddef>
 #include <sstream>
@@ -273,6 +274,88 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
     }
 
     out = std::move(built);
+    res.ok = true;
+    return res;
+}
+
+// ---- trajectory ----------------------------------------------------------
+//
+// A THIRD file, and for the same reason there are already two: a trajectory
+// outlives the map it was recorded against. Section 5 chose normalized
+// coordinates precisely so a recorded path could be replayed against a rebuilt
+// map, and welding the path into the manifold file would destroy that.
+//
+// Stored as sampled points rather than as a parametric curve. Sampling is what
+// recording produces, it preserves the original timing exactly -- including
+// pauses -- and it needs no decision about which curve family is right. A
+// curve representation can be added later as a second format; going the other
+// way, from a fitted curve back to what actually happened, cannot.
+inline std::string saveTrajectory(const Trajectory& tr) {
+    std::ostringstream o;
+    o << "{\n";
+    o << "  \"version\": " << kFormatVersion << ",\n";
+    o << "  \"space\": \"normalized\",\n";
+    o << "  \"samples\": [\n";
+    for (std::size_t i = 0; i < tr.sampleCount(); ++i) {
+        const TrajectorySample& s = tr.sample(i);
+        o << "    { \"t\": " << json::number(s.t)
+          << ", \"p\": [" << json::number(s.position.x) << ", "
+          << json::number(s.position.y) << "] }";
+        if (i + 1 < tr.sampleCount()) o << ",";
+        o << "\n";
+    }
+    o << "  ]\n";
+    o << "}\n";
+    return o.str();
+}
+
+inline LoadResult loadTrajectory(const std::string& text, Trajectory& out) {
+    LoadResult res;
+    const json::ParseResult pr = json::parse(text);
+    if (!pr.ok) {
+        res.error = "json: " + pr.error + " at byte "
+                  + std::to_string(pr.offset);
+        return res;
+    }
+    const json::Value& root = pr.value;
+    if (!root.isObject()) { res.error = "root is not an object"; return res; }
+    if (!root.has("version")
+        || static_cast<int>(root["version"].asNumber()) != kFormatVersion) {
+        res.error = "missing or unsupported version";
+        return res;
+    }
+    if (root.has("space") && root["space"].asString() != "normalized") {
+        res.error = "unsupported space: " + root["space"].asString();
+        return res;
+    }
+    if (!root.has("samples") || !root["samples"].isArray()) {
+        res.error = "missing samples array";
+        return res;
+    }
+
+    std::vector<TrajectorySample> samples;
+    float last = -1.0f;
+    for (const json::Value& s : root["samples"].asArray()) {
+        if (!s.isObject() || !s["p"].isArray()
+            || s["p"].asArray().size() != 2) {
+            res.error = "sample needs a two-element p";
+            return res;
+        }
+        const float t = s["t"].asFloat();
+        // Non-monotonic time would make pointAt's binary search meaningless,
+        // and the failure would look like a jittering playhead rather than a
+        // bad file.
+        if (t < last) {
+            res.error = "samples are not in non-decreasing time order";
+            return res;
+        }
+        last = t;
+        samples.push_back(TrajectorySample{
+            t, glm::vec2(s["p"].asArray()[0].asFloat(),
+                         s["p"].asArray()[1].asFloat())});
+    }
+
+    out.setSamples(std::move(samples));
     res.ok = true;
     return res;
 }

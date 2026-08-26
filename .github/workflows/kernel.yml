@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize; do
+          for v in triangle manifold interpretation mapping serialize trajectory; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize; do
+          for v in triangle manifold interpretation mapping serialize trajectory; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -431,6 +431,60 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldTriangle.h
+
+      - name: Finalize must preserve sample spacing must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '            for (auto& s : samples_) s.t = (s.t - t0) / span;' \
+            '            for (std::size_t i = 0; i < samples_.size(); ++i) samples_[i].t = float(i)/float(samples_.size()-1);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Finalize must start the path at zero must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        const float t0 = samples_.front().t;' \
+            '        const float t0 = 0.0f;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: addSample must clamp backwards time must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '            t = samples_.back().t;      // never allow time to run backwards' \
+            '            (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: pointAt must interpolate, not snap must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        return a.position + (b.position - a.position) * u;' \
+            '        return (u < 0.5f) ? a.position : b.position;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: pointAt must clamp outside the path must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        if (t <= samples_.front().t) return samples_.front().position;' \
+            '        if (t < -1e9f) return samples_.front().position;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Trajectory loader must refuse backwards time must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '            res.error = "samples are not in non-decreasing time order";' \
+            '            res.error = "";'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Restored tree must be green
         run: |

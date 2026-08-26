@@ -15,12 +15,14 @@ MAN_RUN  := $(BUILD)/run_manifold
 INT_RUN  := $(BUILD)/run_interpretation
 MAP_RUN  := $(BUILD)/run_mapping
 SER_RUN  := $(BUILD)/run_serialize
+TRJ_RUN  := $(BUILD)/run_trajectory
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
 INT_VEC  := tests/vectors/interpretation.vec
 MAP_VEC  := tests/vectors/mapping.vec
 SER_VEC  := tests/vectors/serialize.vec
+TRJ_VEC  := tests/vectors/trajectory.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -39,17 +41,20 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
+SOURCES  := src/sources/ofxManifoldPointSource.h \
+            src/sources/ofxManifoldTrajectory.h
+
 IO       := src/io/ofxManifoldJSON.h \
             src/io/ofxManifoldSerialize.h
 
-.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize headers workflow wrapper vectors clean
+.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize
+      test-serialize test-trajectory
 	@echo ""
 	@echo "all suites green"
 
@@ -80,7 +85,7 @@ workflow:
 # point of src/core is that a stranger can drop it into their own project.
 headers:
 	@mkdir -p $(BUILD)
-	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO); do \
+	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES); do \
 		if grep -qE '^[[:space:]]*#[[:space:]]*include.*ofMain\.h' $$f; then \
 			echo "  $$f includes ofMain.h -- src/ofx is the only place that may"; \
 			exit 1; \
@@ -108,6 +113,9 @@ test-mapping: $(MAP_RUN) $(MAP_VEC)
 test-serialize: $(SER_RUN) $(SER_VEC) $(SER_FIX)
 	@./$(SER_RUN) $(SER_VEC) tests/fixtures
 
+test-trajectory: $(TRJ_RUN) $(TRJ_VEC)
+	@./$(TRJ_RUN) $(TRJ_VEC) tests/fixtures
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -117,6 +125,7 @@ vectors:
 	@python3 tests/ref/reference_interpretation.py
 	@python3 tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_serialize.py
+	@python3 tests/ref/reference_trajectory.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -139,6 +148,13 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
+
+$(TRJ_RUN): tests/run_trajectory.cpp $(CORE) $(MAPPING) $(IO) $(SOURCES)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_trajectory.cpp
+
+$(TRJ_VEC): tests/ref/reference_trajectory.py
+	@python3 tests/ref/reference_trajectory.py
 
 $(SER_RUN): tests/run_serialize.cpp $(CORE) $(MAPPING) $(IO)
 	@mkdir -p $(BUILD)

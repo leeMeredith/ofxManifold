@@ -677,3 +677,64 @@ before.
 
 Worth being explicit rather than letting the test count imply a confidence the
 wrapper has not earned.
+
+
+---
+
+## D-011 — The recording path had no vectors at all
+
+**Date:** 2026-08-24
+**Status:** gap found by mutation testing, closed
+**Files:** `tests/ref/reference_trajectory.py`, `tests/run_trajectory.cpp`
+
+### The gap
+
+Trajectories went green at 28/28. Mutation testing then found three faults that
+the suite passed straight through:
+
+- `finalize()` resampling uniformly instead of preserving spacing
+- `finalize()` not subtracting the first sample's time
+- `addSample()` letting time run backwards
+
+All three are in the two functions a recording actually uses. None of the 28
+vectors called either one: every trajectory in the file was built by handing
+`setSamples()` a finished list, which is the PLAYBACK path.
+
+So the suite tested replay thoroughly and recording not at all, while reading as
+complete.
+
+### Why the first one matters most
+
+Uniform resampling looks harmless. It is not.
+
+If a performer holds still for six seconds of a ten-second move, the finalized
+times must be 0, 0.2, 0.8, 1. Resampled uniformly they become 0, 0.333, 0.667,
+1 — and the replay turns a held position into a slow drift. The path visits the
+same points in the same order, so a plot of it looks correct. Only the timing is
+destroyed, and timing is most of what a recorded performance is.
+
+### The fix
+
+`RECORD` and `RECORDBACK` records replay the CALLS: raw times in, finalized
+times asserted out. Plus a standing check that any finalized path of more than
+one sample runs exactly 0 to 1 — a recording that began at t=17.5 and still
+starts at 17.5 is carrying a stopwatch reading around instead of a portable
+path.
+
+All eight trajectory mutations are now caught, and six are CI gates.
+
+### Pattern
+
+Third time in this project, and the same shape each time.
+
+D-005: the generator serialized fixture state instead of replaying `bind()`
+calls, so duplicate binds were never exercised. D-011: the vectors constructed
+trajectories from finished samples instead of replaying `addSample()` calls, so
+recording was never exercised.
+
+**A suite that builds its fixtures by assignment tests only the code downstream
+of the assignment.** Any invariant established while a structure is being built
+— accumulation, ordering, normalization, clamping — is invisible to it.
+
+Worth asking of every future suite before it is trusted: which functions does
+setting up the fixture skip?

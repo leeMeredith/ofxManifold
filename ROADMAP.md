@@ -58,10 +58,13 @@ Remaining:
 
 Roughly in order of what teaches most per line.
 
-**Trajectories (§11).** A recorded path replayed against a DIFFERENT map. This
-is the SpaceMap touring case, the strongest demonstration of the normalized
-coordinate decision, and the piece that makes this a theatre tool rather than a
-demo. `PointSource` is designed but unbuilt.
+**Trajectories — BUILT.** `PointSource`, `Trajectory`, a third file format, and
+33 vectors including the touring case: one path, two maps, identical positions
+and different weights. That is the property section 5 chose normalized
+coordinates for, and nothing in the project asserted it until now.
+
+Still to do: an `example-trajectory` showing record, replay, and load a
+different venue.
 
 **Two manifolds blended (§9.3).** `blend()` exists and nothing demonstrates it.
 Two maps, one crossfade, weights combined downstream — which is also the
