@@ -361,8 +361,16 @@ def build():
     out.append("REJECT reject_short_point ANALYTIC bad_traj_short_point.json "
                "two-element")
     write("bad_traj_no_samples.json", '{ "version": 1 }\n')
+    write("bad_traj_space.json",
+          '{ "version": 1, "space": "pixels", '
+          '"samples": [{"t":0.0,"p":[0.1,0.1]}] }\n')
     out.append("REJECT reject_no_samples ANALYTIC bad_traj_no_samples.json "
                "missing")
+    out.append("# a trajectory in pixel space refused rather than assumed")
+    out.append("# normalized -- the same guard the manifold loader has, which")
+    out.append("# had no vector until a CI gate went looking for one")
+    out.append("REJECT reject_traj_space SPEC bad_traj_space.json "
+               "unsupported")
 
     return out
 

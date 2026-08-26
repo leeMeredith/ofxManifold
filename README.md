@@ -172,6 +172,12 @@ watch it refuse to move when it would turn a region inside out. Three fixtures:
 a clean fan, a deliberately broken T-junction, and two overlapping regions where
 the answer depends on which side you entered from.
 
+**`example-trajectory`** — the touring case. Record a path by dragging, play it
+back, then swap the venue underneath it *while it is still playing*. The dot
+traces the same shape; every node has moved, so the weights reorganize around a
+gesture that has not changed. This is why the manifold lives in normalized
+coordinates rather than pixels.
+
 **`example-parameter-morphing`** — four presets at four nodes, each an ordinary
 struct. Every field interpolates independently.
 
@@ -197,7 +203,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-205 vectors across five suites, plus 36 mutation gates that introduce known
+238 vectors across six suites, plus 36 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

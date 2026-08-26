@@ -363,8 +363,8 @@ jobs:
       - name: Loader accepts an unknown space must be caught
         run: |
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
-            'res.error = "unsupported space: " + root["space"].asString();\n        return res;' \
-            'res.error = "unsupported space";'
+            'res.error = "unsupported space: " + root["space"].asString();\n        return res;\n    }\n    if (!root.has("nodes")' \
+            'res.error = "unsupported space";\n    }\n    if (!root.has("nodes")'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
@@ -482,6 +482,15 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '            res.error = "samples are not in non-decreasing time order";' \
             '            res.error = "";'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Trajectory loader accepts an unknown space must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            'res.error = "unsupported space: " + root["space"].asString();\n        return res;\n    }\n    if (!root.has("samples")' \
+            'res.error = "unsupported space";\n    }\n    if (!root.has("samples")'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h

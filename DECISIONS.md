@@ -738,3 +738,57 @@ of the assignment.** Any invariant established while a structure is being built
 
 Worth asking of every future suite before it is trusted: which functions does
 setting up the fixture skip?
+
+
+---
+
+## D-012 — An ambiguous mutation anchor, refused rather than obeyed
+
+**Date:** 2026-08-25
+**Status:** caught by tooling working as designed
+**Files:** `.github/workflows/kernel.yml`, `tests/ref/reference_trajectory.py`
+
+### What happened
+
+CI failed:
+
+    mutate: anchor appears 2 times in src/io/ofxManifoldSerialize.h;
+    it must be unique
+
+Trajectory serialization added a second `"unsupported space"` guard, so the gate
+written for the manifold loader now matched both.
+
+### Why this is the good outcome
+
+`mutate.py` refuses a non-unique anchor and exits 2. `sed` would have mutated
+the first occurrence and exited 0.
+
+That difference decides what happens next. With `sed`, the gate would have kept
+passing while testing only half of what its name claims — and the day someone
+broke the trajectory guard, the gate named for it would have stayed green. The
+refusal turned a silent weakening into a build failure, which is exactly the
+argument made when the helper replaced `sed` (D-008's predecessor).
+
+### What it exposed
+
+The trajectory loader's space check had **no vector behind it**. It was written
+by symmetry with the manifold loader and never asserted. The CI gate went
+looking for something to mutate and found a guard nobody was testing.
+
+Both are now covered: the manifold gate is disambiguated by trailing context,
+a `bad_traj_space.json` fixture was added, and the trajectory guard has its own
+gate. 43 gates, all anchors verified unique.
+
+### Follow-on
+
+Anchor uniqueness is now worth checking whenever code is added near an existing
+gate. Duplicating a guard for a new type is normal and good; it just quietly
+makes an old anchor ambiguous. The check is a few lines and could move into
+`check_workflow.py` if this recurs.
+
+### Pattern
+
+Most entries here are about a test that looked like it worked. This one is about
+a tool that refused to let a test stop working, and the refusal being loud enough
+to act on. Worth recording as evidence that the exit-code decision earned its
+keep rather than as a fault.

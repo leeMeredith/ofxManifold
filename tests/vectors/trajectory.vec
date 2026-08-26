@@ -123,3 +123,7 @@ ROUNDTRIP roundtrip_tour ANALYTIC tour.json
 REJECT reject_backwards ANALYTIC bad_traj_backwards.json non-decreasing
 REJECT reject_short_point ANALYTIC bad_traj_short_point.json two-element
 REJECT reject_no_samples ANALYTIC bad_traj_no_samples.json missing
+# a trajectory in pixel space refused rather than assumed
+# normalized -- the same guard the manifold loader has, which
+# had no vector until a CI gate went looking for one
+REJECT reject_traj_space SPEC bad_traj_space.json unsupported

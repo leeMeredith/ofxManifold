@@ -21,7 +21,9 @@ struct ofRectangle {
     float getWidth() const {return 1;} float getHeight() const {return 1;}
     float getRight() const {return 1;}
 };
-struct ofBuffer { ofBuffer(){} void set(const std::string&){} };
+struct ofBuffer { ofBuffer(){} void set(const std::string&){}
+                  std::string getText() const {return "";} };
+inline ofBuffer ofBufferFromFile(const std::string&){return ofBuffer();}
 inline void ofPushStyle(){} inline void ofPopStyle(){}
 inline void ofPushMatrix(){} inline void ofPopMatrix(){}
 inline void ofFill(){} inline void ofNoFill(){}
@@ -43,6 +45,7 @@ inline void ofBeginShape(){} inline void ofEndShape(bool){}
 inline void ofVertex(float,float){}
 inline void ofSetWindowTitle(const std::string&){}
 inline void ofSetFrameRate(int){}
+inline float ofGetElapsedTimef(){return 0.f;}
 inline void ofEnableAlphaBlending(){}
 inline float ofGetWidth(){return 1024;} inline float ofGetHeight(){return 640;}
 inline float ofClamp(float v,float a,float b){return v<a?a:(v>b?b:v);}
@@ -51,6 +54,7 @@ template<typename T> std::string ofToString(const T&,int){return "";}
 inline std::string ofToDataPath(const std::string& s){return s;}
 inline bool ofBufferToFile(const std::string&,ofBuffer&){return true;}
 struct ofLogNotice { template<typename T> ofLogNotice& operator<<(const T&){return *this;} };
+struct ofLogError { template<typename T> ofLogError& operator<<(const T&){return *this;} };
 struct ofBaseApp {
     virtual ~ofBaseApp(){}
     virtual void setup(){} virtual void update(){} virtual void draw(){}

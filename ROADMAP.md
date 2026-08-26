@@ -29,6 +29,7 @@ D-010). It is checked for typos against a stub and judged by eye.
 - `example-basic`: drag the point, drag a node, three fixtures
 - `example-parameter-morphing`: four presets, continuous blend
 - `example-mapping`: the node taxonomy, null ring, aggregators, dense output
+- `example-trajectory`: record, replay, swap venue mid-playback
 
 ---
 
@@ -63,8 +64,8 @@ Roughly in order of what teaches most per line.
 and different weights. That is the property section 5 chose normalized
 coordinates for, and nothing in the project asserted it until now.
 
-Still to do: an `example-trajectory` showing record, replay, and load a
-different venue.
+`example-trajectory` shows it on screen: record by dragging, play back looping,
+and swap the venue mid-playback.
 
 **Two manifolds blended (§9.3).** `blend()` exists and nothing demonstrates it.
 Two maps, one crossfade, weights combined downstream — which is also the
