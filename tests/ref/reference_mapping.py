@@ -80,6 +80,40 @@ def dense(targets, links, aggregators, wv):
     return d
 
 
+def blend_by_name(ra, names_a, rb, names_b, t, curve="linear"):
+    """
+    Crossfade two RESOLVED target vectors by target NAME.
+
+    The C++ scans its output list for a matching name; this uses a dict.
+    Different lookup, same merge.
+    """
+    import math as _m
+    t = max(0.0, min(1.0, t))
+    if curve == "linear":
+        ga, gb = 1.0 - t, t
+    elif curve == "equalPower":
+        ga, gb = _m.sqrt(1.0 - t), _m.sqrt(t)
+    else:                                   # cosine
+        ga = _m.cos((1.0 - (1.0 - t)) * (_m.pi / 2))
+        gb = _m.cos((1.0 - t) * (_m.pi / 2))
+        ga, gb = _m.sin((1.0 - t) * (_m.pi / 2)), _m.sin(t * (_m.pi / 2))
+
+    acc, order = {}, []
+    for tid, w in ra:
+        n = names_a[tid]
+        if n not in acc:
+            acc[n] = 0.0
+            order.append(n)
+        acc[n] += w * ga
+    for tid, w in rb:
+        n = names_b[tid]
+        if n not in acc:
+            acc[n] = 0.0
+            order.append(n)
+        acc[n] += w * gb
+    return [(n, acc[n]) for n in order if abs(acc[n]) >= 1e-9]
+
+
 def fmt(x):
     """
     Ten significant digits, deliberately not seventeen.
@@ -346,6 +380,87 @@ def build():
          " does not take the root of a negative"),
     ], note="aggregators are SpaceMap's derived nodes -- they run the routing"
             " backwards and are not part of any region")
+
+    # ---- blending ACROSS manifolds --------------------------------------
+    #
+    # Two maps, built independently, with DELIBERATELY COLLIDING ids.
+    #
+    # blend() merges by NodeID, and NodeIDs are per-manifold indices, so two
+    # independently built maps always collide at 0, 1, 2. Every blend vector
+    # in interpretation.vec uses hand-picked non-colliding ids -- A on 0 and 1,
+    # B on 2 and 3 -- so the suite never met the case (D-013).
+    #
+    # These fixtures resolve each side through its own mapping first, then
+    # merge by target NAME. Both mappings declare their targets in DIFFERENT
+    # ORDERS on purpose: an implementation that merged by TargetID instead of
+    # by name passes if the orders happen to agree and fails here.
+    out.append("")
+    out.append("#" + "-" * 68)
+    out.append("# BLENDING ACROSS MANIFOLDS")
+    out.append("#")
+    out.append("# Node identity is local to a manifold. Target identity is")
+    out.append("# local to a mapping. Only the NAME crosses between them.")
+    out.append("#" + "-" * 68)
+
+    # Map A's mapping.
+    fa = Fixture("blend_map_a")
+    fa.bind(0, "out.L")
+    fa.bind(1, "out.R")
+    fa.bind(2, "out.sub")
+
+    # Map B's mapping. Note out.sub is declared FIRST here, so it lands on a
+    # different TargetID than it has in A.
+    fb = Fixture("blend_map_b")
+    fb.bind(0, "out.sub")
+    fb.bind(1, "out.R")
+    fb.bind(2, "out.rear")
+
+    fa.emit(out, [], note="map A's mapping: L, R, sub")
+    fb.emit(out, [], note="map B's mapping: sub, R, rear -- a DIFFERENT id "
+                          "order for the same names, so a merge by id rather "
+                          "than by name gives the wrong answer")
+
+    wa = [(0, 0.5), (1, 0.3), (2, 0.2)]
+    wb = [(0, 0.1), (1, 0.4), (2, 0.5)]
+    ra, _ = resolve(fa.targets, fa.links, fa.aggregators, wa)
+    rb, _ = resolve(fb.targets, fb.links, fb.aggregators, wb)
+
+    for nm, t, cls, note in [
+        ("t0", 0.0, "ANALYTIC", "t=0 is map A alone"),
+        ("t1", 1.0, "ANALYTIC", "t=1 is map B alone"),
+        ("half", 0.5, "CROSS",
+         "halfway: out.R and out.sub appear in BOTH maps and their "
+         "contributions add; out.L and out.rear appear in one each"),
+        ("quarter", 0.25, "CROSS", ""),
+    ]:
+        res = blend_by_name(ra, fa.targets, rb, fb.targets, t)
+        if note:
+            out.append(f"# {note}")
+        out.append(f"BLENDNAME blendname_{nm} {cls} {fmt(t)} linear "
+                   f"MAPA blend_map_a A " + wv_s(wa) +
+                   " MAPB blend_map_b B " + wv_s(wb) +
+                   " OUT " + " ".join(f"{n}={fmt(w)}" for n, w in res))
+        out.append("")
+
+    out.append("# t outside [0, 1] clamps rather than extrapolating into")
+    out.append("# negative gains. A crossfade driven from an unclamped fader")
+    out.append("# would otherwise invert one map as it passed the end.")
+    for nm, t in (("clamp_high", 2.0), ("clamp_low", -1.0)):
+        res_c = blend_by_name(ra, fa.targets, rb, fb.targets, t)
+        out.append(f"BLENDNAME blendname_{nm} SPEC {fmt(t)} linear "
+                   f"MAPA blend_map_a A " + wv_s(wa) +
+                   " MAPB blend_map_b B " + wv_s(wb) +
+                   " OUT " + " ".join(f"{n}={fmt(w)}" for n, w in res_c))
+    out.append("")
+
+    res = blend_by_name(ra, fa.targets, rb, fb.targets, 0.5, "equalPower")
+    out.append("# constant-power crossfade between two maps, which is what a")
+    out.append("# source moving from one rig to another wants")
+    out.append(f"BLENDNAME blendname_equalpower CROSS {fmt(0.5)} equalPower "
+               f"MAPA blend_map_a A " + wv_s(wa) +
+               " MAPB blend_map_b B " + wv_s(wb) +
+               " OUT " + " ".join(f"{n}={fmt(w)}" for n, w in res))
+    out.append("")
 
     return out
 

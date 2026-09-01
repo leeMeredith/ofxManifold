@@ -549,6 +549,42 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
+      - name: blendByName merges by TargetID not name must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '        const std::string& name = mb.targetName(wt.id);\n        auto it = std::find_if(out.begin(), out.end(),' \
+            '        const std::string& name = mb.targetName(wt.id);\n        auto it = std::find_if(out.end(), out.end(),'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: blendByName gains not curved must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '    const float ga = fn(1.0f - t);\n    const float gb = fn(t);' \
+            '    const float ga = 1.0f - t;\n    const float gb = t;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: blendByName overwrites shared targets must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '        if (it != out.end()) it->weight += wt.weight * gb;' \
+            '        if (it != out.end()) it->weight = wt.weight * gb;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: blendByName does not clamp t must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '    if (t < 0.0f) t = 0.0f;\n    if (t > 1.0f) t = 1.0f;\n\n    const float ga = fn(1.0f - t);' \
+            '    const float ga = fn(1.0f - t);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
       - name: Restored tree must be green
         run: |
           make clean

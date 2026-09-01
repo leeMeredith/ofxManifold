@@ -713,11 +713,25 @@ designing for from the start, and it is why interpretation is closed over weight
 vectors.
 
 ```cpp
-WeightVector blend(const WeightVector& a,
-                   const WeightVector& b,
-                   float t,
-                   CurveFn curve);
+// same manifold only -- merges by NodeID
+WeightVector blend(const WeightVector& a, const WeightVector& b,
+                   float t, curve::Fn);
+
+// two different manifolds -- merges by target NAME, in the mapping layer
+std::vector<NamedWeight> blendByName(const Resolved& a, const Mapping& ma,
+                                     const Resolved& b, const Mapping& mb,
+                                     float t, curve::Fn);
 ```
+
+**[v2] Two functions, not one.** `blend()` merges by `NodeID`, and NodeIDs are
+per-manifold indices — two independently built manifolds both start at zero, so
+blending across them silently sums unrelated nodes into a result that still sums
+to one. Its precondition is that both vectors come from the same manifold.
+
+Crossfading two *different* manifolds happens in the mapping layer, after each
+side has resolved to targets. That is where it belongs rather than a workaround:
+two maps share no nodes — if they did they would be one map — and what they do
+share is outputs, which are named. See DECISIONS.md D-013.
 
 The natural unit of composition is the weight vector, not the manifold. Several
 manifolds evaluated concurrently and blended downstream is the design.

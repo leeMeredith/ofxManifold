@@ -860,3 +860,81 @@ window the computed span is zero or negative and the span check returns zero
 anyway. Verified directly rather than assumed. The guard stays because it states
 the intent at the top of the function, but no vector can distinguish it and none
 pretends to.
+
+
+---
+
+## D-013 — blend() cannot blend two manifolds
+
+**Date:** 2026-09-01
+**Status:** design gap found while building the feature, closed
+**Files:** `src/interpretation/ofxManifoldBlend.h`,
+`src/mapping/ofxManifoldMapping.h`
+
+### The gap
+
+`blend()` has existed since the interpretation layer, with vectors covering
+endpoints, disjoint sets, overlap, curves, clamping and sparse ids. Section 9.3
+names it as the mechanism for combining two manifolds.
+
+It cannot do that.
+
+`blend()` merges by NodeID, and NodeIDs are per-manifold indices. Two manifolds
+built independently both start at zero:
+
+    manifold A   front.L=0  front.R=1  front.C=2
+    manifold B   rear.L =0  rear.R =1  rear.C =2
+
+    blend(A.weights, B.weights, 0.5f)
+        -> three entries, not six
+        -> id 0 = 0.5625, which is front.L and rear.L added together
+
+The result sums to one and looks entirely reasonable.
+
+### Why no vector caught it
+
+Every blend vector picks its ids by hand: A on 0 and 1, B on 2 and 3. There is
+even a deliberate overlap case where both share id 1 — but that models *one*
+manifold's weight vector overlapping another view of itself, which is a real
+and different thing.
+
+The suite tested blend() thoroughly against inputs that never collide, because
+the person writing the inputs knew what each id meant. Two independently built
+manifolds always collide.
+
+### The fix, and why it lives in the mapping layer
+
+`blendByName()` resolves each side through its own `Mapping` first, then merges
+by target NAME.
+
+That is not a workaround, it is where the operation belongs. Two maps have no
+nodes in common — if they did they would be one map — so there is nothing to
+merge at the node level. What they share is **outputs**, and outputs are named.
+
+Resolving first also makes something expressible that the node level cannot: a
+composite node in map A and a terminal node in map B can both feed `out.3`, and
+their contributions add correctly.
+
+Merging by name rather than by TargetID matters for the same reason again:
+TargetIDs are per-Mapping indices. The fixtures declare the same target names in
+DIFFERENT ORDERS on purpose, so an implementation merging by id passes only if
+the orders happen to agree.
+
+### blend() is not deprecated
+
+Its precondition is now documented loudly: both vectors must come from the same
+manifold. Valid uses remain — two evaluators at different points in one map, a
+vector against a curved copy of itself, successive frames of one source.
+
+### Pattern
+
+Different from the earlier gaps. D-004 was a suite that could not see a bug;
+D-005 and D-011 were suites that did not run the code. This is a function that
+worked exactly as tested and could not do the job the architecture assigned it.
+
+The vectors were written by someone who knew what each id meant. The failure
+only appears when the ids come from somewhere that does not know.
+
+**Worth asking of any identifier-keyed operation: where do the identifiers come
+from, and can two callers legitimately produce the same one for different
+things?**

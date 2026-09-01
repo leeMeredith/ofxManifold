@@ -236,4 +236,69 @@ private:
     std::vector<Aggregator>                  aggregators_;
 };
 
+// ---- blending across manifolds -------------------------------------------
+
+// A target weight carrying its NAME rather than an id.
+//
+// TargetIDs are per-Mapping indices, exactly as NodeIDs are per-manifold. Two
+// mappings that declared their targets in different orders give the same name
+// different ids, so anything crossing between them has to travel by name.
+struct NamedWeight {
+    std::string target;
+    float       weight = 0.0f;
+};
+
+// Crossfade between two manifolds.
+//
+// This is the operation MIAP performs when it holds two maps and interpolates
+// between them, and it is the historical answer to three dimensions: several
+// concurrent 2D maps combined downstream, rather than tetrahedra (architecture
+// doc 9.3).
+//
+// It lives here rather than beside blend() because a crossfade between two
+// maps is really a crossfade between what they DRIVE. The maps have no nodes
+// in common -- if they did they would be one map -- so there is nothing to
+// merge at the node level. What they share is outputs, and outputs are named.
+//
+// Each side is resolved through its own Mapping first, so a node's share has
+// already been distributed to targets before the two are combined. A composite
+// node in map A and a terminal node in map B can therefore both feed "out.3"
+// and their contributions add, which is correct and is not expressible at the
+// node level at all.
+inline std::vector<NamedWeight> blendByName(
+        const Resolved& a, const Mapping& ma,
+        const Resolved& b, const Mapping& mb,
+        float t, curve::Fn fn = curve::linear) {
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+
+    const float ga = fn(1.0f - t);
+    const float gb = fn(t);
+
+    std::vector<NamedWeight> out;
+    out.reserve(a.targets.size() + b.targets.size());
+
+    for (const auto& wt : a.targets) {
+        out.push_back(NamedWeight{ma.targetName(wt.id), wt.weight * ga});
+    }
+    for (const auto& wt : b.targets) {
+        const std::string& name = mb.targetName(wt.id);
+        auto it = std::find_if(out.begin(), out.end(),
+                               [&](const NamedWeight& o) {
+                                   return o.target == name;
+                               });
+        if (it != out.end()) it->weight += wt.weight * gb;
+        else out.push_back(NamedWeight{name, wt.weight * gb});
+    }
+
+    // Same convention as blend() and evaluate(): a target with no share is
+    // absent rather than present at zero.
+    out.erase(std::remove_if(out.begin(), out.end(),
+                             [](const NamedWeight& o) {
+                                 return std::fabs(o.weight) < 1e-9f;
+                             }),
+              out.end());
+    return out;
+}
+
 } // namespace ofxManifold

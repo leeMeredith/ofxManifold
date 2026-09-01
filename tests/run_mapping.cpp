@@ -59,6 +59,13 @@ WeightVector readWeights(std::istringstream& in) {
     return v;
 }
 
+curve::Fn curveByName(const std::string& n) {
+    if (n == "linear")     return curve::linear;
+    if (n == "equalPower") return curve::equalPower;
+    if (n == "cosine")     return curve::cosine;
+    return curve::linear;
+}
+
 void expectKeyword(std::istringstream& in, const char* kw) {
     std::string tok;
     in >> tok;
@@ -80,6 +87,7 @@ int main(int argc, char** argv) {
     std::cout << "ofxManifold mapping\nvectors: " << path << "\n\n";
 
     Mapping mp;
+    std::map<std::string, Mapping> named;   // for cross-manifold blending
     std::string line;
     while (std::getline(f, line)) {
         if (line.empty() || line[0] == '#') continue;
@@ -88,9 +96,13 @@ int main(int argc, char** argv) {
         in >> kind;
 
         if (kind == "TOL") { in >> tolerance; continue; }
-        if (kind == "MAPPING") { mp = Mapping{}; in >> fixtureName; continue; }
-        if (kind == "END") continue;
-
+        if (kind == "MAPPING") {
+            if (!fixtureName.empty()) named[fixtureName] = mp;
+            mp = Mapping{};
+            in >> fixtureName;
+            continue;
+        }
+        if (kind == "END") { named[fixtureName] = mp; continue; }
         if (kind == "TARGET") {
             std::string n; in >> n; mp.addTarget(n); continue;
         }
@@ -221,6 +233,67 @@ int main(int argc, char** argv) {
                           << mp.aggregators()[i].name << ": expected "
                           << std::fixed << std::setprecision(9) << want[i]
                           << ", got " << r.aggregates[i];
+                    }
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "BLENDNAME") {
+            // Two independently built mappings, merged by target NAME.
+            // NodeIDs collide across them by construction and TargetIDs are
+            // in different orders, so anything merging by id fails here.
+            float t; std::string cname;
+            in >> t >> cname;
+            expectKeyword(in, "MAPA");
+            std::string na; in >> na;
+            expectKeyword(in, "A");
+            const WeightVector wa = readWeights(in);
+            expectKeyword(in, "MAPB");
+            std::string nb; in >> nb;
+            expectKeyword(in, "B");
+            const WeightVector wb = readWeights(in);
+            expectKeyword(in, "OUT");
+
+            std::vector<std::pair<std::string, float>> want;
+            std::string tok;
+            while (in >> tok) {
+                const std::size_t eq = tok.find('=');
+                if (eq == std::string::npos) continue;
+                want.emplace_back(tok.substr(0, eq),
+                                  std::stof(tok.substr(eq + 1)));
+            }
+
+            const Mapping& ma = named[na];
+            const Mapping& mb = named[nb];
+            const std::vector<NamedWeight> got =
+                blendByName(ma.resolve(wa), ma, mb.resolve(wb), mb, t,
+                            curveByName(cname));
+
+            bool ok = got.size() == want.size();
+            if (!ok) {
+                d << "expected " << want.size() << " targets, got "
+                  << got.size();
+                for (const auto& g : got) {
+                    d << "\n      got " << g.target << "=" << std::fixed
+                      << std::setprecision(6) << g.weight;
+                }
+            } else {
+                for (const auto& wt : want) {
+                    bool found = false;
+                    for (const auto& g : got) {
+                        if (g.target != wt.first) continue;
+                        found = true;
+                        if (!close(g.weight, wt.second)) {
+                            ok = false;
+                            d << "\n      " << wt.first << ": expected "
+                              << std::fixed << std::setprecision(6)
+                              << wt.second << ", got " << g.weight;
+                        }
+                        break;
+                    }
+                    if (!found) {
+                        ok = false;
+                        d << "\n      target " << wt.first << " missing";
                     }
                 }
             }

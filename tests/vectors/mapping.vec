@@ -145,3 +145,51 @@ AGGREGATE aggregate_absent_source CROSS IN 0=1 OUT 1 1 1
 # empty weight vector: every aggregate is zero, and the power mode does not take the root of a negative
 AGGREGATE aggregate_empty_input ANALYTIC IN  OUT 0 0 0
 END
+
+#--------------------------------------------------------------------
+# BLENDING ACROSS MANIFOLDS
+#
+# Node identity is local to a manifold. Target identity is
+# local to a mapping. Only the NAME crosses between them.
+#--------------------------------------------------------------------
+
+# map A's mapping: L, R, sub
+MAPPING blend_map_a
+TARGET out.L
+TARGET out.R
+TARGET out.sub
+BIND 0 out.L 1
+BIND 1 out.R 1
+BIND 2 out.sub 1
+END
+
+# map B's mapping: sub, R, rear -- a DIFFERENT id order for the same names, so a merge by id rather than by name gives the wrong answer
+MAPPING blend_map_b
+TARGET out.sub
+TARGET out.R
+TARGET out.rear
+BIND 0 out.sub 1
+BIND 1 out.R 1
+BIND 2 out.rear 1
+END
+# t=0 is map A alone
+BLENDNAME blendname_t0 ANALYTIC 0 linear MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.L=0.5 out.R=0.3 out.sub=0.2
+
+# t=1 is map B alone
+BLENDNAME blendname_t1 ANALYTIC 1 linear MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.R=0.4 out.sub=0.1 out.rear=0.5
+
+# halfway: out.R and out.sub appear in BOTH maps and their contributions add; out.L and out.rear appear in one each
+BLENDNAME blendname_half CROSS 0.5 linear MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.L=0.25 out.R=0.35 out.sub=0.15 out.rear=0.25
+
+BLENDNAME blendname_quarter CROSS 0.25 linear MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.L=0.375 out.R=0.325 out.sub=0.175 out.rear=0.125
+
+# t outside [0, 1] clamps rather than extrapolating into
+# negative gains. A crossfade driven from an unclamped fader
+# would otherwise invert one map as it passed the end.
+BLENDNAME blendname_clamp_high SPEC 2 linear MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.R=0.4 out.sub=0.1 out.rear=0.5
+BLENDNAME blendname_clamp_low SPEC -1 linear MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.L=0.5 out.R=0.3 out.sub=0.2
+
+# constant-power crossfade between two maps, which is what a
+# source moving from one rig to another wants
+BLENDNAME blendname_equalpower CROSS 0.5 equalPower MAPA blend_map_a A 0=0.5 1=0.3 2=0.2 MAPB blend_map_b B 0=0.1 1=0.4 2=0.5 OUT out.L=0.3535533906 out.R=0.4949747468 out.sub=0.2121320344 out.rear=0.3535533906
+

@@ -23,6 +23,28 @@
 
 namespace ofxManifold {
 
+// PRECONDITION: both vectors must come from the SAME manifold.
+//
+// Merging is by NodeID, and NodeIDs are per-manifold indices. Two manifolds
+// built independently both start at 0, so blending across them silently sums
+// unrelated nodes:
+//
+//     manifold A   front.L=0  front.R=1  front.C=2
+//     manifold B   rear.L =0  rear.R =1  rear.C =2
+//
+//     blend(A.weights, B.weights, 0.5f)
+//         -> three entries, not six. front.L and rear.L were added together
+//            because both are node 0. The result sums to 1 and looks entirely
+//            reasonable.
+//
+// Valid uses: two evaluators at different points in one map, a weight vector
+// against a curved copy of itself, successive frames of the same source.
+//
+// To crossfade between two DIFFERENT manifolds, use blendByName() in the
+// mapping layer. Node identity is local to a manifold; target identity is not,
+// and a crossfade between maps is really a crossfade between what they drive.
+// See DECISIONS.md D-013.
+//
 // Crossfade a into b by t, with the crossfade shaped by `fn`.
 //
 // t == 0 yields a, t == 1 yields b, for every curve, because every curve here
