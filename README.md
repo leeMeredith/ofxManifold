@@ -172,6 +172,12 @@ watch it refuse to move when it would turn a region inside out. Three fixtures:
 a clean fan, a deliberately broken T-junction, and two overlapping regions where
 the answer depends on which side you entered from.
 
+**`example-blend`** — two manifolds stacked in one square, one point evaluated
+against both, one crossfade combining them by target name. Hold the point still
+and sweep the crossfade: every output changes while the point has not moved.
+That is the third axis — two 2D maps combined downstream, which is how SpaceMap
+reached three dimensions rather than with tetrahedra.
+
 **`example-trajectory`** — the touring case. Record a path by dragging, play it
 back, then swap the venue underneath it *while it is still playing*. The dot
 traces the same shape; every node has moved, so the weights reorganize around a

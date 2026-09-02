@@ -30,6 +30,7 @@ D-010). It is checked for typos against a stub and judged by eye.
 - `example-parameter-morphing`: four presets, continuous blend
 - `example-mapping`: the node taxonomy, null ring, aggregators, dense output
 - `example-trajectory`: record, replay, swap venue mid-playback
+- `example-blend`: two maps stacked, crossfaded by target name
 
 ---
 
