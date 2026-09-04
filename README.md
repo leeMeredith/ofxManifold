@@ -172,6 +172,10 @@ watch it refuse to move when it would turn a region inside out. Three fixtures:
 a clean fan, a deliberately broken T-junction, and two overlapping regions where
 the answer depends on which side you entered from.
 
+**`example-spread`** — one slider from pinpoint to wash. The node weights stay
+at 1.000 the whole way; the resolved targets fall, because spread hands weight
+to the null nodes too and they discard it. Nothing was told to fade.
+
 **`example-blend`** — two manifolds stacked in one square, one point evaluated
 against both, one crossfade combining them by target name. Hold the point still
 and sweep the crossfade: every output changes while the point has not moved.

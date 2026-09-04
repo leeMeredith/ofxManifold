@@ -80,6 +80,19 @@ def dense(targets, links, aggregators, wv):
     return d
 
 
+def spread(v, amount, total):
+    """Explicit per-component lerp toward uniform, as in the interpretation
+    reference. Repeated here so the composition test does not depend on
+    importing across reference files."""
+    if amount <= 0.0 or total == 0:
+        return list(v)
+    amount = min(amount, 1.0)
+    uniform = 1.0 / total
+    src = {i: w for i, w in v}
+    return [(i, (1.0 - amount) * src.get(i, 0.0) + amount * uniform)
+            for i in range(total)]
+
+
 def blend_by_name(ra, names_a, rb, names_b, t, curve="linear"):
     """
     Crossfade two RESOLVED target vectors by target NAME.
@@ -380,6 +393,58 @@ def build():
          " does not take the root of a negative"),
     ], note="aggregators are SpaceMap's derived nodes -- they run the routing"
             " backwards and are not part of any region")
+
+    # ---- spread composed with mapping ------------------------------------
+    #
+    # Spread and mapping are each well covered and were never composed. Their
+    # interaction is not obvious, and it is worth asserting rather than
+    # discovering.
+    #
+    # Spreading pushes weight onto EVERY node in the map, including the null
+    # ones. A null node discards its share, so the resolved TARGET total falls
+    # as spread rises -- spreading a map that is ringed with null nodes fades
+    # the output, without anything being told to fade.
+    #
+    # That is emergent behaviour of two correct layers, and it is the sort of
+    # thing that reads as a bug in a rehearsal room unless someone wrote it
+    # down first.
+    f = Fixture("spread_with_nulls")
+    f.bind(0, "out.1")
+    f.bind(1, "out.2")
+    f.bind(2, "out.3")
+    # nodes 3, 4, 5 are bound to nothing: a null ring
+    f.emit(out, [], note="three bound nodes and three null ones")
+
+    out.append("#" + "-" * 68)
+    out.append("# SPREAD COMPOSED WITH MAPPING")
+    out.append("#")
+    out.append("# Node weights sum to 1 at every spread amount. Resolved")
+    out.append("# targets do not, because spread hands part of the weight to")
+    out.append("# nodes bound to nothing.")
+    out.append("#" + "-" * 68)
+    out.append("")
+
+    base = [(0, 0.5), (1, 0.3), (2, 0.2)]
+    for nm, amt, cls, note in [
+        ("none", 0.0, "ANALYTIC",
+         "no spread: all weight is on bound nodes, targets total 1"),
+        ("quarter", 0.25, "CROSS", ""),
+        ("half", 0.5, "CROSS", ""),
+        ("full", 1.0, "ANALYTIC",
+         "full spread: uniform over six nodes, three of them null, so "
+         "exactly half the weight is discarded and the targets total 0.5"),
+    ]:
+        sv = spread(base, amt, 6)
+        res, _ = resolve(f.targets, f.links, f.aggregators, sv)
+        node_total = sum(w for _, w in sv)
+        tgt_total = sum(w for _, w in res)
+        if note:
+            out.append(f"# {note}")
+        out.append(f"SPREADRESOLVE spreadres_{nm} {cls} {fmt(amt)} 6 "
+                   f"IN {wv_s(base)} "
+                   f"NODESUM {fmt(node_total)} TARGETSUM {fmt(tgt_total)} "
+                   f"OUT " + tv_s(f.targets, res))
+        out.append("")
 
     # ---- blending ACROSS manifolds --------------------------------------
     #

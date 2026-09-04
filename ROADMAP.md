@@ -15,11 +15,11 @@ serialization the standard library's own JSON parser against a hand-written one.
 |---|---|---|
 | `core` | 31 + 48 | triangle solve, bias, degeneracy, affine invariance, containment, topology, inverse evaluation, node movement, evaluator hint |
 | `interpretation` | 60 | curves, spread, blend, interpolate, coverage |
-| `mapping` | 31 | bindings, aggregators, dense output, cross-manifold blending by name |
+| `mapping` | 35 | bindings, aggregators, dense output, cross-manifold blending by name |
 | `io` | 42 | JSON round trip, rejection, diagnosis |
 | `sources` | 51 | trajectories, real-time replay, velocity, the touring case |
 
-**263 vectors, 53 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**267 vectors, 53 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 
 ## Built, judged on screen
 
@@ -38,21 +38,14 @@ It is checked for typos against a stub and judged by eye.
 - **`example-trajectory`** — record, replay in real seconds, swap venue
   mid-playback
 - **`example-blend`** — two maps stacked, crossfaded by target name
+- **`example-spread`** — pinpoint to wash, and the fade that emerges from
+  spreading onto null nodes (D-014)
 
 ---
 
 ## Next
 
-Three items, in no fixed order. None blocks anything.
-
-### Spread — an example only
-
-`spread()` is implemented and covered. One slider from pinpoint to wash, and
-nothing demonstrates it. The cheapest remaining item by a wide margin.
-
-Worth presenting alongside MIAP's `barycentricpower`: both are transformations
-of the influence weights themselves, applied before anyone decides what the
-weights mean. Neither is an audio feature, and neither belongs in the evaluator.
+Two items, in no fixed order. Neither blocks anything.
 
 ### Smoothing (§12) — the one real work would notice
 

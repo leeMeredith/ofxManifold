@@ -938,3 +938,67 @@ only appears when the ids come from somewhere that does not know.
 **Worth asking of any identifier-keyed operation: where do the identifiers come
 from, and can two callers legitimately produce the same one for different
 things?**
+
+
+---
+
+## D-014 — Two correct layers, one untested interaction
+
+**Date:** 2026-09-01
+**Status:** gap closed while building the spread example
+**Files:** `tests/ref/reference_mapping.py`, `tests/run_mapping.cpp`
+
+### What was missing
+
+`spread()` had ten vectors: endpoints, sparsity preserved at zero, uniform at
+one, partition of unity at four intermediate amounts, clamping, sparse ids.
+`Mapping::resolve()` had its own. Both correct, both thorough.
+
+Nothing composed them, and their composition is not obvious.
+
+Spread hands part of the weight to EVERY node in the map, null nodes included. A
+null node discards its share. So spreading a map that is ringed with null nodes
+**fades the output**, and nothing was told to fade:
+
+    spread   node weights sum   resolved targets
+    0.0      1.000              1.000
+    0.5      1.000              0.750
+    1.0      1.000              0.500      <- three of six nodes are null
+
+The node weights are right. The target total is right. The relationship between
+them is a consequence neither layer states.
+
+### Why it matters more than it looks
+
+This is the shape of thing that reads as a bug in a rehearsal room. An operator
+raises spread expecting a wash, the level drops, and the obvious conclusion is
+that something is broken. It is not broken — it is correct, and arguably it is
+what you want, since spreading toward the edge of a map should approach the
+same silence that moving toward the edge does.
+
+But nobody can reason their way to that at short notice, which is exactly the
+argument for writing it down as a vector rather than leaving it to be
+rediscovered.
+
+### The fix
+
+`SPREADRESOLVE` records assert both totals separately at four spread amounts,
+because they legitimately differ. Full spread over three bound and three null
+nodes lands the target total at exactly 0.5, which is hand-checkable.
+
+`example-spread` shows the same thing on screen with the two totals side by
+side and the null nodes coloured differently.
+
+### Pattern
+
+Every previous gap here was inside one function or one suite. This one is
+between two of them.
+
+Each layer was tested against its own contract and neither contract mentions
+the other, because the layering is exactly what makes them independent. That
+independence is the architecture working — and it means **composition is a
+third thing that has to be tested on purpose**, since no amount of testing the
+parts implies it.
+
+Worth asking wherever two layers meet: what is true of the pair that is stated
+by neither?

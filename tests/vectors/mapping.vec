@@ -146,6 +146,34 @@ AGGREGATE aggregate_absent_source CROSS IN 0=1 OUT 1 1 1
 AGGREGATE aggregate_empty_input ANALYTIC IN  OUT 0 0 0
 END
 
+# three bound nodes and three null ones
+MAPPING spread_with_nulls
+TARGET out.1
+TARGET out.2
+TARGET out.3
+BIND 0 out.1 1
+BIND 1 out.2 1
+BIND 2 out.3 1
+END
+#--------------------------------------------------------------------
+# SPREAD COMPOSED WITH MAPPING
+#
+# Node weights sum to 1 at every spread amount. Resolved
+# targets do not, because spread hands part of the weight to
+# nodes bound to nothing.
+#--------------------------------------------------------------------
+
+# no spread: all weight is on bound nodes, targets total 1
+SPREADRESOLVE spreadres_none ANALYTIC 0 6 IN 0=0.5 1=0.3 2=0.2 NODESUM 1 TARGETSUM 1 OUT out.1=0.5 out.2=0.3 out.3=0.2
+
+SPREADRESOLVE spreadres_quarter CROSS 0.25 6 IN 0=0.5 1=0.3 2=0.2 NODESUM 1 TARGETSUM 0.875 OUT out.1=0.4166666667 out.2=0.2666666667 out.3=0.1916666667
+
+SPREADRESOLVE spreadres_half CROSS 0.5 6 IN 0=0.5 1=0.3 2=0.2 NODESUM 1 TARGETSUM 0.75 OUT out.1=0.3333333333 out.2=0.2333333333 out.3=0.1833333333
+
+# full spread: uniform over six nodes, three of them null, so exactly half the weight is discarded and the targets total 0.5
+SPREADRESOLVE spreadres_full ANALYTIC 1 6 IN 0=0.5 1=0.3 2=0.2 NODESUM 1 TARGETSUM 0.5 OUT out.1=0.1666666667 out.2=0.1666666667 out.3=0.1666666667
+
+
 #--------------------------------------------------------------------
 # BLENDING ACROSS MANIFOLDS
 #

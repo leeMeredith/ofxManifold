@@ -7,6 +7,7 @@
 //
 // Targets are compared BY NAME throughout, never by position. See D-004.
 
+#include "../src/interpretation/ofxManifoldSpread.h"
 #include "../src/mapping/ofxManifoldMapping.h"
 
 #include <cmath>
@@ -233,6 +234,80 @@ int main(int argc, char** argv) {
                           << mp.aggregators()[i].name << ": expected "
                           << std::fixed << std::setprecision(9) << want[i]
                           << ", got " << r.aggregates[i];
+                    }
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "SPREADRESOLVE") {
+            // The layer boundary, exercised. Interpretation's output is fed
+            // to mapping unchanged, and the two totals are asserted
+            // separately because they legitimately differ.
+            float amount; std::size_t total;
+            in >> amount >> total;
+            expectKeyword(in, "IN");
+            const WeightVector input = readWeights(in);
+            expectKeyword(in, "NODESUM");
+            float wantNodeSum; in >> wantNodeSum;
+            expectKeyword(in, "TARGETSUM");
+            float wantTargetSum; in >> wantTargetSum;
+            expectKeyword(in, "OUT");
+            std::vector<std::pair<std::string, float>> want;
+            std::string tok;
+            while (in >> tok) {
+                const std::size_t eq = tok.find('=');
+                if (eq == std::string::npos) continue;
+                want.emplace_back(tok.substr(0, eq),
+                                  std::stof(tok.substr(eq + 1)));
+            }
+
+            const WeightVector sv = spread(input, amount, total);
+            float nodeSum = 0.0f;
+            for (const auto& wn : sv) nodeSum += wn.weight;
+
+            const Resolved r = mp.resolve(sv);
+            float targetSum = 0.0f;
+            for (const auto& t : r.targets) targetSum += t.weight;
+
+            bool ok = true;
+            if (!close(nodeSum, wantNodeSum)) {
+                ok = false;
+                d << "node weights sum to " << std::fixed
+                  << std::setprecision(6) << nodeSum << ", expected "
+                  << wantNodeSum
+                  << "\n      spread must preserve partition of unity at "
+                     "every amount";
+            }
+            if (!close(targetSum, wantTargetSum)) {
+                ok = false;
+                d << "\n      targets total " << std::fixed
+                  << std::setprecision(6) << targetSum << ", expected "
+                  << wantTargetSum
+                  << "\n      the shortfall is weight spread onto null nodes";
+            }
+            if (ok && r.targets.size() != want.size()) {
+                ok = false;
+                d << "\n      expected " << want.size() << " targets, got "
+                  << r.targets.size();
+            }
+            if (ok) {
+                for (const auto& wt : want) {
+                    const TargetID id = mp.findTarget(wt.first);
+                    bool found = false;
+                    for (const auto& t : r.targets) {
+                        if (t.id != id) continue;
+                        found = true;
+                        if (!close(t.weight, wt.second)) {
+                            ok = false;
+                            d << "\n      " << wt.first << ": expected "
+                              << std::fixed << std::setprecision(6)
+                              << wt.second << ", got " << t.weight;
+                        }
+                        break;
+                    }
+                    if (!found) {
+                        ok = false;
+                        d << "\n      target " << wt.first << " missing";
                     }
                 }
             }
