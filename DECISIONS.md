@@ -1002,3 +1002,92 @@ parts implies it.
 
 Worth asking wherever two layers meet: what is true of the pair that is stated
 by neither?
+
+
+---
+
+## D-015 — Measured the mesh ceiling, and did not optimize
+
+**Date:** 2026-09-01
+**Status:** measured; one example fixed, no kernel change
+**Files:** `tests/bench/bench_mesh.cpp`, `example-basic/src/ofApp.cpp`
+
+### The question
+
+Every map in the suite and every example is five to nine nodes. The roadmap has
+carried a "larger mesh sanity check" since publication on the suspicion that
+containment search would need a spatial index.
+
+### The measurement
+
+Triangulated square grids, 2000 evaluations each, release build, on both
+platforms the project already tests against.
+
+                    Linux x86_64                  macOS arm64
+    nodes  regions   scan    hinted  validate()    scan    hinted  validate()
+       16       18   0.11us  0.06us     0.01ms   0.18us  0.09us     0.01ms
+      100      162   0.45us  0.06us     0.29ms   0.45us  0.06us     0.26ms
+      324      578   1.34us  0.10us     3.21ms   1.10us  0.09us     2.45ms
+     1024     1922   4.16us  0.34us    33.55ms   2.34us  0.18us    14.30ms
+     3136     6050  13.25us  1.94us   328.01ms   4.67us  0.61us    129.22ms
+    10000    19602  42.98us  9.71us  3557.01ms  14.79us  3.32us   1351.20ms
+
+Apple Silicon is 2.6 to 2.9 times faster at the top end and marginally SLOWER
+at the bottom. The crossover sits somewhere near a hundred nodes.
+
+That shape is the usual one for a linear scan over a growing array: at small
+sizes everything is in cache on both machines and raw clock decides it; at large
+sizes memory bandwidth decides it, and the M-series wins comfortably. Worth
+recording because the ceiling below is hardware-dependent, and quoting one
+platform's number as though it were the number would be wrong.
+
+### What it says
+
+**Evaluation is never the problem.** Ten thousand nodes cost 43 microseconds
+with no hint at all — 0.3% of a frame at 60fps. The linear scan over regions is
+fine at every size anyone will author by hand, and the spatial index the
+roadmap anticipated would optimize something that does not cost anything.
+
+The `Evaluator` hint still earns its keep, four times faster at the top end,
+but for a different reason than expected: it is not O(1), because a point that
+leaves its region pays a full scan. It amortizes those scans across the frames
+between region changes.
+
+**`validate()` sets the ceiling, at O(regions x 3 x nodes).** It crosses a
+frame budget around a thousand nodes on both machines -- 33 ms on x86, 14 ms on
+Apple Silicon, either of which is a dropped frame -- and reaches seconds at ten
+thousand.
+
+### What was actually broken
+
+`example-basic` called `validate()` on every `mouseDragged` while a node was
+being dragged. At 324 nodes that is 2 to 3 ms per frame, tolerable; at 1024 it
+is 14 to 34 ms depending on the machine, which is a dropped frame every frame on
+either.
+
+And it was unnecessary. Moving a node cannot change the region list, and the
+one thing a move CAN break — an inverted region — is refused by
+`setNodePosition()` before it happens. A move can create or clear a T-junction,
+so the report is now refreshed once on mouse release rather than continuously.
+
+### Why validate() was not optimized
+
+It is authoring-time work. A bounding-box reject or a spatial grid would cut it
+substantially, and nobody has a map where it matters: the practical ceiling is
+somewhere past a thousand nodes, and a hand-authored control surface is tens.
+
+Optimizing it now would add a spatial structure that must be kept correct
+against node movement, in exchange for making a fast thing faster on maps that
+do not exist. The measurement is recorded here so whoever does hit the ceiling
+starts from evidence rather than repeating the investigation.
+
+### Pattern
+
+This is the Debug-to-Release lesson again, in the other direction. There the
+measurement eliminated a planned optimization track; here it eliminated a
+different one and pointed at a real per-frame cost nobody had suspected, in an
+example rather than in the kernel.
+
+The suspicion was containment search. The problem was validation. Neither
+would have been found by reasoning about the code, and `make bench` now makes
+the question cheap to re-ask.

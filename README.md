@@ -169,8 +169,9 @@ an openFrameworks checkout.
 
 **`example-basic`** — drag the point, watch the weights. Drag a *node* and
 watch it refuse to move when it would turn a region inside out. Three fixtures:
-a clean fan, a deliberately broken T-junction, and two overlapping regions where
-the answer depends on which side you entered from.
+a clean fan, a deliberately broken T-junction, two overlapping regions where the
+answer depends on which side you entered from, and a 144-node grid for looking
+at the renderer at density.
 
 **`example-spread`** — one slider from pinpoint to wash. The node weights stay
 at 1.000 the whole way; the resolved targets fall, because spread hands weight
@@ -218,6 +219,10 @@ faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform
 alone.
+
+`make bench` measures evaluation and validation across triangulated grids from
+16 to 10000 nodes. It gates nothing; it exists so scaling questions get answered
+with evidence. See DECISIONS.md D-015.
 
 `DECISIONS.md` records the reversals and what forced each one. `ROADMAP.md`
 records what is next and what is deliberately parked.

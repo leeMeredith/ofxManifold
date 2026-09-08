@@ -31,6 +31,7 @@ void ofApp::buildFan() {
     evaluator = std::make_unique<Evaluator>(manifold);
     renderer  = std::make_unique<ofxManifoldRenderer>(manifold);
     topology  = manifold.validate();
+    topologyStale = false;
 }
 
 void ofApp::buildTJunction() {
@@ -60,6 +61,7 @@ void ofApp::buildTJunction() {
     evaluator = std::make_unique<Evaluator>(manifold);
     renderer  = std::make_unique<ofxManifoldRenderer>(manifold);
     topology  = manifold.validate();
+    topologyStale = false;
 }
 
 void ofApp::buildOverlap() {
@@ -93,6 +95,7 @@ void ofApp::buildOverlap() {
     evaluator = std::make_unique<Evaluator>(manifold);
     renderer  = std::make_unique<ofxManifoldRenderer>(manifold);
     topology  = manifold.validate();
+    topologyStale = false;
 }
 
 ofxManifold::NodeID ofApp::nodeAt(const glm::vec2& screen) const {
@@ -103,6 +106,47 @@ ofxManifold::NodeID ofApp::nodeAt(const glm::vec2& screen) const {
         if (glm::distance(p, screen) <= grab) return id;
     }
     return InvalidNode;
+}
+
+void ofApp::buildGrid() {
+    // A triangulated 12 x 12 grid: 144 nodes, 242 regions, every interior edge
+    // shared whole. Nothing in the suite or the other fixtures is anywhere
+    // near this dense, and the renderer has never been looked at here.
+    manifold = Manifold2D();
+    const int n = 12;
+    for (int y = 0; y < n; ++y) {
+        for (int x = 0; x < n; ++x) {
+            manifold.addNode(ofToString(y * n + x),
+                             {0.04f + 0.92f * x / (n - 1),
+                              0.04f + 0.92f * y / (n - 1)});
+        }
+    }
+    for (int y = 0; y < n - 1; ++y) {
+        for (int x = 0; x < n - 1; ++x) {
+            const NodeID a = y * n + x, b = a + 1;
+            const NodeID c = a + n,     d = c + 1;
+            manifold.addTriangle(a, b, c);
+            manifold.addTriangle(b, d, c);
+        }
+    }
+    fixtureName = "4  dense grid (144 nodes, 242 regions)";
+    guidance = {
+        "The renderer at a density it was never",
+        "designed against. Labels are the first",
+        "thing to fail -- press L to hide them.",
+        "",
+        "Evaluation is unaffected: 144 nodes costs",
+        "under a microsecond either way. It is",
+        "validate() that grows, at O(regions x 3",
+        "x nodes), which is why dragging a node",
+        "no longer revalidates every frame.",
+        "",
+        "See DECISIONS.md D-015."};
+
+    evaluator = std::make_unique<Evaluator>(manifold);
+    renderer  = std::make_unique<ofxManifoldRenderer>(manifold);
+    topology  = manifold.validate();
+    topologyStale = false;
 }
 
 void ofApp::update() {
@@ -176,6 +220,8 @@ void ofApp::draw() {
     ofDrawBitmapString("1           fan", x, y);                 y += 16.0f;
     ofDrawBitmapString("2           T-junction", x, y);          y += 16.0f;
     ofDrawBitmapString("3           overlap / hysteresis", x, y); y += 16.0f;
+    ofDrawBitmapString("4           dense grid (144 nodes)", x, y);y += 16.0f;
+    ofDrawBitmapString("l           labels on / off", x, y);       y += 16.0f;
     ofDrawBitmapString("t           toggle warnings", x, y);     y += 16.0f;
     ofDrawBitmapString("s           save manifold.json", x, y);
     y += 32.0f;
@@ -199,6 +245,10 @@ void ofApp::mousePressed(int x, int y, int) {
 void ofApp::mouseReleased(int, int, int) {
     dragging = InvalidNode;
     lastMoveRefused = false;
+    if (topologyStale) {
+        topology = manifold.validate();
+        topologyStale = false;
+    }
 }
 
 void ofApp::mouseMoved(int x, int y) {
@@ -230,7 +280,16 @@ void ofApp::mouseDragged(int x, int y, int) {
         // change, so the hint is still VALID -- but clearing it is honest and
         // costs one linear scan on the next frame.
         evaluator->reset();
-        topology = manifold.validate();
+
+        // NOT revalidated here. validate() is O(regions x 3 x nodes), which
+        // measures 3 ms at 324 nodes and 33 ms at 1024 -- a dropped frame
+        // every frame of the drag. Topology cannot change by moving a node
+        // anyway: the region list is untouched, and the one thing a move CAN
+        // break, an inverted region, is refused by setNodePosition() above.
+        //
+        // A move can create or clear a T-junction, though, so the report is
+        // refreshed once on release. See DECISIONS.md D-015.
+        topologyStale = true;
         return;
     }
 
@@ -241,6 +300,10 @@ void ofApp::keyPressed(int key) {
     if (key == '1') buildFan();
     if (key == '2') buildTJunction();
     if (key == '3') buildOverlap();
+    if (key == '4') buildGrid();
+    if (key == 'l' || key == 'L') {
+        renderer->style.drawLabels = !renderer->style.drawLabels;
+    }
     if (key == 't') showTopology = !showTopology;
     if (key == 's') {
         ofBuffer buf;

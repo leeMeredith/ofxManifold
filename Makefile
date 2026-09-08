@@ -47,7 +47,9 @@ SOURCES  := src/sources/ofxManifoldPointSource.h \
 IO       := src/io/ofxManifoldJSON.h \
             src/io/ofxManifoldSerialize.h
 
-.PHONY: all test test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory headers workflow wrapper vectors clean
+BENCH    := $(BUILD)/bench
+
+.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory headers workflow wrapper vectors clean
 
 all: test
 
@@ -168,6 +170,16 @@ $(TRI_VEC): tests/ref/reference.py
 
 $(MAN_VEC): tests/ref/reference_manifold.py
 	@python3 tests/ref/reference_manifold.py
+
+# Not a conformance test: it asserts nothing and gates nothing. It prints
+# numbers so a scaling decision can be made from evidence rather than
+# intuition. See DECISIONS.md D-015.
+bench: $(BENCH)
+	@./$(BENCH)
+
+$(BENCH): tests/bench/bench_mesh.cpp $(CORE)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/bench/bench_mesh.cpp
 
 clean:
 	@rm -rf $(BUILD)

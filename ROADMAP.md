@@ -45,7 +45,7 @@ It is checked for typos against a stub and judged by eye.
 
 ## Next
 
-Two items, in no fixed order. Neither blocks anything.
+One item. It does not block anything.
 
 ### Smoothing (§12) — the one real work would notice
 
@@ -65,14 +65,24 @@ noise and assert the reduction, feed silence and assert it settles rather than
 drifting. That is a new testing shape for this project and worth getting right
 deliberately.
 
-### Larger mesh
+### Larger mesh — MEASURED
 
-Everything so far is five to nine nodes. Thirty would show whether the renderer
-stays legible at density and whether the `Evaluator` hint earns its keep.
+`make bench` runs triangulated grids from 16 to 10000 nodes. Findings in
+DECISIONS.md D-015, in short:
 
-Deliberately after the tag: it may change the renderer, and the renderer is the
-layer with no tests behind it, so a change there wants its own release rather
-than riding along.
+- **evaluation is never the problem** — 10000 nodes costs 43 us on x86 and
+  15 us on Apple Silicon with no hint at all, well under 1% of a frame. The
+  spatial index this item anticipated would optimize something that does not
+  cost anything.
+- **`validate()` sets the ceiling** at O(regions x 3 x nodes), crossing a frame
+  budget around a thousand nodes on both platforms.
+- **`example-basic` was revalidating every frame while dragging a node.** Fixed:
+  once on release. That was the only real cost found.
+
+Not optimized, deliberately. It is authoring-time work and the practical
+ceiling is far past any hand-authored map. `example-basic` fixture 4 is a
+144-node grid for judging the renderer at density; press `l` to hide labels,
+which are the first thing to fail.
 
 ---
 

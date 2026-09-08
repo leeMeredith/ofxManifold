@@ -28,6 +28,7 @@ private:
     void buildFan();
     void buildTJunction();
     void buildOverlap();
+    void buildGrid();
 
     // Which node is under the cursor, or InvalidNode. Hit testing happens in
     // SCREEN space: a node's grab radius should be the same number of pixels
@@ -43,6 +44,7 @@ private:
     ofxManifold::Evaluation       evaluation;
     ofxManifold::TopologyReport   topology;
     bool                          showTopology = true;
+    bool                          topologyStale = false;
 
     // Node dragging. The refusal is the point: setNodePosition() returns false
     // when a move would invert or flatten a region, and the node stops rather
