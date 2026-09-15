@@ -1091,3 +1091,100 @@ example rather than in the kernel.
 The suspicion was containment search. The problem was validation. Neither
 would have been found by reasoning about the code, and `make bench` now makes
 the question cheap to re-ask.
+
+
+---
+
+## D-016 — The first stateful component, and a different testing shape
+
+**Date:** 2026-09-07
+**Status:** built
+**Files:** `src/interpretation/ofxManifoldSmoother.h`,
+`tests/ref/reference_smoother.py`, `tests/run_smoother.cpp`
+
+### What smoothing is actually for
+
+Not ordinary region crossings. On a conforming mesh the weights are already
+continuous there — walk a point across a shared edge and the departing node
+decays to exactly zero as the arriving one rises from zero:
+
+    y=0.56  region 0 : O=0.550 N=0.150 E=0.300
+    y=0.50  region 0 : O=0.700 N=0.000 E=0.300
+    y=0.44  region 1 : O=0.550 E=0.300 S=0.150
+
+The node SET changes; the numbers do not jump. That was worth checking before
+building anything, and it narrowed the job considerably.
+
+Smoothing is for the cases that genuinely step: a jittery source, leaving or
+entering the hull, the Evaluator's hysteresis in overlapping regions, a
+T-junction, or a point that jumps because a cue fired or a map was swapped.
+
+### Weights, not the point
+
+Smoothing the input position would handle jitter and nothing else. A hull exit,
+an overlap pop and a map swap are discontinuities in the OUTPUT that a perfectly
+smooth input still produces. Smoothing where the discontinuity is means one
+component handles all of them.
+
+### The finding worth keeping
+
+**Exponential smoothing preserves partition of unity exactly**, even across two
+weight vectors that share no nodes at all. The smoothed vector is a lerp between
+two vectors that each sum to one, taken over their union with absent nodes at
+zero, so the sum is a lerp of 1 and 1.
+
+Measured across a fully disjoint transition, every tick: 1.000000.
+
+That matters because it means a smoother can sit anywhere in the chain without
+disturbing the invariant every other layer relies on.
+
+**A slew limit does not**, and that is not a bug. Each component is clamped
+independently, so while three nodes fall and two rise the totals do not balance.
+The sum dips to 0.8, holds while the rates happen to match, and recovers to one
+once the departing nodes reach zero. Renormalizing would hide it and would break
+the bound the caller asked for — the point of a slew limit is that nothing moves
+faster than the stated rate. Recorded as vectors rather than corrected.
+
+### The testing shape
+
+Every other suite tests a pure function: one input, one output, order
+irrelevant. A smoother has memory, so a single call proves nothing — an
+implementation right on the first tick and wrong on the fourth passes any
+single-shot check.
+
+Its vectors are sequences. Snap to a state, then tick, and tick, asserting the
+output at every step, with the block failing on the first tick that disagrees.
+
+Half-life and dt rather than a per-frame coefficient, so the result is
+frame-rate independent — six ticks at 60fps and three at 30fps cover the same
+0.1 seconds and must land in the same place. A coefficient tuned in rehearsal on
+one machine would behave differently on another, which is a bad surprise on an
+opening night. That equivalence is its own vector.
+
+### One mutation that took a third vector to catch
+
+Removing the early return for a disabled smoother did not turn the suite red.
+With half-life 0 the general path computes alpha = 1 and lands on the target
+anyway, so every disabled vector passed either way.
+
+The early return sits BEFORE the dt check, deliberately: if smoothing is off,
+elapsed time is irrelevant. `disabled_zero_dt` is the only case that
+distinguishes them, and until it existed the early return looked like an
+untested optimization.
+
+Ten mutations, all now caught, five as CI gates.
+
+### A gap found while writing the example
+
+`ofxManifold.h`, the umbrella header a consumer includes, did not list
+`ofxManifoldSmoother.h`. Nor did it list either of the `sources/` headers.
+
+`example-trajectory` compiled anyway, because `ofxManifoldSerialize.h` includes
+`Trajectory.h` for its own use. Two features were reachable only by accident,
+through a transitive include that could have been removed at any time for
+unrelated reasons.
+
+The same class of bug as the missing `<cstdio>` (D-010's neighbour): it compiles
+for whoever wrote it and breaks for the next person. `make headers` now asserts
+that every header under `src/` appears in the umbrella, which is four lines and
+catches a whole category.

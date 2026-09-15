@@ -17,9 +17,10 @@ serialization the standard library's own JSON parser against a hand-written one.
 | `interpretation` | 60 | curves, spread, blend, interpolate, coverage |
 | `mapping` | 35 | bindings, aggregators, dense output, cross-manifold blending by name |
 | `io` | 42 | JSON round trip, rejection, diagnosis |
+| `interpretation` (smoother) | 24 | exponential and slew smoothing, sequences |
 | `sources` | 51 | trajectories, real-time replay, velocity, the touring case |
 
-**267 vectors, 53 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**291 vectors, 58 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 
 ## Built, judged on screen
 
@@ -40,30 +41,20 @@ It is checked for typos against a stub and judged by eye.
 - **`example-blend`** — two maps stacked, crossfaded by target name
 - **`example-spread`** — pinpoint to wash, and the fade that emerges from
   spreading onto null nodes (D-014)
+- **`example-smoothing`** — raw against smoothed over time, and the four kinds
+  of discontinuity worth smoothing
 
 ---
 
 ## Next
 
-One item. It does not block anything.
+Nothing outstanding. `WeightSmoother` (§12) was the last named item and is
+built — exponential and slew smoothing, frame-rate independent, with the
+project's first sequence-based vectors (DECISIONS.md D-016).
 
-### Smoothing (§12) — the one real work would notice
-
-Named in the architecture since the beginning and still unbuilt. A
-`WeightSmoother` with per-frame slew limiting.
-
-Every real control source is jittery. A tracker, a fader, a network message —
-all of them produce a point that jumps, and a weight vector that jumps is zipper
-noise in audio and popping in visuals. The manifold evaluates instantaneously
-and correctly; something downstream has to slew.
-
-It is also **shaped differently from everything else here**, which is the
-interesting part. The kernel is stateless by design, so every existing vector is
-a single evaluation: one input, one expected output. A smoother has memory, so
-its vectors have to be *sequences* — feed a step and assert the approach, feed
-noise and assert the reduction, feed silence and assert it settles rather than
-drifting. That is a new testing shape for this project and worth getting right
-deliberately.
+`example-smoothing` traces raw against smoothed over time, with jitter, jumps,
+hull exits and a T-junction to provoke. It is also the first thing worth
+reaching for in real use, since every live control source is jittery.
 
 ### Larger mesh — MEASURED
 

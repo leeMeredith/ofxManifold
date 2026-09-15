@@ -19,6 +19,10 @@
 #include "interpretation/ofxManifoldSpread.h"
 #include "interpretation/ofxManifoldBlend.h"
 #include "interpretation/ofxManifoldInterpolate.h"
+#include "interpretation/ofxManifoldSmoother.h"
+
+#include "sources/ofxManifoldPointSource.h"
+#include "sources/ofxManifoldTrajectory.h"
 
 #include "mapping/ofxManifoldMapping.h"
 

@@ -16,6 +16,7 @@ INT_RUN  := $(BUILD)/run_interpretation
 MAP_RUN  := $(BUILD)/run_mapping
 SER_RUN  := $(BUILD)/run_serialize
 TRJ_RUN  := $(BUILD)/run_trajectory
+SMO_RUN  := $(BUILD)/run_smoother
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -23,6 +24,7 @@ INT_VEC  := tests/vectors/interpretation.vec
 MAP_VEC  := tests/vectors/mapping.vec
 SER_VEC  := tests/vectors/serialize.vec
 TRJ_VEC  := tests/vectors/trajectory.vec
+SMO_VEC  := tests/vectors/smoother.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -37,7 +39,8 @@ CORE     := src/core/ofxManifoldTypes.h \
 INTERP   := src/interpretation/ofxManifoldCurves.h \
             src/interpretation/ofxManifoldSpread.h \
             src/interpretation/ofxManifoldBlend.h \
-            src/interpretation/ofxManifoldInterpolate.h
+            src/interpretation/ofxManifoldInterpolate.h \
+            src/interpretation/ofxManifoldSmoother.h
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
@@ -49,14 +52,14 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory headers workflow wrapper vectors clean
+.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize test-trajectory
+      test-serialize test-trajectory test-smoother
 	@echo ""
 	@echo "all suites green"
 
@@ -69,7 +72,7 @@ test: headers workflow wrapper test-triangle test-manifold test-interpretation t
 wrapper:
 	@$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 		-fsyntax-only src/ofx/ofxManifoldRenderer.cpp
-	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread; do \
+	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing; do \
 		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 			-I$$ex/src -fsyntax-only $$ex/src/ofApp.cpp || exit 1; \
 	done
@@ -98,7 +101,14 @@ headers:
 		$(CXX) $(CXXFLAGS) -I. -fsyntax-only $(BUILD)/solo.cpp \
 			|| { echo "  $$h does not compile standalone"; exit 1; }; \
 	done
-	@echo "all headers self-contained"
+	@python3 -c "import os,sys; \
+u=open('src/ofxManifold.h').read(); \
+m=[os.path.join(r,f).replace('src/','') for r,_,fs in os.walk('src') \
+   for f in fs if f.endswith('.h') and f!='ofxManifold.h' \
+   and os.path.join(r,f).replace('src/','') not in u]; \
+print('  ofxManifold.h does not include: '+', '.join(m)) if m else None; \
+sys.exit(1 if m else 0)"
+	@echo "all headers self-contained and reachable from ofxManifold.h"
 
 test-triangle: $(TRI_RUN) $(TRI_VEC)
 	@./$(TRI_RUN) $(TRI_VEC)
@@ -118,6 +128,9 @@ test-serialize: $(SER_RUN) $(SER_VEC) $(SER_FIX)
 test-trajectory: $(TRJ_RUN) $(TRJ_VEC)
 	@./$(TRJ_RUN) $(TRJ_VEC) tests/fixtures
 
+test-smoother: $(SMO_RUN) $(SMO_VEC)
+	@./$(SMO_RUN) $(SMO_VEC)
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -128,6 +141,7 @@ vectors:
 	@python3 tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_serialize.py
 	@python3 tests/ref/reference_trajectory.py
+	@python3 tests/ref/reference_smoother.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -151,12 +165,20 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
 
+$(SMO_RUN): tests/run_smoother.cpp $(CORE) $(INTERP)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_smoother.cpp
+
+$(SMO_VEC): tests/ref/reference_smoother.py
+	@python3 tests/ref/reference_smoother.py
+
 $(TRJ_RUN): tests/run_trajectory.cpp $(CORE) $(MAPPING) $(IO) $(SOURCES)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ tests/run_trajectory.cpp
 
 $(TRJ_VEC): tests/ref/reference_trajectory.py
 	@python3 tests/ref/reference_trajectory.py
+	@python3 tests/ref/reference_smoother.py
 
 $(SER_RUN): tests/run_serialize.cpp $(CORE) $(MAPPING) $(IO)
 	@mkdir -p $(BUILD)

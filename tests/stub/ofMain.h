@@ -20,6 +20,7 @@ struct ofRectangle {
     float getX() const {return 0;} float getY() const {return 0;}
     float getWidth() const {return 1;} float getHeight() const {return 1;}
     float getRight() const {return 1;}
+    float getBottom() const {return 1;}
 };
 struct ofBuffer { ofBuffer(){} void set(const std::string&){}
                   std::string getText() const {return "";} };
@@ -49,6 +50,7 @@ inline float ofGetElapsedTimef(){return 0.f;}
 inline void ofEnableAlphaBlending(){}
 inline float ofGetWidth(){return 1024;} inline float ofGetHeight(){return 640;}
 inline float ofClamp(float v,float a,float b){return v<a?a:(v>b?b:v);}
+inline float ofRandom(float a,float b){return (a+b)*0.5f;}
 template<typename T> std::string ofToString(const T&){return "";}
 template<typename T> std::string ofToString(const T&,int){return "";}
 inline std::string ofToDataPath(const std::string& s){return s;}

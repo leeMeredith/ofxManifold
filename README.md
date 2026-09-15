@@ -173,6 +173,12 @@ a clean fan, a deliberately broken T-junction, two overlapping regions where the
 answer depends on which side you entered from, and a 144-node grid for looking
 at the renderer at density.
 
+**`example-smoothing`** — raw and smoothed weights traced against each other
+over time. Cross an interior edge and the raw line does not jump: on a
+conforming mesh the weights are already continuous there. Then add jitter, fire
+a jump, leave the hull, or load the T-junction — those are the discontinuities
+smoothing is for.
+
 **`example-spread`** — one slider from pinpoint to wash. The node weights stay
 at 1.000 the whole way; the resolved targets fall, because spread hands weight
 to the null nodes too and they discard it. Nothing was told to fade.
@@ -214,7 +220,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-238 vectors across six suites, plus 36 mutation gates that introduce known
+291 vectors across seven suites, plus 58 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform
@@ -233,7 +239,7 @@ records what is next and what is deliberately parked.
 
 ```
 src/core/            kernel, glm only, no ofMain.h
-src/interpretation/  curves, spread, blend, interpolate
+src/interpretation/  curves, spread, blend, interpolate, smoother
 src/mapping/         node to target bindings, aggregators
 src/io/              JSON manifold and mapping files
 src/ofx/             the ONLY place ofMain.h may appear
@@ -241,8 +247,9 @@ tests/               references, vectors, fixtures
 libs/glm/            vendored, see libs/VENDORED.md
 ```
 
-`make headers` enforces the boundary: it fails if anything outside `src/ofx`
-includes `ofMain.h`, and compiles every kernel header standalone.
+`make headers` enforces the boundaries: nothing outside `src/ofx` may include
+`ofMain.h`, every kernel header must compile standalone as the first thing in a
+translation unit, and every header must be reachable from `ofxManifold.h`.
 
 To use the kernel without openFrameworks, include the headers under `src/core`
 directly.

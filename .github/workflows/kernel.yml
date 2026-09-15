@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -584,6 +584,51 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Smoother must honour the half-life must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldSmoother.h \
+            '                          ? 1.0f - std::pow(0.5f, dt / halfLife_)' \
+            '                          ? 0.2f'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldSmoother.h
+
+      - name: Smoother must decay departing nodes must be caught
+        run: |
+          python3 tests/mutate.py --nl src/interpretation/ofxManifoldSmoother.h \
+            '        for (const auto& cur : state_) {\n            float want = 0.0f;' \
+            '        for (const auto& cur : state_) {\n            float want = 0.0f; if (true) continue;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldSmoother.h
+
+      - name: Smoother must clamp to the slew rate must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldSmoother.h \
+            '            if (d >  maxStep) v = from + maxStep;' \
+            '            if (d >  maxStep) v = v;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldSmoother.h
+
+      - name: Smoother must keep held tiny weights must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldSmoother.h \
+            '                           return !std::any_of(target.begin(), target.end(),' \
+            '                           return true; return !std::any_of(target.begin(), target.end(),'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldSmoother.h
+
+      - name: Disabled smoother must pass through must be caught
+        run: |
+          python3 tests/mutate.py --nl src/interpretation/ofxManifoldSmoother.h \
+            '        if (halfLife_ <= 0.0f && maxRate_ <= 0.0f) {\n            state_ = target;\n            return state_;\n        }' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldSmoother.h
 
       - name: Restored tree must be green
         run: |
