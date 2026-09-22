@@ -17,6 +17,7 @@ MAP_RUN  := $(BUILD)/run_mapping
 SER_RUN  := $(BUILD)/run_serialize
 TRJ_RUN  := $(BUILD)/run_trajectory
 SMO_RUN  := $(BUILD)/run_smoother
+REG_RUN  := $(BUILD)/run_regions
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -25,6 +26,7 @@ MAP_VEC  := tests/vectors/mapping.vec
 SER_VEC  := tests/vectors/serialize.vec
 TRJ_VEC  := tests/vectors/trajectory.vec
 SMO_VEC  := tests/vectors/smoother.vec
+REG_VEC  := tests/vectors/regions.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -33,6 +35,7 @@ SER_FIX  := tests/fixtures/simple.json
 
 CORE     := src/core/ofxManifoldTypes.h \
             src/core/ofxManifoldTriangle.h \
+            src/core/ofxManifoldRegion.h \
             src/core/ofxManifold2D.h \
             src/core/ofxManifoldEvaluator.h
 
@@ -52,14 +55,14 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother headers workflow wrapper vectors clean
+.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize test-trajectory test-smoother
+      test-serialize test-trajectory test-smoother test-regions
 	@echo ""
 	@echo "all suites green"
 
@@ -131,6 +134,9 @@ test-trajectory: $(TRJ_RUN) $(TRJ_VEC)
 test-smoother: $(SMO_RUN) $(SMO_VEC)
 	@./$(SMO_RUN) $(SMO_VEC)
 
+test-regions: $(REG_RUN) $(REG_VEC)
+	@./$(REG_RUN) $(REG_VEC)
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -142,6 +148,7 @@ vectors:
 	@python3 tests/ref/reference_serialize.py
 	@python3 tests/ref/reference_trajectory.py
 	@python3 tests/ref/reference_smoother.py
+	@python3 tests/ref/reference_regions.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -165,12 +172,20 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
 
+$(REG_RUN): tests/run_regions.cpp $(CORE)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_regions.cpp
+
+$(REG_VEC): tests/ref/reference_regions.py
+	@python3 tests/ref/reference_regions.py
+
 $(SMO_RUN): tests/run_smoother.cpp $(CORE) $(INTERP)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ tests/run_smoother.cpp
 
 $(SMO_VEC): tests/ref/reference_smoother.py
 	@python3 tests/ref/reference_smoother.py
+	@python3 tests/ref/reference_regions.py
 
 $(TRJ_RUN): tests/run_trajectory.cpp $(CORE) $(MAPPING) $(IO) $(SOURCES)
 	@mkdir -p $(BUILD)
@@ -179,6 +194,7 @@ $(TRJ_RUN): tests/run_trajectory.cpp $(CORE) $(MAPPING) $(IO) $(SOURCES)
 $(TRJ_VEC): tests/ref/reference_trajectory.py
 	@python3 tests/ref/reference_trajectory.py
 	@python3 tests/ref/reference_smoother.py
+	@python3 tests/ref/reference_regions.py
 
 $(SER_RUN): tests/run_serialize.cpp $(CORE) $(MAPPING) $(IO)
 	@mkdir -p $(BUILD)

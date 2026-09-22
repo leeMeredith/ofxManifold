@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory smoother; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory smoother; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -165,8 +165,8 @@ jobs:
       - name: Node identity rotated in the result must be caught
         run: |
           python3 tests/mutate.py src/core/ofxManifold2D.h \
-            'e.weights.push_back(WeightedNode{ids[i], br.w[i]});' \
-            'e.weights.push_back(WeightedNode{ids[(i+1)%3], br.w[i]});'
+            'e.weights.push_back(WeightedNode{ids[i], rr.w[i]});' \
+            'e.weights.push_back(WeightedNode{ids[(i+1)%ids.size()], rr.w[i]});'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
@@ -369,10 +369,10 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
-      - name: Loader accepts a dangling triangle reference must be caught
+      - name: Loader accepts a dangling region reference must be caught
         run: |
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
-            'res.error = "triangle references unknown node: " + nm;\n                    return res;' \
+            'res.error = "region references unknown node: " + nm;\n                    return res;' \
             'continue;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
@@ -629,6 +629,69 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSmoother.h
+
+      - name: Ring edge special case removed must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        if (std::fabs(A[i]) < kRingEpsilon && D[i] < 0.0f) {' \
+            '        if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Ring vertex special case removed must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        if (r[i] < kRingEpsilon) {' \
+            '        if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Region self-intersection check dropped must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        if (ringSelfIntersects(p)) return "self-intersecting";' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Non-convex regions refused must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        if (ringSelfIntersects(p)) return "self-intersecting";' \
+            '        if (ringSelfIntersects(p) || !ringIsConvex(p)) return "self-intersecting";'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Bias ignored for polygon regions must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '            out.w[i] *= bias[i];' \
+            '            (void)bias;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Serializer truncates regions to three nodes must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '        for (std::size_t k = 0; k < ids.size(); ++k) {' \
+            '        for (std::size_t k = 0; k < 3 && k < ids.size(); ++k) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Polygon maps written as version 1 must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    const int version = allTriangles ? 1 : 2;' \
+            '    const int version = 1;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Restored tree must be green
         run: |

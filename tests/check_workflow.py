@@ -96,6 +96,24 @@ def main():
             continue
         if not os.path.exists(path):
             fails.append(f"gate targets a file that does not exist: {path}")
+            continue
+
+        # The anchor must match EXACTLY ONCE, checked here rather than left for
+        # CI. mutate.py refuses a missing or ambiguous anchor at run time, which
+        # is correct -- but it means a refactor that renames the code a gate
+        # targets breaks CI rather than the local build.
+        #
+        # This recurred: once when trajectory serialization duplicated a guard
+        # (D-012), and twice more when the regions work rewrote fill() and the
+        # loader's error text. Each time the gate was fine and the code under
+        # it had moved.
+        find = argv[4] if "--nl" in argv else argv[3]
+        if "--nl" in argv:
+            find = find.replace("\\n", "\n")
+        n = open(path).read().count(find)
+        if n != 1:
+            fails.append(f"gate anchor matches {n} times in {path}, must be "
+                         f"exactly once: {find[:60]}")
 
     if gates == 0:
         fails.append("no mutation gates found; the suite-can-fail job would "
@@ -107,7 +125,7 @@ def main():
         return 1
 
     print("  ok  literal 'on:' trigger present")
-    print(f"  ok  {gates} mutation gates, all targeting files that exist")
+    print(f"  ok  {gates} mutation gates, every anchor matching exactly once")
     return 0
 
 

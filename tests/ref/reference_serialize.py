@@ -266,6 +266,62 @@ def build():
                + " ".join(f"{n}={fmt(w)}" for n, w in e))
     out.append("")
 
+    # ---- regions of more than three nodes --------------------------------
+    #
+    # The writer used to emit exactly three names per region, so a quad saved
+    # as a triangle, dropped its fourth node, and reloaded WITHOUT ERROR as a
+    # different shape. Found by hand, fixed, and -- until these fixtures
+    # existed -- pinned by nothing. Mutation testing put the bug straight
+    # back and the suite stayed green (DECISIONS.md D-017).
+    quad = {
+        "version": 2,
+        "space": "normalized",
+        "nodes": [
+            {"id": "A", "position": [0.15, 0.15], "weight": 1.0},
+            {"id": "B", "position": [0.85, 0.20], "weight": 1.0},
+            {"id": "C", "position": [0.80, 0.85], "weight": 1.0},
+            {"id": "D", "position": [0.20, 0.80], "weight": 1.0},
+        ],
+        "regions": [["A", "B", "C", "D"]],
+    }
+    f = write("quad.json", json.dumps(quad, indent=2) + "\n")
+    out.append("# a quad must survive save and reload with all four nodes")
+    out.append(f"MANIFOLD_LOAD load_quad ANALYTIC {f} OK")
+    out.append(f"COUNTS counts_quad ANALYTIC {f} 4 1")
+    out.append(f"ARITY arity_quad ANALYTIC {f} 4")
+    out.append(f"ROUNDTRIP roundtrip_quad ANALYTIC {f}")
+    out.append("")
+
+    mixed = {
+        "version": 2,
+        "space": "normalized",
+        "nodes": [
+            {"id": "A", "position": [0.10, 0.10], "weight": 1.0},
+            {"id": "B", "position": [0.50, 0.10], "weight": 1.0},
+            {"id": "C", "position": [0.90, 0.10], "weight": 1.0},
+            {"id": "D", "position": [0.90, 0.50], "weight": 1.0},
+            {"id": "E", "position": [0.50, 0.50], "weight": 1.0},
+            {"id": "F", "position": [0.30, 0.85], "weight": 1.0},
+        ],
+        "regions": [["A", "B", "E"], ["B", "C", "D", "E"], ["A", "E", "F"]],
+    }
+    f = write("mixed_regions.json", json.dumps(mixed, indent=2) + "\n")
+    out.append("# triangles and a quad in one map, order preserved")
+    out.append(f"MANIFOLD_LOAD load_mixed ANALYTIC {f} OK")
+    out.append(f"COUNTS counts_mixed ANALYTIC {f} 6 3")
+    out.append(f"ARITY arity_mixed ANALYTIC {f} 3 4 3")
+    out.append(f"ROUNDTRIP roundtrip_mixed ANALYTIC {f}")
+    out.append("")
+    out.append("# a triangle-only map is still written as version 1 under")
+    out.append("# 'triangles', exactly as v1.0.0 wrote it, so an older reader")
+    out.append("# still reads every file it could before")
+    out.append("SAVEDVERSION saved_v1_for_triangles ANALYTIC simple.json 1 triangles")
+    out.append("# and a map with any larger region is version 2 under")
+    out.append("# 'regions', so an older reader FAILS CLEANLY rather than")
+    out.append("# finding no 'triangles' key and loading an empty map")
+    out.append("SAVEDVERSION saved_v2_for_quad ANALYTIC quad.json 2 regions")
+    out.append("")
+
     # ---- files that must be refused --------------------------------------
     bad = [
         ("bad_trailing_comma.json",
@@ -319,6 +375,26 @@ def build():
         ("bad_trailing_junk.json",
          '{ "version": 1, "nodes": [] } garbage',
          "ANALYTIC", "content after the closing brace", "trailing_content"),
+        ("bad_both_keys.json",
+         '{ "version": 2, "nodes": [{"id":"A","position":[0.1,0.1]},'
+         '{"id":"B","position":[0.9,0.1]},{"id":"C","position":[0.5,0.9]}],'
+         ' "triangles": [["A","B","C"]], "regions": [["A","B","C"]] }',
+         "SPEC", "both 'triangles' and 'regions': which one wins would be a "
+                 "guess, so the file is refused", "both"),
+        ("bad_legacy_quad.json",
+         '{ "version": 1, "nodes": [{"id":"A","position":[0.1,0.1]},'
+         '{"id":"B","position":[0.9,0.1]},{"id":"C","position":[0.9,0.9]},'
+         '{"id":"D","position":[0.1,0.9]}],'
+         ' "triangles": [["A","B","C","D"]] }',
+         "ANALYTIC", "four names under the legacy 'triangles' key", "three"),
+        ("bad_region_bowtie.json",
+         '{ "version": 2, "nodes": [{"id":"A","position":[0.43,0.93]},'
+         '{"id":"B","position":[0.94,0.10]},{"id":"C","position":[0.92,0.14]},'
+         '{"id":"D","position":[0.11,0.08]}],'
+         ' "regions": [["A","B","C","D"]] }',
+         "ANALYTIC", "a self-intersecting region is refused at load, and the "
+                     "error names the reason rather than a generic rejection",
+         "self-intersecting"),
         ("bad_root_array.json",
          '[1, 2, 3]',
          "ANALYTIC", "the root is not an object", "not_an_object"),

@@ -100,9 +100,10 @@ void ofApp::drawMap(const Manifold2D& m, const Evaluation& e,
     ofSetLineWidth(1.0f + 1.5f * alpha);
     for (std::size_t i = 0; i < m.regionCount(); ++i) {
         const auto& ids = m.region(static_cast<RegionID>(i)).ids();
-        for (int k = 0; k < 3; ++k) {
+        const std::size_t count = ids.size();
+        for (std::size_t k = 0; k < count; ++k) {
             const glm::vec2 p = r.toScreen(m.node(ids[k]).position);
-            const glm::vec2 q = r.toScreen(m.node(ids[(k + 1) % 3]).position);
+            const glm::vec2 q = r.toScreen(m.node(ids[(k + 1) % ids.size()]).position);
             ofDrawLine(p.x, p.y, q.x, q.y);
         }
     }

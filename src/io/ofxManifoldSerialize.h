@@ -39,9 +39,25 @@ struct LoadResult {
 // ---- manifold ------------------------------------------------------------
 
 inline std::string saveManifold(const Manifold2D& m) {
+    // A map made only of triangles is written EXACTLY as before: version 1,
+    // a "triangles" key. Every file v1.0.0 could read, it still can.
+    //
+    // A map containing any region of four or more nodes is written as
+    // version 2 under "regions". The version bump is what makes an older
+    // reader FAIL CLEANLY -- "unsupported version 2" -- instead of finding no
+    // "triangles" key and silently loading a map with no regions at all.
+    bool allTriangles = true;
+    for (std::size_t r = 0; r < m.regionCount(); ++r) {
+        if (m.region(static_cast<RegionID>(r)).size() != 3) {
+            allTriangles = false;
+            break;
+        }
+    }
+    const int version = allTriangles ? 1 : 2;
+
     std::ostringstream o;
     o << "{\n";
-    o << "  \"version\": " << kFormatVersion << ",\n";
+    o << "  \"version\": " << version << ",\n";
     // Recorded so a future non-normalized variant is DETECTABLE rather than
     // silently misread as normalized. A loader that finds an unknown space
     // refuses rather than guessing.
@@ -59,12 +75,19 @@ inline std::string saveManifold(const Manifold2D& m) {
     }
     o << "  ],\n";
 
-    o << "  \"triangles\": [\n";
+    // Every region is written in full, at whatever arity it has. The
+    // previous writer emitted exactly three names per region, so a quad
+    // saved as a triangle, dropped its fourth node, and reloaded without
+    // error as a different shape. See DECISIONS.md D-017.
+    o << "  \"" << (allTriangles ? "triangles" : "regions") << "\": [\n";
     for (std::size_t r = 0; r < m.regionCount(); ++r) {
         const auto& ids = m.region(static_cast<RegionID>(r)).ids();
-        o << "    [" << json::quote(m.node(ids[0]).name) << ", "
-          << json::quote(m.node(ids[1]).name) << ", "
-          << json::quote(m.node(ids[2]).name) << "]";
+        o << "    [";
+        for (std::size_t k = 0; k < ids.size(); ++k) {
+            o << json::quote(m.node(ids[k]).name);
+            if (k + 1 < ids.size()) o << ", ";
+        }
+        o << "]";
         if (r + 1 < m.regionCount()) o << ",";
         o << "\n";
     }
@@ -89,7 +112,7 @@ inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
         return res;
     }
     const int v = static_cast<int>(root["version"].asNumber());
-    if (v != kFormatVersion) {
+    if (v != 1 && v != 2) {
         res.error = "unsupported version " + std::to_string(v);
         return res;
     }
@@ -125,29 +148,45 @@ inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
         built.addNode(name, {x, y}, w);
     }
 
-    if (root.has("triangles")) {
-        if (!root["triangles"].isArray()) {
-            res.error = "triangles is not an array";
+    // Both keys are read. "triangles" is the version 1 name and must hold
+    // exactly three ids per entry; "regions" allows any ring of three or
+    // more. A file carrying both is refused: which one wins would be a guess.
+    if (root.has("triangles") && root.has("regions")) {
+        res.error = "file has both triangles and regions";
+        return res;
+    }
+    const bool legacy = root.has("triangles");
+    const char* key = legacy ? "triangles" : "regions";
+
+    if (root.has(key)) {
+        if (!root[key].isArray()) {
+            res.error = std::string(key) + " is not an array";
             return res;
         }
-        for (const json::Value& t : root["triangles"].asArray()) {
-            if (!t.isArray() || t.asArray().size() != 3) {
+        for (const json::Value& t : root[key].asArray()) {
+            if (!t.isArray()) {
+                res.error = "region is not an array of node ids";
+                return res;
+            }
+            if (legacy && t.asArray().size() != 3) {
                 res.error = "triangle is not an array of three node ids";
                 return res;
             }
-            NodeID ids[3];
-            for (int k = 0; k < 3; ++k) {
-                const std::string nm = t.asArray()[k].asString();
-                ids[k] = built.findNode(nm);
-                if (ids[k] == InvalidNode) {
-                    res.error = "triangle references unknown node: " + nm;
+            std::vector<NodeID> ids;
+            for (const json::Value& nv : t.asArray()) {
+                const std::string nm = nv.asString();
+                const NodeID id = built.findNode(nm);
+                if (id == InvalidNode) {
+                    res.error = "region references unknown node: " + nm;
                     return res;
                 }
+                ids.push_back(id);
             }
-            if (built.addTriangle(ids[0], ids[1], ids[2]) == InvalidRegion) {
-                // Degenerate or repeated vertices. Refusing here rather than
-                // loading a manifold whose regions divide by zero later.
-                res.error = "triangle rejected: degenerate or repeated vertex";
+            if (built.addRegion(ids) == InvalidRegion) {
+                // Refused at load rather than loaded and wrong later. The
+                // reason comes from the region itself, so a bowtie reads as
+                // self-intersecting rather than as a generic rejection.
+                res.error = "region rejected: " + built.lastRegionError();
                 return res;
             }
         }

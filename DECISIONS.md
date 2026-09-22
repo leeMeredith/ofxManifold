@@ -1188,3 +1188,135 @@ The same class of bug as the missing `<cstdio>` (D-010's neighbour): it compiles
 for whoever wrote it and breaks for the next person. `make headers` now asserts
 that every header under `src/` appears in the umbrella, which is four lines and
 catches a whole category.
+
+
+---
+
+## D-017 — Generalized regions, and three things the work turned up
+
+**Date:** 2026-09-15
+**Status:** kernel, vectors and serialization built; example pending
+**Files:** `src/core/ofxManifoldRegion.h`, `src/core/ofxManifold2D.h`,
+`src/io/ofxManifoldSerialize.h`, `tests/ref/reference_regions.py`,
+`tests/run_regions.cpp`. Full plan and settled decisions in
+`PLAN-regions.md`.
+
+A region is now an ordered ring of N >= 3 nodes. Three take the barycentric
+solve; more take mean-value coordinates after Hormann & Floater (2006). MVC
+reduces to barycentric at N = 3 to 3.3e-16 over a full interior sweep, which is
+what makes it an extension rather than a replacement.
+
+### 1. The contract test passed, and needed a caveat
+
+Step 4 of the plan asserted that `interpretation/`, `mapping/`, `io/` and
+`sources/` would show an empty diff: nothing below the weight-vector line should
+change when a second coordinate algorithm is added.
+
+After the kernel change, it did show an empty diff. That was true, and it was
+also hiding a bug.
+
+`io/` is two things. Mapping and trajectory files sit below the weight line and
+genuinely needed no change. The **manifold** file describes geometry, which is
+above it — and the writer emitted exactly three node names per region. A quad
+saved as a triangle, silently dropped its fourth node, and reloaded without
+error as a different shape.
+
+So the empty diff under `io/` was not evidence the change was unnecessary. It
+was a change nobody had made. **An empty diff is a necessary condition for the
+layering claim, not a sufficient one**, and the directory boundary was too
+coarse: the contract is about what flows downstream of the weight vector, and
+one file in `io/` describes what flows into it.
+
+The claim itself holds. Nothing in `interpretation/`, `mapping/`, `sources/`,
+or the mapping and trajectory halves of `io/`, needed to change.
+
+Manifold files keep their old form where they can: a triangle-only map is still
+written as version 1 under `"triangles"`, byte-identical to v1.0.0, so every
+file an older reader could read it still can. A map containing any larger region
+is written as version 2 under `"regions"`, so an older reader **fails cleanly**
+with "unsupported version 2" rather than finding no `"triangles"` key and
+silently loading a map with no regions at all.
+
+### 2. MVC is not affine invariant, and the reference said it was
+
+The reference asserted affine invariance for polygons, by analogy with the
+triangle case in §7.0, and wrote the untransformed weights as the expected answer
+under six maps. The C++ disagreed on two of them.
+
+It was right. Python and C++ agreed on the transformed result to about 1e-7; the
+expected values were an assumption, not a computation.
+
+    transform    kind          max change in weights
+    translate    similarity    5.6e-17
+    scale        similarity    5.6e-17
+    rotate       similarity    5.6e-17
+    reflect      similarity    0
+    nonuniform   affine only   0.19
+    shear        affine only   0.12
+
+Barycentric coordinates are ratios of **areas**, preserved by any affine map. MVC
+is built from **lengths and angles**, preserved only by similarities.
+
+This is a real tradeoff, made without knowing it. Wachspress coordinates are
+affine invariant but require strictly convex polygons. MVC handles stars and
+L-shapes but is only similarity invariant. Stars were an explicit requirement
+(PLAN-regions.md D-C), so MVC stays — and that choice gave affine invariance up.
+
+What it does not break: the renderer's screen transform never touches the
+weights, since evaluation happens in normalized space, so §5 holds. What it does:
+an author who **stretches the node positions themselves** — squashing a map onto
+a wide stage for a new venue — keeps the relationships in triangle regions and
+shifts them in polygon regions.
+
+The vectors now assert what is true: invariance under similarities, and
+**non-invariance** under the other two, as its own ANALYTIC record — an
+implementation that was affine invariant there would not be computing MVC.
+
+This is the two-implementation discipline catching a false claim in the
+reference rather than in the code, which is the less common and more valuable
+direction.
+
+### 3. A bug found by hand, fixed, and pinned by nothing
+
+The truncation bug in (1) was found by writing a quad and looking at the file.
+Mutation testing then put it straight back — and the suite stayed green, because
+no vector round-tripped a region of more than three nodes. `COUNTS` checked the
+region count, which truncation preserves.
+
+`ARITY` records now assert every region's node count after a round trip.
+
+Per-node bias had the same hole: every bias vector in the project was on a
+triangle, so a polygon path that ignored bias entirely passed all of them.
+
+### Also
+
+- Check order in construction matters. A bowtie's lobes cancel to zero signed
+  area, so testing area first reports `degenerate` for a ring that is really
+  self-intersecting. The reference found this in itself before any C++ existed.
+  A second bowtie with non-cancelling area (0.6655) proves the self-intersection
+  check runs at all.
+- `TopologyReport::nonConvex` lists non-convex regions as information. `clean()`
+  ignores it.
+- Anchor uniqueness moved into `check_workflow.py`. D-012 said to do this if it
+  recurred; the regions work made two existing anchors stale in one pass, so a
+  refactor now fails the local build rather than CI.
+- **The renderer had the same three-node assumption as the serializer**, and
+  nothing could have caught it: `make wrapper` checks syntax only. It filled
+  each region with `ofDrawTriangle` and drew three edges, so a quad would have
+  compiled and rendered as a triangle missing a corner. Found by grepping the
+  wrapper for `ids[2]` before calling the work done, because the kernel had just
+  shown that every file touching regions needed the same audit. Regions are now
+  filled as tessellated shapes, which also fills a non-convex star correctly.
+  `example-blend` had its own copy of the loop.
+- My own patch to `TopologyReport` was silently skipped: a plain string replace
+  matched nothing because the comment read "in no region at all" and the patch
+  looked for "in no region". Every later edit in the pass asserted its anchor.
+
+### Pattern
+
+Three findings, three directions. The contract test was too coarse to see a real
+gap. The reference asserted a property the mathematics does not have. And a bug
+fixed by hand was left unguarded.
+
+The common thread is that each check answered the question it was asked, and
+the question was slightly wrong.

@@ -57,6 +57,27 @@ ROUNDTRIP roundtrip_escapes ANALYTIC escapes.json
 MANIFOLD_LOAD load_exponents ANALYTIC exponents.json OK
 EVAL eval_exponents CROSS exponents.json 0.45 0.4 A=0.2389350324 B=0.4597792695 C=0.301285698
 
+# a quad must survive save and reload with all four nodes
+MANIFOLD_LOAD load_quad ANALYTIC quad.json OK
+COUNTS counts_quad ANALYTIC quad.json 4 1
+ARITY arity_quad ANALYTIC quad.json 4
+ROUNDTRIP roundtrip_quad ANALYTIC quad.json
+
+# triangles and a quad in one map, order preserved
+MANIFOLD_LOAD load_mixed ANALYTIC mixed_regions.json OK
+COUNTS counts_mixed ANALYTIC mixed_regions.json 6 3
+ARITY arity_mixed ANALYTIC mixed_regions.json 3 4 3
+ROUNDTRIP roundtrip_mixed ANALYTIC mixed_regions.json
+
+# a triangle-only map is still written as version 1 under
+# 'triangles', exactly as v1.0.0 wrote it, so an older reader
+# still reads every file it could before
+SAVEDVERSION saved_v1_for_triangles ANALYTIC simple.json 1 triangles
+# and a map with any larger region is version 2 under
+# 'regions', so an older reader FAILS CLEANLY rather than
+# finding no 'triangles' key and loading an empty map
+SAVEDVERSION saved_v2_for_quad ANALYTIC quad.json 2 regions
+
 # files that must be REFUSED. A loader that accepts these
 # hands back a manifold that is wrong rather than absent,
 # which is worse than failing.
@@ -92,6 +113,12 @@ MANIFOLD_LOAD reject_degenerate_triangle ANALYTIC bad_degenerate_triangle.json F
 MANIFOLD_LOAD reject_short_position ANALYTIC bad_short_position.json FAIL position
 # content after the closing brace
 MANIFOLD_LOAD reject_trailing_junk ANALYTIC bad_trailing_junk.json FAIL trailing_content
+# both 'triangles' and 'regions': which one wins would be a guess, so the file is refused
+MANIFOLD_LOAD reject_both_keys SPEC bad_both_keys.json FAIL both
+# four names under the legacy 'triangles' key
+MANIFOLD_LOAD reject_legacy_quad ANALYTIC bad_legacy_quad.json FAIL three
+# a self-intersecting region is refused at load, and the error names the reason rather than a generic rejection
+MANIFOLD_LOAD reject_region_bowtie ANALYTIC bad_region_bowtie.json FAIL self-intersecting
 # the root is not an object
 MANIFOLD_LOAD reject_root_array ANALYTIC bad_root_array.json FAIL not_an_object
 # an unterminated string as the ROOT value. This is the only place the fault is observable: anywhere inside an object or array, the enclosing container fails first and hides it. With no container, a parser that returned the partial string would report 'root is not an object' instead, which is the wrong diagnosis for the file

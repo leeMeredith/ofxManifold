@@ -10,7 +10,7 @@
 //   - hold per-source evaluation state; that is Evaluator's job (8.1)
 //   - interpret weights in any way; that is the interpretation layer (9)
 
-#include "ofxManifoldTriangle.h"
+#include "ofxManifoldRegion.h"
 
 #include <algorithm>
 #include <cmath>
@@ -53,7 +53,14 @@ struct TJunction {
 struct TopologyReport {
     std::vector<TJunction> tJunctions;
     std::vector<NodeID>    orphans;      // in no region at all
-    std::vector<RegionID>  duplicates;   // same three nodes as an earlier region
+    std::vector<RegionID>  duplicates;   // same nodes as an earlier region
+
+    // INFORMATION, not a fault, and deliberately ignored by clean(). A star is
+    // a legitimate control surface and MVC handles it (PLAN-regions.md D-C).
+    // Listed because weights CAN go negative inside a non-convex region, and
+    // an author is better off knowing which parts of a map can do that before
+    // a performance than after.
+    std::vector<RegionID>  nonConvex;
 
     bool clean() const {
         return tJunctions.empty() && orphans.empty() && duplicates.empty();
@@ -73,34 +80,48 @@ public:
         return id;
     }
 
-    // Returns InvalidRegion if the triangle is degenerate or references a node
-    // that does not exist. Degeneracy is a construction error, not a runtime
-    // condition, so it is caught here and the solve never sees it.
-    RegionID addTriangle(NodeID a, NodeID b, NodeID c) {
-        if (!validNode(a) || !validNode(b) || !validNode(c)) {
+    // A region is an ordered ring of N >= 3 nodes. Returns InvalidRegion if
+    // the ring is not constructible; lastRegionError() says why.
+    //
+    // Non-convex rings are ACCEPTED. A star is a legitimate control surface
+    // and mean-value coordinates handle it (PLAN-regions.md D-C).
+    RegionID addRegion(std::vector<NodeID> ids) {
+        lastError_.clear();
+        for (NodeID id : ids) {
+            if (!validNode(id)) {
+                lastError_ = "unknown node";
+                return InvalidRegion;
+            }
+        }
+        std::vector<glm::vec2> p;
+        p.reserve(ids.size());
+        for (NodeID id : ids) p.push_back(nodes_[id].position);
+
+        lastError_ = Region::invalidReason(ids, p);
+        if (!lastError_.empty()) return InvalidRegion;
+
+        Region r;
+        if (!Region::make(ids, p, r)) {
+            if (lastError_.empty()) lastError_ = "region rejected";
             return InvalidRegion;
         }
-        if (a == b || b == c || a == c) {
-            return InvalidRegion;
-        }
-        Triangle t;
-        if (!Triangle::make(a, b, c,
-                            nodes_[a].position,
-                            nodes_[b].position,
-                            nodes_[c].position, t)) {
-            return InvalidRegion;
-        }
-        regions_.push_back(t);
+        regions_.push_back(std::move(r));
         const RegionID id = static_cast<RegionID>(regions_.size() - 1);
 
         // Incidence is derived from TOPOLOGY, not from positions, so caching
         // it does not violate the 8.6 rule against position-derived caches.
-        // It is invalidated by addTriangle alone, which is where it is built.
-        nodeRegions_[a].push_back(id);
-        nodeRegions_[b].push_back(id);
-        nodeRegions_[c].push_back(id);
+        // It is invalidated by addRegion alone, which is where it is built.
+        for (NodeID n : regions_.back().ids()) nodeRegions_[n].push_back(id);
         return id;
     }
+
+    // Kept for the common case, and because it reads better than a braced
+    // list of three. Forwards to addRegion.
+    RegionID addTriangle(NodeID a, NodeID b, NodeID c) {
+        return addRegion({a, b, c});
+    }
+
+    const std::string& lastRegionError() const { return lastError_; }
 
     // ---- access ---------------------------------------------------------
 
@@ -108,7 +129,7 @@ public:
     std::size_t regionCount() const { return regions_.size(); }
 
     const Node& node(NodeID id) const { return nodes_[id]; }
-    const Triangle& region(RegionID id) const { return regions_[id]; }
+    const Region& region(RegionID id) const { return regions_[id]; }
 
     NodeID findNode(const std::string& name) const {
         auto it = byName_.find(name);
@@ -241,9 +262,10 @@ public:
 
         for (RegionID r : nodeRegions_[id]) {
             const auto& ids = regions_[r].ids();
-            const float area2 = signedArea2(nodes_[ids[0]].position,
-                                            nodes_[ids[1]].position,
-                                            nodes_[ids[2]].position);
+            std::vector<glm::vec2> ring;
+            ring.reserve(ids.size());
+            for (NodeID q : ids) ring.push_back(nodes_[q].position);
+            const float area2 = ringArea2(ring);
             const int sign = (area2 > 0.0f) ? 1 : -1;
             if (std::fabs(area2) < kAreaEpsilon
                 || sign != regions_[r].constructionSign()) {
@@ -269,11 +291,14 @@ public:
         // of that region and lies on the edge's interior is a fault.
         for (RegionID r = 0; r < regions_.size(); ++r) {
             const auto& ids = regions_[r].ids();
-            for (int e = 0; e < 3; ++e) {
+            const std::size_t m = ids.size();
+            for (std::size_t e = 0; e < m; ++e) {
                 const NodeID ia = ids[e];
-                const NodeID ib = ids[(e + 1) % 3];
+                const NodeID ib = ids[(e + 1) % m];
                 for (NodeID n = 0; n < nodes_.size(); ++n) {
-                    if (n == ids[0] || n == ids[1] || n == ids[2]) continue;
+                    if (std::find(ids.begin(), ids.end(), n) != ids.end()) {
+                        continue;
+                    }
                     if (onSegmentInterior(nodes_[ia].position,
                                           nodes_[ib].position,
                                           nodes_[n].position)) {
@@ -297,13 +322,21 @@ public:
         // order the only thing distinguishing them, which is a coin flip
         // dressed as a decision.
         for (RegionID r = 0; r < regions_.size(); ++r) {
-            std::array<NodeID, 3> a = regions_[r].ids();
+            std::vector<NodeID> a = regions_[r].ids();
             std::sort(a.begin(), a.end());
             for (RegionID q = 0; q < r; ++q) {
-                std::array<NodeID, 3> b = regions_[q].ids();
+                std::vector<NodeID> b = regions_[q].ids();
                 std::sort(b.begin(), b.end());
                 if (a == b) { rep.duplicates.push_back(r); break; }
             }
+        }
+
+        // Non-convex regions, as INFORMATION. Not a fault and not counted by
+        // clean(): a star is a legitimate control surface. Listed because
+        // weights can go negative inside one, and an author is better off
+        // knowing where before a performance than after.
+        for (RegionID r = 0; r < regions_.size(); ++r) {
+            if (!regions_[r].convex()) rep.nonConvex.push_back(r);
         }
 
         return rep;
@@ -321,7 +354,7 @@ private:
             const auto& ids = regions_[r].ids();
             bool all = true;
             for (const auto& n : w) {
-                if (n.id != ids[0] && n.id != ids[1] && n.id != ids[2]) {
+                if (std::find(ids.begin(), ids.end(), n.id) == ids.end()) {
                     all = false;
                     break;
                 }
@@ -333,27 +366,31 @@ private:
 
     bool containsRegion(RegionID r, glm::vec2 p) const {
         const auto& ids = regions_[r].ids();
-        return regions_[r].contains(nodes_[ids[0]].position,
-                                    nodes_[ids[1]].position,
-                                    nodes_[ids[2]].position, p);
+        std::vector<glm::vec2> pos;
+        pos.reserve(ids.size());
+        for (NodeID id : ids) pos.push_back(nodes_[id].position);
+        return regions_[r].contains(pos, p);
     }
 
     void fill(Evaluation& e, RegionID r, glm::vec2 p) const {
         const auto& ids = regions_[r].ids();
-        const BarycentricResult br =
-            solveBiased(nodes_[ids[0]].position,
-                        nodes_[ids[1]].position,
-                        nodes_[ids[2]].position, p,
-                        nodes_[ids[0]].weight,
-                        nodes_[ids[1]].weight,
-                        nodes_[ids[2]].weight);
-        if (!br.valid) return;                 // leaves inside == false
+        std::vector<glm::vec2> pos;
+        std::vector<float>     bias;
+        pos.reserve(ids.size());
+        bias.reserve(ids.size());
+        for (NodeID id : ids) {
+            pos.push_back(nodes_[id].position);
+            bias.push_back(nodes_[id].weight);
+        }
+
+        const RingResult rr = regions_[r].evaluate(pos, p, bias);
+        if (!rr.valid) return;                 // leaves inside == false
 
         e.regionID = r;
         e.inside   = true;
-        e.weights.reserve(3);
-        for (int i = 0; i < 3; ++i) {
-            e.weights.push_back(WeightedNode{ids[i], br.w[i]});
+        e.weights.reserve(ids.size());
+        for (std::size_t i = 0; i < ids.size(); ++i) {
+            e.weights.push_back(WeightedNode{ids[i], rr.w[i]});
         }
     }
 
@@ -378,7 +415,8 @@ private:
     }
 
     std::vector<Node>     nodes_;
-    std::vector<Triangle> regions_;
+    std::vector<Region>   regions_;
+    std::string           lastError_;
     std::vector<std::vector<RegionID>> nodeRegions_;   // topology-derived
     std::unordered_map<std::string, NodeID> byName_;
 };

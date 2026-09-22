@@ -19,13 +19,18 @@ void ofxManifoldRenderer::draw(RegionID activeRegion) const {
         ofFill();
         for (std::size_t r = 0; r < manifold_->regionCount(); ++r) {
             const auto& ids = manifold_->region(static_cast<RegionID>(r)).ids();
-            const glm::vec2 a = toScreen(manifold_->node(ids[0]).position);
-            const glm::vec2 b = toScreen(manifold_->node(ids[1]).position);
-            const glm::vec2 c = toScreen(manifold_->node(ids[2]).position);
-
+            // A region is a ring of any length, so it is filled as a shape
+            // rather than with ofDrawTriangle -- which drew a quad as a
+            // triangle, missing a corner, with nothing to say so. oF
+            // tessellates the shape, so a non-convex star fills correctly.
             ofSetColor(static_cast<RegionID>(r) == activeRegion
                        ? style.regionActive : style.regionFill);
-            ofDrawTriangle(a.x, a.y, b.x, b.y, c.x, c.y);
+            ofBeginShape();
+            for (NodeID id : ids) {
+                const glm::vec2 v = toScreen(manifold_->node(id).position);
+                ofVertex(v.x, v.y);
+            }
+            ofEndShape(true);
         }
     }
 
@@ -34,10 +39,11 @@ void ofxManifoldRenderer::draw(RegionID activeRegion) const {
         ofSetLineWidth(style.edgeWidth);
         for (std::size_t r = 0; r < manifold_->regionCount(); ++r) {
             const auto& ids = manifold_->region(static_cast<RegionID>(r)).ids();
-            for (int e = 0; e < 3; ++e) {
+            const std::size_t m = ids.size();
+            for (std::size_t e = 0; e < m; ++e) {
                 const glm::vec2 p = toScreen(manifold_->node(ids[e]).position);
                 const glm::vec2 q =
-                    toScreen(manifold_->node(ids[(e + 1) % 3]).position);
+                    toScreen(manifold_->node(ids[(e + 1) % m]).position);
                 ofDrawLine(p.x, p.y, q.x, q.y);
             }
         }

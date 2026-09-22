@@ -163,6 +163,55 @@ int main(int argc, char** argv) {
             }
             record(cls, name, ok, d.str());
 
+        } else if (kind == "ARITY") {
+            // Every region's node count, in order. COUNTS alone cannot see a
+            // writer that truncates regions to three nodes -- the region
+            // count survives and only the shapes change.
+            std::string file; in >> file;
+            std::vector<std::size_t> want; std::size_t k;
+            while (in >> k) want.push_back(k);
+            std::string text; slurp(file, text);
+            Manifold2D m;
+            const io::LoadResult r = io::loadManifold(text, m);
+            // Round-trip first, so this checks the WRITER as well.
+            Manifold2D m2;
+            const io::LoadResult r2 = r.ok
+                ? io::loadManifold(io::saveManifold(m), m2) : r;
+            bool ok = r.ok && r2.ok && m2.regionCount() == want.size();
+            if (ok) {
+                for (std::size_t i = 0; i < want.size(); ++i) {
+                    if (m2.region(static_cast<RegionID>(i)).size() != want[i]) {
+                        ok = false;
+                        d << "\n      region " << i << ": expected "
+                          << want[i] << " nodes after a round trip, got "
+                          << m2.region(static_cast<RegionID>(i)).size();
+                    }
+                }
+            } else {
+                d << "load failed or region count wrong: " << r.error
+                  << r2.error;
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "SAVEDVERSION") {
+            std::string file, wantKey; int wantVer;
+            in >> file >> wantVer >> wantKey;
+            std::string text; slurp(file, text);
+            Manifold2D m;
+            if (!io::loadManifold(text, m).ok) {
+                record(cls, name, false, "fixture failed to load"); continue;
+            }
+            const std::string out = io::saveManifold(m);
+            const bool verOk = out.find("\"version\": " +
+                                        std::to_string(wantVer) + ",")
+                               != std::string::npos;
+            const bool keyOk = out.find("\"" + wantKey + "\":")
+                               != std::string::npos;
+            const bool ok = verOk && keyOk;
+            if (!ok) d << "expected version " << wantVer << " under '"
+                       << wantKey << "'";
+            record(cls, name, ok, d.str());
+
         } else if (kind == "ROUNDTRIP") {
             std::string file; in >> file;
             std::string text; slurp(file, text);
