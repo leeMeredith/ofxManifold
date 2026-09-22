@@ -9,6 +9,7 @@
 
 #include "../src/interpretation/ofxManifoldBlend.h"
 #include "../src/interpretation/ofxManifoldInterpolate.h"
+#include "../src/interpretation/ofxManifoldNegative.h"
 #include "../src/interpretation/ofxManifoldSpread.h"
 
 #include <cmath>
@@ -251,6 +252,65 @@ int main(int argc, char** argv) {
             const bool ok = close(got, want);
             if (!ok) d << "expected coverage " << std::fixed
                        << std::setprecision(9) << want << ", got " << got;
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "ANYNEG") {
+            expectKeyword(in, "IN");
+            const WeightVector input = readVector(in);
+            expectKeyword(in, "OUT");
+            int want; in >> want;
+            const bool ok = (anyNegative(input) ? 1 : 0) == want;
+            if (!ok) d << "anyNegative() returned " << anyNegative(input);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "MOSTNEG") {
+            expectKeyword(in, "IN");
+            const WeightVector input = readVector(in);
+            expectKeyword(in, "OUT");
+            float want; in >> want;
+            const float got = mostNegative(input);
+            const bool ok = close(got, want);
+            if (!ok) d << "expected " << want << ", got " << got;
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "CLAMPNEG") {
+            expectKeyword(in, "IN");
+            const WeightVector input = readVector(in);
+            expectKeyword(in, "OUT");
+            const WeightVector want = readVector(in);
+            const WeightVector got = clampNegative(input);
+            bool ok = sameVector(got, want, d);
+            if (ok && !close(sum(got), 1.0f)) {
+                ok = false;
+                d << "clamped vector sums to " << sum(got);
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "CLAMPSHIFT") {
+            // The clamp changes what an interpolated value comes out as. That
+            // is the whole reason it is never applied automatically.
+            expectKeyword(in, "IN");
+            const WeightVector input = readVector(in);
+            expectKeyword(in, "VALUES");
+            std::vector<float> values; float v;
+            std::streampos mark;
+            while (true) {
+                mark = in.tellg();
+                if (!(in >> v)) { in.clear(); in.seekg(mark); break; }
+                values.push_back(v);
+            }
+            expectKeyword(in, "BEFORE");
+            float wantBefore; in >> wantBefore;
+            expectKeyword(in, "AFTER");
+            float wantAfter; in >> wantAfter;
+            const float before = interpolate(input, values);
+            const float after  = interpolate(clampNegative(input), values);
+            const bool ok = close(before, wantBefore) && close(after, wantAfter)
+                         && std::fabs(before - after) > 0.01f;
+            if (!ok) d << "before " << before << " (want " << wantBefore
+                       << "), after " << after << " (want " << wantAfter
+                       << ")\n      the clamp must visibly change an "
+                          "interpolated value";
             record(cls, name, ok, d.str());
 
         } else if (kind == "BLEND") {

@@ -7,7 +7,7 @@
 // Hormann & Floater (2006), "Mean value coordinates for arbitrary planar
 // polygons", ACM TOG 25(4), 1424-1441.
 //
-// WHY A VALUE TYPE RATHER THAN AN INTERFACE (PLAN-regions.md D-A).
+// WHY A VALUE TYPE RATHER THAN AN INTERFACE (DECISIONS.md D-016b (D-A)).
 //
 // The architecture document committed to `Region` as an interface with
 // `Triangle` implementing it, as an escape hatch for exactly this moment. Now
@@ -29,7 +29,7 @@
 // and because it is four multiplies and a subtract against MVC's divisions and
 // square roots. Fewer operations is fewer places for D-001 to happen again.
 //
-// NON-CONVEX REGIONS ARE ACCEPTED (PLAN-regions.md D-C).
+// NON-CONVEX REGIONS ARE ACCEPTED (DECISIONS.md D-016b (D-C)).
 //
 // A star is a legitimate control surface and MVC handles it. Weights can go
 // negative at some interior points of a non-convex region -- measured at
@@ -40,6 +40,7 @@
 
 #include "ofxManifoldTriangle.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <cstddef>
@@ -198,6 +199,53 @@ inline RingResult solveRing(const std::vector<glm::vec2>& p,
     return out;
 }
 
+// Geometric point-in-ring, boundary inclusive.
+//
+// This is the containment test for regions of four or more nodes, and it is
+// deliberately NOT "every weight non-negative". Those two agree for convex
+// shapes -- for a triangle and a convex polygon they are the same predicate --
+// and disagree for non-convex ones, where MVC gives legitimate negative
+// weights at points genuinely inside the ring.
+//
+// Testing weight sign here silently reported 63% of an L-shape's interior as
+// OUTSIDE the region: every point that carried a negative weight fell through
+// to "not found". Non-convex regions were accepted at construction and then
+// refused at evaluation, and the negative weights the acceptance was about
+// could never reach a consumer. See DECISIONS.md D-018.
+//
+// Points within eps of an edge count as inside, so a point dragged along a
+// shared boundary does not flicker between regions and outside.
+inline bool ringContains(const std::vector<glm::vec2>& p, const glm::vec2& v,
+                         float eps = kEdgeEpsilon) {
+    const std::size_t n = p.size();
+
+    // On the boundary: inside.
+    for (std::size_t i = 0; i < n; ++i) {
+        const glm::vec2& a = p[i];
+        const glm::vec2& b = p[(i + 1) % n];
+        const glm::vec2 ab = b - a;
+        const float len2 = ab.x * ab.x + ab.y * ab.y;
+        float t = (len2 > 0.0f)
+                ? ((v.x - a.x) * ab.x + (v.y - a.y) * ab.y) / len2 : 0.0f;
+        t = std::max(0.0f, std::min(1.0f, t));
+        const glm::vec2 q = a + ab * t;
+        const float dx = v.x - q.x, dy = v.y - q.y;
+        if (dx * dx + dy * dy <= eps * eps) return true;
+    }
+
+    // Crossing number. Winding would also do; for a simple ring -- and
+    // self-intersecting rings are refused at construction -- they agree.
+    bool c = false;
+    for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
+        if (((p[i].y > v.y) != (p[j].y > v.y)) &&
+            (v.x < (p[j].x - p[i].x) * (v.y - p[i].y) / (p[j].y - p[i].y)
+                   + p[i].x)) {
+            c = !c;
+        }
+    }
+    return c;
+}
+
 // ---- the region value type ------------------------------------------------
 
 class Region {
@@ -244,7 +292,7 @@ public:
     // (architecture doc 8.6) has a comparand at any arity.
     int  constructionSign() const { return constructionSign_; }
 
-    // Information, not a verdict. See PLAN-regions.md D-C.
+    // Information, not a verdict. See DECISIONS.md D-016b (D-C).
     bool convex() const { return convex_; }
 
     // Weights for a point, dispatching on arity.
@@ -285,26 +333,22 @@ public:
         return out;
     }
 
-    // Inside when no weight is negative.
+    // Is the point inside this region?
     //
-    // For a convex region this is the ordinary containment test. For a
-    // non-convex one it is STRICTER than geometric containment: a point inside
-    // an L-shape can carry a small negative weight and be reported outside.
-    // That is deliberate, and it is why containsRing() exists separately for
-    // callers who want the geometric answer.
+    // Three nodes: barycentric non-negativity, unchanged -- for a triangle
+    // that IS geometric containment, and 31 vectors depend on it exactly.
+    //
+    // Four or more: geometric point-in-ring. NOT weight sign, which agrees
+    // with geometry only for convex shapes and silently refused most of a
+    // non-convex region's interior (DECISIONS.md D-018).
     bool contains(const std::vector<glm::vec2>& p, const glm::vec2& v,
                   float eps = kEdgeEpsilon) const {
-        const RingResult r = (ids_.size() == 3)
-            ? [&] {
-                RingResult t;
-                const BarycentricResult b = solveRaw(p[0], p[1], p[2], v);
-                if (b.valid) { t.w.assign(b.w.begin(), b.w.end()); t.valid = true; }
-                return t;
-              }()
-            : solveRing(p, v);
-        if (!r.valid) return false;
-        for (float x : r.w) if (x < -eps) return false;
-        return true;
+        if (ids_.size() == 3) {
+            const BarycentricResult b = solveRaw(p[0], p[1], p[2], v);
+            if (!b.valid) return false;
+            return b.w[0] >= -eps && b.w[1] >= -eps && b.w[2] >= -eps;
+        }
+        return ringContains(p, v, eps);
     }
 
 private:

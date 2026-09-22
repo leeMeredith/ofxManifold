@@ -179,6 +179,31 @@ INTERP interp_after_curve SPEC IN 0=0.7071067812 1=0.7071067812 VALUES 10 20 30 
 # and normalizing first restores the affine result
 INTERP interp_curve_normalized SPEC IN 0=0.5 1=0.5 VALUES 10 20 30 OUT 15
 
+
+# NEGATIVE WEIGHTS. Diagnostics, and a clamp that is right for
+# gains and wrong for positions (same distinction as D-003).
+ANYNEG anyneg_true ANALYTIC IN 0=0.62 1=0.45 2=-0.07 OUT 1
+ANYNEG anyneg_false ANALYTIC IN 0=0.2 1=0.5 2=0.3 OUT 0
+# last-digit noise on a mathematically zero weight must NOT
+# count. A point on an edge leaves the far vertices at around
+# -1e-8, and a diagnostic that fired there would fire on every
+# edge and be ignored within a day
+ANYNEG anyneg_ignores_noise SPEC IN 0=0.5 1=0.5 2=-1e-08 3=-2e-08 OUT 0
+MOSTNEG mostneg_value ANALYTIC IN 0=0.62 1=0.45 2=-0.07 OUT -0.07
+MOSTNEG mostneg_none ANALYTIC IN 0=0.2 1=0.5 2=0.3 OUT 0
+# clamp: the negative node is REMOVED, the rest renormalize
+# to one. 0.62 and 0.45 over their sum of 1.07
+CLAMPNEG clamp_removes_negative ANALYTIC IN 0=0.62 1=0.45 2=-0.07 OUT 0=0.5794392523 1=0.4205607477
+# a vector with nothing negative is unchanged
+CLAMPNEG clamp_identity ANALYTIC IN 0=0.2 1=0.5 2=0.3 OUT 0=0.2 1=0.5 2=0.3
+# sparse, non-contiguous ids survive the clamp (D-004)
+CLAMPNEG clamp_sparse_ids CROSS IN 9=0.7 4=-0.1 2=0.4 OUT 9=0.6363636364 2=0.3636363636
+# the clamp BREAKS affinity: interpolating values through a
+# clamped vector does not give what the original weights give.
+# Recorded as a vector so nobody mistakes the clamp for a
+# harmless cleanup.
+CLAMPSHIFT clamp_breaks_affinity SPEC IN 0=0.62 1=0.45 2=-0.07 VALUES 10 20 30 BEFORE 13.1 AFTER 14.20560748
+
 # t outside [0,1] clamps
 BLEND blend_clamps_high SPEC 2.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 2=0.3 3=0.7
 BLEND blend_clamps_low SPEC -1.0 linear A 0=0.6 1=0.4 B 2=0.3 3=0.7 OUT 0=0.6 1=0.4

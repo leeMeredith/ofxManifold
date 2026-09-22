@@ -1190,6 +1190,106 @@ that every header under `src/` appears in the umbrella, which is four lines and
 catches a whole category.
 
 
+
+---
+
+## D-016b — Regions: the four decisions settled before any code
+
+**Date:** 2026-09-15
+**Status:** settled, then built (D-017, D-018)
+
+Written into a working plan, D-016b, while the regions work was in
+progress, and moved here when it was done. The plan is deleted; these are the
+parts that were decisions rather than steps.
+
+Why regions came before the editor: the editor's central interaction is
+"create a region from selected nodes". A triangle-only model makes that a
+three-node pick; an N-node model makes it a different interaction and a
+different data model. Building the editor first would have meant rebuilding it.
+
+#### A · Value type, not an interface
+
+**Decided: one value type holding an ordered ring of `NodeID`, dispatching on
+`size()`.**
+
+§7 committed to `Region` as an interface with `Triangle` implementing it. That is
+reversed.
+
+The interface was written as an escape hatch for exactly this moment. Now that
+the moment is here, a `std::vector<NodeID>` does the same job with less
+machinery: `Manifold2D` stays copyable, no heap allocation per region, no
+virtual call, no `unique_ptr` in a class that gets moved in `loadManifold`.
+
+The argument that settles it: an interface here would be a **one-implementation
+abstraction that stays that way**. A tetrahedron lives in `Manifold3D` because it
+takes a `vec3` point, not here. An abstraction with two members and no prospect
+of a third is a struct wearing a costume.
+
+Value types also serialize obviously, copy obviously, and read as their contents
+in a debugger.
+
+#### B · No new noun
+
+**Decided: `Region` is the concept. No `Polyset`, no `Polygon`, no `Cell`.**
+
+Given D-A there is one struct holding an ordered ring. A region with three nodes
+and one with seven are the same type differing in `size()`. A separate name would
+name a thing that is not a separate thing.
+
+- `Manifold2D::addRegion(std::vector<NodeID>)` is the general call
+- `addTriangle(a, b, c)` stays as a convenience that forwards to it
+- `Triangle` stops being a public type and becomes the fast path inside the
+  solve, which is where an optimization belongs
+
+This is the same shape of finding as the node taxonomy: terminal, null and
+composite nodes turned out to be one struct differing in cardinality (§6.1).
+Regions differ in arity. Neither needed a type hierarchy.
+
+#### C · Non-convex regions are ACCEPTED
+
+**Decided: accept any simple polygon. Stars and L-shapes included.**
+
+An earlier draft of this plan proposed rejecting non-convex regions on the
+grounds that MVC can produce negative weights inside them. That was wrong, and
+measuring it is what showed so:
+
+    shape                    interior samples with a negative   most negative
+    star, inner radius 0.19        0 of 6356                      0.000000
+    star, inner radius 0.07     1384 of 2336                     -0.000416
+    L-shape, one reflex vertex  6288 of 9984                     -0.012705
+
+A moderate star never goes negative at all. Negatives appear only in deep
+notches and around a strong reflex vertex, and are tiny when they do.
+
+Floater and Hormann's 2006 paper is titled *Mean value coordinates for arbitrary
+planar polygons*. Arbitrary is the achievement. Rejecting non-convex would throw
+away the feature the algorithm exists to provide.
+
+The reasoning that led to the wrong answer is worth recording: **an
+audio-specific concern was allowed to decide a geometry question.** A negative
+gain is a phase inversion, which is usually wrong — for a panner. This is not a
+panner. For parameter interpolation a negative weight is extrapolation, pulling
+slightly beyond a node's value, which is sometimes exactly what is wanted.
+
+The manifold describes relationships. A negative weight is a relationship.
+Whether it is acceptable is interpretation.
+
+#### D · Negative weights get help, in the interpretation layer
+
+**Decided: a clamp-and-renormalize policy beside the curves, plus diagnostics.**
+
+`clampNegative()` zeroes negative weights and renormalizes the rest. Cheap — the
+worst measured case redistributes about 1% of the vector.
+
+It must be documented as **breaking affinity**: after clamping the result is no
+longer a true affine combination, so a blend of two parameter values will not
+land where the geometry says. Right for gains, wrong for positions. The same
+distinction as D-003, so it sits beside the curves with the same warning.
+
+Not applied automatically anywhere.
+
+---
+
 ---
 
 ## D-017 — Generalized regions, and three things the work turned up
@@ -1198,8 +1298,7 @@ catches a whole category.
 **Status:** kernel, vectors and serialization built; example pending
 **Files:** `src/core/ofxManifoldRegion.h`, `src/core/ofxManifold2D.h`,
 `src/io/ofxManifoldSerialize.h`, `tests/ref/reference_regions.py`,
-`tests/run_regions.cpp`. Full plan and settled decisions in
-`PLAN-regions.md`.
+`tests/run_regions.cpp`. Settled decisions in D-016b.
 
 A region is now an ordered ring of N >= 3 nodes. Three take the barycentric
 solve; more take mean-value coordinates after Hormann & Floater (2006). MVC
@@ -1260,7 +1359,7 @@ is built from **lengths and angles**, preserved only by similarities.
 This is a real tradeoff, made without knowing it. Wachspress coordinates are
 affine invariant but require strictly convex polygons. MVC handles stars and
 L-shapes but is only similarity invariant. Stars were an explicit requirement
-(PLAN-regions.md D-C), so MVC stays — and that choice gave affine invariance up.
+(D-016b (D-C)), so MVC stays — and that choice gave affine invariance up.
 
 What it does not break: the renderer's screen transform never touches the
 weights, since evaluation happens in normalized space, so §5 holds. What it does:
@@ -1320,3 +1419,86 @@ fixed by hand was left unguarded.
 
 The common thread is that each check answered the question it was asked, and
 the question was slightly wrong.
+
+
+---
+
+## D-018 — Non-convex regions were accepted, then refused
+
+**Date:** 2026-09-21
+**Status:** found while writing the example, fixed
+**Files:** `src/core/ofxManifoldRegion.h`, `tests/ref/reference_regions.py`,
+`tests/run_regions.cpp`
+
+### The bug
+
+Decision D-C accepted non-convex regions at construction, because a star is a
+legitimate control surface and MVC handles it. Containment then refused most of
+their interior.
+
+`Region::contains()` treated a region as containing a point when no weight was
+negative. For a triangle, and for any convex polygon, that is exactly geometric
+containment. For a non-convex polygon it is not: MVC gives legitimate negative
+weights at points genuinely inside the ring.
+
+Measured on an L-shape, 3,900 interior points:
+
+    reported inside by evaluate()      1,446
+    reported OUTSIDE                   2,454   -- every one carrying a negative weight
+
+So 63% of the region was silently treated as outside, and the points dropped
+were precisely the ones D-C was about. A consumer could never receive a negative
+weight from a non-convex region. `anyNegative()` and `clampNegative()` would have
+had nothing to act on.
+
+### Why no vector caught it
+
+Every region vector called the solver directly — `solveRing()` or
+`Region::evaluate()` — rather than going through `Manifold2D::evaluate()`. That
+was deliberate: several vectors test points exactly on a vertex or an edge, and
+containment has its own tolerance, so bypassing it kept those vectors about the
+solve.
+
+It also meant containment was never tested on a non-convex region at all. The
+solver was right; the step that decides whether to call it threw the answer
+away.
+
+The comment in `Region.h` even said so — "stricter than geometric containment
+... that is deliberate" — and pointed at a `containsRing()` that did not exist.
+The trade-off was noticed, described, and not acted on.
+
+### How it was found
+
+By asking, before handing the example over, whether it could show what it
+claimed to. The example tells you to drag into the L-shape's inner corner and
+watch a negative weight appear. With this bug, it would have shown "outside
+every region" at exactly that spot.
+
+### The fix
+
+Three nodes keep barycentric non-negativity, unchanged — for a triangle that is
+geometric containment, and 31 vectors depend on it exactly. Four or more use a
+genuine point-in-ring test: crossing number, plus an explicit boundary check.
+
+The boundary check is not decoration. A bare crossing-number test is ambiguous
+exactly on an edge; measured, it calls 6 of 12 edge points of a quad and 12 of
+18 of the L-shape outside. A point dragged along an edge would flicker between
+the region and nothing.
+
+### What pins it
+
+`CONTAINS` records go through `Manifold2D::evaluate()`: interior points of the
+L-shape and deep star that carry negative weights must be reported inside with
+those weights; every edge point of the quad and L-shape must be inside; points
+in the L's notch and between the star's arms must stay outside, so a test that
+simply said yes fails too.
+
+Four mutations, all caught: reverting to weight sign, always-inside, an inverted
+crossing test, and dropping the boundary check — the last caught by 17 vectors.
+
+### Pattern
+
+D-017 found that the contract test's directory boundary was too coarse. This is
+the same lesson one level down: **testing each part correctly is not testing the
+path a consumer takes through them.** The solver had 70 green vectors. None of
+them walked through the door every real call uses.

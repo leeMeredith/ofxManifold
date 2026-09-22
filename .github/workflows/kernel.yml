@@ -693,6 +693,51 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
+      - name: Containment reverts to weight sign must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        return ringContains(p, v, eps);' \
+            '        const RingResult r = solveRing(p, v); if (!r.valid) return false; for (float x : r.w) if (x < -eps) return false; return true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Containment always inside must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        return ringContains(p, v, eps);' \
+            '        (void)v; return true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: Boundary not counted as inside must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldRegion.h \
+            '        if (dx * dx + dy * dy <= eps * eps) return true;' \
+            '        (void)dx; (void)dy;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldRegion.h
+
+      - name: clampNegative does not renormalize must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldNegative.h \
+            '            out.push_back(WeightedNode{wn.id, wn.weight * inv});' \
+            '            out.push_back(WeightedNode{wn.id, wn.weight});'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldNegative.h
+
+      - name: anyNegative fires on edge noise must be caught
+        run: |
+          python3 tests/mutate.py src/interpretation/ofxManifoldNegative.h \
+            '        if (wn.weight < -eps) return true;' \
+            '        if (wn.weight < 0.0f) return true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/interpretation/ofxManifoldNegative.h
+
       - name: Restored tree must be green
         run: |
           make clean

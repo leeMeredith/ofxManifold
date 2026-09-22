@@ -56,7 +56,7 @@ struct TopologyReport {
     std::vector<RegionID>  duplicates;   // same nodes as an earlier region
 
     // INFORMATION, not a fault, and deliberately ignored by clean(). A star is
-    // a legitimate control surface and MVC handles it (PLAN-regions.md D-C).
+    // a legitimate control surface and MVC handles it (DECISIONS.md D-016b (D-C)).
     // Listed because weights CAN go negative inside a non-convex region, and
     // an author is better off knowing which parts of a map can do that before
     // a performance than after.
@@ -84,7 +84,7 @@ public:
     // the ring is not constructible; lastRegionError() says why.
     //
     // Non-convex rings are ACCEPTED. A star is a legitimate control surface
-    // and mean-value coordinates handle it (PLAN-regions.md D-C).
+    // and mean-value coordinates handle it (DECISIONS.md D-016b (D-C)).
     RegionID addRegion(std::vector<NodeID> ids) {
         lastError_.clear();
         for (NodeID id : ids) {

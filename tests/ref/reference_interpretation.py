@@ -403,6 +403,50 @@ def build():
                f"VALUES {' '.join(fmt(v) for v in vals)} "
                f"OUT {fmt(interp(normalize(curved), vals))}")
     out.append("")
+    # ---- negative weights ------------------------------------------------
+    #
+    # MVC over a non-convex region produces small negative weights at some
+    # interior points. The diagnostics report them; clampNegative() removes
+    # them for consumers that need it, and BREAKS AFFINITY doing so.
+    out.append("")
+    out.append("# NEGATIVE WEIGHTS. Diagnostics, and a clamp that is right for")
+    out.append("# gains and wrong for positions (same distinction as D-003).")
+    neg = [(0, 0.62), (1, 0.45), (2, -0.07)]
+    edge_noise = [(0, 0.5), (1, 0.5), (2, -1e-8), (3, -2e-8)]
+    clean_v = [(0, 0.2), (1, 0.5), (2, 0.3)]
+    out.append(f"ANYNEG anyneg_true ANALYTIC IN {wv(neg)} OUT 1")
+    out.append(f"ANYNEG anyneg_false ANALYTIC IN {wv(clean_v)} OUT 0")
+    out.append("# last-digit noise on a mathematically zero weight must NOT")
+    out.append("# count. A point on an edge leaves the far vertices at around")
+    out.append("# -1e-8, and a diagnostic that fired there would fire on every")
+    out.append("# edge and be ignored within a day")
+    out.append(f"ANYNEG anyneg_ignores_noise SPEC IN {wv(edge_noise)} OUT 0")
+    out.append(f"MOSTNEG mostneg_value ANALYTIC IN {wv(neg)} OUT {fmt(-0.07)}")
+    out.append(f"MOSTNEG mostneg_none ANALYTIC IN {wv(clean_v)} OUT 0")
+    kept = 0.62 + 0.45
+    out.append("# clamp: the negative node is REMOVED, the rest renormalize")
+    out.append("# to one. 0.62 and 0.45 over their sum of 1.07")
+    out.append(f"CLAMPNEG clamp_removes_negative ANALYTIC IN {wv(neg)} "
+               f"OUT 0={fmt(0.62/kept)} 1={fmt(0.45/kept)}")
+    out.append("# a vector with nothing negative is unchanged")
+    out.append(f"CLAMPNEG clamp_identity ANALYTIC IN {wv(clean_v)} "
+               f"OUT {wv(clean_v)}")
+    out.append("# sparse, non-contiguous ids survive the clamp (D-004)")
+    sp = [(9, 0.7), (4, -0.1), (2, 0.4)]
+    k2 = 0.7 + 0.4
+    out.append(f"CLAMPNEG clamp_sparse_ids CROSS IN {wv(sp)} "
+               f"OUT 9={fmt(0.7/k2)} 2={fmt(0.4/k2)}")
+    out.append("# the clamp BREAKS affinity: interpolating values through a")
+    out.append("# clamped vector does not give what the original weights give.")
+    out.append("# Recorded as a vector so nobody mistakes the clamp for a")
+    out.append("# harmless cleanup.")
+    vals = [10.0, 20.0, 30.0]
+    before = sum(vals[i] * w for i, w in neg)
+    after = sum(vals[i] * w / kept for i, w in neg if w > 0)
+    out.append(f"CLAMPSHIFT clamp_breaks_affinity SPEC IN {wv(neg)} "
+               f"VALUES {' '.join(fmt(v) for v in vals)} "
+               f"BEFORE {fmt(before)} AFTER {fmt(after)}")
+    out.append("")
     out.append("# t outside [0,1] clamps")
     out.append(f"BLEND blend_clamps_high SPEC 2.0 linear "
                f"A {wv(a)} B {wv(b)} OUT {wv(b)}")
@@ -421,7 +465,8 @@ def main():
     for line in out:
         p = line.split()
         if p and p[0] in ("CURVE", "POWER", "SUM", "NORMALIZE", "SPREAD",
-                          "SPREADSUM", "BLEND", "BLENDSUM"):
+                          "SPREADSUM", "BLEND", "BLENDSUM",
+                          "ANYNEG", "MOSTNEG", "CLAMPNEG", "CLAMPSHIFT"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

@@ -21,6 +21,7 @@
 #include "interpretation/ofxManifoldBlend.h"
 #include "interpretation/ofxManifoldInterpolate.h"
 #include "interpretation/ofxManifoldSmoother.h"
+#include "interpretation/ofxManifoldNegative.h"
 
 #include "sources/ofxManifoldPointSource.h"
 #include "sources/ofxManifoldTrajectory.h"

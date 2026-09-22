@@ -12,6 +12,8 @@
 #include <glm/vec3.hpp>
 #include <glm/geometric.hpp>
 #define TWO_PI 6.28318530718f
+#define PI 3.14159265359f
+#define HALF_PI 1.57079632679f
 struct ofColor {
     ofColor(){} ofColor(int,int,int){} ofColor(int,int,int,int){}
 };

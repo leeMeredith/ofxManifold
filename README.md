@@ -173,6 +173,12 @@ a clean fan, a deliberately broken T-junction, two overlapping regions where the
 answer depends on which side you entered from, and a 144-node grid for looking
 at the renderer at density.
 
+**`example-regions`** — a triangle, a hexagon, an L-shape and a star in one
+map. Regions of three nodes use the barycentric solve; more use mean-value
+coordinates. Drag into the L-shape's inner corner and a red line pulls
+backwards toward a vertex you cannot see — a negative weight, which is MVC
+working. Press `c` to clamp it: right for speakers, wrong for parameters.
+
 **`example-smoothing`** — raw and smoothed weights traced against each other
 over time. Cross an interior edge and the raw line does not jump: on a
 conforming mesh the weights are already continuous there. Then add jitter, fire
@@ -220,7 +226,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-377 vectors across eight suites, plus 65 mutation gates that introduce known
+426 vectors across eight suites, plus 70 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

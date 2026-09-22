@@ -113,8 +113,19 @@ void ofxManifoldRenderer::drawEvaluation(const Evaluation& e,
     if (e.inside) {
         for (const auto& wn : e.weights) {
             const glm::vec2 n = toScreen(manifold_->node(wn.id).position);
-            ofSetColor(style.weightBar, 60 + 195 * ofClamp(wn.weight, 0.f, 1.f));
-            ofSetLineWidth(1.0f + 5.0f * ofClamp(wn.weight, 0.0f, 1.0f));
+            // A negative weight -- possible inside a non-convex region -- is
+            // drawn in the warning colour, sized by its magnitude. A line
+            // pulling backwards from the point is legible in a way a minus
+            // sign in a list is not, and it shows WHERE in a map the pull
+            // comes from.
+            const float mag = ofClamp(std::fabs(wn.weight), 0.0f, 1.0f);
+            if (wn.weight < -1e-6f) {
+                ofSetColor(style.warning, 120 + 135 * std::min(1.0f, mag * 20.0f));
+                ofSetLineWidth(1.5f + 4.0f * std::min(1.0f, mag * 20.0f));
+            } else {
+                ofSetColor(style.weightBar, 60 + 195 * mag);
+                ofSetLineWidth(1.0f + 5.0f * mag);
+            }
             ofDrawLine(s.x, s.y, n.x, n.y);
         }
     }

@@ -43,7 +43,8 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
             src/interpretation/ofxManifoldSpread.h \
             src/interpretation/ofxManifoldBlend.h \
             src/interpretation/ofxManifoldInterpolate.h \
-            src/interpretation/ofxManifoldSmoother.h
+            src/interpretation/ofxManifoldSmoother.h \
+            src/interpretation/ofxManifoldNegative.h
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
@@ -75,7 +76,7 @@ test: headers workflow wrapper test-triangle test-manifold test-interpretation t
 wrapper:
 	@$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 		-fsyntax-only src/ofx/ofxManifoldRenderer.cpp
-	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing; do \
+	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions; do \
 		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 			-I$$ex/src -fsyntax-only $$ex/src/ofApp.cpp || exit 1; \
 	done

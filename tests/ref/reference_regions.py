@@ -30,7 +30,7 @@ second case continuously, not occasionally.
 
 WHAT THIS FILE DOES NOT DECIDE. Whether a negative weight is acceptable. MVC
 over a non-convex region produces them at some interior points, and that is the
-algorithm working as designed -- see PLAN-regions.md D-C. The geometry reports
+algorithm working as designed -- see DECISIONS.md D-016b (D-C). The geometry reports
 the relationship; the consumer decides what it means.
 """
 
@@ -69,7 +69,7 @@ def signed_area(poly):
 def is_convex(poly, eps=EPS):
     """
     Every turn the same way round. Reported as INFORMATION, never as a reason
-    to refuse a region (PLAN-regions.md D-C): a star is a legitimate control
+    to refuse a region (DECISIONS.md D-016b (D-C)): a star is a legitimate control
     surface and MVC handles it.
     """
     n = len(poly)
@@ -205,7 +205,7 @@ def why_invalid(poly, ids=None):
     Returns a reason string, or None if the ring is constructible.
 
     Only genuinely ill-defined rings are refused. Non-convex is NOT one of
-    them (PLAN-regions.md D-C).
+    them (DECISIONS.md D-016b (D-C)).
     """
     n = len(poly)
     if n < 3:
@@ -444,7 +444,7 @@ def build():
     out.append("# The alternative scheme, Wachspress coordinates, IS affine")
     out.append("# invariant but requires strictly convex polygons. MVC was")
     out.append("# chosen because stars are an explicit requirement")
-    out.append("# (PLAN-regions.md D-C), and that choice gave this up.")
+    out.append("# (DECISIONS.md D-016b (D-C)), and that choice gave this up.")
     out.append("#" + "-" * 68)
     out.append("")
     ang = 0.7
@@ -515,6 +515,83 @@ def build():
                    f"AT {fmt(p[0])} {fmt(p[1])} "
                    f"BIAS " + " ".join(fmt(b) for b in bias) +
                    " EXPECT " + " ".join(fmt(x) for x in want))
+    out.append("")
+
+    # ---- containment through the manifold -------------------------------
+    out.append("#" + "-" * 68)
+    out.append("# CONTAINMENT, THROUGH Manifold2D::evaluate()")
+    out.append("#")
+    out.append("# Every other region vector calls the solver directly, which")
+    out.append("# is how a containment bug stayed invisible: evaluate() tested")
+    out.append("# weight sign, which equals geometric containment only for")
+    out.append("# convex shapes. 63% of an L-shape's interior was reported")
+    out.append("# OUTSIDE, and those were exactly the points carrying negative")
+    out.append("# weights -- so the negatives D-C accepted non-convex regions")
+    out.append("# for could never reach a consumer (DECISIONS.md D-018).")
+    out.append("#")
+    out.append("# These go through evaluate(), and each point is inside the")
+    out.append("# region geometrically AND carries a negative weight.")
+    out.append("#" + "-" * 68)
+    out.append("")
+    probes = []
+    for iy in range(40):
+        for ix in range(40):
+            p = (ix / 39, iy / 39)
+            if not inside(LSHAPE, p):
+                continue
+            w = mvc(LSHAPE, p)
+            if w and min(w) < -1e-4:
+                probes.append((p, w))
+    # A spread of them, not the first few in scan order.
+    picks = [probes[i] for i in range(0, len(probes), max(1, len(probes) // 5))][:5]
+    for k, (p, w) in enumerate(picks):
+        out.append(f"CONTAINS lshape_negative_inside_{k} ANALYTIC "
+                   f"POLY {poly_s(LSHAPE)} AT {fmt(p[0])} {fmt(p[1])} "
+                   f"INSIDE 1 NEGATIVE 1 EXPECT " +
+                   " ".join(fmt(x) for x in w))
+    out.append("")
+    out.append("# the deep star, same property")
+    sp = []
+    for iy in range(60):
+        for ix in range(60):
+            p = (ix / 59, iy / 59)
+            if inside(DEEPSTAR, p):
+                w = mvc(DEEPSTAR, p)
+                if w and min(w) < -1e-5:
+                    sp.append((p, w))
+    for k, (p, w) in enumerate(sp[:: max(1, len(sp) // 3)][:3]):
+        out.append(f"CONTAINS star_negative_inside_{k} ANALYTIC "
+                   f"POLY {poly_s(DEEPSTAR)} AT {fmt(p[0])} {fmt(p[1])} "
+                   f"INSIDE 1 NEGATIVE 1 EXPECT " +
+                   " ".join(fmt(x) for x in w))
+    out.append("")
+    out.append("# ON THE BOUNDARY: inside. A bare crossing-number test is")
+    out.append("# ambiguous exactly on an edge -- measured, it calls 6 of 12")
+    out.append("# edge points of the quad and 12 of 18 of the L-shape OUTSIDE.")
+    out.append("# A point dragged along an edge would flicker between the")
+    out.append("# region and nothing. The explicit boundary check is what")
+    out.append("# prevents that, and every edge point below is one it rescues")
+    out.append("# or one it must not break.")
+    for label, poly in [("quad", QUAD), ("lshape", LSHAPE)]:
+        n = len(poly)
+        for i in range(n):
+            a, b = poly[i], poly[(i + 1) % n]
+            for t in (0.25, 0.5, 0.75):
+                q = (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
+                out.append(f"CONTAINS {label}_edge_{i}_{int(t*100)} ANALYTIC "
+                           f"POLY {poly_s(poly)} AT {fmt(q[0])} {fmt(q[1])} "
+                           f"INSIDE 1 NEGATIVE ANY EXPECT")
+    out.append("")
+    out.append("# and points genuinely OUTSIDE a non-convex region -- in the")
+    out.append("# L's notch and between the star's arms -- must stay outside.")
+    out.append("# A containment test that just said yes would pass everything")
+    out.append("# above and fail here.")
+    for nm, poly, p in [("lshape_notch", LSHAPE, (0.7, 0.7)),
+                        ("star_between_arms", DEEPSTAR, (0.5 + 0.3 * math.cos(math.pi/2 + math.pi/5),
+                                                         0.5 + 0.3 * math.sin(math.pi/2 + math.pi/5)))]:
+        assert not inside(poly, p), nm
+        out.append(f"CONTAINS {nm}_outside ANALYTIC POLY {poly_s(poly)} "
+                   f"AT {fmt(p[0])} {fmt(p[1])} INSIDE 0 NEGATIVE 0 EXPECT")
     out.append("")
 
     # ---- negatives, measured --------------------------------------------
@@ -593,7 +670,7 @@ def main():
         p = line.split()
         if p and p[0] in ("N3AGREE", "EVAL", "SUMONE", "CONTINUOUS",
                           "NEGSWEEP", "CONSTRUCT", "CONVEX", "VARIES",
-                          "EVALBIAS"):
+                          "EVALBIAS", "CONTAINS"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

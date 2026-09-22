@@ -191,7 +191,7 @@ loading: a `"triangles"` key is read as three-node regions. Format version stays
 1 — this is additive, and refusing files that worked yesterday would be worse
 than a version bump is worth.
 
-### 7 · Example — NEXT
+### 7 · Example — DONE (found D-018 on the way)
 
 A quad, a hexagon, a star and a triangle in one map, with the negative-weight
 diagnostic visible and `clampNegative()` on a key so the difference can be seen

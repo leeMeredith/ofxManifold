@@ -167,6 +167,55 @@ int main(int argc, char** argv) {
             }
             record(cls, name, ok, d.str());
 
+        } else if (kind == "CONTAINS") {
+            // Through Manifold2D::evaluate(), the path a consumer takes. The
+            // solver can be right while containment throws its answer away.
+            expectKeyword(in, "POLY");
+            const auto poly = readPoly(in);
+            expectKeyword(in, "AT");
+            float px, py; in >> px >> py;
+            expectKeyword(in, "INSIDE");   int wantIn;  in >> wantIn;
+            expectKeyword(in, "NEGATIVE");
+            std::string negTok; in >> negTok;
+            // ANY: the boundary vectors assert containment only. On an edge
+            // the far vertices carry last-digit noise either side of zero.
+            const bool negAny = (negTok == "ANY");
+            const int wantNeg = negAny ? 0 : std::stoi(negTok);
+            expectKeyword(in, "EXPECT");
+            std::vector<float> want; float x;
+            while (in >> x) want.push_back(x);
+
+            Manifold2D m; RegionID r;
+            if (!build(poly, m, r)) {
+                record(cls, name, false, "region refused"); continue;
+            }
+            const Evaluation e = m.evaluate({px, py});
+            bool ok = (e.inside ? 1 : 0) == wantIn;
+            if (!ok) {
+                d << (wantIn ? "point is geometrically INSIDE the region and "
+                               "evaluate() reported it outside"
+                             : "point is outside the region and evaluate() "
+                               "reported it inside");
+            }
+            if (ok && wantIn) {
+                bool neg = false;
+                for (const auto& wn : e.weights) if (wn.weight < -1e-6f) neg = true;
+                if (!negAny && (neg ? 1 : 0) != wantNeg) {
+                    ok = false;
+                    d << "expected a negative weight to reach the consumer";
+                }
+                const std::vector<float> got = ringWeights(m, e);
+                for (std::size_t i = 0; ok && i < want.size(); ++i) {
+                    if (!close(got[i], want[i])) {
+                        ok = false;
+                        d << "\n      node " << i << ": expected "
+                          << std::fixed << std::setprecision(9) << want[i]
+                          << ", got " << got[i];
+                    }
+                }
+            }
+            record(cls, name, ok, d.str());
+
         } else if (kind == "EVALBIAS") {
             // Bias on a polygon region, which every existing bias vector
             // missed because they are all on triangles.
