@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace ofxManifold {
@@ -244,32 +245,87 @@ public:
 
     // ---- mutation -------------------------------------------------------
 
-    // Move a node, refusing the move if it would invert or flatten any region
-    // the node belongs to (architecture doc 8.6).
+    // Move a node, refusing the move if it would leave any region it belongs
+    // to in a state construction would refuse (architecture doc 8.6).
     //
-    // Weights vary continuously as nodes move, with exactly one failure mode:
-    // a node travelling far enough to turn a region inside out drives the
-    // signed area through zero, and the weights diverge on the way. Comparing
-    // against the winding sign recorded at construction makes that checkable
-    // instead of discovered.
+    // One node is a batch of one: this forwards to setNodePositions(), so a
+    // single move and a group move are held to exactly the same rule by
+    // exactly the same code.
     //
     // Returns false and leaves the node where it was if the move is refused.
     bool setNodePosition(NodeID id, glm::vec2 to) {
-        if (id >= nodes_.size()) return false;
+        return setNodePositions({{id, to}});
+    }
 
-        const glm::vec2 from = nodes_[id].position;
-        nodes_[id].position = to;
+    // Move several nodes as ONE operation: every move is applied, or none.
+    //
+    // Every region touched by any moved node is checked against the FINAL
+    // positions. Moving the nodes one at a time would check each move against
+    // positions partway through the group's move -- sliding a triangle right
+    // by more than its width drags its first vertex past the second and
+    // inverts it, although the finished shape is fine. As a batch that move is
+    // accepted (PLAN-authoring.md decision J).
+    //
+    // A region is refused if it would:
+    //
+    //   * change winding sign -- inverted, the failure 8.6 was written for
+    //   * fall below kAreaEpsilon -- flattened
+    //   * cross itself
+    //
+    // The last one is new. For a triangle the first two are the only ways to
+    // break it, since three edges cannot cross. For four or more they are not:
+    // a convex quad's corner dragged across leaves a self-intersecting ring
+    // whose signed area never changes sign, and the single-node move used to
+    // ACCEPT it -- a region construction would have refused, reached by
+    // editing instead (decision K). The same shape as D-018: the rule applied
+    // when a region is built and the rule applied when it is edited had
+    // drifted apart.
+    //
+    // On refusal nothing is changed. Duplicate ids in `moves` take the last
+    // position given.
+    bool setNodePositions(
+            const std::vector<std::pair<NodeID, glm::vec2>>& moves) {
+        for (const auto& m : moves) {
+            if (m.first >= nodes_.size()) return false;
+        }
 
-        for (RegionID r : nodeRegions_[id]) {
+        // Remember every original position before touching any.
+        std::vector<std::pair<NodeID, glm::vec2>> saved;
+        saved.reserve(moves.size());
+        for (const auto& m : moves) {
+            saved.emplace_back(m.first, nodes_[m.first].position);
+        }
+        for (const auto& m : moves) nodes_[m.first].position = m.second;
+
+        // Each touched region once, however many of its nodes moved.
+        std::vector<RegionID> touched;
+        for (const auto& m : moves) {
+            for (RegionID r : nodeRegions_[m.first]) {
+                if (std::find(touched.begin(), touched.end(), r)
+                        == touched.end()) {
+                    touched.push_back(r);
+                }
+            }
+        }
+
+        for (RegionID r : touched) {
             const auto& ids = regions_[r].ids();
             std::vector<glm::vec2> ring;
             ring.reserve(ids.size());
             for (NodeID q : ids) ring.push_back(nodes_[q].position);
+
             const float area2 = ringArea2(ring);
             const int sign = (area2 > 0.0f) ? 1 : -1;
-            if (std::fabs(area2) < kAreaEpsilon
-                || sign != regions_[r].constructionSign()) {
-                nodes_[id].position = from;   // refuse, restore
+            const bool broken =
+                   std::fabs(area2) < kAreaEpsilon
+                || sign != regions_[r].constructionSign()
+                || (ids.size() > 3 && ringSelfIntersects(ring));
+            if (broken) {
+                // Restore in reverse, so a duplicated id ends at its
+                // ORIGINAL position rather than an intermediate one.
+                for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
+                    nodes_[it->first].position = it->second;
+                }
                 return false;
             }
         }

@@ -26,6 +26,8 @@
 #include "sources/ofxManifoldPointSource.h"
 #include "sources/ofxManifoldTrajectory.h"
 
+#include "authoring/ofxManifoldGrid.h"
+
 #include "mapping/ofxManifoldMapping.h"
 
 #include "io/ofxManifoldJSON.h"

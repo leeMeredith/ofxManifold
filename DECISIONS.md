@@ -1502,3 +1502,66 @@ D-017 found that the contract test's directory boundary was too coarse. This is
 the same lesson one level down: **testing each part correctly is not testing the
 path a consumer takes through them.** The solver had 70 green vectors. None of
 them walked through the door every real call uses.
+
+
+---
+
+## D-019 — Editing a region could reach a shape building it could not
+
+**Date:** 2026-09-22
+**Status:** fixed in the kernel; found while planning the editor's batch move
+**Files:** `src/core/ofxManifold2D.h`, `tests/ref/reference_grids.py`,
+`tests/run_grids.cpp`
+
+### The bug
+
+`setNodePosition()` refused a move that would invert or flatten a region, by
+comparing its winding sign against the one recorded at construction. For a
+triangle that is complete: three edges cannot cross each other, so inverting
+and flattening are the only ways to break one.
+
+For four or more nodes it is not. Measured: a legal convex quad, one corner
+dragged across so the ring crosses itself. Construction refuses that ring as
+self-intersecting. `setNodePosition()` **accepted** it, because the signed area
+went from 0.72 to 0.15 without changing sign, and left the region
+self-intersecting.
+
+Regions of more than three nodes arrived with D-017, and nothing caught that the
+movement check had been written for triangles.
+
+### Same shape as D-018
+
+D-018: non-convex regions were accepted at construction and refused at
+evaluation. D-019: a self-intersecting region was refused at construction and
+reachable by editing. **Both times the rule applied when a region is built and
+the rule applied when it is used or changed had drifted apart**, and both times
+it was the move from three nodes to N that exposed it.
+
+Worth asking of any invariant a constructor enforces: is every other way of
+reaching that state held to the same rule?
+
+### The fix
+
+`setNodePositions()` moves several nodes as one operation, all or nothing,
+checking every touched region against its FINAL shape: winding sign, area, and
+now self-intersection for four or more nodes. `setNodePosition()` is a batch of
+one, so a single move and a group move are held to the same rule by the same
+code — and the runner checks that the two paths reach the same verdict, so they
+keep sharing it.
+
+Checking final rather than intermediate shapes also changes what is allowed.
+Sliding a triangle right by more than its width, one node at a time, drags its
+first vertex past its second and inverts it partway; the sequence is refused
+though the finished shape is fine. As a batch it is accepted.
+
+### Two measurements that were not pinned
+
+The same round measured two things the snapping code needed — reducing a
+lattice basis before searching, and searching every polar ring rather than one
+either side — implemented both, and pinned neither. The vectors targeted plain
+rounding only. Mutation testing removed each fix and the suite stayed green.
+
+D-017 recorded a bug found by hand and fixed without a vector. This is the same
+failure one step earlier: **a measurement that justifies code is not a test of
+that code.** Each now has traps aimed at its specific shortcut, found by
+searching.

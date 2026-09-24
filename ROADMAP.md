@@ -92,6 +92,23 @@ what actually happened — cannot.
 
 ---
 
+## Editor — in planning
+
+See `PLAN-authoring.md`. Grids with an explicit free-hand mode, rotation, and a
+batch move for multi-select. Two items belong to the editor but come after it:
+
+**Layers.** `blendByName()` already combines maps, and `example-blend` draws
+two stacked. What the editor needs is an **active layer**: edit one map, show
+the others dimmed. Node names may repeat across maps safely, since NodeIDs are
+per-manifold (D-013).
+
+**3D stacked view, for viewing only.** Each map as a plane at its own depth
+under a camera, which makes section 9.3's layered-2D-as-3D visible. View only,
+deliberately: picking nodes in 3D is hard to do well, and editing in 2D while
+viewing in 3D avoids the problem entirely. Wrapper code, no kernel change.
+
+---
+
 ## Parked, with reasons
 
 **A second coordinate kernel: mean-value coordinates over polygons.**

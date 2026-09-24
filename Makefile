@@ -18,6 +18,7 @@ SER_RUN  := $(BUILD)/run_serialize
 TRJ_RUN  := $(BUILD)/run_trajectory
 SMO_RUN  := $(BUILD)/run_smoother
 REG_RUN  := $(BUILD)/run_regions
+GRD_RUN  := $(BUILD)/run_grids
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -27,6 +28,7 @@ SER_VEC  := tests/vectors/serialize.vec
 TRJ_VEC  := tests/vectors/trajectory.vec
 SMO_VEC  := tests/vectors/smoother.vec
 REG_VEC  := tests/vectors/regions.vec
+GRD_VEC  := tests/vectors/grids.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -48,6 +50,8 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
+AUTHORING := src/authoring/ofxManifoldGrid.h
+
 SOURCES  := src/sources/ofxManifoldPointSource.h \
             src/sources/ofxManifoldTrajectory.h
 
@@ -56,14 +60,14 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions headers workflow wrapper vectors clean
+.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize test-trajectory test-smoother test-regions
+      test-serialize test-trajectory test-smoother test-regions test-grids
 	@echo ""
 	@echo "all suites green"
 
@@ -94,7 +98,7 @@ workflow:
 # point of src/core is that a stranger can drop it into their own project.
 headers:
 	@mkdir -p $(BUILD)
-	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES); do \
+	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES) $(AUTHORING); do \
 		if grep -qE '^[[:space:]]*#[[:space:]]*include.*ofMain\.h' $$f; then \
 			echo "  $$f includes ofMain.h -- src/ofx is the only place that may"; \
 			exit 1; \
@@ -138,6 +142,9 @@ test-smoother: $(SMO_RUN) $(SMO_VEC)
 test-regions: $(REG_RUN) $(REG_VEC)
 	@./$(REG_RUN) $(REG_VEC)
 
+test-grids: $(GRD_RUN) $(GRD_VEC)
+	@./$(GRD_RUN) $(GRD_VEC)
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -150,6 +157,7 @@ vectors:
 	@python3 tests/ref/reference_trajectory.py
 	@python3 tests/ref/reference_smoother.py
 	@python3 tests/ref/reference_regions.py
+	@python3 tests/ref/reference_grids.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -172,6 +180,13 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
+
+$(GRD_RUN): tests/run_grids.cpp $(CORE) $(AUTHORING)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_grids.cpp
+
+$(GRD_VEC): tests/ref/reference_grids.py
+	@python3 tests/ref/reference_grids.py
 
 $(REG_RUN): tests/run_regions.cpp $(CORE)
 	@mkdir -p $(BUILD)

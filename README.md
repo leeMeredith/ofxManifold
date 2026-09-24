@@ -226,7 +226,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-426 vectors across eight suites, plus 70 mutation gates that introduce known
+507 vectors across nine suites, plus 78 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform
@@ -248,6 +248,7 @@ src/core/            kernel, glm only, no ofMain.h
 src/interpretation/  curves, spread, blend, interpolate, smoother
 src/mapping/         node to target bindings, aggregators
 src/io/              JSON manifold and mapping files
+src/authoring/       grids for placing nodes: free, lattice, polar
 src/ofx/             the ONLY place ofMain.h may appear
 tests/               references, vectors, fixtures
 libs/glm/            vendored, see libs/VENDORED.md

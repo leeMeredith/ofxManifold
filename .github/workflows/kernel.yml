@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -737,6 +737,78 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldNegative.h
+
+      - name: Snap without neighbour search must be caught
+        run: |
+          python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
+            '        for (long d0 = -1; d0 <= 1; ++d0) {' \
+            '        for (long d0 = 0; d0 <= 0; ++d0) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/authoring/ofxManifoldGrid.h
+
+      - name: Lattice basis not reduced must be caught
+        run: |
+          python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
+            '        for (int guard = 0; guard < 64; ++guard) {' \
+            '        for (int guard = 0; guard < 0; ++guard) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/authoring/ofxManifoldGrid.h
+
+      - name: Tie broken by highest address must be caught
+        run: |
+          python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
+            '            if (a != bestA) return a < bestA;' \
+            '            if (a != bestA) return a > bestA;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/authoring/ofxManifoldGrid.h
+
+      - name: Polar searches too few rings must be caught
+        run: |
+          python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
+            '        for (int ring = 1; ring <= top; ++ring) {' \
+            '        for (int ring = (int(r / dr_) > 1 ? int(r / dr_) - 1 : 1); ring <= int(r / dr_) + 1; ++ring) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/authoring/ofxManifoldGrid.h
+
+      - name: Free mode snaps must be caught
+        run: |
+          python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
+            '        r.point = p;               // free: the identity, exactly' \
+            '        r.point = {std::floor(p.x * 10.0f) / 10.0f, p.y};'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/authoring/ofxManifoldGrid.h
+
+      - name: Hysteresis removed must be caught
+        run: |
+          python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
+            '        if (dc <= ds + double(dead) * spacing()) {' \
+            '        if (false) { (void)dc; (void)ds;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/authoring/ofxManifoldGrid.h
+
+      - name: Move allows a self-intersecting region must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifold2D.h \
+            '                || (ids.size() > 3 && ringSelfIntersects(ring));' \
+            '                ;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: Refused batch applied partially must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifold2D.h \
+            '                    nodes_[it->first].position = it->second;' \
+            '                    (void)it;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
 
       - name: Restored tree must be green
         run: |
