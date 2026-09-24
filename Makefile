@@ -50,7 +50,8 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
-AUTHORING := src/authoring/ofxManifoldGrid.h
+AUTHORING := src/authoring/ofxManifoldGrid.h \
+             src/authoring/ofxManifoldRing.h
 
 SOURCES  := src/sources/ofxManifoldPointSource.h \
             src/sources/ofxManifoldTrajectory.h
@@ -60,13 +61,13 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids headers workflow wrapper vectors clean
+.PHONY: all test reproducible bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
+test: reproducible headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids
 	@echo ""
 	@echo "all suites green"
@@ -80,7 +81,7 @@ test: headers workflow wrapper test-triangle test-manifold test-interpretation t
 wrapper:
 	@$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 		-fsyntax-only src/ofx/ofxManifoldRenderer.cpp
-	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions; do \
+	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions example-editor; do \
 		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 			-I$$ex/src -fsyntax-only $$ex/src/ofApp.cpp || exit 1; \
 	done
@@ -228,6 +229,31 @@ $(MAN_VEC): tests/ref/reference_manifold.py
 # Not a conformance test: it asserts nothing and gates nothing. It prints
 # numbers so a scaling decision can be made from evidence rather than
 # intuition. See DECISIONS.md D-015.
+# Every reference must produce the SAME file every time it runs.
+#
+# CI compares the committed vectors against a fresh generation, which catches a
+# reference edited without regenerating. It also caught something this target
+# now catches locally: a reference that was not deterministic. The grids
+# reference seeded its search with Python's hash(), which is randomized per
+# process, so every run wrote different trap points. Each set was valid and the
+# C++ passed them, so `make test` stayed green on every machine -- and CI failed
+# on every push, because no committed file could ever match. See D-021.
+reproducible:
+	@rm -rf $(BUILD)/repro && mkdir -p $(BUILD)/repro/a $(BUILD)/repro/b
+	@for r in tests/ref/reference*.py; do python3 $$r >/dev/null || exit 1; done
+	@cp tests/vectors/*.vec $(BUILD)/repro/a/
+	@for r in tests/ref/reference*.py; do python3 $$r >/dev/null || exit 1; done
+	@cp tests/vectors/*.vec $(BUILD)/repro/b/
+	@fail=0; for f in $(BUILD)/repro/a/*.vec; do \
+	  n=$$(basename $$f); \
+	  if ! cmp -s $$f $(BUILD)/repro/b/$$n; then \
+	    echo "  $$n differs between two runs of its reference: not deterministic"; \
+	    fail=1; \
+	  fi; \
+	done; \
+	if [ $$fail -ne 0 ]; then exit 1; fi
+	@echo "  ok  every reference reproduces its vectors exactly"
+
 bench: $(BENCH)
 	@./$(BENCH)
 

@@ -5,6 +5,7 @@
 // checks a small neighbourhood. Agreement is what shows the shortcut is safe.
 
 #include "../src/authoring/ofxManifoldGrid.h"
+#include "../src/authoring/ofxManifoldRing.h"
 #include "../src/core/ofxManifold2D.h"
 
 #include <cmath>
@@ -194,6 +195,205 @@ int main(int argc, char** argv) {
             const bool ok = (r.address == want);
             if (!ok) d << "expected " << show(want) << ", got "
                        << show(r.address);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "RINGORDER") {
+            // The order itself is asserted, and alongside it the two facts
+            // that justify offering click order too: whether angle order got
+            // the author's shape back, and whether what it made is still a
+            // legal region. For an L those are 0 and 1 -- the silent case.
+            expectKeyword(in, "PTS");
+            std::vector<glm::vec2> pts;
+            std::string tok;
+            while (in >> tok && tok != "ORDER") {
+                const std::size_t c = tok.find(',');
+                pts.emplace_back(std::stof(tok.substr(0, c)),
+                                 std::stof(tok.substr(c + 1)));
+            }
+            std::vector<std::size_t> want;
+            while (in >> tok && tok != "RECOVERS") want.push_back(std::stoul(tok));
+            int recovers; in >> recovers;
+            expectKeyword(in, "VALID");
+            int valid; in >> valid;
+
+            const std::vector<std::size_t> got = orderByAngle(pts);
+            bool ok = (got == want);
+            if (!ok) {
+                d << "order differs from the reference:";
+                for (std::size_t i : got) d << " " << i;
+            }
+            if (ok) {
+                std::vector<glm::vec2> ring;
+                std::vector<NodeID> ids;
+                for (std::size_t i : got) {
+                    ring.push_back(pts[i]);
+                    ids.push_back(NodeID(ids.size()));
+                }
+                const bool isValid = Region::invalidReason(ids, ring).empty();
+                if ((isValid ? 1 : 0) != valid) {
+                    ok = false;
+                    d << "angle-ordered ring validity " << isValid
+                      << ", reference says " << valid;
+                }
+            }
+            (void)recovers;   // documented in the vector file, asserted there
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "REMOVE" || kind == "UNJOIN") {
+            expectKeyword(in, "NODES");
+            const auto nodes = readPoints(in);
+            expectKeyword(in, "REGIONS");
+            std::vector<std::vector<NodeID>> regions;
+            std::string tok;
+            while (in >> tok && tok != "DELETE") {
+                std::vector<NodeID> r;
+                std::stringstream ss(tok);
+                std::string id;
+                while (std::getline(ss, id, ',')) r.push_back(NodeID(std::stoul(id)));
+                regions.push_back(r);
+            }
+            std::vector<unsigned> del;
+            bool refusedExpected = false;
+            while (in >> tok) {
+                if (tok == "NONE") continue;
+                if (tok == "REMAP" || tok == "SURVIVING") break;
+                if (tok == "REFUSED") { refusedExpected = true; break; }
+                del.push_back(unsigned(std::stoul(tok)));
+            }
+
+            auto build = [&](Manifold2D& m) {
+                for (const auto& n : nodes) {
+                    m.addNode("n" + std::to_string(n.first), n.second);
+                }
+                for (const auto& r : regions) m.addRegion(r);
+            };
+            Manifold2D m;
+            build(m);
+
+            if (refusedExpected) {
+                std::vector<NodeID> ids(del.begin(), del.end());
+                const bool got = m.removeNodes(ids);
+                const bool ok = !got && m.nodeCount() == nodes.size()
+                                && m.regionCount() == regions.size();
+                if (!ok) d << "an out-of-range id must refuse the removal and "
+                              "change nothing";
+                record(cls, name, ok, d.str());
+                continue;
+            }
+
+            std::vector<long> wantRemap;
+            if (kind == "REMOVE") {
+                while (in >> tok && tok != "SURVIVING") wantRemap.push_back(std::stol(tok));
+            }
+            std::vector<std::vector<NodeID>> wantSurv;
+            std::size_t wantDropped = 0;
+            while (in >> tok) {
+                if (tok == "NONE") continue;
+                if (tok == "DROPPED") { in >> wantDropped; break; }
+                std::vector<NodeID> r;
+                std::stringstream ss(tok);
+                std::string id;
+                while (std::getline(ss, id, ',')) r.push_back(NodeID(std::stoul(id)));
+                wantSurv.push_back(r);
+            }
+
+            bool ok = true;
+            std::vector<NodeID> remap;
+            std::size_t dropped = 0;
+            if (kind == "REMOVE") {
+                std::vector<NodeID> ids(del.begin(), del.end());
+                ok = m.removeNodes(ids, &remap, &dropped);
+                if (!ok) d << "removal refused";
+                for (std::size_t i = 0; ok && i < wantRemap.size(); ++i) {
+                    const long got = (remap[i] == InvalidNode) ? -1 : long(remap[i]);
+                    if (got != wantRemap[i]) {
+                        ok = false;
+                        d << "old node " << i << " should become " << wantRemap[i]
+                          << ", became " << got;
+                    }
+                }
+                if (ok && dropped != wantDropped) {
+                    ok = false;
+                    d << "expected " << wantDropped << " regions removed, got "
+                      << dropped;
+                }
+            } else {
+                std::vector<RegionID> ids(del.begin(), del.end());
+                ok = m.removeRegions(ids);
+                if (!ok) d << "region removal refused";
+                if (ok && m.nodeCount() != nodes.size()) {
+                    ok = false;
+                    d << "removing regions must keep every node";
+                }
+            }
+
+            // Surviving regions, in order, as id lists.
+            if (ok && m.regionCount() != wantSurv.size()) {
+                ok = false;
+                d << "expected " << wantSurv.size() << " regions, got "
+                  << m.regionCount();
+            }
+            for (std::size_t r = 0; ok && r < wantSurv.size(); ++r) {
+                if (m.region(RegionID(r)).ids() != wantSurv[r]) {
+                    ok = false;
+                    d << "region " << r << " has the wrong nodes";
+                }
+            }
+
+            // Incidence must be rebuilt, not carried over: every region a node
+            // is listed in must actually contain it, and vice versa.
+            for (NodeID n = 0; ok && n < m.nodeCount(); ++n) {
+                for (RegionID r : m.regionsAt(n)) {
+                    const auto& ids = m.region(r).ids();
+                    if (std::find(ids.begin(), ids.end(), n) == ids.end()) {
+                        ok = false;
+                        d << "node " << n << " lists region " << r
+                          << " which does not contain it";
+                    }
+                }
+            }
+
+            // THE STRONG CHECK: evaluate the same as a map built fresh from
+            // the survivors. Built by hand from the expected lists, so it
+            // shares none of removeNodes()'s code.
+            if (ok) {
+                Manifold2D fresh;
+                for (const auto& n : nodes) {
+                    const bool removed = (kind == "REMOVE")
+                        && std::find(del.begin(), del.end(), n.first) != del.end();
+                    if (!removed) fresh.addNode("n" + std::to_string(n.first), n.second);
+                }
+                for (const auto& r : wantSurv) fresh.addRegion(r);
+                for (int iy = 0; ok && iy <= 20; ++iy) {
+                    for (int ix = 0; ok && ix <= 20; ++ix) {
+                        const glm::vec2 p(ix / 20.0f, iy / 20.0f);
+                        const Evaluation a = m.evaluate(p);
+                        const Evaluation b = fresh.evaluate(p);
+                        bool same = a.inside == b.inside
+                                 && a.weights.size() == b.weights.size();
+                        for (std::size_t k = 0; same && k < a.weights.size(); ++k) {
+                            same = a.weights[k].id == b.weights[k].id
+                                && close(a.weights[k].weight, b.weights[k].weight);
+                        }
+                        if (!same) {
+                            ok = false;
+                            d << "at (" << p.x << ", " << p.y << ") the map after "
+                                 "removal evaluates differently from one built "
+                                 "fresh from the survivors";
+                        }
+                    }
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "DUPNAME") {
+            std::string nm; expectKeyword(in, "NAME"); in >> nm;
+            Manifold2D m;
+            m.addNode("n0", {0.1f, 0.1f});
+            m.addNode(nm, {0.5f, 0.5f});
+            const NodeID second = m.addNode(nm, {0.9f, 0.9f});
+            const bool ok = second == InvalidNode && m.nodeCount() == 2;
+            if (!ok) d << "a second node named " << nm << " was accepted";
             record(cls, name, ok, d.str());
 
         } else if (kind == "BATCH") {

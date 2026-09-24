@@ -1565,3 +1565,117 @@ D-017 recorded a bug found by hand and fixed without a vector. This is the same
 failure one step earlier: **a measurement that justifies code is not a test of
 that code.** Each now has traps aimed at its specific shortcut, found by
 searching.
+
+
+---
+
+## D-020 — Removing nodes, and a map that saved but would not reopen
+
+**Date:** 2026-09-22
+**Status:** built
+**Files:** `src/core/ofxManifold2D.h`, `tests/ref/reference_grids.py`,
+`tests/run_grids.cpp`, `example-editor`
+
+### Removal renumbers, and does not leave gaps
+
+`Manifold2D` had no way to remove a node. NodeIDs are positions in a list, so
+removing one must either renumber everything after it or leave a gap. Gaps would
+mean every loop in the kernel — evaluate, validate, serialize, the batch move —
+skipping dead entries, and one of them eventually not doing so.
+
+`removeNodes()` rebuilds the manifold from the survivors and reports an
+old-to-new id table. Anything holding NodeIDs across a removal must pass them
+through it; the editor simply clears its selection. `removeRegions()` does the
+same for regions and keeps every node, which is what "unjoin" means.
+
+A region that loses a vertex is removed whole, never shrunk. A quad missing one
+corner is a triangle nobody drew — and a valid one, so shrinking would be a
+silent substitution of the kind D-018 and the ring-ordering work both turned up.
+
+The strongest vector is not the bookkeeping but this: **the map after removal
+must evaluate identically to a map built fresh from the survivors**, at every
+probe point, where the fresh map is built by hand from the expected lists and
+shares none of `removeNodes()`'s code. A renumbering slip can satisfy the
+bookkeeping checks and fail this one.
+
+### The finding: saved, and could not be reopened
+
+Checked before building delete into the editor, because the editor named new
+nodes "n" plus the node count — and with delete, that repeats a name. Delete n3
+from five nodes, add one, and it is named n4, which exists.
+
+`addNode()` accepted a duplicate name. `saveManifold()` wrote it. The loader
+**refused** the file: `duplicate node id`. So an author could save a map and be
+unable to open it again — lost work, discovered at the worst moment.
+
+Third time, same pattern:
+
+- D-018: non-convex regions accepted when built, refused when evaluated
+- D-019: a self-intersecting region refused when built, reachable by editing
+- D-020: a duplicate name accepted by the kernel, refused by the file format
+
+**Each time, two parts of the addon enforced different rules for the same
+state.** Fixed where the state is created: `addNode()` now refuses a duplicate
+name, so the kernel cannot hold what the file cannot. The editor also generates
+names that cannot collide, rather than relying on the refusal.
+
+### One equivalent mutant
+
+Of six mutations, five were caught. The sixth, meant to keep regions touching a
+removed node, was written so that it behaved exactly like the original, and
+there was nothing for a test to find. Recorded because an uncaught mutation is
+not always a gap; sometimes it is a mutation that changes nothing. The realistic
+failure in that code — shrinking a region instead of removing it — is caught.
+
+
+---
+
+## D-021 — A reference that wrote a different file every time
+
+**Date:** 2026-09-24
+**Status:** fixed, and now caught locally
+**Files:** `tests/ref/reference_grids.py`, `Makefile`
+
+### What CI said
+
+Both platforms failed at the same step: `grids.vec does not match a fresh run of
+its reference`. That check regenerates every vector file and compares it with the
+committed copy.
+
+### Why
+
+The grids reference searches for rounding traps from a seeded random generator,
+and the seed was `hash(label)`. Python randomizes string hashes in every new
+process, as a defence against hash-flooding attacks. So every run seeded
+differently and found different trap points. Three consecutive runs, three
+different files.
+
+Every one of those files was valid. Each trap genuinely misled naive rounding,
+the C++ passed all of them, and `make test` was green on every machine. The only
+thing wrong was that the file could not be reproduced, and so the committed copy
+could never match a fresh run.
+
+### Why only CI saw it
+
+CI's reproducibility check was the only place anything ran a reference twice.
+Locally a reference ran once, wrote its file, and the runner tested that file;
+there was nothing to compare against.
+
+### The fix
+
+`zlib.crc32(label.encode())` as the seed — stable across processes and
+platforms. All nine references were then run three times each and every file
+was identical across runs.
+
+`make reproducible` now runs every reference twice and compares byte for byte,
+as part of `make test`. It takes under half a second. Verified by putting
+`hash()` back: it fails, naming `grids.vec`.
+
+### Pattern
+
+A test that passes is not the same as a test that is repeatable. These vectors
+were correct and unreproducible at once, and correctness is all the local suite
+could see.
+
+It is also the first finding in this project that CI caught and the local suite
+could not, which is the argument for having both.

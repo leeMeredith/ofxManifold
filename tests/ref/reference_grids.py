@@ -19,6 +19,7 @@ explicitly (PLAN-authoring.md decision L).
 
 import math
 import sys
+import zlib
 
 TOL = 1e-6
 TIE = 1e-9          # distances closer than this are a tie
@@ -392,7 +393,13 @@ def build():
                             ("tri_rot17", TRI_ROT, naive_lattice),
                             ("polar5", POLAR5, naive_polar),
                             ("polar12", POLAR12, naive_polar)]:
-        for k, p in enumerate(rounding_traps(g, naive, 4, hash(label) & 0xffff)):
+        # zlib.crc32, NOT hash(). Python randomizes string hashes in every
+        # new process, so hash(label) gave a different seed -- and different
+        # trap points -- on every run. Each set was valid and the C++ passed
+        # them, so nothing looked wrong locally; CI's drift check failed,
+        # because the committed file could never match a fresh run.
+        for k, p in enumerate(rounding_traps(g, naive, 4,
+                                             zlib.crc32(label.encode()))):
             q, a = g.snap(p)
             wrong = naive(g, p)
             out.append(f"# naive rounding would give ({wrong[0]:.4f}, "
@@ -516,6 +523,130 @@ def build():
                    f"ADDR {a[0]} {a[1]}")
     out.append("")
 
+    # ---- ordering a selection into a ring --------------------------------
+    import random as _r
+    import reference_regions as _R
+
+    def by_angle(pts):
+        cx = sum(p[0] for p in pts) / len(pts)
+        cy = sum(p[1] for p in pts) / len(pts)
+        idx = list(range(len(pts)))
+        idx.sort(key=lambda i: (math.atan2(pts[i][1] - cy, pts[i][0] - cx),
+                                (pts[i][0] - cx) ** 2 + (pts[i][1] - cy) ** 2,
+                                i))
+        return idx
+
+    def same_ring(a, b):
+        n = len(a)
+        for k in range(n):
+            if all(math.dist(a[i], b[(i + k) % n]) < 1e-9 for i in range(n)):
+                return True
+            if all(math.dist(a[i], b[(k - i) % n]) < 1e-9 for i in range(n)):
+                return True
+        return False
+
+    out.append("#" + "-" * 68)
+    out.append("# ORDERING A SELECTION INTO A RING")
+    out.append("#")
+    out.append("# Box-selecting gives no order, so the editor sorts by angle")
+    out.append("# about the centroid. That recovers anything star-shaped about")
+    out.append("# its centroid -- every convex shape, and stars. It does NOT")
+    out.append("# recover an L, and the ring it produces instead is still a")
+    out.append("# valid region: a silent substitution, which is why the editor")
+    out.append("# joins shift-clicked nodes in click order instead.")
+    out.append("#" + "-" * 68)
+    rng = _r.Random(12)
+    for nm, shape in [("quad", _R.QUAD), ("pentagon", _R.PENT),
+                      ("star", _R.STAR), ("deepstar", _R.DEEPSTAR),
+                      ("lshape", _R.LSHAPE)]:
+        for k in range(2):
+            pts = shape[:]
+            rng.shuffle(pts)
+            order = by_angle(pts)
+            ring = [pts[i] for i in order]
+            rec = same_ring(ring, shape)
+            valid = _R.why_invalid(ring) is None
+            ps = " ".join(f"{fmt(x)},{fmt(y)}" for x, y in pts)
+            out.append(f"RINGORDER ring_{nm}_{k} ANALYTIC PTS {ps} "
+                       f"ORDER {' '.join(str(i) for i in order)} "
+                       f"RECOVERS {1 if rec else 0} VALID {1 if valid else 0}")
+    out.append("")
+
+    # ---- removing nodes and regions -------------------------------------
+    out.append("#" + "-" * 68)
+    out.append("# REMOVAL")
+    out.append("#")
+    out.append("# NodeIDs are list positions, so removing a node renumbers the")
+    out.append("# ones after it. The runner checks the bookkeeping here and one")
+    out.append("# stronger thing: the map after removal must EVALUATE the same")
+    out.append("# as a map built fresh from the survivors, at every probe point.")
+    out.append("# A renumbering slip can pass the bookkeeping and fail that.")
+    out.append("#")
+    out.append("# A region that loses a vertex is removed whole, never shrunk.")
+    out.append("#" + "-" * 68)
+    rn = {0: (0.30, 0.50), 1: (0.30, 0.80), 2: (0.50, 0.50), 3: (0.30, 0.20),
+          4: (0.10, 0.50), 5: (0.65, 0.35), 6: (0.90, 0.35), 7: (0.90, 0.65),
+          8: (0.65, 0.65)}
+    rr = [(0, 1, 2), (0, 2, 3), (0, 3, 4), (0, 4, 1), (5, 6, 7, 8)]
+    rns = " ".join(f"{k}:{fmt(v[0])},{fmt(v[1])}" for k, v in rn.items())
+    rrs = " ".join(",".join(str(i) for i in r) for r in rr)
+
+    def removal(nm, delete, cls, note):
+        gone = set(delete)
+        remap, nxt = {}, 0
+        for i in sorted(rn):
+            if i in gone:
+                remap[i] = -1
+            else:
+                remap[i] = nxt
+                nxt += 1
+        surv, dropped = [], 0
+        for r in rr:
+            if any(i in gone for i in r):
+                dropped += 1
+            else:
+                surv.append(tuple(remap[i] for i in r))
+        out.append(f"# {note}")
+        out.append(f"REMOVE remove_{nm} {cls} NODES {rns} REGIONS {rrs} "
+                   f"DELETE {' '.join(str(i) for i in delete) or 'NONE'} "
+                   f"REMAP {' '.join(str(remap[i]) for i in sorted(rn))} "
+                   f"SURVIVING {' '.join(','.join(str(i) for i in r) for r in surv) or 'NONE'} "
+                   f"DROPPED {dropped}")
+        out.append("")
+
+    removal("fan_centre", [0], "ANALYTIC",
+            "the fan's centre: all four triangles use it and all four go; "
+            "the quad survives, renumbered")
+    removal("quad_corner", [7], "ANALYTIC",
+            "one corner of the quad: the quad is removed WHOLE, not shrunk to "
+            "a triangle nobody drew")
+    removal("first_node", [1], "ANALYTIC",
+            "an early node, so every id after it shifts down by one")
+    removal("several", [3, 6, 4], "ANALYTIC",
+            "several at once, given out of order")
+    removal("repeated", [2, 2], "ANALYTIC",
+            "the same id twice is the same as once")
+    removal("nothing", [], "ANALYTIC",
+            "removing nothing leaves the map exactly as it was")
+    removal("everything", list(rn), "ANALYTIC",
+            "removing every node leaves an empty map")
+    out.append("# an id that does not exist: refused, and nothing changes")
+    out.append(f"REMOVE remove_out_of_range ANALYTIC NODES {rns} REGIONS {rrs} "
+               f"DELETE 2 99 REFUSED")
+    out.append("")
+    out.append("# removing a REGION keeps every node: unjoin, not delete")
+    out.append(f"UNJOIN unjoin_quad ANALYTIC NODES {rns} REGIONS {rrs} "
+               f"DELETE 4 SURVIVING 0,1,2 0,2,3 0,3,4 0,4,1")
+    out.append(f"UNJOIN unjoin_two_triangles ANALYTIC NODES {rns} REGIONS {rrs} "
+               f"DELETE 1 3 SURVIVING 0,1,2 0,3,4 5,6,7,8")
+    out.append("")
+    out.append("# a second node with an existing name is REFUSED. Names are a")
+    out.append("# node's identity in a saved file and the loader rejects")
+    out.append("# duplicates, so accepting one here let a map be saved that")
+    out.append("# could not be reopened (DECISIONS.md D-020)")
+    out.append("DUPNAME dupname_refused ANALYTIC NAME n3")
+    out.append("")
+
     # ---- batch move ----------------------------------------------------
     out.append("#" + "-" * 68)
     out.append("# BATCH MOVE: all or nothing, checked against FINAL positions")
@@ -572,7 +703,8 @@ def main():
     counts = {}
     for line in out:
         p = line.split()
-        if p and p[0] in ("SNAP", "ADDRRT", "NESTS", "HYST", "BATCH"):
+        if p and p[0] in ("SNAP", "ADDRRT", "NESTS", "HYST", "BATCH",
+                          "RINGORDER", "REMOVE", "UNJOIN", "DUPNAME"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

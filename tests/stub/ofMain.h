@@ -43,6 +43,16 @@ inline void ofDrawRectangle(float,float,float,float){}
 inline void ofDrawTriangle(float,float,float,float,float,float){}
 inline void ofDrawLine(float,float,float,float){}
 inline void ofDrawCircle(float,float,float){}
+inline void ofSetEscapeQuitsApp(bool){}
+#define OF_KEY_BACKSPACE 8
+#define OF_KEY_DEL 127
+struct ofFile { static bool doesFileExist(const std::string&){return false;} };
+inline float ofDegToRad(float d){return d*0.01745329f;}
+inline float ofRadToDeg(float r){return r*57.2957795f;}
+#define OF_KEY_ESC 27
+#define OF_KEY_SHIFT 0x1
+#define OF_KEY_ALT 0x2
+inline bool ofGetKeyPressed(int){return false;}
 inline void ofDrawBitmapString(const std::string&,float,float){}
 inline void ofBeginShape(){} inline void ofEndShape(bool){}
 inline void ofVertex(float,float){}

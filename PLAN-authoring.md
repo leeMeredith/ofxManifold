@@ -271,7 +271,12 @@ and apply the lowest-address rule in their own code.
    polar centre case removed, free mode snapping anyway, rotation ignored,
    hysteresis removed, batch move checking intermediate rather than final
    positions, batch move applying partially
-5. **Editor integration — NEXT** — placement and drag through `grid.snap()`, snapped
+5. **Editor integration — BUILT, awaiting the screen.** `example-editor`.
+   Selection is both: shift-click toggles, a drag across empty space boxes,
+   and a click on empty space that does not drag places a node, so no mode
+   switch is needed. Two faults caught before handover: a per-frame
+   `validate()` (the D-015 cost, reintroduced) and hysteresis memory surviving
+   an alt free-hand stretch of a drag. Originally listed: — placement and drag through `grid.snap()`, snapped
    drags through `setNodePosition()`, multi-select moves through
    `setNodePositions()`, duplicate detection by address or by tolerance
 

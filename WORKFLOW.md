@@ -98,6 +98,7 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make clean` | remove `build/` |
 | `make headers` | assert every header compiles standalone |
 | `make workflow` | assert the CI workflow is still valid |
+| `make reproducible` | every reference produces the same file twice; part of `make test` |
 | `make bench` | measure mesh scaling; asserts nothing |
 
 `make vectors` is run only when cases are added or changed. The regenerated

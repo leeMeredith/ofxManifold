@@ -810,6 +810,51 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
+      - name: Removal shrinks a region instead of removing it must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifold2D.h \
+            '                if (gone[n]) { keep = false; break; }' \
+            '                if (gone[n]) continue;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: Removal accepts an out-of-range id must be caught
+        run: |
+          python3 tests/mutate.py --nl src/core/ofxManifold2D.h \
+            '            if (id >= nodes_.size()) return false;\n        }\n        std::vector<bool> gone(nodes_.size(), false);' \
+            '        }\n        std::vector<bool> gone(nodes_.size(), false);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: Duplicate node name accepted must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifold2D.h \
+            '        if (byName_.count(name) != 0) return InvalidNode;' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: Removal remap not reported must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifold2D.h \
+            '        if (remap) *remap = std::move(map);' \
+            '        if (remap) remap->assign(map.size(), 0);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
+      - name: Unjoin removes the wrong regions must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifold2D.h \
+            '            if (!gone[r]) built.addRegion(regions_[r].ids());' \
+            '            if (gone[r]) built.addRegion(regions_[r].ids());'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifold2D.h
+
       - name: Restored tree must be green
         run: |
           make clean

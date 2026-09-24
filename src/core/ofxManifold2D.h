@@ -72,8 +72,16 @@ class Manifold2D {
 public:
     // ---- construction ---------------------------------------------------
 
+    // Returns InvalidNode if a node of this name already exists.
+    //
+    // Names are the node's identity in a saved file, and the loader refuses
+    // a file with two nodes of the same name. Accepting a duplicate here
+    // meant a map could be SAVED that could not be REOPENED -- the kernel
+    // allowing a state the file format rejects. Refused here so the rule is
+    // the same everywhere (DECISIONS.md D-020).
     NodeID addNode(const std::string& name, glm::vec2 position,
                    float weight = 1.0f) {
+        if (byName_.count(name) != 0) return InvalidNode;
         const NodeID id = static_cast<NodeID>(nodes_.size());
         nodes_.push_back(Node{name, position, weight});
         nodeRegions_.emplace_back();
@@ -329,6 +337,86 @@ public:
                 return false;
             }
         }
+        return true;
+    }
+
+    // ---- removal --------------------------------------------------------
+
+    // Remove nodes, and every region that uses any of them.
+    //
+    // NodeIDs are positions in a list, so removal RENUMBERS every node after
+    // the first one removed. The manifold is rebuilt from the survivors rather
+    // than left with gaps: gaps would mean every loop in the kernel -- evaluate,
+    // validate, serialize -- skipping dead entries, and one of them missing it.
+    //
+    // If `remap` is given it receives, for every OLD id, the new id, or
+    // InvalidNode for a node that was removed. Anything holding NodeIDs across
+    // a removal -- a selection, a mapping -- must pass them through it.
+    //
+    // A region that loses a vertex is removed whole, never shrunk: a quad
+    // missing one corner is not the triangle anyone drew. The count removed is
+    // returned through `regionsRemoved`.
+    //
+    // Refuses, changing nothing, if any id is out of range.
+    bool removeNodes(const std::vector<NodeID>& ids,
+                     std::vector<NodeID>* remap = nullptr,
+                     std::size_t* regionsRemoved = nullptr) {
+        for (NodeID id : ids) {
+            if (id >= nodes_.size()) return false;
+        }
+        std::vector<bool> gone(nodes_.size(), false);
+        for (NodeID id : ids) gone[id] = true;
+
+        std::vector<NodeID> map(nodes_.size(), InvalidNode);
+        Manifold2D built;
+        for (NodeID i = 0; i < nodes_.size(); ++i) {
+            if (gone[i]) continue;
+            map[i] = built.addNode(nodes_[i].name, nodes_[i].position,
+                                   nodes_[i].weight);
+        }
+
+        std::size_t dropped = 0;
+        for (const Region& r : regions_) {
+            std::vector<NodeID> ring;
+            bool keep = true;
+            for (NodeID n : r.ids()) {
+                if (gone[n]) { keep = false; break; }
+                ring.push_back(map[n]);
+            }
+            // Every surviving region was valid when built and every move has
+            // kept it valid (D-019), so re-adding it cannot fail. If it ever
+            // did, it is counted rather than silently lost.
+            if (!keep || built.addRegion(ring) == InvalidRegion) ++dropped;
+        }
+
+        *this = std::move(built);
+        if (remap) *remap = std::move(map);
+        if (regionsRemoved) *regionsRemoved = dropped;
+        return true;
+    }
+
+    // Remove regions, keeping every node. What "unjoin" means in an editor:
+    // the nodes stay where they are and can be joined differently.
+    //
+    // RegionIDs after the first one removed are renumbered, as NodeIDs are
+    // by removeNodes(). NodeIDs do not change.
+    //
+    // Refuses, changing nothing, if any id is out of range.
+    bool removeRegions(const std::vector<RegionID>& ids) {
+        for (RegionID id : ids) {
+            if (id >= regions_.size()) return false;
+        }
+        std::vector<bool> gone(regions_.size(), false);
+        for (RegionID id : ids) gone[id] = true;
+
+        Manifold2D built;
+        for (const Node& n : nodes_) {
+            built.addNode(n.name, n.position, n.weight);
+        }
+        for (RegionID r = 0; r < regions_.size(); ++r) {
+            if (!gone[r]) built.addRegion(regions_[r].ids());
+        }
+        *this = std::move(built);
         return true;
     }
 

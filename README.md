@@ -173,6 +173,15 @@ a clean fan, a deliberately broken T-junction, two overlapping regions where the
 answer depends on which side you entered from, and a 144-node grid for looking
 at the renderer at density.
 
+**`example-editor`** — the first piece of the editor. Click empty space to
+place a node on the active grid, drag a box or shift-click to select, drag the
+selection to move it as one operation, press `f` to join the selection into a
+region, delete to remove nodes, `u` to unjoin, `x` for an empty map, `s` and `l`
+to save and load. Free, square, triangular and polar grids,
+all rotatable; hold alt for a free-hand drag. Drag a corner of the quad
+across its opposite edge and the move is refused, because the ring would cross
+itself.
+
 **`example-regions`** — a triangle, a hexagon, an L-shape and a star in one
 map. Regions of three nodes use the barycentric solve; more use mean-value
 coordinates. Drag into the L-shape's inner corner and a red line pulls
@@ -226,7 +235,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-507 vectors across nine suites, plus 78 mutation gates that introduce known
+528 vectors across nine suites, plus 83 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

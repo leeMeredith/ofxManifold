@@ -50,50 +50,50 @@ SNAP tri_rot17_2 CROSS LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.73
 # these and passes every square-grid vector above.
 #--------------------------------------------------------------------
 
-# naive rounding would give (0.9500, 0.6062), 0.0237 further away
-SNAP trap_tri_0 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.8854113404 0.5714324218 EXPECT 0.85 0.6062177826 ADDR 5 7
-# naive rounding would give (0.4000, 0.1732), 0.0345 further away
-SNAP trap_tri_1 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.3301430191 0.1299088929 EXPECT 0.35 0.08660254038 ADDR 3 1
-# naive rounding would give (0.7500, 0.4330), 0.0311 further away
-SNAP trap_tri_2 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.6806687069 0.3980635976 EXPECT 0.65 0.4330127019 ADDR 4 5
-# naive rounding would give (0.4000, 0.8660), 0.0337 further away
-SNAP trap_tri_3 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.3317901986 0.8228049299 EXPECT 0.35 0.7794228634 ADDR -1 9
+# naive rounding would give (0.6000, 0.6928), 0.0135 further away
+SNAP trap_tri_0 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.6441419691 0.7333320448 EXPECT 0.65 0.7794228634 ADDR 2 9
+# naive rounding would give (0.5500, 0.6062), 0.0284 further away
+SNAP trap_tri_1 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.4819895344 0.5688993119 EXPECT 0.45 0.6062177826 ADDR 1 7
+# naive rounding would give (0.4500, 0.4330), 0.0047 further away
+SNAP trap_tri_2 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.5027054327 0.461291038 EXPECT 0.55 0.4330127019 ADDR 3 5
+# naive rounding would give (0.8000, 0.3464), 0.0013 further away
+SNAP trap_tri_3 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0 AT 0.7492968636 0.3298201981 EXPECT 0.7 0.3464101615 ADDR 5 4
 
-# naive rounding would give (0.9000, 0.8000), 0.0803 further away
-SNAP trap_shear_0 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.7788612871 0.7564301548 EXPECT 0.8 0.8 ADDR -12 8
-# naive rounding would give (0.3000, 0.6000), 0.0347 further away
-SNAP trap_shear_1 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.3742105922 0.6457129522 EXPECT 0.4 0.6 ADDR -11 6
-# naive rounding would give (0.2000, 0.8000), 0.0327 further away
-SNAP trap_shear_2 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.2665884635 0.80827345 EXPECT 0.3 0.8 ADDR -17 8
-# naive rounding would give (0.5000, 0.8000), 0.0415 further away
-SNAP trap_shear_3 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.4259810409 0.773478002 EXPECT 0.4 0.8 ADDR -16 8
+# naive rounding would give (0.5500, 0.5000), 0.0725 further away
+SNAP trap_shear_0 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.6460646893 0.5270087292 EXPECT 0.65 0.5 ADDR -6 5
+# naive rounding would give (0.2500, 0.7000), 0.0713 further away
+SNAP trap_shear_1 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.1535020846 0.6706136883 EXPECT 0.15 0.7 ADDR -16 7
+# naive rounding would give (0.9000, 0.8000), 0.0139 further away
+SNAP trap_shear_2 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.8425064101 0.7800680266 EXPECT 0.8 0.8 ADDR -12 8
+# naive rounding would give (0.6000, 0.4000), 0.0678 further away
+SNAP trap_shear_3 ANALYTIC LATTICE 0.1 0 0.25 0.1 0 0 0 AT 0.4992576194 0.3590351256 EXPECT 0.5 0.4 ADDR -5 4
 
-# naive rounding would give (0.4725, 0.5067), 0.0220 further away
-SNAP trap_tri_rot17_0 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.5112276529 0.5617689008 EXPECT 0.4949974296 0.6041337143 ADDR 4 5
-# naive rounding would give (0.9282, 0.5554), 0.0082 further away
-SNAP trap_tri_rot17_1 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.8822048123 0.5195470051 EXPECT 0.8325291211 0.5262083832 ADDR 8 3
-# naive rounding would give (0.1350, 0.5846), 0.0133 further away
-SNAP trap_tri_rot17_2 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.1836175699 0.6211924975 EXPECT 0.2306011082 0.6138592093 ADDR 1 6
-# naive rounding would give (0.4500, 0.4093), 0.0216 further away
-SNAP trap_tri_rot17_3 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.4018835823 0.3554362151 EXPECT 0.4275121133 0.3118226948 ADDR 4 2
+# naive rounding would give (0.6863, 0.6626), 0.0151 further away
+SNAP trap_tri_rot17_0 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.7249015184 0.7137886541 EXPECT 0.7087534862 0.7600450617 ADDR 6 6
+# naive rounding would give (0.1350, 0.5846), 0.0231 further away
+SNAP trap_tri_rot17_1 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.1878404641 0.6272649156 EXPECT 0.2306011082 0.6138592093 ADDR 1 6
+# naive rounding would give (0.8607, 0.2631), 0.0036 further away
+SNAP trap_tri_rot17_2 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.8410672999 0.214448904 EXPECT 0.8381791749 0.1656975278 ADDR 9 -1
+# naive rounding would give (0.3994, 0.5749), 0.0252 further away
+SNAP trap_tri_rot17_3 ANALYTIC LATTICE 0.1 0 0.05 0.08660254038 0 0 0.2967059728 AT 0.447664551 0.6309085266 EXPECT 0.4218620594 0.6723335503 ADDR 3 6
 
-# naive rounding would give (0.1196, 0.6236), 0.0039 further away
-SNAP trap_polar5_0 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.1128019591 0.4456689463 EXPECT 0.1956619148 0.5988854382 ADDR 4 1
-# naive rounding would give (0.1196, 0.6236), 0.0131 further away
-SNAP trap_polar5_1 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.218824407 0.7271660629 EXPECT 0.1956619148 0.5988854382 ADDR 4 1
-# naive rounding would give (0.5000, 0.9000), 0.0138 further away
-SNAP trap_polar5_2 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.7283594711 0.8193715799 EXPECT 0.5 0.82 ADDR 4 0
-# naive rounding would give (0.2649, 0.1764), 0.0194 further away
-SNAP trap_polar5_3 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.4857002668 0.1300083994 EXPECT 0.3119087193 0.2411145618 ADDR 4 2
+# naive rounding would give (0.8043, 0.5989), 0.0200 further away
+SNAP trap_polar5_0 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.7744977119 0.4327505692 EXPECT 0.7282535639 0.5741640786 ADDR 3 4
+# naive rounding would give (0.6411, 0.3058), 0.0139 further away
+SNAP trap_polar5_1 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.5123828212 0.2881188891 EXPECT 0.5940456404 0.3705572809 ADDR 2 3
+# naive rounding would give (0.5000, 0.9000), 0.0082 further away
+SNAP trap_polar5_2 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.6740132045 0.8415551956 EXPECT 0.5 0.82 ADDR 4 0
+# naive rounding would give (0.1957, 0.5989), 0.0023 further away
+SNAP trap_polar5_3 ANALYTIC POLAR 0.5 0.5 0.08 5 1.570796327 AT 0.2622565386 0.6658818294 EXPECT 0.2717464361 0.5741640786 ADDR 3 1
 
-# naive rounding would give (0.7598, 0.6500), 0.0025 further away
-SNAP trap_polar12_0 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.7581852712 0.5977827924 EXPECT 0.7165063509 0.625 ADDR 5 1
-# naive rounding would give (0.2402, 0.6500), 0.0029 further away
-SNAP trap_polar12_1 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.2871832299 0.675360532 EXPECT 0.2834936491 0.625 ADDR 5 5
-# naive rounding would give (0.6732, 0.6000), 0.0015 further away
-SNAP trap_polar12_2 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.6385457974 0.6079144642 EXPECT 0.6299038106 0.575 ADDR 3 1
-# naive rounding would give (0.7500, 0.9330), 0.0013 further away
-SNAP trap_polar12_3 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.8310072341 0.8541140814 EXPECT 0.725 0.8897114317 ADDR 9 2
+# naive rounding would give (0.6750, 0.1969), 0.0019 further away
+SNAP trap_polar12_0 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.7167343233 0.2529093264 EXPECT 0.65 0.2401923789 ADDR 6 10
+# naive rounding would give (0.5000, 0.6500), 0.0019 further away
+SNAP trap_polar12_1 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.5207568033 0.6237827802 EXPECT 0.5 0.6 ADDR 2 3
+# naive rounding would give (0.1000, 0.5000), 0.0016 further away
+SNAP trap_polar12_2 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.1280332266 0.5942177585 EXPECT 0.15 0.5 ADDR 7 6
+# naive rounding would give (0.5000, 0.2000), 0.0025 further away
+SNAP trap_polar12_3 ANALYTIC POLAR 0.5 0.5 0.05 12 0 AT 0.4426648859 0.2281233218 EXPECT 0.5 0.25 ADDR 5 9
 
 # SHORTCUTS THAT ARE ALMOST RIGHT
 #
@@ -178,6 +178,72 @@ HYST hyst_keeps_inside_dead_zone ANALYTIC LATTICE 0.1 0 0 0.1 0 0 0 AT 0.155 0.2
 HYST hyst_moves_when_clearly_closer ANALYTIC LATTICE 0.1 0 0 0.1 0 0 0 AT 0.19 0.2 CURRENT 1 2 DEAD 0.15 ADDR 2 2
 HYST hyst_no_current_uses_nearest ANALYTIC LATTICE 0.1 0 0 0.1 0 0 0 AT 0.155 0.2 CURRENT NONE DEAD 0.15 ADDR 2 2
 HYST hyst_zero_dead_zone_is_plain_snap ANALYTIC LATTICE 0.1 0 0 0.1 0 0 0 AT 0.155 0.2 CURRENT 1 2 DEAD 0 ADDR 2 2
+
+#--------------------------------------------------------------------
+# ORDERING A SELECTION INTO A RING
+#
+# Box-selecting gives no order, so the editor sorts by angle
+# about the centroid. That recovers anything star-shaped about
+# its centroid -- every convex shape, and stars. It does NOT
+# recover an L, and the ring it produces instead is still a
+# valid region: a silent substitution, which is why the editor
+# joins shift-clicked nodes in click order instead.
+#--------------------------------------------------------------------
+RINGORDER ring_quad_0 ANALYTIC PTS 0.15,0.15 0.8,0.85 0.85,0.2 0.2,0.8 ORDER 0 2 1 3 RECOVERS 1 VALID 1
+RINGORDER ring_quad_1 ANALYTIC PTS 0.8,0.85 0.15,0.15 0.2,0.8 0.85,0.2 ORDER 1 3 0 2 RECOVERS 1 VALID 1
+RINGORDER ring_pentagon_0 ANALYTIC PTS 0.5,0.86 0.8423803459,0.611246118 0.1576196541,0.611246118 0.7116026908,0.208753882 0.2883973092,0.208753882 ORDER 4 3 1 0 2 RECOVERS 1 VALID 1
+RINGORDER ring_pentagon_1 ANALYTIC PTS 0.7116026908,0.208753882 0.5,0.86 0.2883973092,0.208753882 0.1576196541,0.611246118 0.8423803459,0.611246118 ORDER 2 0 4 1 3 RECOVERS 1 VALID 1
+RINGORDER ring_star_0 ANALYTIC PTS 0.3192992619,0.4412867711 0.2354966365,0.1359423525 0.5,0.95 0.5,0.31 0.7645033635,0.1359423525 0.3883208021,0.6537132289 0.9279754323,0.6390576475 0.6807007381,0.4412867711 0.07202456767,0.6390576475 0.6116791979,0.6537132289 ORDER 0 1 3 4 7 6 9 2 5 8 RECOVERS 1 VALID 1
+RINGORDER ring_star_1 ANALYTIC PTS 0.6116791979,0.6537132289 0.07202456767,0.6390576475 0.7645033635,0.1359423525 0.2354966365,0.1359423525 0.5,0.95 0.3192992619,0.4412867711 0.6807007381,0.4412867711 0.5,0.31 0.9279754323,0.6390576475 0.3883208021,0.6537132289 ORDER 5 3 7 2 6 8 0 4 9 1 RECOVERS 1 VALID 1
+RINGORDER ring_deepstar_0 ANALYTIC PTS 0.9279754323,0.6390576475 0.2354966365,0.1359423525 0.07202456767,0.6390576475 0.5411449677,0.5566311896 0.4334260439,0.4783688104 0.5,0.43 0.5,0.95 0.5665739561,0.4783688104 0.7645033635,0.1359423525 0.4588550323,0.5566311896 ORDER 4 1 5 8 7 0 3 6 9 2 RECOVERS 1 VALID 1
+RINGORDER ring_deepstar_1 ANALYTIC PTS 0.4334260439,0.4783688104 0.7645033635,0.1359423525 0.5665739561,0.4783688104 0.4588550323,0.5566311896 0.2354966365,0.1359423525 0.5,0.95 0.5,0.43 0.07202456767,0.6390576475 0.9279754323,0.6390576475 0.5411449677,0.5566311896 ORDER 0 4 6 1 2 8 9 5 3 7 RECOVERS 1 VALID 1
+RINGORDER ring_lshape_0 ANALYTIC PTS 0.1,0.1 0.9,0.1 0.9,0.4 0.1,0.9 0.4,0.9 0.4,0.4 ORDER 5 0 1 2 4 3 RECOVERS 0 VALID 1
+RINGORDER ring_lshape_1 ANALYTIC PTS 0.9,0.1 0.1,0.1 0.9,0.4 0.1,0.9 0.4,0.9 0.4,0.4 ORDER 5 1 0 2 4 3 RECOVERS 0 VALID 1
+
+#--------------------------------------------------------------------
+# REMOVAL
+#
+# NodeIDs are list positions, so removing a node renumbers the
+# ones after it. The runner checks the bookkeeping here and one
+# stronger thing: the map after removal must EVALUATE the same
+# as a map built fresh from the survivors, at every probe point.
+# A renumbering slip can pass the bookkeeping and fail that.
+#
+# A region that loses a vertex is removed whole, never shrunk.
+#--------------------------------------------------------------------
+# the fan's centre: all four triangles use it and all four go; the quad survives, renumbered
+REMOVE remove_fan_centre ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 0 REMAP -1 0 1 2 3 4 5 6 7 SURVIVING 4,5,6,7 DROPPED 4
+
+# one corner of the quad: the quad is removed WHOLE, not shrunk to a triangle nobody drew
+REMOVE remove_quad_corner ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 7 REMAP 0 1 2 3 4 5 6 -1 7 SURVIVING 0,1,2 0,2,3 0,3,4 0,4,1 DROPPED 1
+
+# an early node, so every id after it shifts down by one
+REMOVE remove_first_node ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 1 REMAP 0 -1 1 2 3 4 5 6 7 SURVIVING 0,1,2 0,2,3 4,5,6,7 DROPPED 2
+
+# several at once, given out of order
+REMOVE remove_several ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 3 6 4 REMAP 0 1 2 -1 -1 3 -1 4 5 SURVIVING 0,1,2 DROPPED 4
+
+# the same id twice is the same as once
+REMOVE remove_repeated ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 2 2 REMAP 0 1 -1 2 3 4 5 6 7 SURVIVING 0,2,3 0,3,1 4,5,6,7 DROPPED 2
+
+# removing nothing leaves the map exactly as it was
+REMOVE remove_nothing ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE NONE REMAP 0 1 2 3 4 5 6 7 8 SURVIVING 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DROPPED 0
+
+# removing every node leaves an empty map
+REMOVE remove_everything ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 0 1 2 3 4 5 6 7 8 REMAP -1 -1 -1 -1 -1 -1 -1 -1 -1 SURVIVING NONE DROPPED 5
+
+# an id that does not exist: refused, and nothing changes
+REMOVE remove_out_of_range ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 2 99 REFUSED
+
+# removing a REGION keeps every node: unjoin, not delete
+UNJOIN unjoin_quad ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 4 SURVIVING 0,1,2 0,2,3 0,3,4 0,4,1
+UNJOIN unjoin_two_triangles ANALYTIC NODES 0:0.3,0.5 1:0.3,0.8 2:0.5,0.5 3:0.3,0.2 4:0.1,0.5 5:0.65,0.35 6:0.9,0.35 7:0.9,0.65 8:0.65,0.65 REGIONS 0,1,2 0,2,3 0,3,4 0,4,1 5,6,7,8 DELETE 1 3 SURVIVING 0,1,2 0,3,4 5,6,7,8
+
+# a second node with an existing name is REFUSED. Names are a
+# node's identity in a saved file and the loader rejects
+# duplicates, so accepting one here let a map be saved that
+# could not be reopened (DECISIONS.md D-020)
+DUPNAME dupname_refused ANALYTIC NAME n3
 
 #--------------------------------------------------------------------
 # BATCH MOVE: all or nothing, checked against FINAL positions

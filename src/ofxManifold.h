@@ -27,6 +27,7 @@
 #include "sources/ofxManifoldTrajectory.h"
 
 #include "authoring/ofxManifoldGrid.h"
+#include "authoring/ofxManifoldRing.h"
 
 #include "mapping/ofxManifoldMapping.h"
 
