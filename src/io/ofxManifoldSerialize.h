@@ -199,7 +199,57 @@ inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
 
 // ---- mapping -------------------------------------------------------------
 
+// Would a version 1 file reproduce this mapping EXACTLY on reload?
+//
+// Version 1 lists bindings only, and outputs are recreated as the bindings
+// mention them. Measured before this function existed: an output bound to
+// nothing was DROPPED, and outputs came back in the order bindings mention them
+// rather than the order they were made -- L and R swapped indices, so an OSC
+// receiver reading argument 1 as the right speaker got the left one after
+// reopening the file (DECISIONS.md D-022).
+//
+// So version 1 is written only when it is safe: no new feature, every output
+// bound, and outputs first mentioned in the order they were made. Those files
+// stay byte-identical to what was written before. Anything else is version 2,
+// which lists outputs explicitly, and which an older reader refuses cleanly
+// rather than loading wrongly.
+inline bool mappingNeedsV2(const Mapping& mp, const Manifold2D& m) {
+    for (TargetID t = 0; t < mp.targetCount(); ++t) {
+        if (mp.targetChannel(t) != static_cast<int>(t)) return true;
+        if (mp.targetTrim(t) != 1.0f) return true;
+    }
+    for (const auto& a : mp.aggregators()) {
+        if (a.channel != NoChannel || a.trim != 1.0f) return true;
+        for (float g : a.weights) if (g != 1.0f) return true;
+    }
+    // Walk the bindings in the order version 1 would write them, recording
+    // the order outputs are first mentioned.
+    std::vector<bool> seen(mp.targetCount(), false);
+    TargetID next = 0;
+    for (std::size_t n = 0; n < m.nodeCount(); ++n) {
+        const NodeID id = static_cast<NodeID>(n);
+        for (std::size_t k = 0; k < mp.linkCount(id); ++k) {
+            const Link& l = mp.link(id, k);
+            if (l.kind != DestKind::Output) return true;      // silence
+            if (l.id >= seen.size() || seen[l.id]) continue;
+            if (l.id != next) return true;                    // reordered
+            seen[l.id] = true;
+            ++next;
+        }
+    }
+    // Links to nodes the manifold does not have would be lost either way.
+    for (NodeID n : mp.boundNodes()) {
+        if (n >= m.nodeCount()) return true;
+    }
+    return next != mp.targetCount();                          // unbound
+}
+
+inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m);
+
 inline std::string saveMapping(const Mapping& mp, const Manifold2D& m) {
+    if (mappingNeedsV2(mp, m)) return saveMappingV2(mp, m);
+
+    // ---- version 1: UNCHANGED, so existing files stay byte-identical ----
     std::ostringstream o;
     o << "{\n";
     o << "  \"version\": " << kFormatVersion << ",\n";
@@ -209,7 +259,7 @@ inline std::string saveMapping(const Mapping& mp, const Manifold2D& m) {
     for (std::size_t n = 0; n < m.nodeCount(); ++n) {
         const NodeID id = static_cast<NodeID>(n);
         for (std::size_t k = 0; k < mp.linkCount(id); ++k) {
-            const WeightedTarget& l = mp.link(id, k);
+            const Link& l = mp.link(id, k);
             if (!first) o << ",\n";
             o << "    { \"node\": " << json::quote(m.node(id).name)
               << ", \"target\": " << json::quote(mp.targetName(l.id))
@@ -240,6 +290,71 @@ inline std::string saveMapping(const Mapping& mp, const Manifold2D& m) {
     return o.str();
 }
 
+// Version 2: outputs listed explicitly, in the order they were made, with
+// channel and trim; a binding's kind written only when it is not an output;
+// aggregator sources as objects carrying their weights.
+inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m) {
+    std::ostringstream o;
+    o << "{\n";
+    o << "  \"version\": 2,\n";
+
+    o << "  \"outputs\": [\n";
+    for (TargetID t = 0; t < mp.targetCount(); ++t) {
+        o << "    { \"name\": " << json::quote(mp.targetName(t))
+          << ", \"channel\": " << mp.targetChannel(t)
+          << ", \"trim\": " << json::number(mp.targetTrim(t)) << " }";
+        if (t + 1 < mp.targetCount()) o << ",";
+        o << "\n";
+    }
+    o << "  ],\n";
+
+    o << "  \"bindings\": [\n";
+    bool first = true;
+    for (std::size_t n = 0; n < m.nodeCount(); ++n) {
+        const NodeID id = static_cast<NodeID>(n);
+        for (std::size_t k = 0; k < mp.linkCount(id); ++k) {
+            const Link& l = mp.link(id, k);
+            if (!first) o << ",\n";
+            o << "    { \"node\": " << json::quote(m.node(id).name);
+            if (l.kind == DestKind::Silence) {
+                o << ", \"kind\": \"silence\"";
+            } else {
+                o << ", \"target\": " << json::quote(mp.targetName(l.id));
+            }
+            o << ", \"weight\": " << json::number(l.weight) << " }";
+            first = false;
+        }
+    }
+    if (!first) o << "\n";
+    o << "  ],\n";
+
+    o << "  \"aggregators\": [\n";
+    const auto& ags = mp.aggregators();
+    for (std::size_t a = 0; a < ags.size(); ++a) {
+        o << "    { \"name\": " << json::quote(ags[a].name)
+          << ", \"mode\": \""
+          << (ags[a].mode == SumMode::Linear ? "linear" : "power") << "\"";
+        if (ags[a].channel != NoChannel) {
+            o << ", \"channel\": " << ags[a].channel
+              << ", \"trim\": " << json::number(ags[a].trim);
+        }
+        o << ", \"sources\": [";
+        for (std::size_t s2 = 0; s2 < ags[a].sources.size(); ++s2) {
+            const float g = s2 < ags[a].weights.size() ? ags[a].weights[s2]
+                                                       : 1.0f;
+            o << "{ \"node\": " << json::quote(m.node(ags[a].sources[s2]).name)
+              << ", \"weight\": " << json::number(g) << " }";
+            if (s2 + 1 < ags[a].sources.size()) o << ", ";
+        }
+        o << "] }";
+        if (a + 1 < ags.size()) o << ",";
+        o << "\n";
+    }
+    o << "  ]\n";
+    o << "}\n";
+    return o.str();
+}
+
 inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
                               Mapping& out) {
     LoadResult res;
@@ -251,21 +366,73 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
     }
     const json::Value& root = pr.value;
     if (!root.isObject()) { res.error = "root is not an object"; return res; }
-    if (!root.has("version") ||
-        static_cast<int>(root["version"].asNumber()) != kFormatVersion) {
+    if (!root.has("version")) {
         res.error = "missing or unsupported version";
+        return res;
+    }
+    const int version = static_cast<int>(root["version"].asNumber());
+    if (version != 1 && version != 2) {
+        res.error = "missing or unsupported version "
+                  + std::to_string(version);
         return res;
     }
 
     Mapping built;
+
+    // Version 2 declares outputs up front, in order, with channel and trim.
+    if (version == 2 && root.has("outputs")) {
+        if (!root["outputs"].isArray()) {
+            res.error = "outputs is not an array";
+            return res;
+        }
+        for (const json::Value& ov : root["outputs"].asArray()) {
+            if (!ov.isObject() || !ov["name"].isString()
+                || !ov.has("channel")) {
+                res.error = "output needs a string name and a channel";
+                return res;
+            }
+            const std::string nm = ov["name"].asString();
+            const int ch = static_cast<int>(ov["channel"].asNumber());
+            const float tr = ov.has("trim") ? ov["trim"].asFloat() : 1.0f;
+            if (built.findTarget(nm) != InvalidTarget) {
+                res.error = "duplicate output name: " + nm;
+                return res;
+            }
+            if (ch < 0) {
+                res.error = "negative channel for output " + nm;
+                return res;
+            }
+            if (built.addOutput(nm, ch, tr) == InvalidTarget) {
+                res.error = "duplicate channel " + std::to_string(ch)
+                          + " for output " + nm;
+                return res;
+            }
+        }
+    }
     if (root.has("bindings")) {
         if (!root["bindings"].isArray()) {
             res.error = "bindings is not an array";
             return res;
         }
         for (const json::Value& b : root["bindings"].asArray()) {
-            if (!b.isObject() || !b["node"].isString()
-                || !b["target"].isString()) {
+            if (!b.isObject() || !b["node"].isString()) {
+                res.error = "binding needs a string node";
+                return res;
+            }
+            // Kind: absent means output, which is every version 1 binding.
+            // "layer" is reserved and REFUSED until layers exist -- accepting
+            // and ignoring it would silently drop a binding.
+            const std::string kind =
+                b.has("kind") ? b["kind"].asString() : "output";
+            if (kind != "output" && kind != "silence") {
+                res.error = "unknown binding kind: " + kind;
+                return res;
+            }
+            if (kind == "silence" && b.has("target")) {
+                res.error = "a silence binding must not name a target";
+                return res;
+            }
+            if (kind == "output" && !b["target"].isString()) {
                 res.error = "binding needs string node and target";
                 return res;
             }
@@ -278,7 +445,11 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
                 return res;
             }
             const float w = b.has("weight") ? b["weight"].asFloat() : 1.0f;
-            built.bind(id, built.addTarget(b["target"].asString()), w);
+            if (kind == "silence") {
+                built.bindSilence(id, w);
+            } else {
+                built.bind(id, built.addTarget(b["target"].asString()), w);
+            }
         }
     }
 
@@ -294,21 +465,36 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
                 res.error = "unknown aggregator mode: " + mode;
                 return res;
             }
-            std::vector<NodeID> srcs;
+            // Sources: names (version 1) or {node, weight} (version 2).
+            std::vector<std::pair<NodeID, float>> srcs;
             if (a.has("sources")) {
                 for (const json::Value& s : a["sources"].asArray()) {
-                    const NodeID id = m.findNode(s.asString());
+                    const std::string nm =
+                        s.isObject() ? s["node"].asString() : s.asString();
+                    const float g = (s.isObject() && s.has("weight"))
+                                  ? s["weight"].asFloat() : 1.0f;
+                    const NodeID id = m.findNode(nm);
                     if (id == InvalidNode) {
                         res.error = "aggregator references unknown node: "
-                                  + s.asString();
+                                  + nm;
                         return res;
                     }
-                    srcs.push_back(id);
+                    srcs.emplace_back(id, g);
                 }
             }
-            built.addAggregator(a["name"].asString(), srcs,
-                                mode == "power" ? SumMode::PowerPreserving
-                                                : SumMode::Linear);
+            const int ch = a.has("channel")
+                         ? static_cast<int>(a["channel"].asNumber())
+                         : NoChannel;
+            const float tr = a.has("trim") ? a["trim"].asFloat() : 1.0f;
+            if (built.addDerived(a["name"].asString(), ch, tr,
+                                 mode == "power" ? SumMode::PowerPreserving
+                                                 : SumMode::Linear, srcs)
+                    == static_cast<std::size_t>(-1)) {
+                res.error = "aggregator " + a["name"].asString()
+                          + ": channel " + std::to_string(ch)
+                          + " is negative or already used";
+                return res;
+            }
         }
     }
 

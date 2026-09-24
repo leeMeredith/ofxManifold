@@ -1679,3 +1679,79 @@ could see.
 
 It is also the first finding in this project that CI caught and the local suite
 could not, which is the argument for having both.
+
+
+---
+
+## D-022 — Reopening a saved mapping could swap outputs
+
+**Date:** 2026-09-24
+**Status:** fixed; found while building outputs (PLAN-outputs.md)
+**Files:** `src/io/ofxManifoldSerialize.h`, `src/mapping/ofxManifoldMapping.h`,
+`tests/ref/reference_outputs.py`, `tests/run_outputs.cpp`
+
+### The bug
+
+The mapping file never listed outputs. It listed bindings, and outputs were
+recreated on load as the bindings mentioned them. Measured before anything was
+changed, on a mapping with outputs L, R and an unbound `spare`, where node a was
+bound to R and node b to L:
+
+    before save    [0]=L [1]=R [2]=spare    node a at full weight -> index 1
+    after reload   [0]=R [1]=L              node a at full weight -> index 0
+
+`spare` was dropped, and L and R swapped indices. An OSC receiver reading
+argument 1 as the right speaker got the left one after the file was reopened,
+with no error anywhere.
+
+It had never shown up because every existing test fixture happened to list
+bindings in output order and bind every output. It was in the code as
+published, not introduced by this round.
+
+### Why it changed the plan
+
+The plan's decision G said a mapping using no new feature should still be
+written as version 1, byte-identical. That would have kept this bug for exactly
+those mappings.
+
+The rule now: **version 1 is written only when a version 1 reload would
+reproduce the mapping exactly** — no new feature, every output bound, outputs
+first mentioned in the order they were made. Those files stay byte-identical,
+and the 55 serialization vectors, which include byte-stable round trips, confirm
+it. Anything else is version 2, which lists outputs explicitly in order with
+channel and trim. An older reader refuses version 2 cleanly rather than loading
+it wrongly.
+
+### Two findings in the testing
+
+**One fixture exercising two checks proved neither.** The first preservation
+fixture had both faults at once: reordered outputs and an unbound one. Removing
+either check left the other forcing version 2, so mutation testing removed each
+with the suite still green. Split into one fixture per fault, each is caught.
+The bowtie lesson from D-017 again, in a different layer.
+
+**Silence had never met a null node.** No resolution vector contained a node
+with no bindings at all, so `silenceShare()` could forget null nodes entirely.
+One vector with an unbound node in the input closes it.
+
+### Also in this round
+
+- **Backward compatibility, proven.** The 35 existing mapping vectors pass
+  untouched. For a mapping built the old way, the new by-channel vector equals
+  `toDenseVector()` — checked against the C++ function directly, not only the
+  reference's numbers. The new Python reference agrees with the old,
+  independently written one on 3,000 random legacy mappings.
+- **Three existing gates repointed.** The version 2 writer duplicated two lines
+  the version 1 gates targeted, and a rewrite moved a third. The local anchor
+  check caught all three on the first run; each was repointed at the version 1
+  code and shown to still catch its fault, not just to match.
+- **Bindings follow node renumbering.** `remapNodes()` takes the table
+  `removeNodes()` returns. Without it, deleting a node in the editor would have
+  re-routed every later binding to the wrong node.
+
+### Pattern
+
+Fifth time the same shape: D-018, D-019, D-020, and now a saved file that
+reloaded as a different state than the one saved. Round trips are where two
+parts of a system meet, and a round trip that is only tested on well-behaved
+input is not tested.

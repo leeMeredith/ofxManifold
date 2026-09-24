@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "space": "normalized",
+  "nodes": [
+    {
+      "id": "n0",
+      "position": [
+        0.2,
+        0.2
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n1",
+      "position": [
+        0.8,
+        0.2
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n2",
+      "position": [
+        0.5,
+        0.8
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n3",
+      "position": [
+        0.5,
+        0.45
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n4",
+      "position": [
+        0.1,
+        0.9
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n5",
+      "position": [
+        0.9,
+        0.9
+      ],
+      "weight": 1.0
+    }
+  ],
+  "triangles": [
+    [
+      "n0",
+      "n1",
+      "n3"
+    ],
+    [
+      "n1",
+      "n2",
+      "n3"
+    ],
+    [
+      "n2",
+      "n0",
+      "n3"
+    ]
+  ]
+}

@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -299,9 +299,9 @@ jobs:
 
       - name: Duplicate bind replaces instead of accumulating must be caught
         run: |
-          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
-            'if (l.id == target) { l.weight += weight; return; }' \
-            'if (l.id == target) { l.weight = weight; return; }'
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            'l.id == target) {\n                l.weight += weight;' \
+            'l.id == target) {\n                l.weight = weight;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
@@ -380,18 +380,18 @@ jobs:
 
       - name: Mapping written by NodeID instead of name must be caught
         run: |
-          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
-            'json::quote(m.node(id).name)' \
-            'json::quote(std::to_string(id))'
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            'json::quote(m.node(id).name)\n              << ", \"target\": "' \
+            'json::quote(std::to_string(id))\n              << ", \"target\": "'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Mapping target written by id instead of name must be caught
         run: |
-          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
-            '<< ", \"target\": " << json::quote(mp.targetName(l.id))' \
-            '<< ", \"target\": " << json::quote(std::to_string(l.id))'
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            '<< ", \"target\": " << json::quote(mp.targetName(l.id))\n              << ", \"weight\"' \
+            '<< ", \"target\": " << json::quote(std::to_string(l.id))\n              << ", \"weight\"'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
@@ -854,6 +854,96 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
+
+      - name: Silence left out of normalization must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '            for (const auto& l : it->second) linkTotal += l.weight;' \
+            '            for (const auto& l : it->second) if (l.kind == DestKind::Output) linkTotal += l.weight;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Trim applied to routed share must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '                t.weight * (levels ? trims_[t.id] : 1.0f);' \
+            '                t.weight * trims_[t.id];'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Derived output missing from channels must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '            if (ch < 0) continue;\n            out[static_cast<std::size_t>(ch)] =' \
+            '            if (true) continue;\n            out[static_cast<std::size_t>(ch)] ='
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Mapping ignores node renumbering must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '            moved[to] = std::move(kv.second);' \
+            '            moved[kv.first] = std::move(kv.second);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Duplicate channel accepted must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '        if (channel < 0 || channelInUse(channel)) return InvalidTarget;' \
+            '        if (channel < 0) return InvalidTarget;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Derived source weights ignored must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '                const float a = g * wn.weight;' \
+            '                const float a = wn.weight; (void)g;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Silence forgets null nodes must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '            if (it == links_.end() || it->second.empty()) {\n                s += wn.weight;' \
+            '            if (it == links_.end() || it->second.empty()) {\n                (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Version 1 written after reordering must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '            if (l.id != next) return true;                    // reordered' \
+            '            (void)next;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Version 1 written with an unbound output must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    return next != mp.targetCount();                          // unbound' \
+            '    return false;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Unknown binding kind accepted must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '            if (kind != "output" && kind != "silence") {' \
+            '            if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Restored tree must be green
         run: |

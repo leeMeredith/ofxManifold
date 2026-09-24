@@ -19,6 +19,7 @@ TRJ_RUN  := $(BUILD)/run_trajectory
 SMO_RUN  := $(BUILD)/run_smoother
 REG_RUN  := $(BUILD)/run_regions
 GRD_RUN  := $(BUILD)/run_grids
+OUT_RUN  := $(BUILD)/run_outputs
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -29,6 +30,7 @@ TRJ_VEC  := tests/vectors/trajectory.vec
 SMO_VEC  := tests/vectors/smoother.vec
 REG_VEC  := tests/vectors/regions.vec
 GRD_VEC  := tests/vectors/grids.vec
+OUT_VEC  := tests/vectors/outputs.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -61,14 +63,14 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test reproducible bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids headers workflow wrapper vectors clean
+.PHONY: all test reproducible bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize test-trajectory test-smoother test-regions test-grids
+      test-serialize test-trajectory test-smoother test-regions test-grids test-outputs
 	@echo ""
 	@echo "all suites green"
 
@@ -146,6 +148,9 @@ test-regions: $(REG_RUN) $(REG_VEC)
 test-grids: $(GRD_RUN) $(GRD_VEC)
 	@./$(GRD_RUN) $(GRD_VEC)
 
+test-outputs: $(OUT_RUN) $(OUT_VEC)
+	@./$(OUT_RUN) $(OUT_VEC) tests/fixtures
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -159,6 +164,7 @@ vectors:
 	@python3 tests/ref/reference_smoother.py
 	@python3 tests/ref/reference_regions.py
 	@python3 tests/ref/reference_grids.py
+	@python3 tests/ref/reference_outputs.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -181,6 +187,13 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
+
+$(OUT_RUN): tests/run_outputs.cpp $(CORE) $(MAPPING) $(IO)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_outputs.cpp
+
+$(OUT_VEC): tests/ref/reference_outputs.py
+	@python3 tests/ref/reference_outputs.py
 
 $(GRD_RUN): tests/run_grids.cpp $(CORE) $(AUTHORING)
 	@mkdir -p $(BUILD)

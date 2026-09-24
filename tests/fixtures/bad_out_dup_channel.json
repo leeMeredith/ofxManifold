@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "outputs": [
+    {
+      "name": "a",
+      "channel": 3
+    },
+    {
+      "name": "b",
+      "channel": 3
+    }
+  ],
+  "bindings": []
+}

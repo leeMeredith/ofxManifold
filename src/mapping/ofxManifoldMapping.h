@@ -37,6 +37,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 namespace ofxManifold {
 
@@ -48,6 +49,37 @@ struct WeightedTarget {
     TargetID id     = InvalidTarget;
     float    weight = 0.0f;
 };
+
+// Where a binding sends its share (PLAN-outputs.md decision B).
+//
+// Outputs, silence and -- later -- layers all answer one question: where does
+// a node's share go? The kind is recorded from the start so adding layers does
+// not change the binding structure, or the file format, under maps already
+// saved in it. Layer is reserved and not accepted yet.
+enum class DestKind : std::uint8_t {
+    Output,
+    Silence
+};
+
+struct Link {
+    DestKind kind   = DestKind::Output;
+    TargetID id     = InvalidTarget;   // unused for silence
+    float    weight = 0.0f;
+};
+
+// A node's role, COMPUTED from its bindings and never stored (decision F). A
+// stored type that could disagree with the actual bindings would be the
+// D-018/019/020 pattern a fourth time.
+enum class NodeKind {
+    Null,        // bound to nothing, or to silence alone
+    Terminal,    // one output
+    Composite,   // several outputs
+    Partial      // at least one output, and a share to silence
+};
+
+// No channel. A derived output made the old way, with addAggregator(), has
+// none and does not appear in the channel vector -- exactly as before.
+static constexpr int NoChannel = -1;
 
 // How an aggregator combines the node weights it watches.
 enum class SumMode {
@@ -66,10 +98,18 @@ enum class SumMode {
 // Which is exactly why it is not a node type. Modelling it as one would put a
 // non-participating object into the geometry and force every region operation
 // to filter it out. It lives here and reads the manifold's output.
+//
+// Each source carries a weight, as MIAP's derived links do -- a sub fed three
+// parts front to one part rear. Source weights are GAINS on the sources, not
+// shares, so they are not normalized. An aggregator made with addAggregator()
+// has every weight 1 and resolves exactly as it always did.
 struct Aggregator {
     std::string         name;
     std::vector<NodeID> sources;
     SumMode             mode = SumMode::Linear;
+    std::vector<float>  weights;               // parallel to sources
+    int                 channel = NoChannel;
+    float               trim    = 1.0f;
 };
 
 struct Resolved {
@@ -81,13 +121,51 @@ class Mapping {
 public:
     // ---- targets --------------------------------------------------------
 
+    // An output made the old way: a name, nothing else. It gets channel =
+    // its id, so for every existing mapping the channel vector is IDENTICAL
+    // to toDenseVector(). If that channel is already taken by an explicit
+    // output, the next free one above it.
     TargetID addTarget(const std::string& name) {
         auto it = targetsByName_.find(name);
         if (it != targetsByName_.end()) return it->second;
         const TargetID id = static_cast<TargetID>(targetNames_.size());
+        int ch = static_cast<int>(id);
+        while (channelInUse(ch)) ++ch;
         targetNames_.push_back(name);
+        channels_.push_back(ch);
+        trims_.push_back(1.0f);
         targetsByName_[name] = id;
         return id;
+    }
+
+    // An output with an explicit channel and trim (decision A).
+    //
+    // Refused -- InvalidTarget -- if the name exists, or the channel is
+    // negative or already used by any output or derived output. Two outputs on
+    // one channel would make the channel vector ambiguous: the kernel
+    // accepting a state a consumer trips over.
+    TargetID addOutput(const std::string& name, int channel,
+                       float trim = 1.0f) {
+        if (targetsByName_.count(name) != 0) return InvalidTarget;
+        if (channel < 0 || channelInUse(channel)) return InvalidTarget;
+        const TargetID id = static_cast<TargetID>(targetNames_.size());
+        targetNames_.push_back(name);
+        channels_.push_back(channel);
+        trims_.push_back(trim);
+        targetsByName_[name] = id;
+        return id;
+    }
+
+    int   targetChannel(TargetID id) const { return channels_[id]; }
+    float targetTrim(TargetID id) const { return trims_[id]; }
+    void  setTargetTrim(TargetID id, float trim) {
+        if (id < trims_.size()) trims_[id] = trim;
+    }
+
+    bool channelInUse(int ch) const {
+        for (int c : channels_) if (c == ch) return true;
+        for (const auto& a : aggregators_) if (a.channel == ch) return true;
+        return false;
     }
 
     TargetID findTarget(const std::string& name) const {
@@ -111,9 +189,27 @@ public:
     void bind(NodeID node, TargetID target, float weight = 1.0f) {
         auto& links = links_[node];
         for (auto& l : links) {
-            if (l.id == target) { l.weight += weight; return; }
+            if (l.kind == DestKind::Output && l.id == target) {
+                l.weight += weight;
+                return;
+            }
         }
-        links.push_back(WeightedTarget{target, weight});
+        links.push_back(Link{DestKind::Output, target, weight});
+    }
+
+    // Send part of a node's share to silence (decision B).
+    //
+    // A silence link takes part in the within-node normalization and
+    // contributes nowhere. Bound 0.7 to an output and 0.3 to silence, a node
+    // sends 70% of its share and discards 30% -- MIAP's virtual-to-silent
+    // link, the partial fade ofxManifold could not express. Repeated calls
+    // accumulate, as bind() does.
+    void bindSilence(NodeID node, float weight) {
+        auto& links = links_[node];
+        for (auto& l : links) {
+            if (l.kind == DestKind::Silence) { l.weight += weight; return; }
+        }
+        links.push_back(Link{DestKind::Silence, InvalidTarget, weight});
     }
 
     void unbind(NodeID node, TargetID target) {
@@ -121,8 +217,9 @@ public:
         if (it == links_.end()) return;
         auto& v = it->second;
         v.erase(std::remove_if(v.begin(), v.end(),
-                               [&](const WeightedTarget& l) {
-                                   return l.id == target;
+                               [&](const Link& l) {
+                                   return l.kind == DestKind::Output
+                                       && l.id == target;
                                }),
                 v.end());
     }
@@ -135,8 +232,39 @@ public:
     // Ordered access to a node's links. Serialization needs a deterministic
     // order so that save -> load -> save is byte-stable; the insertion order
     // held in the vector provides it, where iterating the map would not.
-    const WeightedTarget& link(NodeID node, std::size_t k) const {
+    const Link& link(NodeID node, std::size_t k) const {
         return links_.find(node)->second[k];
+    }
+
+    // The role a node plays, and how much of its share reaches an output --
+    // what its shape and its fill show in the editor.
+    NodeKind nodeKind(NodeID node) const {
+        auto it = links_.find(node);
+        if (it == links_.end()) return NodeKind::Null;
+        std::size_t outs = 0;
+        float total = 0.0f, silent = 0.0f;
+        for (const auto& l : it->second) {
+            total += l.weight;
+            if (l.kind == DestKind::Output) ++outs;
+            else silent += l.weight;
+        }
+        if (outs == 0 || std::fabs(total) < 1e-9f) return NodeKind::Null;
+        if (silent > 1e-9f) return NodeKind::Partial;
+        return outs == 1 ? NodeKind::Terminal : NodeKind::Composite;
+    }
+
+    float outputFraction(NodeID node) const {
+        auto it = links_.find(node);
+        if (it == links_.end()) return 0.0f;
+        float total = 0.0f, silent = 0.0f;
+        bool anyOut = false;
+        for (const auto& l : it->second) {
+            total += l.weight;
+            if (l.kind == DestKind::Silence) silent += l.weight;
+            else anyOut = true;
+        }
+        if (!anyOut || std::fabs(total) < 1e-9f) return 0.0f;
+        return 1.0f - silent / total;
     }
 
     // ---- aggregators ----------------------------------------------------
@@ -144,7 +272,35 @@ public:
     std::size_t addAggregator(const std::string& name,
                               std::vector<NodeID> sources,
                               SumMode mode = SumMode::Linear) {
-        aggregators_.push_back(Aggregator{name, std::move(sources), mode});
+        Aggregator a;
+        a.name = name;
+        a.weights.assign(sources.size(), 1.0f);
+        a.sources = std::move(sources);
+        a.mode = mode;
+        aggregators_.push_back(std::move(a));
+        return aggregators_.size() - 1;
+    }
+
+    // A derived output: weighted sources, a channel and a trim (decision C).
+    // It appears in the channel vector at its channel. `channel` may be
+    // NoChannel; any other negative channel, or one already in use, is
+    // refused and returns SIZE_MAX.
+    std::size_t addDerived(const std::string& name, int channel, float trim,
+                           SumMode mode,
+                           const std::vector<std::pair<NodeID, float>>& srcs) {
+        if (channel != NoChannel && (channel < 0 || channelInUse(channel))) {
+            return static_cast<std::size_t>(-1);
+        }
+        Aggregator a;
+        a.name = name;
+        a.mode = mode;
+        a.channel = channel;
+        a.trim = trim;
+        for (const auto& sw : srcs) {
+            a.sources.push_back(sw.first);
+            a.weights.push_back(sw.second);
+        }
+        aggregators_.push_back(std::move(a));
         return aggregators_.size() - 1;
     }
 
@@ -182,7 +338,8 @@ public:
             if (std::fabs(linkTotal) < 1e-9f) continue;
 
             for (const auto& l : it->second) {
-                if (l.id < acc.size()) {
+                // Silence counted in linkTotal above, and sent nowhere.
+                if (l.kind == DestKind::Output && l.id < acc.size()) {
                     acc[l.id] += wn.weight * (l.weight / linkTotal);
                 }
             }
@@ -196,12 +353,17 @@ public:
 
         out.aggregates.reserve(aggregators_.size());
         for (const auto& ag : aggregators_) {
+            // Source weight applied to the AMPLITUDE, then summed or
+            // power-summed. With every weight 1 this is exactly the old sum.
             float v = 0.0f;
-            for (NodeID src : ag.sources) {
+            for (std::size_t s = 0; s < ag.sources.size(); ++s) {
+                const NodeID src = ag.sources[s];
+                const float g = (s < ag.weights.size()) ? ag.weights[s] : 1.0f;
                 for (const auto& wn : w) {
                     if (wn.id != src) continue;
-                    if (ag.mode == SumMode::Linear) v += wn.weight;
-                    else                            v += wn.weight * wn.weight;
+                    const float a = g * wn.weight;
+                    if (ag.mode == SumMode::Linear) v += a;
+                    else                            v += a * a;
                     break;
                 }
             }
@@ -229,10 +391,114 @@ public:
         return dense;
     }
 
+    // ---- channels (decisions A and D) ---------------------------------
+
+    // Indexed by channel number EXACTLY: length highest channel + 1, zeros in
+    // the gaps, derived outputs at their channels. Routed share, BEFORE trim.
+    // For a mapping built only with addTarget(), identical to toDenseVector().
+    std::vector<float> toChannels(const WeightVector& w) const {
+        return channelVector(w, false);
+    }
+
+    // The same, AFTER trim: what actually leaves. Trim is a gain on an output
+    // after routing, unlike a node's weight, which biases the geometry before
+    // renormalization. Keeping the two readings apart keeps outputs plus
+    // silence summing to exactly one up to the last possible moment.
+    std::vector<float> toChannelLevels(const WeightVector& w) const {
+        return channelVector(w, true);
+    }
+
+    // The share that reached no output: null nodes whole, plus every node's
+    // silence links. Routed share plus this is exactly the weight vector's
+    // total -- the bar chart's silence bar.
+    float silenceShare(const WeightVector& w) const {
+        float s = 0.0f;
+        for (const auto& wn : w) {
+            auto it = links_.find(wn.id);
+            if (it == links_.end() || it->second.empty()) {
+                s += wn.weight;
+                continue;
+            }
+            float total = 0.0f, silent = 0.0f;
+            for (const auto& l : it->second) {
+                total += l.weight;
+                if (l.kind == DestKind::Silence) silent += l.weight;
+            }
+            if (std::fabs(total) < 1e-9f) { s += wn.weight; continue; }
+            s += wn.weight * (silent / total);
+        }
+        return s;
+    }
+
+    // Follow a node renumbering (decision E).
+    //
+    // `remap` is the table Manifold2D::removeNodes() returns: for every OLD
+    // NodeID, the new one, or InvalidNode if it was removed. Bindings of
+    // removed nodes are dropped; every other binding moves to its node's new
+    // id; aggregator sources likewise, with their weights. Without this,
+    // deleting a node would silently re-route every binding after it to the
+    // wrong node -- D-020's rule, applied to the first thing that holds
+    // NodeIDs across a removal.
+    void remapNodes(const std::vector<NodeID>& remap) {
+        std::unordered_map<NodeID, std::vector<Link>> moved;
+        for (auto& kv : links_) {
+            if (kv.first >= remap.size()) continue;
+            const NodeID to = remap[kv.first];
+            if (to == InvalidNode) continue;
+            moved[to] = std::move(kv.second);
+        }
+        links_ = std::move(moved);
+        for (auto& ag : aggregators_) {
+            std::vector<NodeID> s;
+            std::vector<float>  g;
+            for (std::size_t i = 0; i < ag.sources.size(); ++i) {
+                const NodeID old = ag.sources[i];
+                if (old >= remap.size() || remap[old] == InvalidNode) continue;
+                s.push_back(remap[old]);
+                g.push_back(i < ag.weights.size() ? ag.weights[i] : 1.0f);
+            }
+            ag.sources = std::move(s);
+            ag.weights = std::move(g);
+        }
+    }
+
+    // All nodes with bindings, in ascending order: what a serializer walks.
+    std::vector<NodeID> boundNodes() const {
+        std::vector<NodeID> n;
+        for (const auto& kv : links_) n.push_back(kv.first);
+        std::sort(n.begin(), n.end());
+        return n;
+    }
+
 private:
+    std::vector<float> channelVector(const WeightVector& w,
+                                     bool levels) const {
+        int top = -1;
+        for (int c : channels_) top = std::max(top, c);
+        for (const auto& a : aggregators_) top = std::max(top, a.channel);
+        std::vector<float> out(static_cast<std::size_t>(top + 1), 0.0f);
+        if (top < 0) return out;
+
+        const Resolved r = resolve(w);
+        for (const auto& t : r.targets) {
+            if (t.id >= channels_.size()) continue;
+            out[static_cast<std::size_t>(channels_[t.id])] =
+                t.weight * (levels ? trims_[t.id] : 1.0f);
+        }
+        for (std::size_t a = 0; a < aggregators_.size(); ++a) {
+            const int ch = aggregators_[a].channel;
+            if (ch < 0) continue;
+            out[static_cast<std::size_t>(ch)] =
+                r.aggregates[a] * (levels ? aggregators_[a].trim : 1.0f);
+        }
+        return out;
+    }
+
     std::vector<std::string>                 targetNames_;
+    std::vector<int>                         channels_;
+    std::vector<float>                       trims_;
     std::unordered_map<std::string, TargetID> targetsByName_;
-    std::unordered_map<NodeID, std::vector<WeightedTarget>> links_;
+    std::unordered_map<NodeID, std::vector<Link>> links_;
     std::vector<Aggregator>                  aggregators_;
 };
 

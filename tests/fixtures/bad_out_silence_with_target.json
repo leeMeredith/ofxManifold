@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "outputs": [
+    {
+      "name": "a",
+      "channel": 0
+    }
+  ],
+  "bindings": [
+    {
+      "node": "n0",
+      "kind": "silence",
+      "target": "a",
+      "weight": 1.0
+    }
+  ]
+}

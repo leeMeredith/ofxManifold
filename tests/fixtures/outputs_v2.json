@@ -1,0 +1,70 @@
+{
+  "version": 2,
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1,
+      "trim": 1.0
+    },
+    {
+      "name": "R",
+      "channel": 2,
+      "trim": 0.8
+    },
+    {
+      "name": "C",
+      "channel": 5,
+      "trim": 0.5
+    }
+  ],
+  "bindings": [
+    {
+      "node": "n0",
+      "target": "L",
+      "weight": 0.7
+    },
+    {
+      "node": "n0",
+      "kind": "silence",
+      "weight": 0.3
+    },
+    {
+      "node": "n1",
+      "target": "R",
+      "weight": 1.0
+    },
+    {
+      "node": "n2",
+      "target": "C",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "target": "R",
+      "weight": 1.0
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "sub",
+      "channel": 7,
+      "trim": 0.9,
+      "mode": "linear",
+      "sources": [
+        {
+          "node": "n0",
+          "weight": 3.0
+        },
+        {
+          "node": "n1",
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}
