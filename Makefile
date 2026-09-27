@@ -58,9 +58,11 @@ MAPPING  := src/mapping/ofxManifoldMapping.h
 # never compiled into projects that want only the manifold (PLAN-editor.md A).
 EDITOR_H   := ofxManifoldEditor/src/ofxManifoldEditor.h \
               ofxManifoldEditor/src/ofxManifoldEditorModel.h \
-              ofxManifoldEditor/src/ofxManifoldEditorSelection.h
+              ofxManifoldEditor/src/ofxManifoldEditorSelection.h \
+              ofxManifoldEditor/src/ofxManifoldEditorChartLayout.h
 EDITOR_CPP := ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-              ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp
+              ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
+              ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 EDITOR_INC := -Isrc -IofxManifoldEditor/src
 
 AUTHORING := src/authoring/ofxManifoldGrid.h \
@@ -74,13 +76,13 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test reproducible bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor headers workflow wrapper vectors clean
+.PHONY: all test reproducible door bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: reproducible headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
+test: reproducible door headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor
 	@echo ""
 	@echo "all suites green"
@@ -96,7 +98,8 @@ wrapper:
 		-fsyntax-only src/ofx/ofxManifoldRenderer.cpp
 	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions example-editor; do \
 		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
-			-I$$ex/src -fsyntax-only $$ex/src/ofApp.cpp || exit 1; \
+			-IofxManifoldEditor/src -I$$ex/src -fsyntax-only \
+			$$ex/src/ofApp.cpp || exit 1; \
 	done
 	@echo "wrapper and examples: syntax ok (stub, not real oF)"
 
@@ -293,6 +296,11 @@ reproducible:
 	done; \
 	if [ $$fail -ne 0 ]; then exit 1; fi
 	@echo "  ok  every reference reproduces its vectors exactly"
+
+# The editor's one door (PLAN-editor.md D): snippets that must FAIL to
+# compile, and a control that must compile. See tests/check_door.py.
+door:
+	@CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" python3 tests/check_door.py
 
 bench: $(BENCH)
 	@./$(BENCH)

@@ -173,6 +173,11 @@ a clean fan, a deliberately broken T-junction, two overlapping regions where the
 answer depends on which side you entered from, and a 144-node grid for looking
 at the renderer at density.
 
+**`example-editor`** needs a second addon, **`ofxManifoldEditor`**, which lives
+in this repository beside `src/`: copy it into your `addons/` folder next to
+ofxManifold. It is kept out of ofxManifold's own `src/` on purpose, so projects
+that want only the manifold never compile the editor.
+
 **`example-editor`** — the first piece of the editor. Click empty space to
 place a node on the active grid, drag a box or shift-click to select, drag the
 selection to move it as one operation, press `f` to join the selection into a
@@ -243,7 +248,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-595 vectors across eleven suites, plus 104 mutation gates that introduce known
+596 vectors across eleven suites, plus 108 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

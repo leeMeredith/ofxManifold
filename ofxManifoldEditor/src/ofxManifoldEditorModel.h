@@ -38,15 +38,20 @@ struct Result {
 
 class Model {
 public:
-    Manifold2D manifold;
-    Mapping    mapping;
-    TargetID   currentOutput = InvalidTarget;
+    // The model's state is PRIVATE, readable from outside only through the
+    // const accessors below. Its own operations are the only code that can
+    // change it -- the one door, enforced by the compiler rather than by
+    // convention. An app holding the model could otherwise write
+    // model.manifold.addNode() and skip every rule an operation applies; with
+    // these members public, it did compile.
+    const Manifold2D& manifold() const { return manifold_; }
+    const Mapping&    mapping() const { return mapping_; }
+    const TargetID&   currentOutput() const { return currentOutput_; }
 
     // Placing a node also makes an output named after it, on the next free
     // channel, and binds the node to it. On by default: speaker layout is the
-    // common case. The model is unchanged by it -- a convenience over outputs
-    // that stay separate from nodes.
-    bool autoOutput = true;
+    // common case. Changed only through toggleAutoOutput().
+    const bool&       autoOutput() const { return autoOutput_; }
 
     const TopologyReport& topology() const { return topology_; }
 
@@ -83,6 +88,10 @@ public:
     Result silence(const Selection& sel);
     Result clear(const Selection& sel);
     Result cycleOutput();
+
+    // Make `t` the current output, as clicking its fader does. Through the
+    // model like every other change, so nothing edits its state from outside.
+    Result pickOutput(TargetID t);
     Result trimCurrent(float dB);
     Result removeCurrentOutput();
     Result toggleAutoOutput();
@@ -96,12 +105,16 @@ public:
     bool        occupied(glm::vec2 p, GridAddress addr,
                          const Grid& grid) const;
 
-    void refreshTopology() { topology_ = manifold.validate(); }
+    void refreshTopology() { topology_ = manifold_.validate(); }
 
 private:
     void afterOutputRemoved(TargetID t);
     void settleCurrentOutput();
 
+    Manifold2D     manifold_;
+    Mapping        mapping_;
+    TargetID       currentOutput_ = InvalidTarget;
+    bool           autoOutput_ = true;
     TopologyReport topology_;
 };
 

@@ -2,38 +2,39 @@
 
 // ofxManifold — example-editor.
 //
-// The first piece of the editor: placing, selecting and moving nodes, on a
-// grid or free-hand.
+// A thin app over ofxManifoldEditor. It owns the window, the mouse and the
+// keys, and draws; every change to the map or its outputs goes through
+// editor::Model, the ONE DOOR (PLAN-editor.md decision D).
 //
-//   click empty space        place a node, snapped to the active grid
-//   drag across empty space  box-select (shift adds to the selection)
-//   click a node             select it
-//   shift-click a node       add it to, or remove it from, the selection
-//   drag a selected node     move the whole selection as ONE operation
-//   hold alt while dragging  free-hand for that drag, whatever the grid
+// That rule is enforced, not just intended: this class holds the map and its
+// outputs only as CONST references for drawing. A line here that tried to
+// change them directly would not compile.
 //
-// Every move goes through Manifold2D::setNodePositions(), all or nothing,
-// checked against the FINAL shape of every region it touches. A move that
-// would invert, flatten or self-intersect a region is refused and nothing
-// moves -- shown as a red flash rather than silence.
+// The code falls into sections that become separate files in round 2:
 //
-// The quad in the starting map is there on purpose. Drag one of its corners
-// across the opposite edge: the ring would cross itself while keeping its
-// winding sign, which the kernel used to accept (DECISIONS.md D-019).
+//   app          setup, update, draw -- assembling the pieces
+//   controller   mouse and keys, turned into Model operations
+//   grid tool    the snapping grid, a preference of the session
+//   MapView      grid lines, regions, the drag box, selection rings
+//   NodeGlyph    one node's shape, fill and audition halo
+//   OutputChart  the faders, drawn from editor::ChartLayout
+//   KeyPanel     the side panel and help
+//   EditorFiles  saving and opening the map and its outputs
 //
-// Grid settings live here, in the editing session, and are never written into
-// a manifold file: which grid an author used is a tool preference, not part of
-// a map meant to travel between venues.
+// Each view section only READS the model.
 
 #include "ofMain.h"
 #include "ofxManifold.h"
+#include "ofxManifoldEditor.h"
 
 class ofApp : public ofBaseApp {
 public:
+    // ---- app --------------------------------------------------------------
     void setup() override;
     void update() override;
     void draw() override;
 
+    // ---- controller -------------------------------------------------------
     void mousePressed(int x, int y, int button) override;
     void mouseDragged(int x, int y, int button) override;
     void mouseReleased(int x, int y, int button) override;
@@ -41,117 +42,84 @@ public:
     void keyReleased(int key) override;
 
 private:
-    enum class GridKind { Free, Square, Triangular, Polar };
+    // ---- controller -------------------------------------------------------
+    void show(const ofxManifold::editor::Result& r);  // a Result on screen
+    void adopt();                     // after the map is replaced wholesale
+    void placeAt(glm::vec2 p);
+    ofxManifold::NodeID nodeAt(glm::vec2 screen) const;
+    bool auditioning() const { return auditionHeld || auditionLocked; }
 
-    void buildStartingMap();
+    // ---- grid tool --------------------------------------------------------
+    enum class GridKind { Free, Square, Triangular, Polar };
     void rebuildGrid();
+
+    // ---- MapView ----------------------------------------------------------
     void drawGrid() const;
     void drawSegment(glm::vec2 a, glm::vec2 b) const;
-    void joinSelection();
+
+    // ---- NodeGlyph --------------------------------------------------------
+    void  drawNode(ofxManifold::NodeID id) const;
+    void  drawHalo(ofxManifold::NodeID id, float weight) const;
+    float nodeRadius(ofxManifold::NodeID id) const;
+
+    // ---- OutputChart ------------------------------------------------------
+    void drawChart() const;
+
+    // ---- KeyPanel ---------------------------------------------------------
+    void drawPanel() const;
+
+    // ---- EditorFiles ------------------------------------------------------
     void save();
     void load();
-    void removeSelected();
 
-    // ---- outputs (PLAN-outputs.md) ---------------------------------------
-    void newOutput();
-    void newDerived();
-    void bindSelection();
-    void silenceSelection();
-    void clearSelection();
-    void cycleOutput();
-    void trimCurrent(float dB);
-    void removeCurrentOutput();
-    bool outputInUse(ofxManifold::TargetID t) const;
-    void afterOutputRemoved(ofxManifold::TargetID t);
-    int  nextFreeChannel() const;
-    std::size_t outputCount(ofxManifold::NodeID id) const;
+    // ---- state: the model, and read-only views of it ----------------------
+    //
+    // The model and the selection own all editing state. The references below
+    // are CONST: drawing and hit-testing read through them, and nothing here
+    // can change the map, its outputs, or the current output except through a
+    // Model operation. Declared after the model, so they bind to it.
+    ofxManifold::editor::Model     model;
+    ofxManifold::editor::Selection selection;
+    const ofxManifold::Manifold2D& manifold      = model.manifold();
+    const ofxManifold::Mapping&    mapping       = model.mapping();
+    const ofxManifold::TargetID&   currentOutput = model.currentOutput();
+    const bool&                    autoOutput    = model.autoOutput();
 
-    // ---- display ---------------------------------------------------------
-    void drawNode(ofxManifold::NodeID id) const;
-    void drawHalo(ofxManifold::NodeID id, float weight) const;
-    float nodeRadius(ofxManifold::NodeID id) const;
-    void drawChart();
-    void drawPanel();
-    bool auditioning() const { return auditionHeld || auditionLocked; }
-    void unjoinSelected();
-    void newEmptyMap();
-    void adopt();                       // after the manifold is replaced
-    std::string freshName() const;
-    void placeNode(glm::vec2 p);
-    bool isSelected(ofxManifold::NodeID id) const;
-    ofxManifold::NodeID nodeAt(glm::vec2 screen) const;
-
-    // Duplicate detection: by grid address when the grid has addresses, by
-    // distance in free mode, which has none (decision F).
-    bool occupied(glm::vec2 p, ofxManifold::GridAddress addr) const;
-
-    ofxManifold::Manifold2D                 manifold;
+    // ---- state: drawing and listening --------------------------------------
     std::unique_ptr<ofxManifoldRenderer>    renderer;
-    ofxManifold::Grid                       grid;
-
-    // The second file: which outputs exist and what each node is bound to.
-    // Installation-specific, where the map is portable, so it is saved
-    // alongside it rather than inside it.
-    ofxManifold::Mapping                    mapping;
-    ofxManifold::TargetID                   currentOutput =
-        ofxManifold::InvalidTarget;
-
-    // Auto-output: placing a node also makes an output named after it, on
-    // the next free channel, and binds the node to it -- one fader per
-    // speaker without the keystrokes. On by default, since speaker layout is
-    // the common case; off for null rings, fade zones and parameter maps.
-    // The model is unchanged: this is a convenience over separate outputs.
-    bool autoOutput = true;
-
-    // Audition: a mode in which dragging moves the evaluation point and can
-    // NEVER move a node. Held with space, or locked on with v.
     std::unique_ptr<ofxManifold::Evaluator> evaluator;
     ofxManifold::Evaluation                 evaluation;
+    ofxManifold::editor::ChartLayout        chart;
+    float chartTop = 0.0f;
+
+    // Audition: dragging moves the listening point and can NEVER move a node.
     glm::vec2 auditionPoint{0.5f, 0.5f};
     bool      auditionHeld   = false;
     bool      auditionLocked = false;
     bool      pressAudition  = false;   // this press began in audition
     bool      pressInChart   = false;   // this press began on the chart
 
-    // The bar chart along the bottom, and where each output's bar landed so a
-    // click can pick it.
-    struct BarHit { float x, y, w, h; ofxManifold::TargetID id; };
-    std::vector<BarHit> barHits;
-    float chartTop = 0.0f;
+    // ---- state: the grid tool -----------------------------------------------
+    //
+    // A preference of the editing session, never written into a map file.
+    ofxManifold::Grid grid;
+    GridKind kind     = GridKind::Square;
+    float    spacing  = 0.05f;
+    float    rotation = 0.0f;           // radians
+    int      spokes   = 8;
+    float    deadZone = 0.25f;          // fraction of grid spacing
 
-    GridKind kind       = GridKind::Square;
-    float    spacing    = 0.05f;
-    float    rotation   = 0.0f;     // radians
-    int      spokes     = 8;
-    float    deadZone   = 0.25f;    // fraction of grid spacing
-
-    // selection, in the order nodes were chosen
-    std::vector<ofxManifold::NodeID> selected;
-
-    // True while every node in the selection was chosen by an individual
-    // click, so the order is the author's. A box select has no order, and
-    // clears this. Decides how joinSelection() orders the ring.
-    bool selectionOrdered = true;
-
-    // an in-progress drag of the selection
-    bool                                   dragging = false;
-    ofxManifold::NodeID                    anchor   = ofxManifold::InvalidNode;
-    glm::vec2                              grabOffset{0.0f, 0.0f};
-    std::vector<glm::vec2>                 dragFrom;   // per selected node
-    ofxManifold::GridAddress               anchorAddr;
-
-    // an in-progress press on empty space: a click places, a drag boxes
-    bool      pressingEmpty = false;
+    // ---- state: an in-progress drag or press -------------------------------
+    bool                     dragging = false;
+    ofxManifold::NodeID      anchor   = ofxManifold::InvalidNode;
+    glm::vec2                grabOffset{0.0f, 0.0f};
+    std::vector<glm::vec2>   dragFrom;         // per selected node
+    ofxManifold::GridAddress anchorAddr;
+    bool      pressingEmpty = false;           // a click places, a drag boxes
     glm::vec2 pressScreen{0.0f, 0.0f};
     glm::vec2 boxScreen{0.0f, 0.0f};
 
-    // Refreshed only when the node or region list changes. Calling
-    // validate() every frame is the cost D-015 measured and removed from
-    // example-basic -- O(regions x 3 x nodes), a dropped frame at a thousand
-    // nodes. Moving nodes cannot change the orphan count, so a drag need not
-    // refresh it.
-    ofxManifold::TopologyReport topology;
-
+    // ---- state: the message line -------------------------------------------
     float       refusedFlash = 0.0f;
     std::string message;
     float       messageTime = 0.0f;

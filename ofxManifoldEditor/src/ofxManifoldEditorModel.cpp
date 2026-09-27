@@ -39,26 +39,26 @@ std::string plural(std::size_t n, const char* one, const char* many) {
 // ---------------------------------------------------------------------------
 
 void Model::loadExample() {
-    manifold = Manifold2D();
+    manifold_ = Manifold2D();
 
     // A fan of four triangles...
-    const auto O = manifold.addNode("O", {0.30f, 0.50f});
-    const auto N = manifold.addNode("N", {0.30f, 0.80f});
-    const auto E = manifold.addNode("E", {0.50f, 0.50f});
-    const auto S = manifold.addNode("S", {0.30f, 0.20f});
-    const auto W = manifold.addNode("W", {0.10f, 0.50f});
-    manifold.addTriangle(O, N, E);
-    manifold.addTriangle(O, E, S);
-    manifold.addTriangle(O, S, W);
-    manifold.addTriangle(O, W, N);
+    const auto O = manifold_.addNode("O", {0.30f, 0.50f});
+    const auto N = manifold_.addNode("N", {0.30f, 0.80f});
+    const auto E = manifold_.addNode("E", {0.50f, 0.50f});
+    const auto S = manifold_.addNode("S", {0.30f, 0.20f});
+    const auto W = manifold_.addNode("W", {0.10f, 0.50f});
+    manifold_.addTriangle(O, N, E);
+    manifold_.addTriangle(O, E, S);
+    manifold_.addTriangle(O, S, W);
+    manifold_.addTriangle(O, W, N);
 
     // ...and a quad. Drag one of its corners across the opposite edge and the
     // move is refused: the ring would cross itself (D-019).
-    const auto A = manifold.addNode("A", {0.65f, 0.35f});
-    const auto B = manifold.addNode("B", {0.90f, 0.35f});
-    const auto C = manifold.addNode("C", {0.90f, 0.65f});
-    const auto D = manifold.addNode("D", {0.65f, 0.65f});
-    manifold.addRegion({A, B, C, D});
+    const auto A = manifold_.addNode("A", {0.65f, 0.35f});
+    const auto B = manifold_.addNode("B", {0.90f, 0.35f});
+    const auto C = manifold_.addNode("C", {0.90f, 0.65f});
+    const auto D = manifold_.addNode("D", {0.65f, 0.65f});
+    manifold_.addRegion({A, B, C, D});
 
     // Outputs, and bindings chosen so every node shape appears at once:
     //
@@ -70,42 +70,42 @@ void Model::loadExample() {
     //   D         rear, and a quarter silent     circle, three-quarters filled
     //
     // plus a derived "sub" fed by N and O, at its own channel.
-    mapping = Mapping();
-    const TargetID front = mapping.addOutput("front", 0);
-    const TargetID left  = mapping.addOutput("left", 1);
-    const TargetID right = mapping.addOutput("right", 2);
-    const TargetID rear  = mapping.addOutput("rear", 3);
-    mapping.bind(N, front);
-    mapping.bind(W, left);
-    mapping.bind(E, right);
-    mapping.bind(S, rear);
-    for (TargetID t : {front, left, right, rear}) mapping.bind(O, t);
-    mapping.bind(B, right);
-    mapping.bindSilence(B, 1.0f);
-    mapping.bind(C, left);
-    mapping.bind(C, right);
-    mapping.bind(D, rear);
-    mapping.bindSilence(D, 1.0f / 3.0f);
-    mapping.addDerived("sub", 4, 1.0f, SumMode::Linear, {{N, 1.0f}, {O, 1.0f}});
+    mapping_ = Mapping();
+    const TargetID front = mapping_.addOutput("front", 0);
+    const TargetID left  = mapping_.addOutput("left", 1);
+    const TargetID right = mapping_.addOutput("right", 2);
+    const TargetID rear  = mapping_.addOutput("rear", 3);
+    mapping_.bind(N, front);
+    mapping_.bind(W, left);
+    mapping_.bind(E, right);
+    mapping_.bind(S, rear);
+    for (TargetID t : {front, left, right, rear}) mapping_.bind(O, t);
+    mapping_.bind(B, right);
+    mapping_.bindSilence(B, 1.0f);
+    mapping_.bind(C, left);
+    mapping_.bind(C, right);
+    mapping_.bind(D, rear);
+    mapping_.bindSilence(D, 1.0f / 3.0f);
+    mapping_.addDerived("sub", 4, 1.0f, SumMode::Linear, {{N, 1.0f}, {O, 1.0f}});
     (void)A;
 
-    currentOutput = front;
+    currentOutput_ = front;
     settleCurrentOutput();
     refreshTopology();
 }
 
 void Model::newEmpty() {
-    manifold = Manifold2D();
-    mapping = Mapping();
-    currentOutput = InvalidTarget;
+    manifold_ = Manifold2D();
+    mapping_ = Mapping();
+    currentOutput_ = InvalidTarget;
     settleCurrentOutput();
     refreshTopology();
 }
 
 void Model::adopt(Manifold2D m, Mapping mp) {
-    manifold = std::move(m);
-    mapping = std::move(mp);
-    currentOutput = InvalidTarget;
+    manifold_ = std::move(m);
+    mapping_ = std::move(mp);
+    currentOutput_ = InvalidTarget;
     settleCurrentOutput();
     refreshTopology();
 }
@@ -113,12 +113,12 @@ void Model::adopt(Manifold2D m, Mapping mp) {
 // The current output must name an output that exists; with any outputs at all
 // and none current, the first becomes current.
 void Model::settleCurrentOutput() {
-    if (currentOutput != InvalidTarget
-        && currentOutput >= mapping.targetCount()) {
-        currentOutput = InvalidTarget;
+    if (currentOutput_ != InvalidTarget
+        && currentOutput_ >= mapping_.targetCount()) {
+        currentOutput_ = InvalidTarget;
     }
-    if (currentOutput == InvalidTarget && mapping.targetCount() > 0) {
-        currentOutput = 0;
+    if (currentOutput_ == InvalidTarget && mapping_.targetCount() > 0) {
+        currentOutput_ = 0;
     }
 }
 
@@ -131,10 +131,10 @@ void Model::settleCurrentOutput() {
 // name would find its auto-output already taken and be left unbound without a
 // word.
 std::string Model::freshName() const {
-    for (std::size_t k = manifold.nodeCount(); ; ++k) {
+    for (std::size_t k = manifold_.nodeCount(); ; ++k) {
         const std::string nm = "n" + std::to_string(k);
-        if (manifold.findNode(nm) == InvalidNode
-            && mapping.findTarget(nm) == InvalidTarget) {
+        if (manifold_.findNode(nm) == InvalidNode
+            && mapping_.findTarget(nm) == InvalidTarget) {
             return nm;
         }
     }
@@ -142,22 +142,22 @@ std::string Model::freshName() const {
 
 int Model::nextFreeChannel() const {
     int ch = 0;
-    while (mapping.channelInUse(ch)) ++ch;
+    while (mapping_.channelInUse(ch)) ++ch;
     return ch;
 }
 
 std::size_t Model::outputCount(NodeID id) const {
     std::size_t n = 0;
-    for (std::size_t k = 0; k < mapping.linkCount(id); ++k) {
-        if (mapping.link(id, k).kind == DestKind::Output) ++n;
+    for (std::size_t k = 0; k < mapping_.linkCount(id); ++k) {
+        if (mapping_.link(id, k).kind == DestKind::Output) ++n;
     }
     return n;
 }
 
 bool Model::outputInUse(TargetID t) const {
-    for (NodeID n : mapping.boundNodes()) {
-        for (std::size_t k = 0; k < mapping.linkCount(n); ++k) {
-            const Link& l = mapping.link(n, k);
+    for (NodeID n : mapping_.boundNodes()) {
+        for (std::size_t k = 0; k < mapping_.linkCount(n); ++k) {
+            const Link& l = mapping_.link(n, k);
             if (l.kind == DestKind::Output && l.id == t) return true;
         }
     }
@@ -167,8 +167,8 @@ bool Model::outputInUse(TargetID t) const {
 // Duplicate detection: by grid address where the grid has addresses, by a
 // distance tolerance in free mode, which has none (authoring decision F).
 bool Model::occupied(glm::vec2 p, GridAddress addr, const Grid& grid) const {
-    for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
-        const glm::vec2 q = manifold.node(NodeID(i)).position;
+    for (std::size_t i = 0; i < manifold_.nodeCount(); ++i) {
+        const glm::vec2 q = manifold_.node(NodeID(i)).position;
         if (addr.valid) {
             if (grid.snap(q).address == addr
                 && glm::distance(grid.point(addr), q) < 1e-4f) {
@@ -194,19 +194,19 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
     if (occupied(s.point, s.address, grid)) {
         return refusal("a node is already there", 1.5f);
     }
-    const NodeID id = manifold.addNode(freshName(), s.point);
+    const NodeID id = manifold_.addNode(freshName(), s.point);
     if (id == InvalidNode) return Result{};
 
     // The output takes the NODE'S NAME. That is what pairs them, and it
     // survives save and reload with no extra bookkeeping -- which is how
     // deleting the node later finds its own fader.
-    if (autoOutput && mapping.findTarget(manifold.node(id).name)
+    if (autoOutput_ && mapping_.findTarget(manifold_.node(id).name)
                           == InvalidTarget) {
-        const TargetID t = mapping.addOutput(manifold.node(id).name,
+        const TargetID t = mapping_.addOutput(manifold_.node(id).name,
                                              nextFreeChannel());
         if (t != InvalidTarget) {
-            mapping.bind(id, t);
-            currentOutput = t;
+            mapping_.bind(id, t);
+            currentOutput_ = t;
         }
     }
     refreshTopology();
@@ -219,7 +219,7 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
 // One operation, all or nothing, checked against FINAL shapes. On refusal
 // nothing changes, so the nodes stay at their last valid positions.
 Result Model::move(const std::vector<std::pair<NodeID, glm::vec2>>& moves) {
-    if (!manifold.setNodePositions(moves)) {
+    if (!manifold_.setNodePositions(moves)) {
         return refusal(
             "move refused: a region would invert, flatten or cross itself",
             1.5f);
@@ -244,7 +244,7 @@ Result Model::join(const Selection& sel) {
     std::vector<NodeID> ring = sel.nodes();
     if (!sel.ordered()) {
         std::vector<glm::vec2> pts;
-        for (NodeID id : sel.nodes()) pts.push_back(manifold.node(id).position);
+        for (NodeID id : sel.nodes()) pts.push_back(manifold_.node(id).position);
         ring.clear();
         for (std::size_t i : orderByAngle(pts)) ring.push_back(sel.nodes()[i]);
     }
@@ -253,16 +253,16 @@ Result Model::join(const Selection& sel) {
     // rather than created and reported by validate().
     std::vector<NodeID> key = ring;
     std::sort(key.begin(), key.end());
-    for (std::size_t r = 0; r < manifold.regionCount(); ++r) {
-        std::vector<NodeID> have = manifold.region(RegionID(r)).ids();
+    for (std::size_t r = 0; r < manifold_.regionCount(); ++r) {
+        std::vector<NodeID> have = manifold_.region(RegionID(r)).ids();
         std::sort(have.begin(), have.end());
         if (have == key) {
             return refusal("those nodes already form a region", 2.0f);
         }
     }
 
-    if (manifold.addRegion(ring) == InvalidRegion) {
-        return refusal("refused: " + manifold.lastRegionError()
+    if (manifold_.addRegion(ring) == InvalidRegion) {
+        return refusal("refused: " + manifold_.lastRegionError()
                        + (sel.ordered() ? " (in click order)" : ""), 3.0f);
     }
     refreshTopology();
@@ -273,9 +273,9 @@ Result Model::join(const Selection& sel) {
 // Remove every region whose nodes are ALL selected, keeping the nodes.
 Result Model::unjoin(const Selection& sel) {
     std::vector<RegionID> doomed;
-    for (std::size_t r = 0; r < manifold.regionCount(); ++r) {
+    for (std::size_t r = 0; r < manifold_.regionCount(); ++r) {
         bool all = true;
-        for (NodeID id : manifold.region(RegionID(r)).ids()) {
+        for (NodeID id : manifold_.region(RegionID(r)).ids()) {
             if (!sel.contains(id)) { all = false; break; }
         }
         if (all) doomed.push_back(RegionID(r));
@@ -283,7 +283,7 @@ Result Model::unjoin(const Selection& sel) {
     if (doomed.empty()) {
         return refusal("no region is made only of selected nodes", 2.5f);
     }
-    manifold.removeRegions(doomed);
+    manifold_.removeRegions(doomed);
     refreshTopology();
     return changed("unjoined " + plural(doomed.size(), " region", " regions"),
                    2.5f);
@@ -298,10 +298,10 @@ Result Model::remove(const Selection& sel) {
     // NodeIDs, so it MUST follow, or every binding after the deleted node
     // would silently move to the wrong node (outputs decision E, D-020).
     std::vector<std::string> names;
-    for (NodeID id : sel.nodes()) names.push_back(manifold.node(id).name);
+    for (NodeID id : sel.nodes()) names.push_back(manifold_.node(id).name);
     std::vector<NodeID> remap;
-    manifold.removeNodes(sel.nodes(), &remap, &regionsGone);
-    mapping.remapNodes(remap);
+    manifold_.removeNodes(sel.nodes(), &remap, &regionsGone);
+    mapping_.remapNodes(remap);
 
     // A node's own output -- the one named after it -- goes with it, but ONLY
     // if nothing else is bound to it. Otherwise deleting a speaker's node
@@ -309,9 +309,9 @@ Result Model::remove(const Selection& sel) {
     // by hand never share a node's name, so they are never removed this way.
     std::size_t outsGone = 0;
     for (const std::string& nm : names) {
-        const TargetID t = mapping.findTarget(nm);
+        const TargetID t = mapping_.findTarget(nm);
         if (t != InvalidTarget && !outputInUse(t)) {
-            mapping.removeOutput(t);
+            mapping_.removeOutput(t);
             afterOutputRemoved(t);
             ++outsGone;
         }
@@ -335,10 +335,10 @@ Result Model::remove(const Selection& sel) {
 Result Model::newOutput() {
     const int ch = nextFreeChannel();
     std::string nm = "out" + std::to_string(ch);
-    for (int k = 2; mapping.findTarget(nm) != InvalidTarget; ++k) {
+    for (int k = 2; mapping_.findTarget(nm) != InvalidTarget; ++k) {
         nm = "out" + std::to_string(ch) + "_" + std::to_string(k);
     }
-    currentOutput = mapping.addOutput(nm, ch);
+    currentOutput_ = mapping_.addOutput(nm, ch);
     return changed("new output " + nm + " on channel " + std::to_string(ch)
                    + " -- select nodes and press b", 3.0f);
 }
@@ -353,19 +353,19 @@ Result Model::newDerived(const Selection& sel) {
     const std::string nm = "sum" + std::to_string(ch);
     std::vector<std::pair<NodeID, float>> srcs;
     for (NodeID id : sel.nodes()) srcs.emplace_back(id, 1.0f);
-    mapping.addDerived(nm, ch, 1.0f, SumMode::Linear, srcs);
+    mapping_.addDerived(nm, ch, 1.0f, SumMode::Linear, srcs);
     return changed("derived " + nm + " on channel " + std::to_string(ch)
                    + ", sum of " + std::to_string(srcs.size()), 3.0f);
 }
 
 Result Model::bind(const Selection& sel) {
-    if (currentOutput == InvalidTarget) {
+    if (currentOutput_ == InvalidTarget) {
         return refusal("no output yet -- press o to make one", 2.5f);
     }
     if (sel.empty()) return Result{};
-    for (NodeID id : sel.nodes()) mapping.bind(id, currentOutput);
+    for (NodeID id : sel.nodes()) mapping_.bind(id, currentOutput_);
     return changed("bound " + std::to_string(sel.size()) + " to "
-                   + mapping.targetName(currentOutput), 2.0f);
+                   + mapping_.targetName(currentOutput_), 2.0f);
 }
 
 // A quarter-share of silence per press. On a node with no output it changes
@@ -377,7 +377,7 @@ Result Model::silence(const Selection& sel) {
     if (sel.empty()) return Result{};
     bool anyOutput = false;
     for (NodeID id : sel.nodes()) {
-        mapping.bindSilence(id, 0.25f);
+        mapping_.bindSilence(id, 0.25f);
         if (outputCount(id) > 0) anyOutput = true;
     }
     return changed(anyOutput ? "added a silence share -- the fill drops"
@@ -386,27 +386,36 @@ Result Model::silence(const Selection& sel) {
 }
 
 Result Model::clear(const Selection& sel) {
-    for (NodeID id : sel.nodes()) mapping.clearBindings(id);
+    for (NodeID id : sel.nodes()) mapping_.clearBindings(id);
     if (sel.empty()) return Result{};
     return changed("cleared bindings on " + std::to_string(sel.size()), 2.0f);
 }
 
 Result Model::cycleOutput() {
-    if (mapping.targetCount() == 0) return Result{};
-    currentOutput = (currentOutput == InvalidTarget)
-                  ? 0 : (currentOutput + 1) % mapping.targetCount();
+    if (mapping_.targetCount() == 0) return Result{};
+    currentOutput_ = (currentOutput_ == InvalidTarget)
+                  ? 0 : (currentOutput_ + 1) % mapping_.targetCount();
     Result r;
-    r.message = "current output: " + mapping.targetName(currentOutput);
+    r.message = "current output: " + mapping_.targetName(currentOutput_);
+    r.seconds = 2.0f;
+    return r;
+}
+
+Result Model::pickOutput(TargetID t) {
+    if (t == InvalidTarget || t >= mapping_.targetCount()) return Result{};
+    currentOutput_ = t;
+    Result r;
+    r.message = "current output: " + mapping_.targetName(t);
     r.seconds = 2.0f;
     return r;
 }
 
 // Trim in dB, stored as a linear gain, capped at +12 dB.
 Result Model::trimCurrent(float dB) {
-    if (currentOutput == InvalidTarget) return Result{};
-    const float t = mapping.targetTrim(currentOutput)
+    if (currentOutput_ == InvalidTarget) return Result{};
+    const float t = mapping_.targetTrim(currentOutput_)
                   * std::pow(10.0f, dB / 20.0f);
-    mapping.setTargetTrim(currentOutput, std::min(t, 3.9810717f));
+    mapping_.setTargetTrim(currentOutput_, std::min(t, 3.9810717f));
     Result r;
     r.changed = true;
     return r;
@@ -415,29 +424,29 @@ Result Model::trimCurrent(float dB) {
 // TargetIDs after a removed output shift down by one, so the current output
 // has to follow -- the same rule removeNodes() taught for NodeIDs.
 void Model::afterOutputRemoved(TargetID t) {
-    if (currentOutput == InvalidTarget) return;
-    if (currentOutput == t) currentOutput = InvalidTarget;
-    else if (currentOutput > t) --currentOutput;
+    if (currentOutput_ == InvalidTarget) return;
+    if (currentOutput_ == t) currentOutput_ = InvalidTarget;
+    else if (currentOutput_ > t) --currentOutput_;
     settleCurrentOutput();
 }
 
 // Nodes that fed it and others renormalize onto the others; nodes that fed
 // only it go silent. The message says how many.
 Result Model::removeCurrentOutput() {
-    if (currentOutput == InvalidTarget) return Result{};
+    if (currentOutput_ == InvalidTarget) return Result{};
     std::size_t feeders = 0;
-    for (NodeID n : mapping.boundNodes()) {
-        for (std::size_t k = 0; k < mapping.linkCount(n); ++k) {
-            const Link& l = mapping.link(n, k);
-            if (l.kind == DestKind::Output && l.id == currentOutput) {
+    for (NodeID n : mapping_.boundNodes()) {
+        for (std::size_t k = 0; k < mapping_.linkCount(n); ++k) {
+            const Link& l = mapping_.link(n, k);
+            if (l.kind == DestKind::Output && l.id == currentOutput_) {
                 ++feeders;
                 break;
             }
         }
     }
-    const std::string nm = mapping.targetName(currentOutput);
-    const TargetID t = currentOutput;
-    mapping.removeOutput(t);
+    const std::string nm = mapping_.targetName(currentOutput_);
+    const TargetID t = currentOutput_;
+    mapping_.removeOutput(t);
     afterOutputRemoved(t);
     Result r;
     r.changed = true;
@@ -451,9 +460,9 @@ Result Model::removeCurrentOutput() {
 }
 
 Result Model::toggleAutoOutput() {
-    autoOutput = !autoOutput;
+    autoOutput_ = !autoOutput_;
     Result r;
-    r.message = autoOutput
+    r.message = autoOutput_
         ? "auto-output on: each new node gets its own output"
         : "auto-output off: new nodes start unbound";
     r.seconds = 3.0f;

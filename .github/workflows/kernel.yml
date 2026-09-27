@@ -984,7 +984,7 @@ jobs:
       - name: Editor delete leaves bindings unrenumbered must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '    mapping.remapNodes(remap);' \
+            '    mapping_.remapNodes(remap);' \
             '    (void)remap;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
@@ -1002,8 +1002,8 @@ jobs:
       - name: Editor names ignore outputs must be caught
         run: |
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '        if (manifold.findNode(nm) == InvalidNode\n            && mapping.findTarget(nm) == InvalidTarget) {' \
-            '        if (manifold.findNode(nm) == InvalidNode) {'
+            '        if (manifold_.findNode(nm) == InvalidNode\n            && mapping_.findTarget(nm) == InvalidTarget) {' \
+            '        if (manifold_.findNode(nm) == InvalidNode) {'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1029,7 +1029,7 @@ jobs:
       - name: Editor current output stranded by removal must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '    else if (currentOutput > t) --currentOutput;' \
+            '    else if (currentOutput_ > t) --currentOutput_;' \
             '    (void)0;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
@@ -1043,6 +1043,42 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp
+
+      - name: Faders not narrowed as outputs are added must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '    L.barWidth = std::min(46.0f,' \
+            '    L.barWidth = std::max(46.0f,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Silence fader loses its extra gap must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '    L.silenceX = x0 + L.gap + float(channels) * (L.barWidth + L.gap) + L.gap;' \
+            '    L.silenceX = x0 + L.gap + float(channels) * (L.barWidth + L.gap);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Fader click ignores height must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '        if (x >= b.x && x <= b.x + barWidth && y >= top && y <= top + height) {' \
+            '        if (x >= b.x && x <= b.x + barWidth) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Picking an output does nothing must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    currentOutput_ = t;\n    Result r;\n    r.message = "current output: " + mapping_.targetName(t);' \
+            '    Result r;\n    r.message = "current output: " + mapping_.targetName(t);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Restored tree must be green
         run: |

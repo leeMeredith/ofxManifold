@@ -8,6 +8,7 @@
 
 #include "ofxManifoldEditorModel.h"
 #include "ofxManifoldEditorSelection.h"
+#include "ofxManifoldEditorChartLayout.h"
 
 #include <cctype>
 #include <cmath>
@@ -38,8 +39,8 @@ std::string num(double v) {
 
 // The model's state in the reference's canonical form.
 std::string dump(const Model& md) {
-    const Manifold2D& m = md.manifold;
-    const Mapping& mp = md.mapping;
+    const Manifold2D& m = md.manifold();
+    const Mapping& mp = md.mapping();
     std::ostringstream o;
     o << "N";
     for (NodeID i = 0; i < m.nodeCount(); ++i) {
@@ -76,9 +77,9 @@ std::string dump(const Model& md) {
             o << (k ? "," : "") << m.node(a.sources[k]).name;
         }
     }
-    o << " | C " << (md.currentOutput == InvalidTarget
-                     ? std::string("-") : mp.targetName(md.currentOutput));
-    o << " | A " << (md.autoOutput ? "1" : "0");
+    o << " | C " << (md.currentOutput() == InvalidTarget
+                     ? std::string("-") : mp.targetName(md.currentOutput()));
+    o << " | A " << (md.autoOutput() ? "1" : "0");
     return o.str();
 }
 
@@ -153,6 +154,8 @@ int main(int argc, char** argv) {
     Selection sel;
     Grid grid;
     Result last;
+    ChartLayout layout;
+    float chX = 0, chTop = 0, chW = 0, chH = 0;
     bool ok = true;
     std::ostringstream why;
     int step = 0;
@@ -177,7 +180,7 @@ int main(int argc, char** argv) {
             if (op == "clear") { sel.clear(); continue; }
             std::string nm;
             while (in >> nm) {
-                const NodeID id = md.manifold.findNode(nm);
+                const NodeID id = md.manifold().findNode(nm);
                 if (op == "only") sel.only(id);
                 else if (op == "toggle") sel.toggle(id);
                 else if (op == "box") sel.addFromBox(id);
@@ -199,6 +202,9 @@ int main(int argc, char** argv) {
             else if (lastOp == "trim")    { float db; in >> db;
                                             last = md.trimCurrent(db); }
             else if (lastOp == "removeoutput") last = md.removeCurrentOutput();
+            else if (lastOp == "pick")    { std::string nm; in >> nm;
+                                            last = md.pickOutput(
+                                                md.mapping().findTarget(nm)); }
             else if (lastOp == "auto")    last = md.toggleAutoOutput();
             else if (lastOp == "example") { md.loadExample(); last = Result{};
                                             last.changed = true; }
@@ -226,6 +232,58 @@ int main(int argc, char** argv) {
                 ok = false;
                 why << "step " << step << " (" << lastOp << ") state differs"
                     << "\n      want:" << want << "\n      got:  " << got;
+            }
+        } else if (kind == "CHART") {
+            in >> chX >> chTop >> chW >> chH;
+            layout = layoutChart(md.mapping(), chX, chTop, chW, chH);
+        } else if (kind == "EXPECTCHART") {
+            std::string first; in >> first;
+            if (first == "EMPTY") {
+                if (ok && !layout.empty) {
+                    ok = false; why << "chart should be empty";
+                }
+                continue;
+            }
+            const float bw = std::stof(first);
+            float sx, tx; in >> sx >> tx;
+            bool good = !layout.empty && std::fabs(layout.barWidth - bw) < 1e-3
+                     && std::fabs(layout.silenceX - sx) < 1e-3
+                     && std::fabs(layout.totalX - tx) < 1e-3;
+            std::string tok;
+            std::size_t i = 0;
+            while (good && in >> tok) {
+                // ch:kind:x:name
+                std::vector<std::string> f;
+                std::stringstream ss(tok);
+                std::string part;
+                while (std::getline(ss, part, ':')) f.push_back(part);
+                if (i >= layout.bars.size()) { good = false; break; }
+                const ChartBar& b = layout.bars[i];
+                const char* k = b.kind == ChartBar::Kind::Output ? "output"
+                              : b.kind == ChartBar::Kind::Derived ? "derived"
+                              : "unused";
+                const std::string nm = b.name.empty() ? "-" : b.name;
+                good = b.channel == std::stoi(f[0]) && f[1] == k
+                    && std::fabs(b.x - std::stof(f[2])) < 1e-3 && f[3] == nm;
+                ++i;
+            }
+            if (good && i != layout.bars.size()) good = false;
+            if (ok && !good) {
+                ok = false;
+                why << "chart layout differs after step " << step
+                    << ": bar width " << layout.barWidth << ", silence at "
+                    << layout.silenceX << ", " << layout.bars.size() << " bars";
+            }
+        } else if (kind == "CLICK") {
+            float x, y; std::string want;
+            in >> x >> y >> want;
+            const TargetID hit = layout.outputAt(x, y);
+            const std::string got = hit == InvalidTarget
+                                  ? "-" : md.mapping().targetName(hit);
+            if (ok && got != want) {
+                ok = false;
+                why << "click at (" << x << ", " << y << ") picked " << got
+                    << ", expected " << want;
             }
         } else if (kind == "ENDEDIT") {
             Tally& t = tallies[cls];

@@ -72,7 +72,7 @@ each a `.h` and a `.cpp`:
 
 ## Rounds
 
-### Round 1 — the split, NO change in behaviour
+### Round 1 — the split, NO change in behaviour — DONE
 
 1. **Slice 1a — the logic. DONE.** `ofxManifoldEditor/`, an addon of its
    own. `Model` and `Selection`, each a `.h` and `.cpp`, no openFrameworks,
@@ -94,7 +94,33 @@ each a `.h` and a `.cpp`:
    including behaviour round 2 will change on purpose (a quarter-share of
    silence per `q`; a placed node becoming selected). When round 2 changes one,
    its vector changes in the same commit, visibly.
-2. **Slice 1b — the app.** `example-editor` rewired onto the package; views
+2. **Slice 1b — the app. DONE.** `example-editor` hands every edit to
+   `editor::Model`: 1,260 lines to 811, its own copy of the logic gone.
+   `ChartLayout` in the package, 12 scripts now, 113 steps, fader geometry and
+   clicks included. Checked statically: 36 keys handled before and after, all
+   43 messages still exist. The view code sits in marked sections of `ofApp`,
+   ready to lift into files.
+
+   **The door is enforced by the compiler.** The app holds the map and outputs
+   only as const references, and the model's state is private behind const
+   accessors. The first version left the model's members public, and
+   `model.manifold.addNode()` compiled -- found by trying it rather than
+   assuming the const references were enough. `make door` now tries eight ways
+   in, each of which must fail to compile, plus a control that must compile.
+   Its first version, a Makefile rule, failed every snippet through a quoting
+   mistake: the check would have passed for the wrong reason, which is exactly
+   what the control is there to catch.
+
+   Found by mutation testing: a pick-output step that picked the output
+   already current, so it could not fail. Two further misses were EQUIVALENT
+   mutants -- a derived bar carries no output id, and the kernel refuses two
+   outputs on one channel -- recorded as such rather than "fixed".
+
+   The chart vectors pin one current defect deliberately: with thirty outputs
+   the running total is drawn at x = 1016 in a 1024-wide window, off screen.
+   Round 2's fader narrowing fixes it and changes that vector.
+
+   Originally: `example-editor` rewired onto the package; views
    grouped into marked sections of `ofApp`, lifted into files next round;
    `ChartLayout` extracted with its drawing.
 

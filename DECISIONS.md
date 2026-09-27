@@ -1755,3 +1755,57 @@ Fifth time the same shape: D-018, D-019, D-020, and now a saved file that
 reloaded as a different state than the one saved. Round trips are where two
 parts of a system meet, and a round trip that is only tested on well-behaved
 input is not tested.
+
+
+---
+
+## D-023 — The editor split, and a door that was open
+
+**Date:** 2026-09-26
+**Status:** round 1 of PLAN-editor.md complete
+**Files:** `ofxManifoldEditor/`, `example-editor/`, `tests/ref/reference_editor.py`,
+`tests/run_editor.cpp`, `tests/check_door.py`
+
+### What changed
+
+The editor's logic left `example-editor/src/ofApp.cpp` for a package of its
+own, `ofxManifoldEditor/` -- an addon, because Project Generator compiles only a
+project's own sources and its addons, and outside ofxManifold's `src/`, so
+projects wanting only the manifold never compile it. `Model`, `Selection` and
+`ChartLayout`, each a `.h` and a `.cpp`, no openFrameworks. `ofApp` went from
+1,260 lines to 811 and now only handles the window, input and drawing.
+
+The reason was testing, not tidiness. Checking one editing rule had previously
+meant rewriting the editor's logic by hand in a separate test, because the real
+logic could not be reached. It is now tested directly: 12 scripts, 113 steps,
+each checking result, message and complete state against a Python reference
+that tracks everything by name and so never has to renumber.
+
+### The door
+
+The plan's rule: every change to the map or its outputs goes through a `Model`
+operation. The app was given the map and outputs only as const references, and
+five direct writes through them were confirmed to fail to compile.
+
+That was half the story. The model's own members were public, so
+`model.manifold.addNode()` compiled -- the app could skip every rule an
+operation applies. Found by trying it after the first five passed, rather than
+assuming the const references were the only way in.
+
+The model's state is now private behind const accessors. `make door` tries eight
+ways in, each of which must fail to compile, plus a control snippet that must
+compile. Its first version was a Makefile rule whose quoting broke every snippet
+-- so it failed them all for the wrong reason, and would have passed while
+proving nothing. The control exists to catch exactly that.
+
+### Pattern
+
+**A rule that is enforced only by convention is a rule someone will break
+without noticing.** Making it a compile error costs a const and a private.
+Checking the enforcement needs negative tests -- things that must NOT compile --
+and a negative test needs a positive control, or it cannot tell "correctly
+refused" from "broken for another reason".
+
+Mutation testing also found a step that could not fail -- picking an output
+that was already current -- the fourth appearance of the same shape: a check
+whose starting state already equals its expected result.

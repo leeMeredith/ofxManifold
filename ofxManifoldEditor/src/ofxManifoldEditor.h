@@ -7,3 +7,4 @@
 
 #include "ofxManifoldEditorSelection.h"
 #include "ofxManifoldEditorModel.h"
+#include "ofxManifoldEditorChartLayout.h"

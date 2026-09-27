@@ -251,6 +251,12 @@ class Editor:
         self.current = names[(i + 1) % len(names)]
         return (0, 0, f"current output: {self.current}")
 
+    def pick(self, name):
+        if name not in self.out_names():
+            return (0, 0, "")
+        self.current = name
+        return (0, 0, f"current output: {name}")
+
     def trim(self, db):
         if self.current is None:
             return (0, 0, "")
@@ -303,6 +309,42 @@ class Editor:
         self.derived = [["sub", 4, ["N", "O"]]]
         self.current = "front"
 
+    # ---- the fader layout ----------------------------------------------
+    def chart(self, x0, top, w, h):
+        """Geometry only, as a list; restated from the rules, not the C++."""
+        empty = not self.outputs and not self.derived
+        if empty:
+            return {"empty": True}
+        used = [o[1] for o in self.outputs] + [d[1] for d in self.derived]
+        channels = max(used) + 1
+        gap = 8.0
+        slots = channels + 1
+        bw = min(46.0, (w - gap * (slots + 1)) / max(slots, 1))
+        bars = []
+        for ch in range(channels):
+            x = x0 + gap + ch * (bw + gap)
+            kind, name, out = "unused", "", None
+            for o in self.outputs:
+                if o[1] == ch:
+                    kind, name, out = "output", o[0], o[0]
+            if kind == "unused":
+                for d in self.derived:
+                    if d[1] == ch:
+                        kind, name = "derived", d[0]
+            bars.append((ch, kind, x, name, out))
+        sx = x0 + gap + channels * (bw + gap) + gap
+        return {"empty": False, "bw": bw, "sx": sx, "tx": sx + bw + 16.0,
+                "bars": bars, "top": top, "h": h}
+
+    def output_at(self, lay, x, y):
+        if lay["empty"]:
+            return None
+        for ch, kind, bx, name, out in lay["bars"]:
+            if kind == "output" and bx <= x <= bx + lay["bw"] \
+                    and lay["top"] <= y <= lay["top"] + lay["h"]:
+                return out
+        return None
+
     # ---- the state, canonically ----------------------------------------
     def dump(self):
         parts = ["N " + " ".join(f"{n}@{fmt(p[0])},{fmt(p[1])}"
@@ -347,6 +389,7 @@ class Script:
             "bind":     lambda: e.bind(s), "silence": lambda: e.silence(s),
             "clear":    lambda: e.clear(s), "cycle": e.cycle,
             "trim":     lambda: e.trim(args[0]),
+            "pick":     lambda: e.pick(args[0]),
             "removeoutput": e.remove_current, "auto": e.toggle_auto,
             "example":  lambda: (e.example(), (1, 0, ""))[1],
             "empty":    lambda: (e.new_empty(), (1, 0, ""))[1],
@@ -356,12 +399,28 @@ class Script:
             argtxt = f" {fmt(args[0][0])} {fmt(args[0][1])}"
         elif op == "trim":
             argtxt = f" {fmt(args[0])}"
+        elif op == "pick":
+            argtxt = f" {args[0]}"
         self.out.append(f"DO {op}{argtxt}")
         self.out.append(f'EXPECT {res[0]} {res[1]} "{res[2]}"')
         self.out.append(f"STATE {e.dump()}")
         if op == "remove":           # the app clears after a removal
             self.sel, self.ordered = [], True
             self.out.append("SEL clear")
+
+    def chart(self, x0, top, w, h, clicks=()):
+        lay = self.ed.chart(x0, top, w, h)
+        self.out.append(f"CHART {fmt(x0)} {fmt(top)} {fmt(w)} {fmt(h)}")
+        if lay["empty"]:
+            self.out.append("EXPECTCHART EMPTY")
+        else:
+            bars = " ".join(f"{c}:{k}:{fmt(x)}:{n or '-'}"
+                            for c, k, x, n, _o in lay["bars"])
+            self.out.append(f"EXPECTCHART {fmt(lay['bw'])} {fmt(lay['sx'])} "
+                            f"{fmt(lay['tx'])} {bars}")
+        for x, y in clicks:
+            hit = None if lay["empty"] else self.ed.output_at(lay, x, y)
+            self.out.append(f"CLICK {fmt(x)} {fmt(y)} {hit or '-'}")
 
     def select(self, *names):
         self.sel, self.ordered = [names[0]], True
@@ -514,6 +573,10 @@ def build():
     t.clear_sel(); t.do("derived")          # nothing selected: refused
     t.select("n0", "n1"); t.do("derived")
     t.do("cycle"); t.do("trim", -1.0); t.do("trim", 20.0)
+    # Pick an output that is NOT already current. The first version picked
+    # out0 while out0 was current, so a pick that did nothing left the state
+    # exactly as expected and the step could not fail.
+    t.do("pick", "out1"); t.do("pick", "nothing")
     t.do("removeoutput")
     t.do("newoutput")
     t.end()
@@ -521,8 +584,33 @@ def build():
     t = Script(out, "example",
                "the example map, and its outputs, exactly")
     t.do("example")
+    # The window as it is today: 1024 x 640, chart 118 high from y 502.
+    t.chart(24, 502, 976, 118,
+            clicks=[(24 + 8 + 1 * 54 + 20, 560),     # inside left's bar
+                    (24 + 8 + 4 * 54 + 20, 560),     # the derived sub: no
+                    (24 + 8 + 5 * 54 + 8 + 20, 560), # the silence bar: no
+                    (24 + 8 + 0 * 54 + 20, 700),     # below the chart: no
+                    (24 + 8 + 0 * 54 + 50, 560)])    # in the gap: no
     t.select("B"); t.do("silence")
     t.do("empty")
+    t.chart(24, 502, 976, 118, clicks=[(60, 560)])
+    t.end()
+
+    t = Script(out, "chart_layout",
+               "the fader layout: a gap left by a deleted node's output shows "
+               "as an unused channel, and thirty outputs narrow every bar. "
+               "Round 2 changes this layout on purpose, and this vector with "
+               "it")
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)
+    t.select("n1"); t.do("remove")          # channel 1 left unused
+    t.chart(24, 502, 976, 118,
+            clicks=[(24 + 8 + 1 * 54 + 20, 560),     # unused: no
+                    (24 + 8 + 2 * 54 + 20, 560)])    # n2, channel 2
+    t.do("auto")
+    for _ in range(28):
+        t.do("newoutput")
+    t.chart(24, 502, 976, 118)
     t.end()
     return out
 

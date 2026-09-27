@@ -1,1 +1,2 @@
 ofxManifold
+ofxManifoldEditor
