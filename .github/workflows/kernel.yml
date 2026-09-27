@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -944,6 +944,105 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Clearing bindings does nothing must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '    void clearBindings(NodeID node) { links_.erase(node); }' \
+            '    void clearBindings(NodeID node) { (void)node; }'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Removed output leaves binding ids unshifted must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '                if (l.kind == DestKind::Output && l.id > id) --l.id;' \
+            '                (void)l;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Removed output leaves name lookup unshifted must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '            if (kv.second > id) --kv.second;' \
+            '            (void)kv;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Removed output keeps its bindings must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            '                            return l.kind == DestKind::Output && l.id == id;' \
+            '                            return false && l.id == id;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Editor delete leaves bindings unrenumbered must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    mapping.remapNodes(remap);' \
+            '    (void)remap;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Editor removes an output others still feed must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (t != InvalidTarget && !outputInUse(t)) {' \
+            '        if (t != InvalidTarget) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Editor names ignore outputs must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (manifold.findNode(nm) == InvalidNode\n            && mapping.findTarget(nm) == InvalidTarget) {' \
+            '        if (manifold.findNode(nm) == InvalidNode) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Editor box join ignores angle order must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    if (!sel.ordered()) {\n        std::vector<glm::vec2> pts;' \
+            '    if (false) {\n        std::vector<glm::vec2> pts;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Editor allows a duplicate region must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '            return refusal("those nodes already form a region", 2.0f);' \
+            '            (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Editor current output stranded by removal must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    else if (currentOutput > t) --currentOutput;' \
+            '    (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Box selection keeps click order must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
+            '    nodes_.push_back(id);\n    ordered_ = false;' \
+            '    nodes_.push_back(id);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp
 
       - name: Restored tree must be green
         run: |

@@ -235,7 +235,30 @@ works.
    somewhere, trim applied to routed share, derived output missing from the
    dense vector, remap not applied, duplicate channel accepted, version 1 files
    no longer byte-identical
-5. **Editor — NEXT.** Outputs panel, binding selected nodes, shapes, audition, bar
+5. **Editor — BUILT, awaiting the screen.** `example-editor`. Settled along
+   the way, each small and reversible: channels shown from 0, as
+   SuperCollider counts; trim shown in dB, stored linear, stepped by 1 dB;
+   binding weights set by keys for now (b binds, q adds a quarter-share of
+   silence per press, c clears), MIAP's right-click menu the natural upgrade;
+   space held to audition, v to lock it. Needed one kernel addition,
+   `Mapping::clearBindings()` -- nothing could remove a silence share -- with
+   a vector checking it clears exactly one node, and a gate. The example's
+   shapes and fills were checked off-screen against the comments describing
+   them, and outputs plus silence totals 1 at every audition point.
+
+   **Added after first use:** auto-output, on by default -- placing a node
+   makes an output with the node's NAME on the next free channel and binds it.
+   Needed `Mapping::removeOutput()`, which the kernel lacked: TargetIDs after
+   it shift down, every other output keeps its channel, and bindings to it go
+   exactly as `unbind()` removes one -- a node that fed it and others
+   renormalizes, one that fed only it goes silent. Deleting a node removes its
+   own output only if nothing else feeds it. The audition halo from
+   `example-spread`: green core for the share reaching outputs, grey rim for
+   silence, area in proportion to the share. Caught before handover: a new
+   node could be given the name of an output that outlived its node, leaving
+   it silently unbound; names now avoid output names too.
+
+   Originally listed: Outputs panel, binding selected nodes, shapes, audition, bar
    chart, saving the mapping as the second file
 
 ---

@@ -80,6 +80,17 @@ class Mapping:
         self.derived.append([name, channel, trim, mode, list(sources)])
         return len(self.derived) - 1
 
+    def remove_output(self, name):
+        """Links here name their destination, so nothing is renumbered; the
+        C++ holds ids and must shift them. Agreement is the test of that."""
+        self.outputs = [o for o in self.outputs if o[0] != name]
+        self.legacy.discard(name)
+        for node in list(self.links):
+            self.links[node] = [l for l in self.links[node]
+                                if not (l[0] == "output" and l[1] == name)]
+            if not self.links[node]:
+                del self.links[node]
+
     def bind(self, node, dest, weight=1.0):
         self.links.setdefault(node, []).append(("output", dest, weight))
 
@@ -373,6 +384,43 @@ def build():
                    f"EXPECT {lab} FRACTION {fmt(frac)}")
     out.append("")
 
+    out.append("# CLEARING a node removes every binding it has, silence included,")
+    out.append("# and leaves every OTHER node exactly as it was. Checked on the")
+    out.append("# partial node, whose silence share nothing else could remove,")
+    out.append("# and on a composite.")
+    for node in (0, 3):
+        others = [(n, *fade.label(n)) for n in range(5) if n != node]
+        exp = " ".join(f"{n}:{lab}:{fmt(fr)}" for n, lab, fr in others)
+        out.append(f"CLEARED cleared_fade_{node} ANALYTIC MAP fade NODE {node} "
+                   f"OTHERS {exp}")
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# REMOVING AN OUTPUT")
+    out.append("#")
+    out.append("# Other outputs keep their channels. A node that fed the removed")
+    out.append("# output and others renormalizes onto the others; a node that")
+    out.append("# fed ONLY it becomes null and its share silence -- exactly what")
+    out.append("# unbinding already does, so one rule, not two.")
+    out.append("#" + "-" * 68)
+    import copy as _copy
+    for nm, src, mapname, gone, wv in [
+            ("fade_out2", fade, "fade", "out.2", [(1, 0.5), (3, 0.5)]),
+            ("fade_out1", fade, "fade", "out.1", [(0, 0.4), (3, 0.6)]),
+            ("rig_first", rig, "rig", "L", [(0, 0.3), (1, 0.3), (3, 0.4)]),
+            ("rig_middle", rig, "rig", "R", [(1, 0.5), (3, 0.5)]),
+            ("legacy_first", legacy, "legacy", "out.1",
+             [(0, 0.3), (2, 0.4), (3, 0.3)])]:
+        m = _copy.deepcopy(src)
+        m.remove_output(gone)
+        rest = " ".join(f"{o[0]}:{o[1]}" for o in m.outputs)
+        out.append(f"REMOVEOUT removeout_{nm} ANALYTIC MAP {mapname} "
+                   f"OUTPUT {gone} IN {wv_s(wv)} "
+                   f"ROUTED {dense_s(m.by_channel(wv, False))} "
+                   f"SILENCE {fmt(m.silence(wv))} "
+                   f"LEVELS {dense_s(m.by_channel(wv, True))} REST {rest}")
+    out.append("")
+
     # ---- remapping after removal ----------------------------------------
     out.append("#" + "-" * 68)
     out.append("# REMAPPING AFTER NODE REMOVAL (decision E)")
@@ -541,7 +589,7 @@ def main():
         p = line.split()
         if p and p[0] in ("LEGACY", "RESOLVE", "REFUSE", "LABEL", "REMAP",
                           "MAPFILE", "MAPROUNDTRIP", "MAPVERSION",
-                          "MAPPRESERVE"):
+                          "MAPPRESERVE", "CLEARED", "REMOVEOUT"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

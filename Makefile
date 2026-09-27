@@ -20,6 +20,7 @@ SMO_RUN  := $(BUILD)/run_smoother
 REG_RUN  := $(BUILD)/run_regions
 GRD_RUN  := $(BUILD)/run_grids
 OUT_RUN  := $(BUILD)/run_outputs
+EDI_RUN  := $(BUILD)/run_editor
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -31,6 +32,7 @@ SMO_VEC  := tests/vectors/smoother.vec
 REG_VEC  := tests/vectors/regions.vec
 GRD_VEC  := tests/vectors/grids.vec
 OUT_VEC  := tests/vectors/outputs.vec
+EDI_VEC  := tests/vectors/editor.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -52,6 +54,15 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
 
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
+# The editor package: an addon of its own, outside ofxManifold's src/ so it is
+# never compiled into projects that want only the manifold (PLAN-editor.md A).
+EDITOR_H   := ofxManifoldEditor/src/ofxManifoldEditor.h \
+              ofxManifoldEditor/src/ofxManifoldEditorModel.h \
+              ofxManifoldEditor/src/ofxManifoldEditorSelection.h
+EDITOR_CPP := ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+              ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp
+EDITOR_INC := -Isrc -IofxManifoldEditor/src
+
 AUTHORING := src/authoring/ofxManifoldGrid.h \
              src/authoring/ofxManifoldRing.h
 
@@ -63,14 +74,14 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test reproducible bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs headers workflow wrapper vectors clean
+.PHONY: all test reproducible bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize test-trajectory test-smoother test-regions test-grids test-outputs
+      test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor
 	@echo ""
 	@echo "all suites green"
 
@@ -101,15 +112,20 @@ workflow:
 # point of src/core is that a stranger can drop it into their own project.
 headers:
 	@mkdir -p $(BUILD)
-	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES) $(AUTHORING); do \
+	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES) $(AUTHORING) $(EDITOR_H) $(EDITOR_CPP); do \
 		if grep -qE '^[[:space:]]*#[[:space:]]*include.*ofMain\.h' $$f; then \
 			echo "  $$f includes ofMain.h -- src/ofx is the only place that may"; \
 			exit 1; \
 		fi; \
 	done
-	@for h in $(CORE) $(INTERP) $(MAPPING) $(IO); do \
+	@for h in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES) $(AUTHORING); do \
 		printf '#include "%s"\nint main(){return 0;}\n' "$$h" > $(BUILD)/solo.cpp; \
 		$(CXX) $(CXXFLAGS) -I. -fsyntax-only $(BUILD)/solo.cpp \
+			|| { echo "  $$h does not compile standalone"; exit 1; }; \
+	done
+	@for h in $(EDITOR_H); do \
+		printf '#include "%s"\nint main(){return 0;}\n' "$$(basename $$h)" > $(BUILD)/solo.cpp; \
+		$(CXX) $(CXXFLAGS) $(EDITOR_INC) -fsyntax-only $(BUILD)/solo.cpp \
 			|| { echo "  $$h does not compile standalone"; exit 1; }; \
 	done
 	@python3 -c "import os,sys; \
@@ -151,6 +167,9 @@ test-grids: $(GRD_RUN) $(GRD_VEC)
 test-outputs: $(OUT_RUN) $(OUT_VEC)
 	@./$(OUT_RUN) $(OUT_VEC) tests/fixtures
 
+test-editor: $(EDI_RUN) $(EDI_VEC)
+	@./$(EDI_RUN) $(EDI_VEC)
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -165,6 +184,7 @@ vectors:
 	@python3 tests/ref/reference_regions.py
 	@python3 tests/ref/reference_grids.py
 	@python3 tests/ref/reference_outputs.py
+	@python3 tests/ref/reference_editor.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -187,6 +207,13 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
+
+$(EDI_RUN): tests/run_editor.cpp $(CORE) $(MAPPING) $(AUTHORING) $(EDITOR_H) $(EDITOR_CPP)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) $(EDITOR_INC) -o $@ tests/run_editor.cpp $(EDITOR_CPP)
+
+$(EDI_VEC): tests/ref/reference_editor.py
+	@python3 tests/ref/reference_editor.py
 
 $(OUT_RUN): tests/run_outputs.cpp $(CORE) $(MAPPING) $(IO)
 	@mkdir -p $(BUILD)

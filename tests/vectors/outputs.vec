@@ -114,6 +114,27 @@ LABEL label_legacy_2 ANALYTIC MAP legacy NODE 2 EXPECT composite FRACTION 1
 LABEL label_legacy_3 ANALYTIC MAP legacy NODE 3 EXPECT composite FRACTION 1
 LABEL label_legacy_4 ANALYTIC MAP legacy NODE 4 EXPECT null FRACTION 0
 
+# CLEARING a node removes every binding it has, silence included,
+# and leaves every OTHER node exactly as it was. Checked on the
+# partial node, whose silence share nothing else could remove,
+# and on a composite.
+CLEARED cleared_fade_0 ANALYTIC MAP fade NODE 0 OTHERS 1:terminal:1 2:null:0 3:partial:0.5 4:null:0
+CLEARED cleared_fade_3 ANALYTIC MAP fade NODE 3 OTHERS 0:partial:0.7 1:terminal:1 2:null:0 4:null:0
+
+#--------------------------------------------------------------------
+# REMOVING AN OUTPUT
+#
+# Other outputs keep their channels. A node that fed the removed
+# output and others renormalizes onto the others; a node that
+# fed ONLY it becomes null and its share silence -- exactly what
+# unbinding already does, so one rule, not two.
+#--------------------------------------------------------------------
+REMOVEOUT removeout_fade_out2 ANALYTIC MAP fade OUTPUT out.2 IN 1=0.5 3=0.5 ROUTED 0.1666666667 SILENCE 0.8333333333 LEVELS 0.1666666667 REST out.1:0
+REMOVEOUT removeout_fade_out1 ANALYTIC MAP fade OUTPUT out.1 IN 0=0.4 3=0.6 ROUTED 0 0.2 SILENCE 0.8 LEVELS 0 0.2 REST out.2:1
+REMOVEOUT removeout_rig_first ANALYTIC MAP rig OUTPUT L IN 0=0.3 1=0.3 3=0.4 ROUTED 0 0 0.7 0 0 0 0 1.2 0.4242640687 SILENCE 0.3 LEVELS 0 0 0.56 0 0 0 0 1.08 0.4242640687 REST R:2 C:5
+REMOVEOUT removeout_rig_middle ANALYTIC MAP rig OUTPUT R IN 1=0.5 3=0.5 ROUTED 0 0.5 0 0 0 0 0 0.5 0.5 SILENCE 0.5 LEVELS 0 0.5 0 0 0 0 0 0.45 0.5 REST L:1 C:5
+REMOVEOUT removeout_legacy_first ANALYTIC MAP legacy OUTPUT out.1 IN 0=0.3 2=0.4 3=0.3 ROUTED 0 0.2 0.275 0.225 SILENCE 0.3 LEVELS 0 0.2 0.275 0.225 REST out.2:1 out.3:2 out.sub:3
+
 #--------------------------------------------------------------------
 # REMAPPING AFTER NODE REMOVAL (decision E)
 #

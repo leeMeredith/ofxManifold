@@ -50,6 +50,7 @@ struct ofFile { static bool doesFileExist(const std::string&){return false;} };
 inline float ofDegToRad(float d){return d*0.01745329f;}
 inline float ofRadToDeg(float r){return r*57.2957795f;}
 #define OF_KEY_ESC 27
+#define OF_KEY_TAB 9
 #define OF_KEY_SHIFT 0x1
 #define OF_KEY_ALT 0x2
 inline bool ofGetKeyPressed(int){return false;}
@@ -75,6 +76,7 @@ struct ofBaseApp {
     virtual void mouseDragged(int,int,int){}
     virtual void mousePressed(int,int,int){}
     virtual void mouseReleased(int,int,int){}
+    virtual void keyReleased(int){}
     virtual void mouseMoved(int,int){}
     virtual void keyPressed(int){}
 };

@@ -38,6 +38,7 @@ public:
     void mouseDragged(int x, int y, int button) override;
     void mouseReleased(int x, int y, int button) override;
     void keyPressed(int key) override;
+    void keyReleased(int key) override;
 
 private:
     enum class GridKind { Free, Square, Triangular, Polar };
@@ -50,6 +51,28 @@ private:
     void save();
     void load();
     void removeSelected();
+
+    // ---- outputs (PLAN-outputs.md) ---------------------------------------
+    void newOutput();
+    void newDerived();
+    void bindSelection();
+    void silenceSelection();
+    void clearSelection();
+    void cycleOutput();
+    void trimCurrent(float dB);
+    void removeCurrentOutput();
+    bool outputInUse(ofxManifold::TargetID t) const;
+    void afterOutputRemoved(ofxManifold::TargetID t);
+    int  nextFreeChannel() const;
+    std::size_t outputCount(ofxManifold::NodeID id) const;
+
+    // ---- display ---------------------------------------------------------
+    void drawNode(ofxManifold::NodeID id) const;
+    void drawHalo(ofxManifold::NodeID id, float weight) const;
+    float nodeRadius(ofxManifold::NodeID id) const;
+    void drawChart();
+    void drawPanel();
+    bool auditioning() const { return auditionHeld || auditionLocked; }
     void unjoinSelected();
     void newEmptyMap();
     void adopt();                       // after the manifold is replaced
@@ -65,6 +88,36 @@ private:
     ofxManifold::Manifold2D                 manifold;
     std::unique_ptr<ofxManifoldRenderer>    renderer;
     ofxManifold::Grid                       grid;
+
+    // The second file: which outputs exist and what each node is bound to.
+    // Installation-specific, where the map is portable, so it is saved
+    // alongside it rather than inside it.
+    ofxManifold::Mapping                    mapping;
+    ofxManifold::TargetID                   currentOutput =
+        ofxManifold::InvalidTarget;
+
+    // Auto-output: placing a node also makes an output named after it, on
+    // the next free channel, and binds the node to it -- one fader per
+    // speaker without the keystrokes. On by default, since speaker layout is
+    // the common case; off for null rings, fade zones and parameter maps.
+    // The model is unchanged: this is a convenience over separate outputs.
+    bool autoOutput = true;
+
+    // Audition: a mode in which dragging moves the evaluation point and can
+    // NEVER move a node. Held with space, or locked on with v.
+    std::unique_ptr<ofxManifold::Evaluator> evaluator;
+    ofxManifold::Evaluation                 evaluation;
+    glm::vec2 auditionPoint{0.5f, 0.5f};
+    bool      auditionHeld   = false;
+    bool      auditionLocked = false;
+    bool      pressAudition  = false;   // this press began in audition
+    bool      pressInChart   = false;   // this press began on the chart
+
+    // The bar chart along the bottom, and where each output's bar landed so a
+    // click can pick it.
+    struct BarHit { float x, y, w, h; ofxManifold::TargetID id; };
+    std::vector<BarHit> barHits;
+    float chartTop = 0.0f;
 
     GridKind kind       = GridKind::Square;
     float    spacing    = 0.05f;

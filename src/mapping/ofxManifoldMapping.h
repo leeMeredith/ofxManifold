@@ -156,6 +156,46 @@ public:
         return id;
     }
 
+    // Remove an output.
+    //
+    // TargetIDs after it shift down by one. Channels are stored explicitly,
+    // so every other output keeps its channel: the channel vector loses the
+    // removed slot and nothing else moves, which is what an OSC receiver
+    // needs.
+    //
+    // Bindings to it are removed exactly as unbind() removes one. A node that
+    // fed it and other outputs renormalizes onto the others; a node that fed
+    // ONLY it becomes null, and its share becomes silence. Consistent with
+    // unbinding, rather than a second rule for the same situation.
+    //
+    // Returns false, changing nothing, for an id that does not exist.
+    bool removeOutput(TargetID id) {
+        if (id >= targetNames_.size()) return false;
+        targetsByName_.erase(targetNames_[id]);
+        targetNames_.erase(targetNames_.begin() + id);
+        channels_.erase(channels_.begin() + id);
+        trims_.erase(trims_.begin() + id);
+        for (auto& kv : targetsByName_) {
+            if (kv.second > id) --kv.second;
+        }
+        for (auto it = links_.begin(); it != links_.end();) {
+            auto& v = it->second;
+            v.erase(std::remove_if(v.begin(), v.end(),
+                        [&](const Link& l) {
+                            return l.kind == DestKind::Output && l.id == id;
+                        }),
+                    v.end());
+            for (auto& l : v) {
+                if (l.kind == DestKind::Output && l.id > id) --l.id;
+            }
+            // A node left with nothing is null; drop the empty entry so the
+            // mapping holds no trace of bindings that no longer exist.
+            if (v.empty()) it = links_.erase(it);
+            else ++it;
+        }
+        return true;
+    }
+
     int   targetChannel(TargetID id) const { return channels_[id]; }
     float targetTrim(TargetID id) const { return trims_[id]; }
     void  setTargetTrim(TargetID id, float trim) {
@@ -211,6 +251,12 @@ public:
         }
         links.push_back(Link{DestKind::Silence, InvalidTarget, weight});
     }
+
+    // Remove every binding a node has -- outputs AND silence -- leaving it
+    // null. unbind() removes one output binding; nothing removed a silence
+    // share, so a node given the wrong one could not be reset. The editor's
+    // "clear" is this.
+    void clearBindings(NodeID node) { links_.erase(node); }
 
     void unbind(NodeID node, TargetID target) {
         auto it = links_.find(node);

@@ -321,6 +321,87 @@ int main(int argc, char** argv) {
                        << " " << mp.outputFraction(NodeID(node));
             record(cls, name, ok, d.str());
 
+        } else if (kind == "REMOVEOUT") {
+            expectKeyword(in, "MAP");
+            std::string mn; in >> mn;
+            expectKeyword(in, "OUTPUT");
+            std::string gone; in >> gone;
+            expectKeyword(in, "IN");
+            const WeightVector w = readWeights(in);
+            expectKeyword(in, "ROUTED");
+            const std::vector<float> routed = readFloats(in);
+            expectKeyword(in, "SILENCE");
+            float silence; in >> silence;
+            expectKeyword(in, "LEVELS");
+            const std::vector<float> levels = readFloats(in);
+            expectKeyword(in, "REST");
+
+            Mapping mp = maps[mn];
+            bool ok = mp.removeOutput(mp.findTarget(gone));
+            if (!ok) d << "removal refused";
+            if (ok && mp.findTarget(gone) != InvalidTarget) {
+                ok = false; d << gone << " still findable";
+            }
+            // Survivors in order, each with its OWN channel still.
+            std::string tok;
+            TargetID t = 0;
+            while (ok && in >> tok) {
+                const std::size_t c = tok.find(':');
+                const std::string nm = tok.substr(0, c);
+                const int ch = std::stoi(tok.substr(c + 1));
+                if (t >= mp.targetCount() || mp.targetName(t) != nm
+                    || mp.targetChannel(t) != ch
+                    || mp.findTarget(nm) != t) {
+                    ok = false;
+                    d << "survivor " << t << " should be " << nm << " on "
+                      << ch;
+                }
+                ++t;
+            }
+            if (ok && t != mp.targetCount()) {
+                ok = false; d << "wrong number of survivors";
+            }
+            if (ok) ok = sameFloats(mp.toChannels(w), routed, "routed", d);
+            if (ok && !close(mp.silenceShare(w), silence)) {
+                ok = false;
+                d << "silence " << mp.silenceShare(w) << ", expected " << silence;
+            }
+            if (ok) ok = sameFloats(mp.toChannelLevels(w), levels, "levels", d);
+            // An id that does not exist changes nothing.
+            if (ok) {
+                const std::size_t before = mp.targetCount();
+                if (mp.removeOutput(TargetID(999)) || mp.targetCount() != before) {
+                    ok = false; d << "removing a missing id changed the mapping";
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "CLEARED") {
+            expectKeyword(in, "MAP");
+            std::string mn; in >> mn;
+            expectKeyword(in, "NODE");
+            unsigned node; in >> node;
+            expectKeyword(in, "OTHERS");
+            Mapping mp = maps[mn];
+            mp.clearBindings(NodeID(node));
+            bool ok = mp.nodeKind(NodeID(node)) == NodeKind::Null
+                   && mp.outputFraction(NodeID(node)) == 0.0f
+                   && mp.linkCount(NodeID(node)) == 0;
+            if (!ok) d << "node " << node << " still has bindings";
+            std::string tok;
+            while (ok && in >> tok) {
+                const std::size_t a = tok.find(':'), b = tok.find(':', a + 1);
+                const NodeID n = NodeID(std::stoul(tok.substr(0, a)));
+                const std::string lab = tok.substr(a + 1, b - a - 1);
+                const float fr = std::stof(tok.substr(b + 1));
+                if (kindName(mp.nodeKind(n)) != lab
+                    || !close(mp.outputFraction(n), fr)) {
+                    ok = false;
+                    d << "clearing node " << node << " changed node " << n;
+                }
+            }
+            record(cls, name, ok, d.str());
+
         } else if (kind == "MAPPRESERVE") {
             // Everything must survive a save and reload -- the check the L/R
             // swap and the dropped unbound output would have failed.

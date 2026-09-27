@@ -177,7 +177,15 @@ at the renderer at density.
 place a node on the active grid, drag a box or shift-click to select, drag the
 selection to move it as one operation, press `f` to join the selection into a
 region, delete to remove nodes, `u` to unjoin, `x` for an empty map, `s` and `l`
-to save and load. Free, square, triangular and polar grids,
+to save and load. Outputs: `o` makes one, `b` binds the selection to it, `q`
+sends part of a node's share to silence, `d` makes a derived output. Node shape
+shows what a node does with its share -- circle for one output, triangle for
+several, hollow square for none -- and its fill shows how much reaches an
+output. Hold space to audition: dragging moves a listening point and never a
+node, and the chart along the bottom shows every output, and silence, live,
+while a halo on each node shows its share -- green where it reaches an output,
+grey where it goes to silence. With auto-output on (the default, `p` to
+toggle), each new node gets its own output; `O` removes the current one. Free, square, triangular and polar grids,
 all rotatable; hold alt for a free-hand drag. Drag a corner of the quad
 across its opposite edge and the move is refused, because the ring would cross
 itself.
@@ -235,7 +243,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-577 vectors across ten suites, plus 93 mutation gates that introduce known
+595 vectors across eleven suites, plus 104 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform
