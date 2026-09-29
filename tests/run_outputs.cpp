@@ -321,6 +321,47 @@ int main(int argc, char** argv) {
                        << " " << mp.outputFraction(NodeID(node));
             record(cls, name, ok, d.str());
 
+        } else if (kind == "SETFILL") {
+            expectKeyword(in, "MAP");
+            std::string mn; in >> mn;
+            expectKeyword(in, "NODE");
+            unsigned node; in >> node;
+            expectKeyword(in, "TO");
+            float f; in >> f;
+            expectKeyword(in, "RESULT");
+            int want; in >> want;
+            expectKeyword(in, "LINKS");
+            std::size_t wantLinks; in >> wantLinks;
+            expectKeyword(in, "FRACTION");
+            float frac; in >> frac;
+            expectKeyword(in, "IN");
+            const WeightVector w = readWeights(in);
+            expectKeyword(in, "ROUTED");
+            const std::vector<float> routed = readFloats(in);
+            expectKeyword(in, "SILENCE");
+            float silence; in >> silence;
+
+            Mapping mp = maps[mn];
+            const bool got = mp.setOutputFraction(NodeID(node), f);
+            bool ok = (got ? 1 : 0) == want;
+            if (!ok) d << "setOutputFraction returned " << got;
+            if (ok && mp.linkCount(NodeID(node)) != wantLinks) {
+                ok = false;
+                d << "node has " << mp.linkCount(NodeID(node))
+                  << " bindings, expected " << wantLinks;
+            }
+            if (ok && !close(mp.outputFraction(NodeID(node)), frac)) {
+                ok = false;
+                d << "fill " << mp.outputFraction(NodeID(node))
+                  << ", expected " << frac;
+            }
+            if (ok) ok = sameFloats(mp.toChannels(w), routed, "routed", d);
+            if (ok && !close(mp.silenceShare(w), silence)) {
+                ok = false;
+                d << "silence " << mp.silenceShare(w) << ", expected " << silence;
+            }
+            record(cls, name, ok, d.str());
+
         } else if (kind == "REMOVEOUT") {
             expectKeyword(in, "MAP");
             std::string mn; in >> mn;

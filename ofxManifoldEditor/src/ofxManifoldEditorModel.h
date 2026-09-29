@@ -85,7 +85,16 @@ public:
     Result newOutput();
     Result newDerived(const Selection& sel);
     Result bind(const Selection& sel);
-    Result silence(const Selection& sel);
+    // Step each selected node's fill: how much of its share reaches its
+    // outputs. `direction` +1 up, -1 down; 5% a step, or 1% when `fine`.
+    // A step lands on the next multiple of its size in its direction, so a
+    // node fine-tuned to 73% goes to 70% on a coarse step down, not 68%. The
+    // floor is 1%: fully silent is clear(). The same step for every shape --
+    // a node feeding four outputs moves exactly as far as one feeding one.
+    Result stepFill(const Selection& sel, int direction, bool fine);
+
+    // Bind each selected node to EVERY output, equally, keeping its fill.
+    Result bindAll(const Selection& sel);
     Result clear(const Selection& sel);
     Result cycleOutput();
 

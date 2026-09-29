@@ -276,7 +276,7 @@ EXPECT 1 0 "unjoined 1 region"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
 ENDEDIT
 
-# outputs: new, derived, bind, silence, clear, cycle, trim, remove. Silence adds a QUARTER SHARE per press today; round 2 replaces it with 5% fill steps and changes this vector
+# outputs: new, derived, bind, silence, clear, cycle, trim, remove. Round 2 replaced the quarter share of silence per press with fill steps, and this vector changed with it
 EDIT outputs ANALYTIC
 GRID FREE
 DO auto
@@ -307,49 +307,58 @@ DO bind
 EXPECT 1 0 "bound 2 to out1"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n1>out1:1 | D  | C out1 | A 0
 SEL only n0
-DO silence
-EXPECT 1 0 "added a silence share -- the fill drops"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.25 n1>out1:1 | D  | C out1 | A 0
-DO silence
-EXPECT 1 0 "added a silence share -- the fill drops"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>out1:1 | D  | C out1 | A 0
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 n1>out1:1 | D  | C out1 | A 0
+DO fill -1 0
+EXPECT 1 0 "fill 90%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.222222 n1>out1:1 | D  | C out1 | A 0
+DO fill -1 1
+EXPECT 1 0 "fill 89%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.247191 n1>out1:1 | D  | C out1 | A 0
+DO fill 1 1
+EXPECT 1 0 "fill 90%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.222222 n1>out1:1 | D  | C out1 | A 0
+DO fill 1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 n1>out1:1 | D  | C out1 | A 0
 SEL only n1
 DO clear
 EXPECT 1 0 "cleared bindings on 1"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 | D  | C out1 | A 0
-DO silence
-EXPECT 1 0 "silence on a node with no output: still silent"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D  | C out1 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D  | C out1 | A 0
+DO fill -1 0
+EXPECT 0 1 "no output to fill -- bind the node first"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D  | C out1 | A 0
 SEL clear
 DO derived
 EXPECT 0 1 "select the nodes a derived output should sum"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D  | C out1 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D  | C out1 | A 0
 SEL only n0
 SEL toggle n1
 DO derived
 EXPECT 1 0 "derived sum2 on channel 2, sum of 2"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out1 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out1 | A 0
 DO cycle
 EXPECT 0 0 "current output: out0"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out0 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:1 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out0 | A 0
 DO trim -1
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:0.891251 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out0 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:0.891251 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out0 | A 0
 DO trim 20
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out0 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out0 | A 0
 DO pick out1
 EXPECT 0 0 "current output: out1"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out1 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out1 | A 0
 DO pick nothing
 EXPECT 0 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out1 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>out1:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out1 | A 0
 DO removeoutput
 EXPECT 1 1 "removed output out1 -- 1 node no longer reach it"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 | L n0>out0:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out0 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 | L n0>out0:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out0 | A 0
 DO newoutput
 EXPECT 1 0 "new output out1 on channel 1 -- select nodes and press b"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>~:0.5 n1>~:0.25 | D sum2:2:n0,n1 | C out1 | A 0
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O out0:0:3.98107 out1:1:1 | L n0>out0:1 n0>~:0.105263 | D sum2:2:n0,n1 | C out1 | A 0
 ENDEDIT
 
 # the example map, and its outputs, exactly
@@ -366,15 +375,277 @@ CLICK 330 560 -
 CLICK 52 700 -
 CLICK 82 560 -
 SEL only B
-DO silence
-EXPECT 1 0 "added a silence share -- the fill drops"
-STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1.25 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+DO fill 1 0
+EXPECT 1 0 "fill 55%"
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:0.818182 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | A 1
 CHART 24 502 976 118
 EXPECTCHART EMPTY
 CLICK 60 560 -
+ENDEDIT
+
+# THE REPORTED PROBLEM: a quarter share of silence stepped a triangle feeding four outputs far less than a circle feeding one. A fill step now moves every shape by exactly 5%
+EDIT fill_same_step_every_shape ANALYTIC
+GRID FREE
+DO example
+EXPECT 1 0 ""
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+SEL only O
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 O>~:0.210526 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+SEL only N
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 O>~:0.210526 N>front:1 N>~:0.0526316 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+SEL only C
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 O>~:0.210526 N>front:1 N>~:0.0526316 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 C>~:0.105263 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+ENDEDIT
+
+# fine steps of 1%, then a coarse step lands on the next multiple of 5 in its direction: 97% down gives 95%, not 92%. A step from exactly 95% moves a whole step. The floor is 1% and the ceiling 100%; a step at either end changes nothing
+EDIT fill_steps_land_on_round_numbers ANALYTIC
+GRID FREE
+DO place 0.5 0.5
+EXPECT 1 0 ""
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+SEL only n0
+DO fill -1 1
+EXPECT 1 0 "fill 99%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.010101 | D  | C n0 | A 1
+DO fill -1 1
+EXPECT 1 0 "fill 98%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.0204082 | D  | C n0 | A 1
+DO fill -1 1
+EXPECT 1 0 "fill 97%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.0309278 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.0526316 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 90%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.111111 | D  | C n0 | A 1
+DO fill 1 1
+EXPECT 1 0 "fill 91%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.0989011 | D  | C n0 | A 1
+DO fill 1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.0526316 | D  | C n0 | A 1
+DO fill 1 0
+EXPECT 1 0 "fill 100%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO fill 1 0
+EXPECT 0 0 "fill 100%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.0526316 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 90%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.111111 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 85%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.176471 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 80%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.25 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 75%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.333333 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 70%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.428571 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 65%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.538462 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 60%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.666667 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 55%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:0.818182 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 50%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:1 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 45%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:1.22222 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 40%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:1.5 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 35%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:1.85714 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 30%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:2.33333 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 25%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:3 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 20%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:4 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 15%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:5.66667 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 10%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:9 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 5%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:19 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 1%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:99 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 0 0 "fill 1%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:99 | D  | C n0 | A 1
+DO fill -1 0
+EXPECT 0 0 "fill 1%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:99 | D  | C n0 | A 1
+DO fill -1 1
+EXPECT 0 0 "fill 1%"
+STATE N n0@0.5,0.5 | R  | O n0:0:1 | L n0>n0:1 n0>~:99 | D  | C n0 | A 1
+ENDEDIT
+
+# shift-B binds a node to EVERY output equally, replacing its output bindings rather than adding to them -- adding would feed the output it already had double -- and keeps its fill
+EDIT bind_to_every_output ANALYTIC
+GRID FREE
+SEL only n0
+DO bindall
+EXPECT 0 1 "no output yet -- press o to make one"
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO place 0.2 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO place 0.8 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.5 0.8
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n0
+DO bindall
+EXPECT 1 0 "bound 1 node to every output (3)"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.157895 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO fill -1 0
+EXPECT 1 0 "fill 90%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO bindall
+EXPECT 1 0 "bound 1 node to every output (3)"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n1
+SEL toggle n2
+DO bindall
+EXPECT 1 0 "bound 2 nodes to every output (3)"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n0:1 n1>n1:1 n1>n2:1 n2>n0:1 n2>n1:1 n2>n2:1 | D  | C n2 | A 1
+ENDEDIT
+
+# undo and redo over whole-state snapshots. Refusals and cursor moves are never steps; a new action discards the redo steps; undoing a delete restores the node, its output and its bindings, renumbering and all
+EDIT undo_redo ANALYTIC
+GRID FREE
+DO undo
+EXPECT 0 1 "nothing to undo"
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO place 0.2 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO place 0.8 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.5 0.8
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+DO join
+EXPECT 1 0 "joined 3 nodes in click order"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO undo
+EXPECT 1 0 "undid join"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO redo
+EXPECT 1 0 "redid place"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO place 0.2004 0.2
+EXPECT 0 1 "a node is already there"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO cycle
+EXPECT 0 0 "current output: n0"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.9 0.9
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO redo
+EXPECT 0 1 "nothing to redo"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n0
+DO remove
+EXPECT 1 0 "removed 1 node, and 1 output"
+STATE N n1@0.8,0.2 n2@0.9,0.9 | R  | O n1:1:1 n2:2:1 | L n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL clear
+DO undo
+EXPECT 1 0 "undid delete"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n1
+DO move n1 0.7 0.3
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.7,0.3 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO undo
+EXPECT 1 0 "undid move"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO undo
+EXPECT 1 0 "undid new map"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+ENDEDIT
+
+# beyond the limit the OLDEST step goes, never the newest
+EDIT history_limit ANALYTIC
+GRID FREE
+HISTORY 3
+DO place 0.1 0.1
+EXPECT 1 0 ""
+STATE N n0@0.1,0.1 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO place 0.3 0.1
+EXPECT 1 0 ""
+STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.5 0.1
+EXPECT 1 0 ""
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO place 0.7 0.1
+EXPECT 1 0 ""
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+DO place 0.9 0.1
+EXPECT 1 0 ""
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 n4@0.9,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n4 | A 1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO undo
+EXPECT 0 1 "nothing to undo"
+STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
 ENDEDIT
 
 # the fader layout: a gap left by a deleted node's output shows as an unused channel, and thirty outputs narrow every bar. Round 2 changes this layout on purpose, and this vector with it

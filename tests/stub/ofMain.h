@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <cmath>
+#include <functional>
 #include <cstdlib>
 #include <algorithm>
 #include <glm/vec2.hpp>
@@ -53,6 +54,7 @@ inline float ofRadToDeg(float r){return r*57.2957795f;}
 #define OF_KEY_TAB 9
 #define OF_KEY_SHIFT 0x1
 #define OF_KEY_ALT 0x2
+#define OF_KEY_COMMAND 0x4
 inline bool ofGetKeyPressed(int){return false;}
 inline void ofDrawBitmapString(const std::string&,float,float){}
 inline void ofBeginShape(){} inline void ofEndShape(bool){}

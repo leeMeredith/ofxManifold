@@ -299,6 +299,40 @@ public:
         return outs == 1 ? NodeKind::Terminal : NodeKind::Composite;
     }
 
+    // Set how much of a node's share reaches its outputs, to exactly `f`.
+    //
+    // Only the node's silence share changes; its output bindings are left as
+    // they are, so the balance BETWEEN its outputs is kept exactly. A node
+    // feeding two speakers equally still feeds them equally, just less.
+    //
+    // f of 1 or more removes silence altogether. Returns false, changing
+    // nothing, for a node with no output binding -- there is nothing to fill
+    // -- and for f of 0 or less: fully silent is clearBindings(), which is
+    // what a null node IS, rather than a silence share infinitely large.
+    //
+    // bindSilence() ADDS a share; this SETS the result. The editor's fill keys
+    // need the second: a fixed silence amount lowers a node feeding four
+    // outputs far less than one feeding one, which is what made the old key
+    // step triangles more slowly than circles.
+    bool setOutputFraction(NodeID node, float f) {
+        auto it = links_.find(node);
+        if (it == links_.end() || f <= 0.0f) return false;
+        float outW = 0.0f;
+        for (const auto& l : it->second) {
+            if (l.kind == DestKind::Output) outW += l.weight;
+        }
+        if (outW <= 0.0f) return false;
+        auto& v = it->second;
+        v.erase(std::remove_if(v.begin(), v.end(),
+                    [](const Link& l) { return l.kind == DestKind::Silence; }),
+                v.end());
+        if (f < 1.0f) {
+            v.push_back(Link{DestKind::Silence, InvalidTarget,
+                             outW * (1.0f - f) / f});
+        }
+        return true;
+    }
+
     float outputFraction(NodeID node) const {
         auto it = links_.find(node);
         if (it == links_.end()) return 0.0f;

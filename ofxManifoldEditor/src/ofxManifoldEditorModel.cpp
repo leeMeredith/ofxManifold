@@ -368,21 +368,66 @@ Result Model::bind(const Selection& sel) {
                    + mapping_.targetName(currentOutput_), 2.0f);
 }
 
-// A quarter-share of silence per press. On a node with no output it changes
-// nothing it would output -- silence alone is null -- so that case says so.
-//
-// Round 2 replaces this with fill steps of 5% for every shape: a fixed amount
-// of silence lowers a node feeding four outputs far less than one feeding one.
-Result Model::silence(const Selection& sel) {
+Result Model::stepFill(const Selection& sel, int direction, bool fine) {
     if (sel.empty()) return Result{};
-    bool anyOutput = false;
+    const float unit = fine ? 0.01f : 0.05f;
+    bool any = false, moved = false;
+    float lo = 2.0f, hi = -1.0f;
     for (NodeID id : sel.nodes()) {
-        mapping_.bindSilence(id, 0.25f);
-        if (outputCount(id) > 0) anyOutput = true;
+        if (outputCount(id) == 0) continue;
+        any = true;
+        const float before = mapping_.outputFraction(id);
+
+        // Position in steps. A value already on a step -- within float noise
+        // -- moves a whole step; one between steps moves to the next step in
+        // its direction. Without the snap, 70% read back as 69.99999% and a
+        // step down would land on 65%... from 69.99999, skipping 70.
+        float k = before / unit;
+        const float kr = std::round(k);
+        if (std::fabs(k - kr) < 1e-3f) k = kr;
+        const float next = (k == kr) ? kr + float(direction)
+                         : (direction > 0 ? std::ceil(k) : std::floor(k));
+        const float f = std::min(1.0f, std::max(0.01f, next * unit));
+
+        mapping_.setOutputFraction(id, f);
+        const float after = mapping_.outputFraction(id);
+        if (std::fabs(after - before) > 1e-6f) moved = true;
+        lo = std::min(lo, after);
+        hi = std::max(hi, after);
     }
-    return changed(anyOutput ? "added a silence share -- the fill drops"
-                             : "silence on a node with no output: still silent",
-                   2.5f);
+    if (!any) {
+        return refusal("no output to fill -- bind the node first", 2.5f);
+    }
+    auto pct = [](float v) { return std::to_string(int(std::lround(v * 100.0f))); };
+    Result r;
+    r.changed = moved;
+    r.message = "fill " + pct(lo) + "%"
+              + (pct(lo) == pct(hi) ? std::string() : " to " + pct(hi) + "%");
+    r.seconds = 2.0f;
+    return r;
+}
+
+// Binding ADDS weight, so binding a node already feeding one output to every
+// output would feed that one double. This REPLACES the node's output bindings
+// with one equal binding per output, then restores its fill -- "this node
+// feeds everything, equally, as loudly as before".
+Result Model::bindAll(const Selection& sel) {
+    if (mapping_.targetCount() == 0) {
+        return refusal("no output yet -- press o to make one", 2.5f);
+    }
+    if (sel.empty()) return Result{};
+    for (NodeID id : sel.nodes()) {
+        const float fill = outputCount(id) > 0 ? mapping_.outputFraction(id)
+                                               : 1.0f;
+        mapping_.clearBindings(id);
+        for (TargetID t = 0; t < mapping_.targetCount(); ++t) {
+            mapping_.bind(id, t);
+        }
+        if (fill < 1.0f) mapping_.setOutputFraction(id, fill);
+    }
+    return changed("bound " + plural(sel.size(), " node", " nodes")
+                   + " to every output (" + std::to_string(mapping_.targetCount())
+                   + ")", 2.5f);
 }
 
 Result Model::clear(const Selection& sel) {

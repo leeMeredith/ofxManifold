@@ -59,10 +59,12 @@ MAPPING  := src/mapping/ofxManifoldMapping.h
 EDITOR_H   := ofxManifoldEditor/src/ofxManifoldEditor.h \
               ofxManifoldEditor/src/ofxManifoldEditorModel.h \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.h \
-              ofxManifoldEditor/src/ofxManifoldEditorChartLayout.h
+              ofxManifoldEditor/src/ofxManifoldEditorChartLayout.h \
+              ofxManifoldEditor/src/ofxManifoldEditorHistory.h
 EDITOR_CPP := ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
-              ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+              ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+              ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
 EDITOR_INC := -Isrc -IofxManifoldEditor/src
 
 AUTHORING := src/authoring/ofxManifoldGrid.h \

@@ -126,6 +126,51 @@ each a `.h` and a `.cpp`:
 
 ### Round 2 — the features
 
+**Fill keys, amended.** Shift was to mean both "up" (`Q`) and, as requested
+later, "finer" -- but `Q` IS shift held with `q`. So direction gets its own
+keys and shift means one thing everywhere: `q` down and `w` up by 5%, shifted
+by 1%. Arrows stay free, since in most editors they nudge the selection.
+Coarse steps land on multiples of 5 in their direction (73% then `q` gives
+70%, not 68%); the floor is 1%, one fine step above silent -- fully silent is
+`c`, which is what a null node is.
+
+**Slices:**
+
+| slice | what |
+|---|---|
+| 2a | fill steps, ⇧B, undo and redo, placement leaves nothing selected, a click on empty space clears a selection — **DONE** |
+| 2b | named saves as a pair through the Mac dialogs |
+| 2c | window at 90% of the screen, full screen, fader narrowing, scaled text |
+| 2d | keys grouped and lit when usable; view sections lifted into files |
+
+**Slice 2a, done.** Kernel: `Mapping::setOutputFraction()` sets a node's fill
+exactly by changing only its silence share, so the balance between its outputs
+is kept. Package: `Model::stepFill()` and `bindAll()` replace the quarter-share
+`silence()`, and the vectors that pinned it changed in the same commit, as
+round 1 promised. `History`, snapshots of the model, with `apply()` recording
+at the one door. 17 scripts, 192 steps, all passing on the first run; 11 of 11
+mutations caught; the app wired through one `act()` helper.
+
+Found along the way:
+
+- **Float noise skipped round numbers.** 70% reads back as 69.99999%, so a
+  plain "floor to the next 5%" step went to 65%. Values within 1e-3 of a step
+  are treated as on it. Caught by mutation, both ways.
+- **A full fill left a zero-weight silence binding.** It behaves identically
+  but forced the mapping file to version 2, since any silence binding needs it.
+  The fill vectors checked behaviour and not bindings; they now count bindings.
+- **⇧B had to REPLACE bindings.** Binding adds weight, so binding a node
+  already feeding one output to every output would feed that one double.
+- **Startup would have been undoable.** Reopening the last save records an
+  "open", so command-Z straight after launch would swap the saved map for the
+  example. History is cleared once the app is ready.
+
+Every model call in the app not wrapped in `act()` was listed and accounted
+for: the drag (one step, recorded at release), opening a file (recorded just
+before), and three that change no map data.
+
+Originally listed:
+
 Placement leaves nothing selected; a click on empty space with a selection
 clears it; undo and redo; `q`/`Q` in 5% fill steps for every shape; ⇧B binds to
 every output; named saves as a pair through the Mac dialogs; faders narrowing

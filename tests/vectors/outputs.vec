@@ -136,6 +136,23 @@ REMOVEOUT removeout_rig_middle ANALYTIC MAP rig OUTPUT R IN 1=0.5 3=0.5 ROUTED 0
 REMOVEOUT removeout_legacy_first ANALYTIC MAP legacy OUTPUT out.1 IN 0=0.3 2=0.4 3=0.3 ROUTED 0 0.2 0.275 0.225 SILENCE 0.3 LEVELS 0 0.2 0.275 0.225 REST out.2:1 out.3:2 out.sub:3
 
 #--------------------------------------------------------------------
+# SETTING A NODE'S FILL
+#
+# Only the silence share changes, so the balance between a
+# node's outputs is kept: the composite below feeds out.1 and
+# out.2 equally before and after. Refused for a node with no
+# output, and for a fill of zero -- fully silent is clearing.
+#--------------------------------------------------------------------
+SETFILL setfill_partial_down ANALYTIC MAP fade NODE 0 TO 0.25 RESULT 1 LINKS 2 FRACTION 0.25 IN 0=1 ROUTED 0.25 0 SILENCE 0.75
+SETFILL setfill_composite_up ANALYTIC MAP fade NODE 3 TO 0.9 RESULT 1 LINKS 3 FRACTION 0.9 IN 3=1 ROUTED 0.45 0.45 SILENCE 0.1
+SETFILL setfill_terminal_full ANALYTIC MAP fade NODE 1 TO 1 RESULT 1 LINKS 1 FRACTION 1 IN 1=1 ROUTED 0 1 SILENCE 0
+SETFILL setfill_partial_to_full ANALYTIC MAP fade NODE 0 TO 1 RESULT 1 LINKS 1 FRACTION 1 IN 0=1 ROUTED 1 0 SILENCE 0
+SETFILL setfill_terminal_to_one_percent ANALYTIC MAP fade NODE 1 TO 0.01 RESULT 1 LINKS 2 FRACTION 0.01 IN 1=1 ROUTED 0 0.01 SILENCE 0.99
+SETFILL setfill_silence_only_refused ANALYTIC MAP fade NODE 2 TO 0.5 RESULT 0 LINKS 1 FRACTION 0 IN 2=1 ROUTED 0 0 SILENCE 1
+SETFILL setfill_unbound_refused ANALYTIC MAP fade NODE 4 TO 0.5 RESULT 0 LINKS 0 FRACTION 0 IN 4=1 ROUTED 0 0 SILENCE 1
+SETFILL setfill_zero_refused ANALYTIC MAP fade NODE 0 TO 0 RESULT 0 LINKS 2 FRACTION 0.7 IN 0=1 ROUTED 0.7 0 SILENCE 0.3
+
+#--------------------------------------------------------------------
 # REMAPPING AFTER NODE REMOVAL (decision E)
 #
 # removeNodes() renumbers nodes (D-020). Bindings held by NodeID

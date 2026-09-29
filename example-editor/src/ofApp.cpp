@@ -20,6 +20,10 @@ void ofApp::setup() {
     model.loadExample();
     adopt();
     if (ofFile::doesFileExist("editor.json")) load();
+    // Undo starts from here. Reopening the last save above records an "open",
+    // and without this, command-Z straight after launch would swap the saved
+    // map for the example that preceded it.
+    history.clear();
     rebuildGrid();
 }
 
@@ -103,6 +107,28 @@ void ofApp::show(const Result& r) {
     if (r.refused) refusedFlash = 0.35f;
 }
 
+void ofApp::act(const std::string& label,
+                const std::function<Result(Model&)>& op) {
+    show(history.apply(model, label, op));
+}
+
+// Undo and redo restore a whole snapshot. NodeIDs in the selection may name
+// different nodes afterwards, so it clears, as after a delete; any drag in
+// progress is dropped.
+void ofApp::undo() {
+    show(history.undo(model));
+    selection.clear();
+    dragging = false;
+    anchor = InvalidNode;
+}
+
+void ofApp::redo() {
+    show(history.redo(model));
+    selection.clear();
+    dragging = false;
+    anchor = InvalidNode;
+}
+
 // After the map is replaced wholesale -- the example, a new map, a file. The
 // renderer and evaluator are rebuilt, and the selection cleared, since it
 // holds NodeIDs of a map that no longer exists.
@@ -118,13 +144,11 @@ void ofApp::adopt() {
     anchor = InvalidNode;
 }
 
-// Place a node where the click landed. The placed node becomes the selection,
-// as it has so far; round 2 changes that on purpose (placement leaves nothing
-// selected, so a row of nodes is click, click, click).
+// Place a node where the click landed. Placement leaves nothing selected --
+// so laying out a row of speakers is click, click, click, and selecting is a
+// separate act: click a node, or drag a box.
 void ofApp::placeAt(glm::vec2 p) {
-    NodeID placed = InvalidNode;
-    show(model.place(p, grid, &placed));
-    if (placed != InvalidNode) selection.only(placed);
+    act("place", [&](Model& m) { return m.place(p, grid); });
 }
 
 NodeID ofApp::nodeAt(glm::vec2 screen) const {
@@ -163,6 +187,10 @@ void ofApp::mousePressed(int x, int y, int) {
         // select) is not known until release.
         pressingEmpty = true;
         pressScreen = boxScreen = screen;
+        // With nodes selected, a click on empty space only DESELECTS; it does
+        // not also place a node. Noted now, acted on at release, since a drag
+        // from here is still a box select.
+        pressHadSelection = !selection.empty();
         if (!shift) selection.clear();
         return;
     }
@@ -187,6 +215,10 @@ void ofApp::mousePressed(int x, int y, int) {
         dragFrom.push_back(manifold.node(id).position);
     }
     anchorAddr = grid.snap(anchorPos).address;
+    // A drag is one undo step, not one per frame: the state it began from is
+    // kept here and recorded at release, if any part of the drag landed.
+    dragBefore = model;
+    dragMoved = false;
 }
 
 void ofApp::mouseDragged(int x, int y, int) {
@@ -232,7 +264,9 @@ void ofApp::mouseDragged(int x, int y, int) {
     }
     // One operation, all or nothing, checked against FINAL shapes. On refusal
     // nothing changes, so the selection stays at its last valid position.
-    show(model.move(moves));
+    const Result r = model.move(moves);
+    if (r.changed) dragMoved = true;
+    show(r);
 }
 
 void ofApp::mouseReleased(int x, int y, int) {
@@ -242,9 +276,10 @@ void ofApp::mouseReleased(int x, int y, int) {
 
     if (pressingEmpty) {
         pressingEmpty = false;
-        // Barely moved: it was a click, so place a node.
+        // Barely moved: a click. It places a node only if nothing was
+        // selected when it began -- otherwise it was a deselect.
         if (glm::distance(screen, pressScreen) < 4.0f) {
-            placeAt(renderer->toManifold(screen));
+            if (!pressHadSelection) placeAt(renderer->toManifold(screen));
             return;
         }
         // Otherwise a box: every node inside it joins the selection.
@@ -262,11 +297,20 @@ void ofApp::mouseReleased(int x, int y, int) {
         return;
     }
 
+    if (dragging && dragMoved) history.record(dragBefore, "move");
     dragging = false;
     anchor = InvalidNode;
 }
 
 void ofApp::keyPressed(int key) {
+    // ---- undo, redo: command-Z and shift-command-Z ----
+    const bool command = ofGetKeyPressed(OF_KEY_COMMAND);
+    if (command && (key == 'z' || key == 'Z' || key == 26)) {
+        if (key == 'Z' || ofGetKeyPressed(OF_KEY_SHIFT)) redo();
+        else undo();
+        return;
+    }
+
     // ---- grid tool ----
     bool regrid = true;
     if      (key == '1') kind = GridKind::Free;
@@ -291,29 +335,51 @@ void ofApp::keyPressed(int key) {
     if (key == OF_KEY_ESC) selection.clear();
 
     // ---- the map ----
-    if (key == 'x') { model.newEmpty(); adopt();
-                      show(Result{false, false,
-                                  "new empty map -- click to place nodes",
-                                  3.0f}); }
-    if (key == 'e') { model.loadExample(); adopt(); }
+    if (key == 'x') {
+        act("new map", [](Model& m) {
+            m.newEmpty();
+            return Result{true, false,
+                          "new empty map -- click to place nodes", 3.0f};
+        });
+        adopt();
+    }
+    if (key == 'e') {
+        act("example map", [](Model& m) {
+            m.loadExample();
+            return Result{true, false, "", 0.0f};
+        });
+        adopt();
+    }
     if (key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) {
         // Removal renumbers NodeIDs; the selection holds them, so it clears.
-        show(model.remove(selection));
+        act("delete", [&](Model& m) { return m.remove(selection); });
         selection.clear();
     }
-    if (key == 'u') show(model.unjoin(selection));
-    if (key == 'f') show(model.join(selection));
+    if (key == 'u') act("unjoin", [&](Model& m) { return m.unjoin(selection); });
+    if (key == 'f') act("join", [&](Model& m) { return m.join(selection); });
 
     // ---- outputs ----
-    if (key == 'o') show(model.newOutput());
-    if (key == 'd') show(model.newDerived(selection));
-    if (key == 'b') show(model.bind(selection));
-    if (key == 'q') show(model.silence(selection));
-    if (key == 'c') show(model.clear(selection));
+    if (key == 'o') act("new output", [](Model& m) { return m.newOutput(); });
+    if (key == 'd') act("derived output",
+                        [&](Model& m) { return m.newDerived(selection); });
+    if (key == 'b') act("bind", [&](Model& m) { return m.bind(selection); });
+    if (key == 'B') act("bind to every output",
+                        [&](Model& m) { return m.bindAll(selection); });
+    // Fill: q down, w up, 5% a step; shift for 1%. Shift arrives as the
+    // capital letter, so the capital means "fine" and never "up".
+    if (key == 'q' || key == 'Q' || key == 'w' || key == 'W') {
+        const int  dir  = (key == 'w' || key == 'W') ? +1 : -1;
+        const bool fine = (key == 'Q' || key == 'W');
+        act("fill", [&, dir, fine](Model& m) {
+            return m.stepFill(selection, dir, fine); });
+    }
+    if (key == 'c') act("clear bindings",
+                        [&](Model& m) { return m.clear(selection); });
     if (key == OF_KEY_TAB) show(model.cycleOutput());
-    if (key == 't') show(model.trimCurrent(-1.0f));
-    if (key == 'T') show(model.trimCurrent(+1.0f));
-    if (key == 'O') show(model.removeCurrentOutput());
+    if (key == 't') act("trim", [](Model& m) { return m.trimCurrent(-1.0f); });
+    if (key == 'T') act("trim", [](Model& m) { return m.trimCurrent(+1.0f); });
+    if (key == 'O') act("remove output",
+                        [](Model& m) { return m.removeCurrentOutput(); });
     if (key == 'p') show(model.toggleAutoOutput());
 
     // ---- files ----
@@ -700,6 +766,21 @@ void ofApp::drawPanel() const {
                        + "   regions " + ofToString(manifold.regionCount())
                        + "   selected " + ofToString(selection.size()), x, y);
     y += 15.0f;
+    // The selection's fill, so a q or w press can be read before and after.
+    if (!selection.empty()) {
+        float lo = 2.0f, hi = -1.0f;
+        for (NodeID id : selection.nodes()) {
+            if (model.outputCount(id) == 0) continue;
+            lo = std::min(lo, mapping.outputFraction(id));
+            hi = std::max(hi, mapping.outputFraction(id));
+        }
+        const std::string fill = hi < 0.0f ? std::string("- (no output)")
+            : ofToString(int(std::lround(lo * 100))) + "%"
+              + (std::lround(lo * 100) == std::lround(hi * 100) ? std::string()
+                 : " to " + ofToString(int(std::lround(hi * 100))) + "%");
+        ofDrawBitmapString("fill " + fill, x, y);
+        y += 15.0f;
+    }
     if (!model.topology().orphans.empty()) {
         ofSetColor(140, 146, 160);
         ofDrawBitmapString("orphans " + ofToString(model.topology().orphans.size())
@@ -751,10 +832,11 @@ void ofApp::drawPanel() const {
     const char* right[] = {
         "o     new output",         "d     derived from selection",
         "tab   next output",        "b     bind to output",
-        "q     add silence share",  "c     clear bindings",
-        "t T   trim -/+ 1 dB",      "O     remove current output",
-        "p     auto-output on/off", "space audition (hold)",
-        "v     lock audition",      "click a bar: pick output",
+        "B     bind to every output", "q w   fill -/+ 5% (shift 1%)",
+        "c     clear bindings",     "t T   trim -/+ 1 dB",
+        "O     remove current output", "p     auto-output on/off",
+        "space audition (hold)",    "v     lock audition",
+        "cmd-z undo, shift redo",   "click a bar: pick output",
     };
     ofSetColor(140, 146, 160);
     float yl = y;
@@ -801,6 +883,7 @@ void ofApp::load() {
             note = " -- outputs file refused: " + mr.error;
         }
     }
+    history.record(model, "open");
     model.adopt(std::move(loaded), std::move(mp));
     adopt();
     show(Result{true, !note.empty(),

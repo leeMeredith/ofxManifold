@@ -137,6 +137,13 @@ class Editor:
             self.current = nm
         return (1, 0, "")
 
+    def move(self, name, p):
+        # Single-node moves only in these scripts, and only valid ones.
+        for n in self.nodes:
+            if n[0] == name:
+                n[1] = (p[0], p[1])
+        return (1, 0, "")
+
     def join(self, sel, ordered):
         if len(sel) < 3:
             return (0, 1, "select at least three nodes to join")
@@ -225,16 +232,65 @@ class Editor:
             self.bind_one(n, self.current)
         return (1, 0, f"bound {len(sel)} to {self.current}")
 
-    def silence(self, sel):
+    def fraction(self, node):
+        ls = self.links.get(node, [])
+        out_w = sum(l[2] for l in ls if l[0] == "out")
+        tot = sum(l[2] for l in ls)
+        return 0.0 if out_w <= 0 or tot <= 0 else out_w / tot
+
+    def set_fraction(self, node, f):
+        ls = self.links.get(node, [])
+        out_w = sum(l[2] for l in ls if l[0] == "out")
+        kept = [l for l in ls if l[0] != "sil"]
+        if f < 1.0:
+            kept.append(("sil", None, out_w * (1.0 - f) / f))
+        self.links[node] = kept
+
+    def step_fill(self, sel, direction, fine):
+        """Restated from the rule: land on the next multiple of the step in
+        its direction; a value already on a step moves a whole step."""
         if not sel:
             return (0, 0, "")
-        any_out = False
+        unit = 0.01 if fine else 0.05
+        vals, moved, any_ = [], False, False
         for n in sel:
-            self.silence_one(n, 0.25)
-            if self.output_count(n) > 0:
-                any_out = True
-        return (1, 0, "added a silence share -- the fill drops" if any_out
-                else "silence on a node with no output: still silent")
+            if self.output_count(n) == 0:
+                continue
+            any_ = True
+            before = self.fraction(n)
+            k = before / unit
+            kr = round(k)
+            if abs(k - kr) < 1e-3:
+                nxt = kr + direction
+            else:
+                nxt = math.ceil(k) if direction > 0 else math.floor(k)
+            f = min(1.0, max(0.01, nxt * unit))
+            self.set_fraction(n, f)
+            after = self.fraction(n)
+            if abs(after - before) > 1e-6:
+                moved = True
+            vals.append(after)
+        if not any_:
+            return (0, 1, "no output to fill -- bind the node first")
+        lo, hi = round(min(vals) * 100), round(max(vals) * 100)
+        return (1 if moved else 0, 0,
+                f"fill {lo}%" + ("" if lo == hi else f" to {hi}%"))
+
+    def bind_all(self, sel):
+        if not self.outputs:
+            return (0, 1, "no output yet -- press o to make one")
+        if not sel:
+            return (0, 0, "")
+        for n in sel:
+            fill = self.fraction(n) if self.output_count(n) > 0 else 1.0
+            self.links.pop(n, None)
+            for o in self.out_names():
+                self.bind_one(n, o)
+            if fill < 1.0:
+                self.set_fraction(n, fill)
+        k = len(sel)
+        return (1, 0, f"bound {k} node" + ("" if k == 1 else "s")
+                + f" to every output ({len(self.outputs)})")
 
     def clear(self, sel):
         for n in sel:
@@ -369,16 +425,58 @@ class Editor:
 S = 0.05
 
 
+LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
+          "remove": "delete", "newoutput": "new output",
+          "derived": "derived output", "bind": "bind",
+          "bindall": "bind to every output", "fill": "fill",
+          "clear": "clear bindings", "trim": "trim",
+          "removeoutput": "remove output", "example": "example map",
+          "empty": "new map", "move": "move"}
+
+
 class Script:
-    def __init__(self, out, name, note, grid=None, spec="FREE"):
+    def __init__(self, out, name, note, grid=None, spec="FREE", limit=200):
         self.out, self.ed = out, Editor()
+        self.past, self.future, self.limit = [], [], limit
         self.grid = grid or G.Free()
         self.sel, self.ordered = [], True
         out.append(f"# {note}")
         out.append(f"EDIT {name} ANALYTIC")
         out.append(f"GRID {spec}")
+        if limit != 200:
+            out.append(f"HISTORY {limit}")
 
     def do(self, op, *args):
+        if op in ("undo", "redo"):
+            return self.history(op)
+        import copy
+        before = copy.deepcopy(self.ed)
+        res = self._do(op, *args)
+        # Recorded only if something changed, exactly as History::apply.
+        if res[0]:
+            self.past.append((before, LABELS[op]))
+            if len(self.past) > self.limit:
+                self.past.pop(0)
+            self.future = []
+        return res
+
+    def history(self, op):
+        import copy
+        src, dst = (self.past, self.future) if op == "undo" \
+            else (self.future, self.past)
+        if not src:
+            res = (0, 1, f"nothing to {op}")
+        else:
+            state, label = src.pop()
+            dst.append((copy.deepcopy(self.ed), label))
+            self.ed = state
+            res = (1, 0, f"{'undid' if op == 'undo' else 'redid'} {label}")
+        self.out.append(f"DO {op}")
+        self.out.append(f'EXPECT {res[0]} {res[1]} "{res[2]}"')
+        self.out.append(f"STATE {self.ed.dump()}")
+        return res
+
+    def _do(self, op, *args):
         e, s = self.ed, self.sel
         res = {
             "place":    lambda: e.place(args[0], self.grid),
@@ -386,7 +484,10 @@ class Script:
             "unjoin":   lambda: e.unjoin(s),
             "remove":   lambda: e.remove(s),
             "newoutput": e.new_output, "derived": lambda: e.new_derived(s),
-            "bind":     lambda: e.bind(s), "silence": lambda: e.silence(s),
+            "bind":     lambda: e.bind(s),
+            "bindall":  lambda: e.bind_all(s),
+            "fill":     lambda: e.step_fill(s, args[0], args[1]),
+            "move":     lambda: e.move(args[0], args[1]),
             "clear":    lambda: e.clear(s), "cycle": e.cycle,
             "trim":     lambda: e.trim(args[0]),
             "pick":     lambda: e.pick(args[0]),
@@ -401,12 +502,17 @@ class Script:
             argtxt = f" {fmt(args[0])}"
         elif op == "pick":
             argtxt = f" {args[0]}"
+        elif op == "fill":
+            argtxt = f" {args[0]} {1 if args[1] else 0}"
+        elif op == "move":
+            argtxt = f" {args[0]} {fmt(args[1][0])} {fmt(args[1][1])}"
         self.out.append(f"DO {op}{argtxt}")
         self.out.append(f'EXPECT {res[0]} {res[1]} "{res[2]}"')
         self.out.append(f"STATE {e.dump()}")
         if op == "remove":           # the app clears after a removal
             self.sel, self.ordered = [], True
             self.out.append("SEL clear")
+        return res
 
     def chart(self, x0, top, w, h, clicks=()):
         lay = self.ed.chart(x0, top, w, h)
@@ -561,15 +667,16 @@ def build():
 
     t = Script(out, "outputs",
                "outputs: new, derived, bind, silence, clear, cycle, trim, "
-               "remove. Silence adds a QUARTER SHARE per press today; round 2 "
-               "replaces it with 5% fill steps and changes this vector")
+               "remove. Round 2 replaced the quarter share of silence per press "
+               "with fill steps, and this vector changed with it")
     t.do("auto")
     t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
     t.select("n0"); t.do("bind")            # no outputs yet: refused
     t.do("newoutput"); t.do("bind")
     t.do("newoutput"); t.select("n0", "n1"); t.do("bind")
-    t.select("n0"); t.do("silence"); t.do("silence")
-    t.select("n1"); t.do("clear"); t.do("silence")
+    t.select("n0"); t.do("fill", -1, False); t.do("fill", -1, False)
+    t.do("fill", -1, True); t.do("fill", +1, True); t.do("fill", +1, False)
+    t.select("n1"); t.do("clear"); t.do("fill", -1, False)
     t.clear_sel(); t.do("derived")          # nothing selected: refused
     t.select("n0", "n1"); t.do("derived")
     t.do("cycle"); t.do("trim", -1.0); t.do("trim", 20.0)
@@ -591,9 +698,80 @@ def build():
                     (24 + 8 + 5 * 54 + 8 + 20, 560), # the silence bar: no
                     (24 + 8 + 0 * 54 + 20, 700),     # below the chart: no
                     (24 + 8 + 0 * 54 + 50, 560)])    # in the gap: no
-    t.select("B"); t.do("silence")
+    t.select("B"); t.do("fill", +1, False)
     t.do("empty")
     t.chart(24, 502, 976, 118, clicks=[(60, 560)])
+    t.end()
+
+    t = Script(out, "fill_same_step_every_shape",
+               "THE REPORTED PROBLEM: a quarter share of silence stepped a "
+               "triangle feeding four outputs far less than a circle feeding "
+               "one. A fill step now moves every shape by exactly 5%")
+    t.do("example")
+    t.select("O"); t.do("fill", -1, False)     # the triangle: 100% -> 95%
+    t.select("N"); t.do("fill", -1, False)     # a circle:     100% -> 95%
+    t.select("C"); t.do("fill", -1, False)     # two outputs:  100% -> 95%
+    t.end()
+
+    t = Script(out, "fill_steps_land_on_round_numbers",
+               "fine steps of 1%, then a coarse step lands on the next "
+               "multiple of 5 in its direction: 97% down gives 95%, not 92%. "
+               "A step from exactly 95% moves a whole step. The floor is 1% "
+               "and the ceiling 100%; a step at either end changes nothing")
+    t.do("place", (0.5, 0.5))
+    t.select("n0")
+    t.do("fill", -1, True); t.do("fill", -1, True); t.do("fill", -1, True)
+    t.do("fill", -1, False)                     # 97% -> 95%
+    t.do("fill", -1, False)                     # 95% -> 90%
+    t.do("fill", +1, True); t.do("fill", +1, False)   # 91% -> 95%
+    t.do("fill", +1, False); t.do("fill", +1, False)  # 100%, then 100% again
+    for _ in range(22):
+        t.do("fill", -1, False)                 # down past 5% to the floor
+    t.do("fill", -1, True)                      # 1% stays 1%
+    t.end()
+
+    t = Script(out, "bind_to_every_output",
+               "shift-B binds a node to EVERY output equally, replacing its "
+               "output bindings rather than adding to them -- adding would "
+               "feed the output it already had double -- and keeps its fill")
+    t.select("n0"); t.do("bindall")             # nothing to bind to: refused
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)
+    t.select("n0"); t.do("bindall")
+    t.do("fill", -1, False); t.do("fill", -1, False)   # 90%
+    t.do("bindall")                             # still 90%, still equal
+    t.select("n1", "n2"); t.do("bindall")
+    t.end()
+
+    t = Script(out, "undo_redo",
+               "undo and redo over whole-state snapshots. Refusals and cursor "
+               "moves are never steps; a new action discards the redo steps; "
+               "undoing a delete restores the node, its output and its "
+               "bindings, renumbering and all")
+    t.do("undo")                                # nothing yet
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)
+    t.select("n0", "n1", "n2"); t.do("join")
+    t.do("undo"); t.do("undo"); t.do("redo")
+    t.do("place", (0.2004, 0.2))               # refused: not a step
+    t.do("cycle")                               # not a step
+    t.do("undo")                                # undoes the redone place
+    t.do("place", (0.9, 0.9))                   # new action: redo is gone
+    t.do("redo")
+    t.select("n0"); t.do("remove")
+    t.do("undo")                                # n0, its output, back
+    t.select("n1"); t.do("move", "n1", (0.7, 0.3))
+    t.do("undo")
+    t.do("empty"); t.do("undo")                 # even a new map undoes
+    t.end()
+
+    t = Script(out, "history_limit",
+               "beyond the limit the OLDEST step goes, never the newest",
+               limit=3)
+    for p in [(0.1, 0.1), (0.3, 0.1), (0.5, 0.1), (0.7, 0.1), (0.9, 0.1)]:
+        t.do("place", p)
+    for _ in range(4):
+        t.do("undo")                            # three undo, the fourth can't
     t.end()
 
     t = Script(out, "chart_layout",

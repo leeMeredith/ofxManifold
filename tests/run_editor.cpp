@@ -9,6 +9,9 @@
 #include "ofxManifoldEditorModel.h"
 #include "ofxManifoldEditorSelection.h"
 #include "ofxManifoldEditorChartLayout.h"
+#include "ofxManifoldEditorHistory.h"
+
+#include <functional>
 
 #include <cctype>
 #include <cmath>
@@ -140,6 +143,21 @@ Grid readGrid(std::istringstream& in) {
     return Grid::free();
 }
 
+// The label each operation is recorded under -- the same words the reference
+// uses, so an undo message naming the wrong action fails a vector.
+std::string label(const std::string& op) {
+    static const std::map<std::string, std::string> L = {
+        {"place", "place"}, {"join", "join"}, {"unjoin", "unjoin"},
+        {"remove", "delete"}, {"newoutput", "new output"},
+        {"derived", "derived output"}, {"bind", "bind"},
+        {"bindall", "bind to every output"}, {"fill", "fill"},
+        {"clear", "clear bindings"}, {"trim", "trim"},
+        {"removeoutput", "remove output"}, {"example", "example map"},
+        {"empty", "new map"}, {"move", "move"}};
+    auto it = L.find(op);
+    return it == L.end() ? op : it->second;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -154,6 +172,7 @@ int main(int argc, char** argv) {
     Selection sel;
     Grid grid;
     Result last;
+    History hist;
     ChartLayout layout;
     float chX = 0, chTop = 0, chW = 0, chH = 0;
     bool ok = true;
@@ -170,11 +189,15 @@ int main(int argc, char** argv) {
         if (kind == "EDIT") {
             in >> name >> cls;
             md = Model();
+            hist = History();
             sel.clear();
             grid = Grid::free();
             ok = true; why.str(""); why.clear(); step = 0;
         } else if (kind == "GRID") {
             grid = readGrid(in);
+        } else if (kind == "HISTORY") {
+            std::size_t limit; in >> limit;
+            hist = History(limit);
         } else if (kind == "SEL") {
             std::string op; in >> op;
             if (op == "clear") { sel.clear(); continue; }
@@ -188,29 +211,53 @@ int main(int argc, char** argv) {
         } else if (kind == "DO") {
             in >> lastOp;
             ++step;
-            if      (lastOp == "place")   { float x, y; in >> x >> y;
-                                            last = md.place({x, y}, grid); }
-            else if (lastOp == "join")    last = md.join(sel);
-            else if (lastOp == "unjoin")  last = md.unjoin(sel);
-            else if (lastOp == "remove")  last = md.remove(sel);
-            else if (lastOp == "newoutput") last = md.newOutput();
-            else if (lastOp == "derived") last = md.newDerived(sel);
-            else if (lastOp == "bind")    last = md.bind(sel);
-            else if (lastOp == "silence") last = md.silence(sel);
-            else if (lastOp == "clear")   last = md.clear(sel);
-            else if (lastOp == "cycle")   last = md.cycleOutput();
-            else if (lastOp == "trim")    { float db; in >> db;
-                                            last = md.trimCurrent(db); }
-            else if (lastOp == "removeoutput") last = md.removeCurrentOutput();
-            else if (lastOp == "pick")    { std::string nm; in >> nm;
-                                            last = md.pickOutput(
-                                                md.mapping().findTarget(nm)); }
-            else if (lastOp == "auto")    last = md.toggleAutoOutput();
-            else if (lastOp == "example") { md.loadExample(); last = Result{};
-                                            last.changed = true; }
-            else if (lastOp == "empty")   { md.newEmpty(); last = Result{};
-                                            last.changed = true; }
+            if (lastOp == "undo") { last = hist.undo(md); continue; }
+            if (lastOp == "redo") { last = hist.redo(md); continue; }
+
+            // The operation, then History::apply -- the same call an editor
+            // makes, so the rule "recorded only if it changed something" is
+            // the package's own code under test, not a copy of it here.
+            std::function<Result(Model&)> op;
+            if (lastOp == "place") {
+                float x, y; in >> x >> y;
+                op = [&, x, y](Model& m) { return m.place({x, y}, grid); };
+            }
+            else if (lastOp == "join")    op = [&](Model& m) { return m.join(sel); };
+            else if (lastOp == "unjoin")  op = [&](Model& m) { return m.unjoin(sel); };
+            else if (lastOp == "remove")  op = [&](Model& m) { return m.remove(sel); };
+            else if (lastOp == "newoutput") op = [&](Model& m) { return m.newOutput(); };
+            else if (lastOp == "derived") op = [&](Model& m) { return m.newDerived(sel); };
+            else if (lastOp == "bind")    op = [&](Model& m) { return m.bind(sel); };
+            else if (lastOp == "bindall") op = [&](Model& m) { return m.bindAll(sel); };
+            else if (lastOp == "fill") {
+                int dir, fine; in >> dir >> fine;
+                op = [&, dir, fine](Model& m) {
+                    return m.stepFill(sel, dir, fine != 0); };
+            }
+            else if (lastOp == "clear")   op = [&](Model& m) { return m.clear(sel); };
+            else if (lastOp == "cycle")   op = [&](Model& m) { return m.cycleOutput(); };
+            else if (lastOp == "trim") {
+                float db; in >> db;
+                op = [&, db](Model& m) { return m.trimCurrent(db); };
+            }
+            else if (lastOp == "removeoutput") op = [&](Model& m) { return m.removeCurrentOutput(); };
+            else if (lastOp == "pick") {
+                std::string nm; in >> nm;
+                op = [&, nm](Model& m) {
+                    return m.pickOutput(m.mapping().findTarget(nm)); };
+            }
+            else if (lastOp == "auto")    op = [&](Model& m) { return m.toggleAutoOutput(); };
+            else if (lastOp == "move") {
+                std::string nm; float x, y; in >> nm >> x >> y;
+                op = [&, nm, x, y](Model& m) {
+                    return m.move({{m.manifold().findNode(nm), {x, y}}}); };
+            }
+            else if (lastOp == "example") op = [&](Model& m) {
+                m.loadExample(); Result r; r.changed = true; return r; };
+            else if (lastOp == "empty")   op = [&](Model& m) {
+                m.newEmpty(); Result r; r.changed = true; return r; };
             else { std::cerr << "unknown op " << lastOp << "\n"; return 2; }
+            last = hist.apply(md, label(lastOp), op);
         } else if (kind == "EXPECT") {
             int ch, rf; in >> ch >> rf;
             std::string rest; std::getline(in, rest);

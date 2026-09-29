@@ -1080,6 +1080,87 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
+      - name: Setting a fill stacks silence shares must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '        v.erase(std::remove_if(v.begin(), v.end(),\n                    [](const Link& l) { return l.kind == DestKind::Silence; }),\n                v.end());' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: A full fill leaves a zero silence binding must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '        if (f < 1.0f) {\n            v.push_back(Link{DestKind::Silence, InvalidTarget,' \
+            '        if (true) {\n            v.push_back(Link{DestKind::Silence, InvalidTarget,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Fill steps ignore round numbers must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '                         : (direction > 0 ? std::ceil(k) : std::floor(k));' \
+            '                         : k + float(direction);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Fill steps skip values through float noise must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (std::fabs(k - kr) < 1e-3f) k = kr;' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Fine fill steps are coarse must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    const float unit = fine ? 0.01f : 0.05f;' \
+            '    const float unit = 0.05f; (void)fine;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Bind to every output doubles an existing binding must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        mapping_.clearBindings(id);\n        for (TargetID t = 0;' \
+            '        for (TargetID t = 0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Refusals become undo steps must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.h \
+            '        if (r.changed) record(std::move(before), label);' \
+            '        record(std::move(before), label);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.h
+
+      - name: A new action keeps stale redo steps must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
+            '    future_.clear();\n}' \
+            '}'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
+
+      - name: History limit drops the newest step must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
+            '    if (limit_ > 0 && past_.size() > limit_) past_.erase(past_.begin());' \
+            '    if (limit_ > 0 && past_.size() > limit_) past_.pop_back();'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
+
       - name: Restored tree must be green
         run: |
           make clean

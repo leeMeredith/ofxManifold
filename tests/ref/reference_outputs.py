@@ -91,6 +91,18 @@ class Mapping:
             if not self.links[node]:
                 del self.links[node]
 
+    def set_fraction(self, node, f):
+        """Silence weight s such that out / (out + s) == f, outputs kept."""
+        links = self.links.get(node, [])
+        out_w = sum(l[2] for l in links if l[0] == "output")
+        if not links or f <= 0.0 or out_w <= 0.0:
+            return False
+        kept = [l for l in links if l[0] != "silence"]
+        if f < 1.0:
+            kept.append(("silence", None, out_w * (1.0 - f) / f))
+        self.links[node] = kept
+        return True
+
     def bind(self, node, dest, weight=1.0):
         self.links.setdefault(node, []).append(("output", dest, weight))
 
@@ -421,6 +433,37 @@ def build():
                    f"LEVELS {dense_s(m.by_channel(wv, True))} REST {rest}")
     out.append("")
 
+    out.append("#" + "-" * 68)
+    out.append("# SETTING A NODE'S FILL")
+    out.append("#")
+    out.append("# Only the silence share changes, so the balance between a")
+    out.append("# node's outputs is kept: the composite below feeds out.1 and")
+    out.append("# out.2 equally before and after. Refused for a node with no")
+    out.append("# output, and for a fill of zero -- fully silent is clearing.")
+    out.append("#" + "-" * 68)
+    for nm, node, f, wv in [("partial_down", 0, 0.25, [(0, 1.0)]),
+                            ("composite_up", 3, 0.9, [(3, 1.0)]),
+                            ("terminal_full", 1, 1.0, [(1, 1.0)]),
+                            ("partial_to_full", 0, 1.0, [(0, 1.0)]),
+                            ("terminal_to_one_percent", 1, 0.01, [(1, 1.0)]),
+                            ("silence_only_refused", 2, 0.5, [(2, 1.0)]),
+                            ("unbound_refused", 4, 0.5, [(4, 1.0)]),
+                            ("zero_refused", 0, 0.0, [(0, 1.0)])]:
+        m = _copy.deepcopy(fade)
+        ok = m.set_fraction(node, f)
+        _lab, frac = m.label(node)
+        # LINKS: how many bindings the node has afterwards. A full fill must
+        # REMOVE the silence binding, not leave one of weight zero -- which
+        # behaves identically but still forces the mapping file to version 2,
+        # since any silence binding needs it.
+        out.append(f"SETFILL setfill_{nm} ANALYTIC MAP fade NODE {node} "
+                   f"TO {fmt(f)} RESULT {1 if ok else 0} "
+                   f"LINKS {len(m.links.get(node, []))} "
+                   f"FRACTION {fmt(frac)} IN {wv_s(wv)} "
+                   f"ROUTED {dense_s(m.by_channel(wv, False))} "
+                   f"SILENCE {fmt(m.silence(wv))}")
+    out.append("")
+
     # ---- remapping after removal ----------------------------------------
     out.append("#" + "-" * 68)
     out.append("# REMAPPING AFTER NODE REMOVAL (decision E)")
@@ -589,7 +632,8 @@ def main():
         p = line.split()
         if p and p[0] in ("LEGACY", "RESOLVE", "REFUSE", "LABEL", "REMAP",
                           "MAPFILE", "MAPROUNDTRIP", "MAPVERSION",
-                          "MAPPRESERVE", "CLEARED", "REMOVEOUT"):
+                          "MAPPRESERVE", "CLEARED", "REMOVEOUT",
+                          "SETFILL"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

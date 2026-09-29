@@ -44,6 +44,15 @@ public:
 private:
     // ---- controller -------------------------------------------------------
     void show(const ofxManifold::editor::Result& r);  // a Result on screen
+
+    // Run a Model operation as one undoable step: recorded under `label` if
+    // it changed anything, and its Result shown. Every edit comes through
+    // here, so undo sees every edit.
+    void act(const std::string& label,
+             const std::function<ofxManifold::editor::Result(
+                 ofxManifold::editor::Model&)>& op);
+    void undo();
+    void redo();
     void adopt();                     // after the map is replaced wholesale
     void placeAt(glm::vec2 p);
     ofxManifold::NodeID nodeAt(glm::vec2 screen) const;
@@ -80,6 +89,7 @@ private:
     // Model operation. Declared after the model, so they bind to it.
     ofxManifold::editor::Model     model;
     ofxManifold::editor::Selection selection;
+    ofxManifold::editor::History   history;
     const ofxManifold::Manifold2D& manifold      = model.manifold();
     const ofxManifold::Mapping&    mapping       = model.mapping();
     const ofxManifold::TargetID&   currentOutput = model.currentOutput();
@@ -116,6 +126,9 @@ private:
     std::vector<glm::vec2>   dragFrom;         // per selected node
     ofxManifold::GridAddress anchorAddr;
     bool      pressingEmpty = false;           // a click places, a drag boxes
+    bool      pressHadSelection = false;       // ...unless it only deselects
+    ofxManifold::editor::Model dragBefore;     // the state a drag began from
+    bool      dragMoved = false;               // did any part of it land
     glm::vec2 pressScreen{0.0f, 0.0f};
     glm::vec2 boxScreen{0.0f, 0.0f};
 
