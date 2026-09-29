@@ -223,14 +223,44 @@ class Editor:
         self.derived.append([nm, ch, list(sel)])
         return (1, 0, f"derived {nm} on channel {ch}, sum of {len(sel)}")
 
+    def feeds(self, node, out):
+        return any(l[0] == "out" and l[1] == out
+                   for l in self.links.get(node, []))
+
+    def unbind_one(self, node, out):
+        ls = [l for l in self.links.get(node, [])
+              if not (l[0] == "out" and l[1] == out)]
+        if ls:
+            self.links[node] = ls
+        else:
+            self.links.pop(node, None)
+
     def bind(self, sel):
+        """A toggle for the current output: unbind all if every selected
+        node feeds it, otherwise bind the ones that don't. Fill kept; a node
+        losing its last output becomes cleanly null."""
         if self.current is None:
             return (0, 1, "no output yet -- press o to make one")
         if not sel:
             return (0, 0, "")
+        cur = self.current
+        every = all(self.feeds(n, cur) for n in sel)
+        count = 0
         for n in sel:
-            self.bind_one(n, self.current)
-        return (1, 0, f"bound {len(sel)} to {self.current}")
+            if every != self.feeds(n, cur):
+                continue
+            fill = self.fraction(n) if self.output_count(n) > 0 else 1.0
+            if every:
+                self.unbind_one(n, cur)
+            else:
+                self.bind_one(n, cur)
+            if self.output_count(n) == 0:
+                self.links.pop(n, None)
+            elif fill < 1.0:
+                self.set_fraction(n, fill)
+            count += 1
+        return (1, 0, ("unbound " if every else "bound ") + str(count)
+                + (" from " if every else " to ") + cur)
 
     def fraction(self, node):
         ls = self.links.get(node, [])
@@ -427,7 +457,7 @@ S = 0.05
 
 LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "remove": "delete", "newoutput": "new output",
-          "derived": "derived output", "bind": "bind",
+          "derived": "derived output", "bind": "binding",
           "bindall": "bind to every output", "fill": "fill",
           "clear": "clear bindings", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
@@ -741,6 +771,26 @@ def build():
     t.do("fill", -1, False); t.do("fill", -1, False)   # 90%
     t.do("bindall")                             # still 90%, still equal
     t.select("n1", "n2"); t.do("bindall")
+    t.end()
+
+    t = Script(out, "bind_toggles",
+               "b toggles each selected node's binding to the CURRENT output. "
+               "Pressing it twice unbinds rather than feeding the output "
+               "double; a mixed selection binds only the nodes not yet bound; "
+               "fill is kept through every change; a node losing its last "
+               "output becomes cleanly null")
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)                        # outputs n0, n1, n2
+    t.do("pick", "n0")
+    t.select("n1"); t.do("bind")                # n1 feeds n1 and n0
+    t.do("bind")                                # again: unbinds, never doubles
+    t.select("n0", "n1"); t.do("bind")          # mixed: binds n1 only
+    t.do("bind")                                # all feed n0: unbinds both
+    t.select("n1"); t.do("fill", -1, False); t.do("fill", -1, False)   # 90%
+    t.do("pick", "n2"); t.do("bind")            # n1 -> n1 and n2, still 90%
+    t.do("bind")                                # back to n1 alone, still 90%
+    t.do("pick", "n1"); t.do("bind")            # its LAST output: null, clean
+    t.do("undo")                                # "undid binding", 90% again
     t.end()
 
     t = Script(out, "undo_redo",

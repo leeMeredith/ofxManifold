@@ -84,6 +84,15 @@ public:
 
     Result newOutput();
     Result newDerived(const Selection& sel);
+    // Toggle the selected nodes' binding to the CURRENT output.
+    //
+    //   if every selected node already feeds it  -> unbind them all from it
+    //   otherwise                                -> bind the ones that don't
+    //
+    // Nodes already bound are left alone, so pressing it twice never feeds an
+    // output double -- binding ADDS weight, and the old key did exactly that.
+    // Each node keeps its fill through the change. A node whose last output
+    // is unbound becomes cleanly null, with no stray silence binding left.
     Result bind(const Selection& sel);
     // Step each selected node's fill: how much of its share reaches its
     // outputs. `direction` +1 up, -1 down; 5% a step, or 1% when `fine`.
@@ -110,6 +119,7 @@ public:
     std::string freshName() const;
     int         nextFreeChannel() const;
     std::size_t outputCount(NodeID id) const;
+    bool        feeds(NodeID node, TargetID output) const;
     bool        outputInUse(TargetID t) const;
     bool        occupied(glm::vec2 p, GridAddress addr,
                          const Grid& grid) const;

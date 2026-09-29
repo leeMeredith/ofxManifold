@@ -154,6 +154,14 @@ std::size_t Model::outputCount(NodeID id) const {
     return n;
 }
 
+bool Model::feeds(NodeID node, TargetID output) const {
+    for (std::size_t k = 0; k < mapping_.linkCount(node); ++k) {
+        const Link& l = mapping_.link(node, k);
+        if (l.kind == DestKind::Output && l.id == output) return true;
+    }
+    return false;
+}
+
 bool Model::outputInUse(TargetID t) const {
     for (NodeID n : mapping_.boundNodes()) {
         for (std::size_t k = 0; k < mapping_.linkCount(n); ++k) {
@@ -363,9 +371,34 @@ Result Model::bind(const Selection& sel) {
         return refusal("no output yet -- press o to make one", 2.5f);
     }
     if (sel.empty()) return Result{};
-    for (NodeID id : sel.nodes()) mapping_.bind(id, currentOutput_);
-    return changed("bound " + std::to_string(sel.size()) + " to "
-                   + mapping_.targetName(currentOutput_), 2.0f);
+    const TargetID t = currentOutput_;
+
+    bool all = true;
+    for (NodeID id : sel.nodes()) {
+        if (!feeds(id, t)) { all = false; break; }
+    }
+
+    std::size_t n = 0;
+    for (NodeID id : sel.nodes()) {
+        if (all == !feeds(id, t)) continue;       // already as wanted
+        // The fill a node had, kept through the change: removing a binding
+        // would otherwise make the node louder or quieter as a side effect.
+        const float fill = outputCount(id) > 0 ? mapping_.outputFraction(id)
+                                               : 1.0f;
+        if (all) mapping_.unbind(id, t);
+        else     mapping_.bind(id, t);
+        if (outputCount(id) == 0) {
+            // Its last output gone: null, with no silence binding left behind
+            // -- a stray one behaves the same but pushes the outputs file to
+            // version 2 for nothing.
+            mapping_.clearBindings(id);
+        } else if (fill < 1.0f) {
+            mapping_.setOutputFraction(id, fill);
+        }
+        ++n;
+    }
+    return changed(std::string(all ? "unbound " : "bound ") + std::to_string(n)
+                   + (all ? " from " : " to ") + mapping_.targetName(t), 2.0f);
 }
 
 Result Model::stepFill(const Selection& sel, int direction, bool fine) {

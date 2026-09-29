@@ -1161,6 +1161,33 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
 
+      - name: Binding twice feeds an output double must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (all == !feeds(id, t)) continue;       // already as wanted' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Unbinding changes a node's fill must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        } else if (fill < 1.0f) {\n            mapping_.setOutputFraction(id, fill);\n        }' \
+            '        }'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Unbinding the last output leaves stray silence must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (outputCount(id) == 0) {\n            // Its last output gone' \
+            '        if (false) {\n            // Its last output gone'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
       - name: Restored tree must be green
         run: |
           make clean

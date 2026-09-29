@@ -139,9 +139,21 @@ Coarse steps land on multiples of 5 in their direction (73% then `q` gives
 | slice | what |
 |---|---|
 | 2a | fill steps, ⇧B, undo and redo, placement leaves nothing selected, a click on empty space clears a selection — **DONE** |
+| 2a+ | `b` toggles the binding to the current output; binding marks on faders and map — **DONE** |
 | 2b | named saves as a pair through the Mac dialogs |
 | 2c | window at 90% of the screen, full screen, fader narrowing, scaled text |
 | 2d | keys grouped and lit when usable; view sections lifted into files |
+
+**Slice 2a+, done.** Asked for after using 2a: bindings could be added one at a
+time but removed only all at once, and pressing `b` twice fed an output DOUBLE,
+since binding adds weight. `b` is now a toggle for the current output -- every
+selected node already feeding it unbinds, otherwise the ones not yet bound bind
+-- keeping each node's fill, and leaving a node that loses its last output
+cleanly null. `Model::feeds()` added; the undo label became "binding" so
+undoing an unbind does not say "undid bind". 18 scripts, 208 steps; 5 of 5
+mutations caught, 3 as gates. The faders mark what the selection feeds, and
+the map rings what feeds the current output. No new source file, so no
+Project Generator update needed.
 
 **Slice 2a, done.** Kernel: `Mapping::setOutputFraction()` sets a node's fill
 exactly by changing only its silence share, so the balance between its outputs

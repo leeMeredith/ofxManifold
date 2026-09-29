@@ -149,7 +149,7 @@ std::string label(const std::string& op) {
     static const std::map<std::string, std::string> L = {
         {"place", "place"}, {"join", "join"}, {"unjoin", "unjoin"},
         {"remove", "delete"}, {"newoutput", "new output"},
-        {"derived", "derived output"}, {"bind", "bind"},
+        {"derived", "derived output"}, {"bind", "binding"},
         {"bindall", "bind to every output"}, {"fill", "fill"},
         {"clear", "clear bindings"}, {"trim", "trim"},
         {"removeoutput", "remove output"}, {"example", "example map"},

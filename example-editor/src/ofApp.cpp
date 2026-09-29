@@ -64,6 +64,22 @@ void ofApp::draw() {
         drawNode(NodeID(i));
     }
 
+    // Nodes feeding the CURRENT output: a green ring, outside the selection
+    // ring so both can show at once. With the fader marks below, this is how
+    // a binding can be seen before and after pressing b.
+    ofPushStyle();
+    ofNoFill();
+    ofSetLineWidth(1.5f);
+    if (currentOutput != InvalidTarget) {
+        for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
+            if (!model.feeds(NodeID(i), currentOutput)) continue;
+            const glm::vec2 p = renderer->toScreen(manifold.node(NodeID(i)).position);
+            ofSetColor(120, 200, 160);
+            ofDrawCircle(p.x, p.y, 18.0f);
+        }
+    }
+    ofPopStyle();
+
     // Selection rings, over the nodes.
     ofPushStyle();
     ofNoFill();
@@ -698,6 +714,19 @@ void ofApp::drawChart() const {
         const float ty = chart.base - lv * rise;
         ofDrawLine(b.x - 2.0f, ty, b.x + bw + 2.0f, ty);
 
+        // A dot above each output a selected node feeds -- the other half of
+        // seeing a binding: which faders this selection reaches.
+        if (!derived) {
+            bool fed = false;
+            for (NodeID id : selection.nodes()) {
+                if (model.feeds(id, b.output)) { fed = true; break; }
+            }
+            if (fed) {
+                ofSetColor(255, 214, 90);
+                ofDrawCircle(b.x + bw * 0.5f, chart.top + 1.0f, 3.0f);
+            }
+        }
+
         if (!derived && b.output == currentOutput) {
             ofNoFill();
             ofSetColor(255, 214, 90);
@@ -831,7 +860,7 @@ void ofApp::drawPanel() const {
     };
     const char* right[] = {
         "o     new output",         "d     derived from selection",
-        "tab   next output",        "b     bind to output",
+        "tab   next output",        "b     bind/unbind current",
         "B     bind to every output", "q w   fill -/+ 5% (shift 1%)",
         "c     clear bindings",     "t T   trim -/+ 1 dB",
         "O     remove current output", "p     auto-output on/off",
