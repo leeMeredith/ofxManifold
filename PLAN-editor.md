@@ -166,6 +166,14 @@ ran off the end -- so the runner now reports an id that names no output
 instead of looking it up. Undefined behaviour that fails on one machine can
 pass on another.
 
+**2b, first build on the Mac:** three errors -- `getPath()` called on a const
+`ofFileDialogResult`. Real openFrameworks declares it non-const; the test stub
+had declared it const, so the stub accepted what the real library rejects.
+Fixed both: the code, and the stub, which now reproduces the error before the
+fix. A stub must be no MORE permissive than the library it stands in for --
+D-010's warning, met in practice. The stub's other const functions were
+checked against openFrameworks and are accurate.
+
 **Slice 2a+, done.** Asked for after using 2a: bindings could be added one at a
 time but removed only all at once, and pressing `b` twice fed an output DOUBLE,
 since binding adds weight. `b` is now a toggle for the current output -- every

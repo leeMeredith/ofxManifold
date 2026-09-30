@@ -69,11 +69,18 @@ inline float ofRandom(float a,float b){return (a+b)*0.5f;}
 template<typename T> std::string ofToString(const T&){return "";}
 template<typename T> std::string ofToString(const T&,int){return "";}
 inline std::string ofToDataPath(const std::string& s){return s;}
-struct ofFileDialogResult {
-    bool bSuccess = false;
+// As real openFrameworks declares it: getPath() and getName() are NOT const.
+// The first version of this stub made them const, so it accepted code that
+// real openFrameworks rejects -- a const result, then getPath() -- and the
+// error only appeared in Xcode. A stub must be no MORE permissive than the
+// library it stands in for, or it hides exactly what it exists to catch.
+class ofFileDialogResult {
+public:
+    std::string getName() { return fileName; }
+    std::string getPath() { return filePath; }
     std::string filePath;
-    std::string getPath() const { return filePath; }
-    std::string getName() const { return filePath; }
+    std::string fileName;
+    bool bSuccess = false;
 };
 inline ofFileDialogResult ofSystemSaveDialog(const std::string&, const std::string&){ return {}; }
 inline ofFileDialogResult ofSystemLoadDialog(const std::string& = "", bool = false, const std::string& = ""){ return {}; }

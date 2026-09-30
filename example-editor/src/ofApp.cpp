@@ -965,7 +965,7 @@ void ofApp::save() {
 void ofApp::saveAs() {
     const std::string suggested = currentPath.empty()
         ? std::string("untitled") : pairFor(currentPath).name;
-    const ofFileDialogResult d =
+    ofFileDialogResult d =
         ofSystemSaveDialog(suggested, "Save the map and its outputs");
     if (!d.bSuccess) return;
     const Result r = savePair(model, d.getPath());
@@ -978,7 +978,7 @@ void ofApp::saveAs() {
 }
 
 void ofApp::open() {
-    const ofFileDialogResult d =
+    ofFileDialogResult d =
         ofSystemLoadDialog("Open a map -- either file of a pair");
     if (d.bSuccess) openAt(d.getPath());
 }
