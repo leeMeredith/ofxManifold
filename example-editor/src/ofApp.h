@@ -78,8 +78,19 @@ private:
     void drawPanel() const;
 
     // ---- EditorFiles ------------------------------------------------------
-    void save();
-    void load();
+    //
+    // A map and its outputs are saved and opened as a PAIR (editor::Files).
+    // Only the native dialogs are here; the pairing and the reading and
+    // writing are the package's, and tested.
+    void save();                        // command-S: to the open pair
+    void saveAs();                      // shift-command-S: choose a name
+    void open();                        // command-O
+    void openAt(const std::string& path);
+    void remember() const;              // the pair to reopen next launch
+    void markChanged(const ofxManifold::editor::Result& r);
+    std::string currentPath;            // the open pair's map; empty: untitled
+    bool        unsaved = false;
+    std::string shownTitle;
 
     // ---- state: the model, and read-only views of it ----------------------
     //

@@ -184,7 +184,9 @@ selection to move it as one operation, press `f` to join the selection into a
 region, delete to remove nodes, `u` to unjoin, `x` for an empty map, `s` and `l`
 to save and load. Outputs: `o` makes one, `b` binds the selection to it or unbinds
 it (a toggle), ⇧B to every output, `q` and `w` step a node's fill down and up by 5% (shift for 1%),
-`d` makes a derived output. ⌘Z undoes and ⇧⌘Z redoes, any edit. Node shape
+`d` makes a derived output. ⌘Z undoes and ⇧⌘Z redoes, any edit. ⌘S saves the map and its
+outputs as a pair of files, ⇧⌘S under a new name, ⌘O opens either file of a
+pair. Node shape
 shows what a node does with its share -- circle for one output, triangle for
 several, hollow square for none -- and its fill shows how much reaches an
 output. Hold space to audition: dragging moves a listening point and never a
@@ -249,7 +251,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-610 vectors across eleven suites, plus 120 mutation gates that introduce known
+613 vectors across eleven suites, plus 124 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

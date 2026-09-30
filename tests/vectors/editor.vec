@@ -604,6 +604,127 @@ EXPECT 1 0 "undid binding"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n1>n1:1 n1>~:0.111111 n2>n2:1 | D  | C n1 | A 1
 ENDEDIT
 
+# the fader line: for each output a selected node feeds, that node's fill -- the percentage its shape shows -- so the line and the shape move together on q and w
+EDIT fill_line_on_the_faders ANALYTIC
+GRID FREE
+DO example
+EXPECT 1 0 ""
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+SEL only O
+FILLMARKS front:O:1 left:O:1 right:O:1 rear:O:1
+SEL only B
+FILLMARKS right:B:0.5
+SEL only B
+SEL toggle D
+FILLMARKS right:B:0.5 rear:D:0.75
+SEL only B
+DO fill 1 0
+EXPECT 1 0 "fill 55%"
+STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:0.818182 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | A 1
+FILLMARKS right:B:0.55
+SEL only A
+FILLMARKS NONE
+ENDEDIT
+
+# a named save writes the pair; opening either file of the pair restores it exactly, outputs and all; a missing file changes nothing; opening is one undo step
+EDIT files_save_and_open ANALYTIC
+GRID FREE
+PAIR sets/stage-left.json MAP sets/stage-left.json OUT sets/stage-left-outputs.json LEGACY sets/stage-left-mapping.json NAME stage-left
+PAIR sets/stage-left-outputs.json MAP sets/stage-left.json OUT sets/stage-left-outputs.json LEGACY sets/stage-left-mapping.json NAME stage-left
+PAIR sets/stage-left-mapping.json MAP sets/stage-left.json OUT sets/stage-left-outputs.json LEGACY sets/stage-left-mapping.json NAME stage-left
+PAIR stage-left MAP stage-left.json OUT stage-left-outputs.json LEGACY stage-left-mapping.json NAME stage-left
+DO place 0.2 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO place 0.8 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.5 0.8
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+DO join
+EXPECT 1 0 "joined 3 nodes in click order"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO trim -3
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n1
+DO fill -1 0
+EXPECT 1 0 "fill 95%"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n2 | A 1
+DO savepair stage-left
+EXPECT 0 0 "saved stage-left.json and stage-left-outputs.json"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n2 | A 1
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO openpair stage-left.json
+EXPECT 1 0 "opened stage-left: 3 nodes, 1 region, 3 outputs"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO openpair stage-left-outputs.json
+EXPECT 1 0 "opened stage-left: 3 nodes, 1 region, 3 outputs"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
+DO openpair nowhere.json
+EXPECT 0 1 "cannot open nowhere.json"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
+DO undo
+EXPECT 1 0 "undid open"
+STATE N  | R  | O  | L  | D  | C - | A 1
+ENDEDIT
+
+# an earlier editor's -mapping.json pair still opens; a map with no outputs file opens with none; an outputs file that is refused opens the map, says why, and is flagged
+EDIT files_old_partial_and_refused ANALYTIC
+GRID FREE
+DO place 0.2 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO place 0.8 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.5 0.8
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+DO join
+EXPECT 1 0 "joined 3 nodes in click order"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO legacypair old
+EXPECT 0 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO maponly bare
+EXPECT 0 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO badoutputs broken
+EXPECT 0 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO openpair old.json
+EXPECT 1 0 "opened old: 3 nodes, 1 region, 3 outputs"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO openpair bare.json
+EXPECT 1 0 "opened bare: 3 nodes, 1 region, 0 outputs (no outputs file)"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O  | L  | D  | C - | A 1
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | A 1
+DO openpair broken.json
+EXPECT 1 1 "opened broken: 3 nodes, 1 region, 0 outputs -- outputs file refused: *"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O  | L  | D  | C - | A 1
+ENDEDIT
+
 # undo and redo over whole-state snapshots. Refusals and cursor moves are never steps; a new action discards the redo steps; undoing a delete restores the node, its output and its bindings, renumbering and all
 EDIT undo_redo ANALYTIC
 GRID FREE

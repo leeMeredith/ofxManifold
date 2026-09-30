@@ -1188,6 +1188,42 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
+      - name: Opening the outputs file looks for the wrong map must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
+            '    for (const char* tail : {"-outputs.json", "-mapping.json", ".json"}) {' \
+            '    for (const char* tail : {".json", "-outputs.json", "-mapping.json"}) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+
+      - name: Earlier editors' saves lose their outputs must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
+            '    if (readFile(p.outputs, otext) || readFile(p.legacy, otext)) {' \
+            '    if (readFile(p.outputs, otext)) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+
+      - name: A refused outputs file goes unflagged must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
+            '            note = " -- outputs file refused: " + mr.error;\n            r.refused = true;' \
+            '            note = " -- outputs file refused: " + mr.error;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+
+      - name: Fader line drawn for silence must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '            if (l.kind == DestKind::Output) marks.push_back({l.id, id, fill});' \
+            '            marks.push_back({l.id, id, fill});'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
       - name: Restored tree must be green
         run: |
           make clean

@@ -19,7 +19,22 @@ void ofApp::setup() {
     // carries over between sessions. Otherwise start from the example.
     model.loadExample();
     adopt();
-    if (ofFile::doesFileExist("editor.json")) load();
+    // Reopen the pair open last time. Failing that, the save an earlier
+    // version of this editor made, editor.json -- its outputs file,
+    // editor-mapping.json, is found by the pair's old-name fallback.
+    const std::string lastFile = ofToDataPath("editor-last.txt");
+    std::string last;
+    if (ofFile::doesFileExist(lastFile)) {
+        last = ofBufferFromFile(lastFile).getText();
+        while (!last.empty() && (last.back() == '\n' || last.back() == '\r')) {
+            last.pop_back();
+        }
+    }
+    if (!last.empty() && ofFile::doesFileExist(last)) openAt(last);
+    else if (ofFile::doesFileExist(ofToDataPath("editor.json"))) {
+        openAt(ofToDataPath("editor.json"));
+    }
+    unsaved = false;
     // Undo starts from here. Reopening the last save above records an "open",
     // and without this, command-Z straight after launch would swap the saved
     // map for the example that preceded it.
@@ -49,6 +64,16 @@ void ofApp::update() {
     }
     if (refusedFlash > 0.0f) refusedFlash -= 1.0f / 60.0f;
     if (messageTime > 0.0f) messageTime -= 1.0f / 60.0f;
+
+    // The window title names the open pair, with a dot for unsaved changes.
+    const std::string title = "ofxManifold editor — "
+        + (currentPath.empty() ? std::string("untitled")
+                               : pairFor(currentPath).name)
+        + (unsaved ? "  •" : "");
+    if (title != shownTitle) {
+        ofSetWindowTitle(title);
+        shownTitle = title;
+    }
 }
 
 void ofApp::draw() {
@@ -125,21 +150,27 @@ void ofApp::show(const Result& r) {
 
 void ofApp::act(const std::string& label,
                 const std::function<Result(Model&)>& op) {
-    show(history.apply(model, label, op));
+    const Result r = history.apply(model, label, op);
+    markChanged(r);
+    show(r);
 }
 
 // Undo and redo restore a whole snapshot. NodeIDs in the selection may name
 // different nodes afterwards, so it clears, as after a delete; any drag in
 // progress is dropped.
 void ofApp::undo() {
-    show(history.undo(model));
+    const Result r = history.undo(model);
+    markChanged(r);
+    show(r);
     selection.clear();
     dragging = false;
     anchor = InvalidNode;
 }
 
 void ofApp::redo() {
-    show(history.redo(model));
+    const Result r = history.redo(model);
+    markChanged(r);
+    show(r);
     selection.clear();
     dragging = false;
     anchor = InvalidNode;
@@ -313,7 +344,10 @@ void ofApp::mouseReleased(int x, int y, int) {
         return;
     }
 
-    if (dragging && dragMoved) history.record(dragBefore, "move");
+    if (dragging && dragMoved) {
+        history.record(dragBefore, "move");
+        unsaved = true;
+    }
     dragging = false;
     anchor = InvalidNode;
 }
@@ -321,9 +355,17 @@ void ofApp::mouseReleased(int x, int y, int) {
 void ofApp::keyPressed(int key) {
     // ---- undo, redo: command-Z and shift-command-Z ----
     const bool command = ofGetKeyPressed(OF_KEY_COMMAND);
-    if (command && (key == 'z' || key == 'Z' || key == 26)) {
-        if (key == 'Z' || ofGetKeyPressed(OF_KEY_SHIFT)) redo();
-        else undo();
+    if (command) {
+        const bool shift = ofGetKeyPressed(OF_KEY_SHIFT);
+        if (key == 'z' || key == 'Z' || key == 26) {
+            if (key == 'Z' || shift) redo(); else undo();
+        } else if (key == 's' || key == 'S' || key == 19) {
+            if (key == 'S' || shift) saveAs(); else save();
+        } else if (key == 'o' || key == 'O' || key == 15) {
+            open();
+        }
+        // Nothing else acts with command held: command-O must never also
+        // make a new output, as a plain o would.
         return;
     }
 
@@ -352,6 +394,7 @@ void ofApp::keyPressed(int key) {
 
     // ---- the map ----
     if (key == 'x') {
+        currentPath.clear();
         act("new map", [](Model& m) {
             m.newEmpty();
             return Result{true, false,
@@ -360,6 +403,7 @@ void ofApp::keyPressed(int key) {
         adopt();
     }
     if (key == 'e') {
+        currentPath.clear();
         act("example map", [](Model& m) {
             m.loadExample();
             return Result{true, false, "", 0.0f};
@@ -398,9 +442,6 @@ void ofApp::keyPressed(int key) {
                         [](Model& m) { return m.removeCurrentOutput(); });
     if (key == 'p') show(model.toggleAutoOutput());
 
-    // ---- files ----
-    if (key == 's') save();
-    if (key == 'l') load();
 
     // ---- listening ----
     if (key == ' ') auditionHeld = true;
@@ -742,6 +783,21 @@ void ofApp::drawChart() const {
         ofDrawBitmapString(ofToString(ch), b.x, chart.base + 26.0f);
     }
 
+    // The fader line: each selected node's fill, on each output it feeds --
+    // the same percentage its shape shows, so pressing q or w moves the line
+    // and the shape together. Yellow, as the selection is; the white tick is
+    // the level after trim, a different thing.
+    ofSetLineWidth(2.0f);
+    ofSetColor(255, 214, 90);
+    for (const FillMark& m : fillMarks(model, selection)) {
+        for (const ChartBar& b : chart.bars) {
+            if (b.kind != ChartBar::Kind::Output || b.output != m.output) continue;
+            const float y = chart.base - ofClamp(m.fill, 0.0f, 1.0f) * rise;
+            ofDrawLine(b.x, y, b.x + bw, y);
+        }
+    }
+    ofSetLineWidth(1.0f);
+
     // Silence, so the whole share is accounted for.
     ofSetColor(58, 62, 74);
     ofDrawRectangle(chart.silenceX, chart.top + 6.0f, bw, rise);
@@ -781,6 +837,10 @@ void ofApp::drawPanel() const {
     y += 20.0f;
 
     ofSetColor(180, 186, 200);
+    ofDrawBitmapString((currentPath.empty() ? std::string("untitled")
+                                            : pairFor(currentPath).name)
+                       + (unsaved ? "   (unsaved)" : ""), x, y);
+    y += 15.0f;
     std::string g = std::string("grid ") + names[int(kind)];
     if (kind != GridKind::Free) {
         g += "  " + ofToString(spacing, 3) + "  "
@@ -856,7 +916,8 @@ void ofApp::drawPanel() const {
         "alt+drag     free-hand",    "f  u         join  unjoin",
         "delete       remove nodes", "1-4          grid kind",
         "r R 0        rotate grid",  "- = [ ]      spacing spokes",
-        "s  l         save  load",   "x  e         empty  example",
+        "x  e         empty  example", "cmd-s  save   (+shift: as)",
+        "cmd-o  open a pair",
     };
     const char* right[] = {
         "o     new output",         "d     derived from selection",
@@ -881,43 +942,58 @@ void ofApp::drawPanel() const {
 // EditorFiles -- the map and its outputs, as a pair of files
 // ===========================================================================
 
-void ofApp::save() {
-    ofBuffer a, b;
-    a.set(io::saveManifold(manifold));
-    b.set(io::saveMapping(mapping, manifold));
-    ofBufferToFile("editor.json", a);
-    ofBufferToFile("editor-mapping.json", b);
-    message = "saved editor.json and editor-mapping.json";
-    messageTime = 3.0f;
+void ofApp::markChanged(const Result& r) {
+    if (r.changed) unsaved = true;
 }
 
-void ofApp::load() {
-    const ofBuffer buf = ofBufferFromFile("editor.json");
-    Manifold2D loaded;
-    const io::LoadResult r = io::loadManifold(buf.getText(), loaded);
-    if (!r.ok) {
-        show(Result{false, true, "load failed: " + r.error, 3.0f});
-        return;
-    }
+void ofApp::remember() const {
+    ofBuffer b;
+    b.set(currentPath);
+    ofBufferToFile(ofToDataPath("editor-last.txt"), b);
+}
 
-    // The outputs refer to nodes by NAME, so they are loaded against the map
-    // just read. A missing file is fine -- a map with no outputs yet.
-    Mapping mp;
-    std::string note;
-    if (ofFile::doesFileExist("editor-mapping.json")) {
-        const ofBuffer mb = ofBufferFromFile("editor-mapping.json");
-        const io::LoadResult mr = io::loadMapping(mb.getText(), loaded, mp);
-        if (!mr.ok) {
-            mp = Mapping();
-            note = " -- outputs file refused: " + mr.error;
-        }
+void ofApp::save() {
+    if (currentPath.empty()) { saveAs(); return; }
+    const Result r = savePair(model, currentPath);
+    show(r);
+    if (!r.refused) {
+        unsaved = false;
+        remember();
     }
-    history.record(model, "open");
-    model.adopt(std::move(loaded), std::move(mp));
-    adopt();
-    show(Result{true, !note.empty(),
-                "loaded " + ofToString(manifold.nodeCount()) + " nodes, "
-                + ofToString(manifold.regionCount()) + " regions, "
-                + ofToString(mapping.targetCount()) + " outputs" + note,
-                note.empty() ? 3.0f : 6.0f});
+}
+
+void ofApp::saveAs() {
+    const std::string suggested = currentPath.empty()
+        ? std::string("untitled") : pairFor(currentPath).name;
+    const ofFileDialogResult d =
+        ofSystemSaveDialog(suggested, "Save the map and its outputs");
+    if (!d.bSuccess) return;
+    const Result r = savePair(model, d.getPath());
+    show(r);
+    if (!r.refused) {
+        currentPath = pairFor(d.getPath()).map;
+        unsaved = false;
+        remember();
+    }
+}
+
+void ofApp::open() {
+    const ofFileDialogResult d =
+        ofSystemLoadDialog("Open a map -- either file of a pair");
+    if (d.bSuccess) openAt(d.getPath());
+}
+
+// Opening is one undo step, like any edit: history.apply records it only if
+// the map was actually replaced, so a file that cannot be read leaves both
+// the map and the history as they were.
+void ofApp::openAt(const std::string& path) {
+    const Result r = history.apply(model, "open",
+        [&](Model& m) { return openPair(m, path); });
+    show(r);
+    if (r.changed) {
+        adopt();
+        currentPath = pairFor(path).map;
+        unsaved = false;
+        remember();
+    }
 }

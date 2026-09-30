@@ -140,9 +140,31 @@ Coarse steps land on multiples of 5 in their direction (73% then `q` gives
 |---|---|
 | 2a | fill steps, ⇧B, undo and redo, placement leaves nothing selected, a click on empty space clears a selection — **DONE** |
 | 2a+ | `b` toggles the binding to the current output; binding marks on faders and map — **DONE** |
-| 2b | named saves as a pair through the Mac dialogs |
+| 2b | named saves as a pair through the Mac dialogs, and the fader fill line — **DONE** |
 | 2c | window at 90% of the screen, full screen, fader narrowing, scaled text |
 | 2d | keys grouped and lit when usable; view sections lifted into files |
+
+**Slice 2b, done.** `ofxManifoldEditorFiles` -- a NEW source file, so
+Project Generator must re-scan the addon. A save writes `name.json` and
+`name-outputs.json`; choosing either, or the bare name, opens the pair, and an
+earlier editor's `-mapping.json` still opens. Pure C++ file I/O, tested in a
+scratch folder emptied at every run so a leftover file cannot pass a
+missing-file step. Command-S, shift-command-S, command-O; plain `s` and `l`
+retired. The title names the pair and marks unsaved changes; the last pair
+reopens at launch, and the old `editor.json` still opens when there is none.
+
+Asked for during the slice: a **fader line** at each selected node's fill, on
+each output it feeds, so the line and the node's shape move together on q and
+w. `fillMarks()` computes it, tested; the app only draws it.
+
+21 scripts, 236 steps, first run. Mutation testing: 5 of 6 caught. The sixth
+was EQUIVALENT: the kernel's mapping loader builds into a local and writes its
+output only on success, so a refused file can never leave half-read outputs
+behind. One mutation was caught by a CRASH rather than a clean failure -- a
+silence binding reaching the fader line was looked up as an output name and
+ran off the end -- so the runner now reports an id that names no output
+instead of looking it up. Undefined behaviour that fails on one machine can
+pass on another.
 
 **Slice 2a+, done.** Asked for after using 2a: bindings could be added one at a
 time but removed only all at once, and pressing `b` twice fed an output DOUBLE,

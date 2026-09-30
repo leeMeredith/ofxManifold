@@ -60,11 +60,13 @@ EDITOR_H   := ofxManifoldEditor/src/ofxManifoldEditor.h \
               ofxManifoldEditor/src/ofxManifoldEditorModel.h \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.h \
               ofxManifoldEditor/src/ofxManifoldEditorChartLayout.h \
-              ofxManifoldEditor/src/ofxManifoldEditorHistory.h
+              ofxManifoldEditor/src/ofxManifoldEditorHistory.h \
+              ofxManifoldEditor/src/ofxManifoldEditorFiles.h
 EDITOR_CPP := ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
-              ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
+              ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
+              ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
 EDITOR_INC := -Isrc -IofxManifoldEditor/src
 
 AUTHORING := src/authoring/ofxManifoldGrid.h \
@@ -213,7 +215,7 @@ $(MAP_RUN): tests/run_mapping.cpp $(CORE) $(INTERP) $(MAPPING)
 $(MAP_VEC): tests/ref/reference_mapping.py
 	@python3 tests/ref/reference_mapping.py
 
-$(EDI_RUN): tests/run_editor.cpp $(CORE) $(MAPPING) $(AUTHORING) $(EDITOR_H) $(EDITOR_CPP)
+$(EDI_RUN): tests/run_editor.cpp $(CORE) $(MAPPING) $(IO) $(AUTHORING) $(EDITOR_H) $(EDITOR_CPP)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) $(EDITOR_INC) -o $@ tests/run_editor.cpp $(EDITOR_CPP)
 

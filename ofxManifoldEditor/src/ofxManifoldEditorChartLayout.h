@@ -12,6 +12,8 @@
 // channels -- and its vectors change with it.
 
 #include "mapping/ofxManifoldMapping.h"
+#include "ofxManifoldEditorModel.h"
+#include "ofxManifoldEditorSelection.h"
 
 #include <cstddef>
 #include <string>
@@ -51,6 +53,18 @@ struct ChartLayout {
 
 ChartLayout layoutChart(const Mapping& mapping, float x0, float top,
                         float width, float height);
+
+// The fader line: for each output a selected node feeds, that node's fill --
+// the same percentage its shape shows, so the line on the fader and the fill
+// in the node move together when q or w is pressed. One mark per node per
+// output, in selection order then binding order.
+struct FillMark {
+    TargetID output = InvalidTarget;
+    NodeID   node   = InvalidNode;
+    float    fill   = 0.0f;
+};
+
+std::vector<FillMark> fillMarks(const Model& model, const Selection& sel);
 
 } // namespace editor
 } // namespace ofxManifold

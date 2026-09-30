@@ -395,6 +395,35 @@ class Editor:
         self.derived = [["sub", 4, ["N", "O"]]]
         self.current = "front"
 
+    # ---- files -----------------------------------------------------------
+    # A pair on "disk" is a snapshot of the map and, depending on the case, of
+    # its outputs. The kernel's own suites pin the file FORMATS; this only has
+    # to know what a correct round trip must restore.
+    def snapshot(self):
+        import copy
+        return copy.deepcopy((self.nodes, self.regions, self.outputs,
+                              self.links, self.derived))
+
+    def restore(self, snap, with_outputs):
+        import copy
+        n, r, o, l, d = copy.deepcopy(snap)
+        self.nodes, self.regions = n, r
+        if with_outputs:
+            self.outputs, self.links, self.derived = o, l, d
+        else:
+            self.outputs, self.links, self.derived = [], {}, []
+        self.current = None
+        self.settle()
+
+    def fill_marks(self, sel):
+        marks = []
+        for n in sel:
+            f = self.fraction(n)
+            for l in self.links.get(n, []):
+                if l[0] == "out":
+                    marks.append((l[1], n, f))
+        return marks
+
     # ---- the fader layout ----------------------------------------------
     def chart(self, x0, top, w, h):
         """Geometry only, as a list; restated from the rules, not the C++."""
@@ -461,13 +490,14 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "bindall": "bind to every output", "fill": "fill",
           "clear": "clear bindings", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
-          "empty": "new map", "move": "move"}
+          "empty": "new map", "move": "move", "openpair": "open"}
 
 
 class Script:
     def __init__(self, out, name, note, grid=None, spec="FREE", limit=200):
         self.out, self.ed = out, Editor()
         self.past, self.future, self.limit = [], [], limit
+        self.disk = {}           # base name -> (snapshot, outputs state)
         self.grid = grid or G.Free()
         self.sel, self.ordered = [], True
         out.append(f"# {note}")
@@ -518,6 +548,11 @@ class Script:
             "bindall":  lambda: e.bind_all(s),
             "fill":     lambda: e.step_fill(s, args[0], args[1]),
             "move":     lambda: e.move(args[0], args[1]),
+            "savepair": lambda: self.save_pair(args[0]),
+            "openpair": lambda: self.open_pair(args[0]),
+            "legacypair": lambda: self.write_as(args[0], "legacy"),
+            "maponly":  lambda: self.write_as(args[0], None),
+            "badoutputs": lambda: self.write_as(args[0], "bad"),
             "clear":    lambda: e.clear(s), "cycle": e.cycle,
             "trim":     lambda: e.trim(args[0]),
             "pick":     lambda: e.pick(args[0]),
@@ -534,6 +569,9 @@ class Script:
             argtxt = f" {args[0]}"
         elif op == "fill":
             argtxt = f" {args[0]} {1 if args[1] else 0}"
+        elif op in ("savepair", "openpair", "legacypair", "maponly",
+                    "badoutputs"):
+            argtxt = f" {args[0]}"
         elif op == "move":
             argtxt = f" {args[0]} {fmt(args[1][0])} {fmt(args[1][1])}"
         self.out.append(f"DO {op}{argtxt}")
@@ -557,6 +595,55 @@ class Script:
         for x, y in clicks:
             hit = None if lay["empty"] else self.ed.output_at(lay, x, y)
             self.out.append(f"CLICK {fmt(x)} {fmt(y)} {hit or '-'}")
+
+    @staticmethod
+    def base(chosen):
+        for tail in ("-outputs.json", "-mapping.json", ".json"):
+            if chosen.endswith(tail):
+                return chosen[:-len(tail)]
+        return chosen
+
+    def save_pair(self, chosen):
+        b = self.base(chosen)
+        self.disk[b] = (self.ed.snapshot(), "ok")
+        return (0, 0, f"saved {b}.json and {b}-outputs.json")
+
+    def write_as(self, chosen, outputs):
+        """A file written some other way: by an earlier editor ("legacy"),
+        with no outputs file (None), or with an outputs file that is
+        refused ("bad")."""
+        self.disk[self.base(chosen)] = (self.ed.snapshot(), outputs)
+        return (0, 0, "")
+
+    def open_pair(self, chosen):
+        b = self.base(chosen)
+        if b not in self.disk:
+            return (0, 1, f"cannot open {b}.json")
+        snap, outs = self.disk[b]
+        good = outs in ("ok", "legacy")
+        self.ed.restore(snap, good)
+        e = self.ed
+        pl = lambda k, one, many: f"{k} {one if k == 1 else many}"
+        msg = (f"opened {b}: {pl(len(e.nodes), 'node', 'nodes')}, "
+               f"{pl(len(e.regions), 'region', 'regions')}, "
+               f"{pl(len(e.outputs), 'output', 'outputs')}")
+        if outs is None:
+            return (1, 0, msg + " (no outputs file)")
+        if outs == "bad":
+            # The parser's own words follow; the runner matches the prefix.
+            return (1, 1, msg + " -- outputs file refused: *")
+        return (1, 0, msg)
+
+    def pair(self, chosen):
+        b = self.base(chosen)
+        name = b.replace("\\", "/").split("/")[-1]
+        self.out.append(f"PAIR {chosen} MAP {b}.json OUT {b}-outputs.json "
+                        f"LEGACY {b}-mapping.json NAME {name}")
+
+    def marks(self):
+        m = self.ed.fill_marks(self.sel)
+        self.out.append("FILLMARKS " + (" ".join(
+            f"{o}:{n}:{fmt(f)}" for o, n, f in m) or "NONE"))
 
     def select(self, *names):
         self.sel, self.ordered = [names[0]], True
@@ -791,6 +878,52 @@ def build():
     t.do("bind")                                # back to n1 alone, still 90%
     t.do("pick", "n1"); t.do("bind")            # its LAST output: null, clean
     t.do("undo")                                # "undid binding", 90% again
+    t.end()
+
+    t = Script(out, "fill_line_on_the_faders",
+               "the fader line: for each output a selected node feeds, that "
+               "node's fill -- the percentage its shape shows -- so the line "
+               "and the shape move together on q and w")
+    t.do("example")
+    t.select("O"); t.marks()                    # four outputs, full
+    t.select("B"); t.marks()                    # right, half
+    t.select("B", "D"); t.marks()               # two nodes, two fills
+    t.select("B"); t.do("fill", +1, False); t.marks()     # 55%
+    t.select("A"); t.marks()                    # no outputs: no line
+    t.end()
+
+    t = Script(out, "files_save_and_open",
+               "a named save writes the pair; opening either file of the pair "
+               "restores it exactly, outputs and all; a missing file changes "
+               "nothing; opening is one undo step")
+    t.pair("sets/stage-left.json"); t.pair("sets/stage-left-outputs.json")
+    t.pair("sets/stage-left-mapping.json"); t.pair("stage-left")
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)
+    t.select("n0", "n1", "n2"); t.do("join")
+    t.do("trim", -3.0)
+    t.select("n1"); t.do("fill", -1, False)
+    t.do("savepair", "stage-left")
+    t.do("empty")
+    t.do("openpair", "stage-left.json")
+    t.do("empty")
+    t.do("openpair", "stage-left-outputs.json")   # the outputs name: the pair
+    t.do("openpair", "nowhere.json")               # missing: nothing changes
+    t.do("undo")                                   # back to the empty map
+    t.end()
+
+    t = Script(out, "files_old_partial_and_refused",
+               "an earlier editor's -mapping.json pair still opens; a map "
+               "with no outputs file opens with none; an outputs file that is "
+               "refused opens the map, says why, and is flagged")
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)
+    t.select("n0", "n1", "n2"); t.do("join")
+    t.do("legacypair", "old"); t.do("maponly", "bare")
+    t.do("badoutputs", "broken")
+    t.do("empty"); t.do("openpair", "old.json")
+    t.do("empty"); t.do("openpair", "bare.json")
+    t.do("empty"); t.do("openpair", "broken.json")
     t.end()
 
     t = Script(out, "undo_redo",

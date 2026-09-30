@@ -52,6 +52,19 @@ ChartLayout layoutChart(const Mapping& mapping, float x0, float top,
     return L;
 }
 
+std::vector<FillMark> fillMarks(const Model& model, const Selection& sel) {
+    std::vector<FillMark> marks;
+    const Mapping& mp = model.mapping();
+    for (NodeID id : sel.nodes()) {
+        const float fill = mp.outputFraction(id);
+        for (std::size_t k = 0; k < mp.linkCount(id); ++k) {
+            const Link& l = mp.link(id, k);
+            if (l.kind == DestKind::Output) marks.push_back({l.id, id, fill});
+        }
+    }
+    return marks;
+}
+
 TargetID ChartLayout::outputAt(float x, float y) const {
     for (const ChartBar& b : bars) {
         if (b.kind != ChartBar::Kind::Output) continue;

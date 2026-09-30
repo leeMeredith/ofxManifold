@@ -69,6 +69,14 @@ inline float ofRandom(float a,float b){return (a+b)*0.5f;}
 template<typename T> std::string ofToString(const T&){return "";}
 template<typename T> std::string ofToString(const T&,int){return "";}
 inline std::string ofToDataPath(const std::string& s){return s;}
+struct ofFileDialogResult {
+    bool bSuccess = false;
+    std::string filePath;
+    std::string getPath() const { return filePath; }
+    std::string getName() const { return filePath; }
+};
+inline ofFileDialogResult ofSystemSaveDialog(const std::string&, const std::string&){ return {}; }
+inline ofFileDialogResult ofSystemLoadDialog(const std::string& = "", bool = false, const std::string& = ""){ return {}; }
 inline bool ofBufferToFile(const std::string&,ofBuffer&){return true;}
 struct ofLogNotice { template<typename T> ofLogNotice& operator<<(const T&){return *this;} };
 struct ofLogError { template<typename T> ofLogError& operator<<(const T&){return *this;} };

@@ -10,6 +10,10 @@
 #include "ofxManifoldEditorSelection.h"
 #include "ofxManifoldEditorChartLayout.h"
 #include "ofxManifoldEditorHistory.h"
+#include "ofxManifoldEditorFiles.h"
+#include "io/ofxManifoldSerialize.h"
+
+#include <filesystem>
 
 #include <functional>
 
@@ -143,6 +147,16 @@ Grid readGrid(std::istringstream& in) {
     return Grid::free();
 }
 
+// Scratch space for the file scripts. Emptied at the start of every run, so a
+// file left from an earlier run cannot make a "missing file" step pass.
+const std::string kScratch = "build/editor-files/";
+
+bool writeText(const std::string& path, const std::string& text) {
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    f << text;
+    return bool(f);
+}
+
 // The label each operation is recorded under -- the same words the reference
 // uses, so an undo message naming the wrong action fails a vector.
 std::string label(const std::string& op) {
@@ -153,7 +167,7 @@ std::string label(const std::string& op) {
         {"bindall", "bind to every output"}, {"fill", "fill"},
         {"clear", "clear bindings"}, {"trim", "trim"},
         {"removeoutput", "remove output"}, {"example", "example map"},
-        {"empty", "new map"}, {"move", "move"}};
+        {"empty", "new map"}, {"move", "move"}, {"openpair", "open"}};
     auto it = L.find(op);
     return it == L.end() ? op : it->second;
 }
@@ -166,6 +180,8 @@ int main(int argc, char** argv) {
     std::ifstream f(path);
     if (!f) { std::cerr << "cannot open: " << path << "\n"; return 2; }
     std::cout << "ofxManifoldEditor model\nvectors: " << path << "\n\n";
+    std::filesystem::remove_all(kScratch);
+    std::filesystem::create_directories(kScratch);
 
     std::string name, cls, lastOp;
     Model md;
@@ -252,6 +268,30 @@ int main(int argc, char** argv) {
                 op = [&, nm, x, y](Model& m) {
                     return m.move({{m.manifold().findNode(nm), {x, y}}}); };
             }
+            else if (lastOp == "savepair") {
+                std::string nm; in >> nm;
+                op = [nm](Model& m) { return savePair(m, kScratch + nm); };
+            }
+            else if (lastOp == "openpair") {
+                std::string nm; in >> nm;
+                op = [nm](Model& m) { return openPair(m, kScratch + nm); };
+            }
+            else if (lastOp == "legacypair" || lastOp == "maponly"
+                     || lastOp == "badoutputs") {
+                // Files written some other way than savePair: as an earlier
+                // editor named them, with no outputs file, or with one that
+                // will be refused. Written directly; the model is untouched.
+                std::string nm; in >> nm;
+                const FilePair p = pairFor(kScratch + nm);
+                writeText(p.map, io::saveManifold(md.manifold()));
+                if (lastOp == "legacypair") {
+                    writeText(p.legacy,
+                              io::saveMapping(md.mapping(), md.manifold()));
+                } else if (lastOp == "badoutputs") {
+                    writeText(p.outputs, "{ \"version\": ");
+                }
+                op = [](Model&) { return Result{}; };
+            }
             else if (lastOp == "example") op = [&](Model& m) {
                 m.loadExample(); Result r; r.changed = true; return r; };
             else if (lastOp == "empty")   op = [&](Model& m) {
@@ -263,9 +303,14 @@ int main(int argc, char** argv) {
             std::string rest; std::getline(in, rest);
             const std::size_t q1 = rest.find('"'), q2 = rest.rfind('"');
             const std::string msg = rest.substr(q1 + 1, q2 - q1 - 1);
+            const bool prefix = !msg.empty() && msg.back() == '*';
+            const bool sameMsg = prefix
+                ? last.message.compare(0, msg.size() - 1, msg, 0,
+                                       msg.size() - 1) == 0
+                : last.message == msg;
             if (ok && ((last.changed ? 1 : 0) != ch
                        || (last.refused ? 1 : 0) != rf
-                       || last.message != msg)) {
+                       || !sameMsg)) {
                 ok = false;
                 why << "step " << step << " (" << lastOp << "): expected "
                     << ch << " " << rf << " \"" << msg << "\", got "
@@ -279,6 +324,38 @@ int main(int argc, char** argv) {
                 ok = false;
                 why << "step " << step << " (" << lastOp << ") state differs"
                     << "\n      want:" << want << "\n      got:  " << got;
+            }
+        } else if (kind == "PAIR") {
+            std::string chosen, k1, m, k2, o, k3, l, k4, n;
+            in >> chosen >> k1 >> m >> k2 >> o >> k3 >> l >> k4 >> n;
+            const FilePair p = pairFor(chosen);
+            if (ok && (p.map != m || p.outputs != o || p.legacy != l
+                       || p.name != n)) {
+                ok = false;
+                why << "pairFor(" << chosen << ") gave " << p.map << " "
+                    << p.outputs << " " << p.legacy << " " << p.name;
+            }
+        } else if (kind == "FILLMARKS") {
+            std::string want, tok;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            for (const FillMark& fm : fillMarks(md, sel)) {
+                // An id that names no output is reported, not looked up: a
+                // silence binding reaching the fader line once CRASHED here,
+                // which caught the fault on this machine but is undefined
+                // behaviour that could as easily pass on another.
+                const std::string out =
+                    fm.output < md.mapping().targetCount()
+                        ? md.mapping().targetName(fm.output)
+                        : std::string("INVALID");
+                got += (got.empty() ? "" : " ") + out + ":"
+                     + md.manifold().node(fm.node).name + ":" + num(fm.fill);
+            }
+            if (got.empty()) got = "NONE";
+            if (ok && !sameState(want, got)) {
+                ok = false;
+                why << "fill marks after step " << step << ": want " << want
+                    << ", got " << got;
             }
         } else if (kind == "CHART") {
             in >> chX >> chTop >> chW >> chH;
