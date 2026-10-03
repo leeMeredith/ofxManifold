@@ -141,6 +141,16 @@ Coarse steps land on multiples of 5 in their direction (73% then `q` gives
 | 2a | fill steps, ⇧B, undo and redo, placement leaves nothing selected, a click on empty space clears a selection — **DONE** |
 | 2a+ | `b` toggles the binding to the current output; binding marks on faders and map — **DONE** |
 | 2b | named saves as a pair through the Mac dialogs, and the fader fill line — **DONE** |
+| 2b+ | binding fixes: placing a node leaves the current output alone; an unbind that silences a node says so — **DONE** |
+| 2c | listening: permanent listening point and levels, halos always, a selected node's contribution in each fader, shift-click several faders |
+| 2d | the screen: window at 90%, full screen, fader narrowing, labels that fit, hover, slivers, scaled text |
+| 2e | keys grouped and lit when usable, `b` previewing its action; views lifted into files |
+
+The slices from 2c on were reordered after using 2b, around three kinds of
+request: binding, seeing what is heard, choosing outputs. Mute was considered
+and left for the PLAYER example (round 3B), where performing happens.
+
+Previously planned for 2c and 2d:
 | 2c | window at 90% of the screen, full screen, fader narrowing, scaled text |
 | 2d | keys grouped and lit when usable; view sections lifted into files |
 
@@ -165,6 +175,26 @@ silence binding reaching the fader line was looked up as an output name and
 ran off the end -- so the runner now reports an id that names no output
 instead of looking it up. Undefined behaviour that fails on one machine can
 pass on another.
+
+**Slice 2b+, done.** Reported in use: selecting a node and pressing `b` made
+it SILENT, and binding seemed not to work once nodes were bound. Reproduced:
+auto-output made each new node's output current, so `b` -- a toggle -- acted on
+the very output the node already fed, and unbound it. Placing a node now
+changes the current output only if there was none; an unbind that leaves a
+node with no output says so, by name or count, as a warning.
+
+**Three scripts passed while no longer testing their purpose.** Each relied on
+the newest node's output being current; under the new rule a surviving-output
+case, a reserved-name case and a removal-before-the-current-output case were
+simply never reached, and the suite stayed GREEN. Confirmed rather than
+assumed: with the scripts unrepaired, two of three existing gates went DEAD --
+their faults passed. Each script now picks its output explicitly instead of
+relying on a default. CI would have caught it, since a gate demands its fault
+make the suite fail; but only faults WITH gates are protected, so the affected
+scripts were also read by hand. A behaviour change is checked by what its
+scripts still reach, not by whether they pass.
+
+22 scripts, 252 steps. No new source file.
 
 **2b, first build on the Mac:** three errors -- `getPath()` called on a const
 `ofFileDialogResult`. Real openFrameworks declares it non-const; the test stub

@@ -15,16 +15,16 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 0.2004 0.2
 EXPECT 0 1 "a node is already there"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 1.3 0.5
 EXPECT 0 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 ENDEDIT
 
 # on a square grid the node lands on the grid point, and a second click at the same address is refused
@@ -38,7 +38,7 @@ EXPECT 0 1 "a node is already there"
 STATE N n0@0.1,0.35 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.3 0.3
 EXPECT 1 0 ""
-STATE N n0@0.1,0.35 n1@0.3,0.3 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.1,0.35 n1@0.3,0.3 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 ENDEDIT
 
 # with auto-output off a node starts unbound and no output appears
@@ -69,42 +69,42 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.8 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 0.2 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 DO join
 EXPECT 0 1 "select at least three nodes to join"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n2
 SEL toggle n1
 SEL toggle n3
 DO join
 EXPECT 0 1 "refused: self-intersecting (in click order)"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 SEL toggle n3
 DO join
 EXPECT 1 0 "joined 4 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL clear
 SEL box n3 n1 n0 n2
 DO join
 EXPECT 0 1 "those nodes already form a region"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL clear
 SEL box n0 n1 n2
 DO join
 EXPECT 1 0 "joined 3 nodes in angle order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 ENDEDIT
 
 # a box over four fresh corners, caught in CROSSING order. Angle order makes the square; the selection's own order would cross itself. The earlier box join landed on a set already joined, so the duplicate check answered before ordering was consulted, and ordering went untested -- one step exercising two checks proves neither, as with the bowties and D-022
@@ -115,32 +115,32 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.8 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 0.2 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL clear
 SEL box n0 n2 n1 n3
 DO join
 EXPECT 1 0 "joined 4 nodes in angle order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R n0,n1,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n2
 SEL toggle n1
 SEL toggle n3
 DO unjoin
 EXPECT 1 0 "unjoined 1 region"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n2
 SEL toggle n1
 SEL toggle n3
 DO join
 EXPECT 0 1 "refused: self-intersecting (in click order)"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.8,0.8 n3@0.2,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 ENDEDIT
 
 # removing an output that comes BEFORE the current one: output ids after it shift down, so the current output must shift with them and still name the same output. Every earlier removal hit the current output or one after it
@@ -151,9 +151,12 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
+DO pick n2
+EXPECT 0 0 "current output: n2"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
 SEL only n0
 DO remove
@@ -174,20 +177,20 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 0.5 0.45
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.5,0.45 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.5,0.45 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.5,0.45 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
-DO cycle
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.5,0.45 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
+DO pick n0
 EXPECT 0 0 "current output: n0"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.5,0.45 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n1
@@ -210,7 +213,7 @@ EXPECT 1 0 "bound 1 to n0"
 STATE N n1@0.8,0.2 n3@0.5,0.45 | R  | O n0:0:1 n1:1:1 n3:3:1 | L n1>n1:1 n1>n0:1 n3>n3:1 n3>n0:1 | D  | C n0 | A 1
 DO place 0.3 0.3
 EXPECT 1 0 ""
-STATE N n1@0.8,0.2 n3@0.5,0.45 n2@0.3,0.3 | R  | O n0:0:1 n1:1:1 n3:3:1 n2:2:1 | L n1>n1:1 n1>n0:1 n3>n3:1 n3>n0:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n1@0.8,0.2 n3@0.5,0.45 n2@0.3,0.3 | R  | O n0:0:1 n1:1:1 n3:3:1 n2:2:1 | L n1>n1:1 n1>n0:1 n3>n3:1 n3>n0:1 n2>n2:1 | D  | C n0 | A 1
 ENDEDIT
 
 # an output that outlives its node keeps its name reserved: a new node skips it rather than being left unbound
@@ -221,6 +224,9 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
+DO pick n1
+EXPECT 0 0 "current output: n1"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
 SEL only n0
 DO bind
@@ -233,7 +239,7 @@ STATE N n0@0.2,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n0>n1:1 | D  | C n1 | A 1
 SEL clear
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n2>n2:1 | D  | C n1 | A 1
 ENDEDIT
 
 # unjoin removes only regions made entirely of selected nodes, keeping the nodes
@@ -244,36 +250,36 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 0.9 0.9
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n3
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n2 n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n2 n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n3
 DO unjoin
 EXPECT 0 1 "no region is made only of selected nodes"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n2 n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n2 n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 DO unjoin
 EXPECT 1 0 "unjoined 1 region"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R n0,n1,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 ENDEDIT
 
 # outputs: new, derived, bind, silence, clear, cycle, trim, remove. Round 2 replaced the quarter share of silence per press with fill steps, and this vector changed with it
@@ -523,28 +529,82 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n0
 DO bindall
 EXPECT 1 0 "bound 1 node to every output (3)"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO fill -1 0
 EXPECT 1 0 "fill 95%"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.157895 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.157895 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO fill -1 0
 EXPECT 1 0 "fill 90%"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO bindall
 EXPECT 1 0 "bound 1 node to every output (3)"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n1
 SEL toggle n2
 DO bindall
 EXPECT 1 0 "bound 2 nodes to every output (3)"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n0:1 n1>n1:1 n1>n2:1 n2>n0:1 n2>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n0:1 n1>n1:1 n1>n2:1 n2>n0:1 n2>n1:1 n2>n2:1 | D  | C n0 | A 1
+ENDEDIT
+
+# placing a node no longer moves the current output. It used to follow every new node, so b on the newest node unbound it from its own output and left it silent. An unbind that leaves a node with no output says so: by name for one node, by count for several, and as a warning
+EDIT current_output_stays_put ANALYTIC
+GRID FREE
+DO place 0.2 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
+DO place 0.8 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
+DO pick n1
+EXPECT 0 0 "current output: n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+DO place 0.5 0.8
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n1 | A 1
+SEL only n2
+DO bind
+EXPECT 1 0 "bound 1 to n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n2>n1:1 | D  | C n1 | A 1
+DO bind
+EXPECT 1 0 "unbound 1 from n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n1 | A 1
+DO pick n2
+EXPECT 0 0 "current output: n2"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO bind
+EXPECT 1 1 "unbound 1 from n2 -- n2 now silent; cmd-z undoes"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 | D  | C n2 | A 1
+DO undo
+EXPECT 1 0 "undid binding"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+DO pick n0
+EXPECT 0 0 "current output: n0"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
+SEL only n1
+DO bind
+EXPECT 1 0 "bound 1 to n0"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>n0:1 n2>n2:1 | D  | C n0 | A 1
+DO pick n1
+EXPECT 0 0 "current output: n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>n0:1 n2>n2:1 | D  | C n1 | A 1
+DO bind
+EXPECT 1 0 "unbound 1 from n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n0:1 n2>n2:1 | D  | C n1 | A 1
+DO pick n0
+EXPECT 0 0 "current output: n0"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n0:1 n2>n2:1 | D  | C n0 | A 1
+SEL only n0
+SEL toggle n1
+DO bind
+EXPECT 1 1 "unbound 2 from n0 -- 2 nodes now silent; cmd-z undoes"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n2>n2:1 | D  | C n0 | A 1
 ENDEDIT
 
 # b toggles each selected node's binding to the CURRENT output. Pressing it twice unbinds rather than feeding the output double; a mixed selection binds only the nodes not yet bound; fill is kept through every change; a node losing its last output becomes cleanly null
@@ -555,10 +615,10 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO pick n0
 EXPECT 0 0 "current output: n0"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
@@ -575,7 +635,7 @@ DO bind
 EXPECT 1 0 "bound 1 to n0"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>n0:1 n2>n2:1 | D  | C n0 | A 1
 DO bind
-EXPECT 1 0 "unbound 2 from n0"
+EXPECT 1 1 "unbound 2 from n0 -- n0 now silent; cmd-z undoes"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n1
 DO fill -1 0
@@ -597,7 +657,7 @@ DO pick n1
 EXPECT 0 0 "current output: n1"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n1>n1:1 n1>~:0.111111 n2>n2:1 | D  | C n1 | A 1
 DO bind
-EXPECT 1 0 "unbound 1 from n1"
+EXPECT 1 1 "unbound 1 from n1 -- n1 now silent; cmd-z undoes"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n2>n2:1 | D  | C n1 | A 1
 DO undo
 EXPECT 1 0 "undid binding"
@@ -638,41 +698,41 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO trim -3
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:0.707946 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n1
 DO fill -1 0
 EXPECT 1 0 "fill 95%"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:0.707946 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
 DO savepair stage-left
 EXPECT 0 0 "saved stage-left.json and stage-left-outputs.json"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:0.707946 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | A 1
 DO openpair stage-left.json
 EXPECT 1 0 "opened stage-left: 3 nodes, 1 region, 3 outputs"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:0.707946 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | A 1
 DO openpair stage-left-outputs.json
 EXPECT 1 0 "opened stage-left: 3 nodes, 1 region, 3 outputs"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:0.707946 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
 DO openpair nowhere.json
 EXPECT 0 1 "cannot open nowhere.json"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:0.707946 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:0.707946 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>~:0.0526316 n2>n2:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid open"
 STATE N  | R  | O  | L  | D  | C - | A 1
@@ -686,25 +746,25 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO legacypair old
 EXPECT 0 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO maponly bare
 EXPECT 0 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO badoutputs broken
 EXPECT 0 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | A 1
@@ -736,61 +796,61 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid join"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
-DO undo
-EXPECT 1 0 "undid place"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
-DO redo
-EXPECT 1 0 "redid place"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
-DO place 0.2004 0.2
-EXPECT 0 1 "a node is already there"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
-DO cycle
-EXPECT 0 0 "current output: n0"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid place"
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
+DO redo
+EXPECT 1 0 "redid place"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
+DO place 0.2004 0.2
+EXPECT 0 1 "a node is already there"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
+DO cycle
+EXPECT 0 0 "current output: n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n1 | A 1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.9 0.9
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO redo
 EXPECT 0 1 "nothing to redo"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n0
 DO remove
 EXPECT 1 0 "removed 1 node, and 1 output"
-STATE N n1@0.8,0.2 n2@0.9,0.9 | R  | O n1:1:1 n2:2:1 | L n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n1@0.8,0.2 n2@0.9,0.9 | R  | O n1:1:1 n2:2:1 | L n1>n1:1 n2>n2:1 | D  | C n1 | A 1
 SEL clear
 DO undo
 EXPECT 1 0 "undid delete"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n1
 DO move n1 0.7 0.3
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.7,0.3 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.7,0.3 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid move"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | A 1
 DO undo
 EXPECT 1 0 "undid new map"
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 ENDEDIT
 
 # beyond the limit the OLDEST step goes, never the newest
@@ -802,28 +862,28 @@ EXPECT 1 0 ""
 STATE N n0@0.1,0.1 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.3 0.1
 EXPECT 1 0 ""
-STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.1
 EXPECT 1 0 ""
-STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO place 0.7 0.1
 EXPECT 1 0 ""
-STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 DO place 0.9 0.1
 EXPECT 1 0 ""
-STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 n4@0.9,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n4 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 n4@0.9,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid place"
-STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n3 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 n3@0.7,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid place"
-STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 n2@0.5,0.1 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 DO undo
 EXPECT 1 0 "undid place"
-STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO undo
 EXPECT 0 1 "nothing to undo"
-STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 ENDEDIT
 
 # the fader layout: a gap left by a deleted node's output shows as an unused channel, and thirty outputs narrow every bar. Round 2 changes this layout on purpose, and this vector with it
@@ -834,14 +894,14 @@ EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | A 1
 DO place 0.8 0.2
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | A 1
 DO place 0.5 0.8
 EXPECT 1 0 ""
-STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | A 1
 SEL only n1
 DO remove
 EXPECT 1 0 "removed 1 node, and 1 output"
-STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 | L n0>n0:1 n2>n2:1 | D  | C n2 | A 1
+STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 | L n0>n0:1 n2>n2:1 | D  | C n0 | A 1
 SEL clear
 CHART 24 502 976 118
 EXPECTCHART 46 202 264 0:output:32:n0 1:unused:86:- 2:output:140:n2
@@ -849,7 +909,7 @@ CLICK 106 560 -
 CLICK 160 560 n2
 DO auto
 EXPECT 0 0 "auto-output off: new nodes start unbound"
-STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 | L n0>n0:1 n2>n2:1 | D  | C n2 | A 0
+STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 | L n0>n0:1 n2>n2:1 | D  | C n0 | A 0
 DO newoutput
 EXPECT 1 0 "new output out1 on channel 1 -- select nodes and press b"
 STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 out1:1:1 | L n0>n0:1 n2>n2:1 | D  | C out1 | A 0

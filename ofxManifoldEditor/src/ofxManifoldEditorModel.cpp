@@ -214,7 +214,12 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
                                              nextFreeChannel());
         if (t != InvalidTarget) {
             mapping_.bind(id, t);
-            currentOutput_ = t;
+            // The current output changes only if there was none. It used to
+            // follow every new node, so the output `b` acted on was usually
+            // the one the newest node already fed -- and b, a toggle, then
+            // UNBOUND it, leaving it silent. The current output is the one
+            // the user picked, and placing a node must not move it.
+            if (currentOutput_ == InvalidTarget) currentOutput_ = t;
         }
     }
     refreshTopology();
@@ -379,6 +384,7 @@ Result Model::bind(const Selection& sel) {
     }
 
     std::size_t n = 0;
+    std::vector<std::string> silenced;
     for (NodeID id : sel.nodes()) {
         if (all == !feeds(id, t)) continue;       // already as wanted
         // The fill a node had, kept through the change: removing a binding
@@ -392,13 +398,28 @@ Result Model::bind(const Selection& sel) {
             // -- a stray one behaves the same but pushes the outputs file to
             // version 2 for nothing.
             mapping_.clearBindings(id);
+            silenced.push_back(manifold_.node(id).name);
         } else if (fill < 1.0f) {
             mapping_.setOutputFraction(id, fill);
         }
         ++n;
     }
-    return changed(std::string(all ? "unbound " : "bound ") + std::to_string(n)
-                   + (all ? " from " : " to ") + mapping_.targetName(t), 2.0f);
+    Result r = changed(std::string(all ? "unbound " : "bound ")
+                       + std::to_string(n) + (all ? " from " : " to ")
+                       + mapping_.targetName(t), 2.0f);
+    // An unbind that leaves a node with no output at all makes it silent,
+    // which is easy to do without meaning to. Say so, by name when it is one
+    // node, and flag it so an editor shows it as a warning.
+    if (!silenced.empty()) {
+        r.message += " -- "
+                   + (silenced.size() == 1 ? silenced[0]
+                                           : plural(silenced.size(), " node",
+                                                    " nodes"))
+                   + " now silent; cmd-z undoes";
+        r.refused = true;
+        r.seconds = 3.5f;
+    }
+    return r;
 }
 
 Result Model::stepFill(const Selection& sel, int direction, bool fine) {

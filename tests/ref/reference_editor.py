@@ -134,7 +134,8 @@ class Editor:
         if self.auto and nm not in self.out_names():
             self.outputs.append([nm, self.next_channel(), 1.0])
             self.bind_one(nm, nm)
-            self.current = nm
+            if self.current is None:        # only if there was none
+                self.current = nm
         return (1, 0, "")
 
     def move(self, name, p):
@@ -245,7 +246,7 @@ class Editor:
             return (0, 0, "")
         cur = self.current
         every = all(self.feeds(n, cur) for n in sel)
-        count = 0
+        count, silenced = 0, []
         for n in sel:
             if every != self.feeds(n, cur):
                 continue
@@ -256,11 +257,17 @@ class Editor:
                 self.bind_one(n, cur)
             if self.output_count(n) == 0:
                 self.links.pop(n, None)
+                silenced.append(n)
             elif fill < 1.0:
                 self.set_fraction(n, fill)
             count += 1
-        return (1, 0, ("unbound " if every else "bound ") + str(count)
-                + (" from " if every else " to ") + cur)
+        msg = (("unbound " if every else "bound ") + str(count)
+               + (" from " if every else " to ") + cur)
+        if silenced:
+            who = silenced[0] if len(silenced) == 1 \
+                else f"{len(silenced)} nodes"
+            return (1, 1, msg + f" -- {who} now silent; cmd-z undoes")
+        return (1, 0, msg)
 
     def fraction(self, node):
         ls = self.links.get(node, [])
@@ -742,7 +749,8 @@ def build():
                "with them and still name the same output. Every earlier "
                "removal hit the current output or one after it")
     for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
-        t.do("place", p)                    # current output is n2
+        t.do("place", p)
+    t.do("pick", "n2")                      # explicit: the current output is n2
     t.select("n0"); t.do("remove")          # removes output n0, before n2
     t.select("n1"); t.do("bind")            # binds to n2, the same output
     t.end()
@@ -754,7 +762,11 @@ def build():
     for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8), (0.5, 0.45)]:
         t.do("place", p)
     t.select("n0", "n1", "n2"); t.do("join")
-    t.do("cycle")                           # current: n0
+    # Pick the output explicitly. This step used "cycle", relying on the newest
+    # node's output being current; when placement stopped moving the current
+    # output, cycle landed elsewhere, b UNBOUND instead, and the script still
+    # passed while no longer testing a surviving output at all.
+    t.do("pick", "n0")
     t.select("n1"); t.do("bind")            # n1 now also feeds n0's output
     t.select("n0"); t.do("remove")          # n0's output survives
     t.select("n2"); t.do("remove")          # n2's output goes with it
@@ -766,7 +778,8 @@ def build():
                "an output that outlives its node keeps its name reserved: "
                "a new node skips it rather than being left unbound")
     t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
-    t.select("n0"); t.do("bind")           # current is n1: n0 feeds n1's output
+    t.do("pick", "n1")                     # explicit, not a placement side effect
+    t.select("n0"); t.do("bind")           # n0 now also feeds n1's output
     t.select("n1"); t.do("remove")         # output n1 survives
     t.do("place", (0.5, 0.8))              # must be n2, not n1
     t.end()
@@ -858,6 +871,26 @@ def build():
     t.do("fill", -1, False); t.do("fill", -1, False)   # 90%
     t.do("bindall")                             # still 90%, still equal
     t.select("n1", "n2"); t.do("bindall")
+    t.end()
+
+    t = Script(out, "current_output_stays_put",
+               "placing a node no longer moves the current output. It used "
+               "to follow every new node, so b on the newest node unbound "
+               "it from its own output and left it silent. An unbind that "
+               "leaves a node with no output says so: by name for one node, "
+               "by count for several, and as a warning")
+    for p in [(0.2, 0.2), (0.8, 0.2)]:
+        t.do("place", p)                    # current output: n0, the first
+    t.do("pick", "n1")
+    t.do("place", (0.5, 0.8))               # current STAYS n1
+    t.select("n2"); t.do("bind")            # n2 -> n1 as well: no surprise
+    t.do("bind")                            # back off n1: n2 still has n2
+    t.do("pick", "n2"); t.do("bind")        # n2's ONLY output: silent, named
+    t.do("undo")
+    # Two nodes whose only output is n0, unbound together: counted.
+    t.do("pick", "n0"); t.select("n1"); t.do("bind")     # n1 -> n1, n0
+    t.do("pick", "n1"); t.do("bind")                     # n1 -> n0 only
+    t.do("pick", "n0"); t.select("n0", "n1"); t.do("bind")
     t.end()
 
     t = Script(out, "bind_toggles",
