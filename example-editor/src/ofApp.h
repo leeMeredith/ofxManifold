@@ -66,6 +66,9 @@ private:
     void drawGrid() const;
     void drawSegment(glm::vec2 a, glm::vec2 b) const;
 
+    // ---- links --------------------------------------------------------------
+    void drawLinks() const;
+
     // ---- NodeGlyph --------------------------------------------------------
     void  drawNode(ofxManifold::NodeID id) const;
     void  drawHalo(ofxManifold::NodeID id, float weight) const;

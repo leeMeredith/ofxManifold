@@ -46,6 +46,7 @@ class Editor:
         self.links = {}          # node name -> [(kind, output name|None, w)]
         self.derived = []        # [name, channel, [source names]]
         self.current = None
+        self.out_sel = []        # selected outputs        # selected outputs, by name; current among them
 
     # ---- helpers -------------------------------------------------------
     def names(self):
@@ -84,6 +85,15 @@ class Editor:
             self.current = None
         if self.current is None and self.outputs:
             self.current = self.outputs[0][0]
+        self.out_sel = [o for o in self.out_sel if o in self.out_names()]
+        if self.current is None:
+            self.out_sel = []
+        elif self.current not in self.out_sel:
+            self.out_sel.append(self.current)
+
+    def select_only(self, name):
+        self.current = name
+        self.out_sel = [] if name is None else [name]
 
     def bind_one(self, node, out, w=1.0):
         ls = self.links.setdefault(node, [])
@@ -108,8 +118,9 @@ class Editor:
                              if not (l[0] == "out" and l[1] == name)]
             if not self.links[n]:
                 del self.links[n]
+        self.out_sel = [o for o in self.out_sel if o != name]
         if self.current == name:
-            self.current = None
+            self.current = self.out_sel[0] if self.out_sel else None
         self.settle()
 
     # ---- operations ----------------------------------------------------
@@ -135,7 +146,7 @@ class Editor:
             self.outputs.append([nm, self.next_channel(), 1.0])
             self.bind_one(nm, nm)
             if self.current is None:        # only if there was none
-                self.current = nm
+                self.select_only(nm)
         return (1, 0, "")
 
     def move(self, name, p):
@@ -212,7 +223,7 @@ class Editor:
             nm = f"out{ch}_{k}"
             k += 1
         self.outputs.append([nm, ch, 1.0])
-        self.current = nm
+        self.select_only(nm)
         return (1, 0, f"new output {nm} on channel {ch} "
                 "-- select nodes and press b")
 
@@ -236,25 +247,41 @@ class Editor:
         else:
             self.links.pop(node, None)
 
+    def toggle_output(self, name):
+        if name not in self.out_names():
+            return (0, 0, "")
+        if name in self.out_sel:
+            if len(self.out_sel) == 1:
+                return (0, 0, "")
+            self.out_sel = [o for o in self.out_sel if o != name]
+            if self.current == name:
+                self.current = self.out_sel[0]
+        else:
+            self.out_sel.append(name)
+            self.current = name
+        head = "current output: " if len(self.out_sel) == 1 else "outputs: "
+        return (0, 0, head + ", ".join(self.out_sel))
+
     def bind(self, sel):
-        """A toggle for the current output: unbind all if every selected
-        node feeds it, otherwise bind the ones that don't. Fill kept; a node
-        losing its last output becomes cleanly null."""
-        if self.current is None:
+        if not self.out_sel:
             return (0, 1, "no output yet -- press o to make one")
         if not sel:
             return (0, 0, "")
-        cur = self.current
-        every = all(self.feeds(n, cur) for n in sel)
+        every = all(self.feeds(n, t) for n in sel for t in self.out_sel)
         count, silenced = 0, []
         for n in sel:
-            if every != self.feeds(n, cur):
-                continue
             fill = self.fraction(n) if self.output_count(n) > 0 else 1.0
-            if every:
-                self.unbind_one(n, cur)
-            else:
-                self.bind_one(n, cur)
+            touched = False
+            for t in self.out_sel:
+                if every != self.feeds(n, t):
+                    continue
+                if every:
+                    self.unbind_one(n, t)
+                else:
+                    self.bind_one(n, t)
+                touched = True
+            if not touched:
+                continue
             if self.output_count(n) == 0:
                 self.links.pop(n, None)
                 silenced.append(n)
@@ -262,7 +289,7 @@ class Editor:
                 self.set_fraction(n, fill)
             count += 1
         msg = (("unbound " if every else "bound ") + str(count)
-               + (" from " if every else " to ") + cur)
+               + (" from " if every else " to ") + ", ".join(self.out_sel))
         if silenced:
             who = silenced[0] if len(silenced) == 1 \
                 else f"{len(silenced)} nodes"
@@ -341,26 +368,29 @@ class Editor:
             return (0, 0, "")
         names = self.out_names()
         i = -1 if self.current is None else names.index(self.current)
-        self.current = names[(i + 1) % len(names)]
+        self.select_only(names[(i + 1) % len(names)])
         return (0, 0, f"current output: {self.current}")
 
     def pick(self, name):
         if name not in self.out_names():
             return (0, 0, "")
-        self.current = name
+        self.select_only(name)
         return (0, 0, f"current output: {name}")
 
     def trim(self, db):
-        if self.current is None:
+        if not self.out_sel:
             return (0, 0, "")
         for o in self.outputs:
-            if o[0] == self.current:
+            if o[0] in self.out_sel:
                 o[2] = min(o[2] * 10 ** (db / 20.0), 3.9810717)
         return (1, 0, "")
 
     def remove_current(self):
         if self.current is None:
             return (0, 0, "")
+        if len(self.out_sel) > 1:
+            return (0, 1, "select one output to remove -- "
+                    f"{len(self.out_sel)} are selected")
         nm = self.current
         feeders = sum(1 for ls in self.links.values()
                       if any(l[0] == "out" and l[1] == nm for l in ls))
@@ -400,7 +430,7 @@ class Editor:
         self.bind_one("D", "rear")
         self.silence_one("D", 1.0 / 3.0)
         self.derived = [["sub", 4, ["N", "O"]]]
-        self.current = "front"
+        self.select_only("front")
 
     # ---- files -----------------------------------------------------------
     # A pair on "disk" is a snapshot of the map and, depending on the case, of
@@ -419,8 +449,45 @@ class Editor:
             self.outputs, self.links, self.derived = o, l, d
         else:
             self.outputs, self.links, self.derived = [], {}, []
-        self.current = None
+        self.select_only(None)
         self.settle()
+
+    def link_lines(self, sel):
+        names = self.names()
+        lines = []
+        for n in names:
+            ls = self.links.get(n, [])
+            total = sum(l[2] for l in ls)
+            for l in ls:
+                if l[0] != "out" or l[1] not in names or l[1] == n:
+                    continue
+                if n not in sel and l[1] not in sel:
+                    continue
+                lines.append([n, l[1], l[2] / total if total > 0 else 0.0,
+                              n in sel, 0])
+        for a in lines:
+            if any(b[0] == a[1] and b[1] == a[0] for b in lines):
+                a[4] = 1 if names.index(a[0]) < names.index(a[1]) else -1
+        return lines
+
+    def contributions(self, sel, weights):
+        used = [o[1] for o in self.outputs] + [d[1] for d in self.derived]
+        out = [0.0] * ((max(used) + 1) if used else 0)
+        chan = {o[0]: o[1] for o in self.outputs}
+        for n, w in weights:
+            if n not in sel:
+                continue
+            ls = self.links.get(n, [])
+            total = sum(l[2] for l in ls)
+            if total <= 0:
+                continue
+            for l in ls:
+                if l[0] == "out":
+                    out[chan[l[1]]] += w * l[2] / total
+        return out
+
+    def taps(self, sel):
+        return [d[0] for d in self.derived if any(s in sel for s in d[2])]
 
     def fill_marks(self, sel):
         marks = []
@@ -480,6 +547,7 @@ class Editor:
                  "D " + " ".join(f"{d[0]}:{d[1]}:{','.join(d[2])}"
                                  for d in self.derived),
                  "C " + (self.current or "-"),
+                 "S " + (",".join(self.out_sel) or "-"),
                  "A " + ("1" if self.auto else "0")]
         return " | ".join(parts)
 
@@ -563,6 +631,7 @@ class Script:
             "clear":    lambda: e.clear(s), "cycle": e.cycle,
             "trim":     lambda: e.trim(args[0]),
             "pick":     lambda: e.pick(args[0]),
+            "toggleout": lambda: e.toggle_output(args[0]),
             "removeoutput": e.remove_current, "auto": e.toggle_auto,
             "example":  lambda: (e.example(), (1, 0, ""))[1],
             "empty":    lambda: (e.new_empty(), (1, 0, ""))[1],
@@ -572,7 +641,7 @@ class Script:
             argtxt = f" {fmt(args[0][0])} {fmt(args[0][1])}"
         elif op == "trim":
             argtxt = f" {fmt(args[0])}"
-        elif op == "pick":
+        elif op in ("pick", "toggleout"):
             argtxt = f" {args[0]}"
         elif op == "fill":
             argtxt = f" {args[0]} {1 if args[1] else 0}"
@@ -646,6 +715,21 @@ class Script:
         name = b.replace("\\", "/").split("/")[-1]
         self.out.append(f"PAIR {chosen} MAP {b}.json OUT {b}-outputs.json "
                         f"LEGACY {b}-mapping.json NAME {name}")
+
+    def lines(self):
+        ls = self.ed.link_lines(self.sel)
+        self.out.append("LINKS " + (" ".join(
+            f"{a}>{b}:{fmt(sh)}:{1 if hv else 0}:{ln}"
+            for a, b, sh, hv, ln in ls) or "NONE"))
+
+    def contrib(self, weights):
+        c = self.ed.contributions(self.sel, weights)
+        self.out.append("CONTRIB " + " ".join(f"{n}={fmt(w)}"
+                                              for n, w in weights)
+                        + " EXPECT " + (" ".join(fmt(x) for x in c) or "NONE"))
+
+    def taps(self):
+        self.out.append("TAPS " + (" ".join(self.ed.taps(self.sel)) or "NONE"))
 
     def marks(self):
         m = self.ed.fill_marks(self.sel)
@@ -871,6 +955,59 @@ def build():
     t.do("fill", -1, False); t.do("fill", -1, False)   # 90%
     t.do("bindall")                             # still 90%, still equal
     t.select("n1", "n2"); t.do("bindall")
+    t.end()
+
+    t = Script(out, "outputs_selected_together",
+               "shift-click selects several faders: b binds or unbinds every "
+               "selected node to EVERY selected output, t and T trim them "
+               "all, and removing an output needs exactly one selected. The "
+               "set follows removals like the current output does")
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8), (0.5, 0.45)]:
+        t.do("place", p)                    # outputs n0..n3, current n0
+    t.do("pick", "n1"); t.do("toggleout", "n2")
+    t.select("n3"); t.do("bind")            # n3 -> n1 and n2 together
+    t.do("bind")                            # every pair present: unbinds
+    t.do("bind")
+    t.do("trim", -3.0)                      # n1 and n2 both
+    t.do("removeoutput")                    # two selected: refused
+    t.do("toggleout", "n2")                 # back to n1 alone
+    t.do("toggleout", "n1")                 # the last one stays
+    t.do("toggleout", "n2"); t.do("pick", "n2"); t.do("toggleout", "n1")
+    t.select("n2"); t.do("bind")            # n2 -> n1 as well (n2 has n2)
+    t.select("n1"); t.do("remove")          # n1's output survives: n2 feeds it
+    t.select("n0"); t.do("remove")          # output n0 goes; the set shifts
+    t.end()
+
+    t = Script(out, "link_lines",
+               "the lines drawn on the map: only between two nodes, each "
+               "link ONCE, heavy when its sender is selected and light when "
+               "only its receiver is, side by side when two nodes feed each "
+               "other. A line's share counts silence: a node's lines, plus "
+               "its own output (no line), plus its silence, add up to 100%")
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8), (0.9, 0.9)]:
+        t.do("place", p)
+    t.do("pick", "n1"); t.select("n0"); t.do("bind")      # n0 -> n1
+    t.do("pick", "n0"); t.select("n1"); t.do("bind")      # n1 -> n0: mutual
+    t.do("pick", "n2"); t.select("n0"); t.do("bind")      # n0 -> n2
+    t.select("n0"); t.do("fill", -1, False); t.do("fill", -1, False)
+    t.select("n0"); t.lines()               # out of n0, and n1 into it
+    t.select("n0", "n1"); t.lines()         # the mutual pair, both heavy
+    t.select("n2"); t.lines()               # only into n2: light
+    t.select("n3"); t.lines()               # its own output only: none
+    t.clear_sel(); t.lines()
+    t.select("n0")
+    t.contrib([("n0", 0.5), ("n1", 0.3), ("n2", 0.2)])
+    t.select("n0", "n1")
+    t.contrib([("n0", 0.5), ("n1", 0.3), ("n2", 0.2)])
+    t.end()
+
+    t = Script(out, "derived_taps",
+               "a selected node that a derived output reads from is marked "
+               "on that fader: a tap, a copy the node loses nothing to")
+    t.do("example")
+    t.select("N"); t.taps()
+    t.select("O", "A"); t.taps()
+    t.select("A"); t.taps()
     t.end()
 
     t = Script(out, "current_output_stays_put",

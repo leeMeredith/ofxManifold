@@ -65,6 +65,40 @@ std::vector<FillMark> fillMarks(const Model& model, const Selection& sel) {
     return marks;
 }
 
+std::vector<float> contributions(const Model& model, const Selection& sel,
+                                 const WeightVector& weights) {
+    const Mapping& mp = model.mapping();
+    std::vector<float> out(mp.toChannels(WeightVector{}).size(), 0.0f);
+    for (const auto& wn : weights) {
+        if (!sel.contains(wn.id)) continue;
+        float total = 0.0f;
+        for (std::size_t k = 0; k < mp.linkCount(wn.id); ++k) {
+            total += mp.link(wn.id, k).weight;
+        }
+        if (total <= 0.0f) continue;
+        for (std::size_t k = 0; k < mp.linkCount(wn.id); ++k) {
+            const Link& l = mp.link(wn.id, k);
+            if (l.kind != DestKind::Output) continue;
+            const int ch = mp.targetChannel(l.id);
+            if (ch >= 0 && std::size_t(ch) < out.size()) {
+                out[std::size_t(ch)] += wn.weight * l.weight / total;
+            }
+        }
+    }
+    return out;
+}
+
+std::vector<std::size_t> tapsOf(const Model& model, const Selection& sel) {
+    std::vector<std::size_t> taps;
+    const auto& ags = model.mapping().aggregators();
+    for (std::size_t a = 0; a < ags.size(); ++a) {
+        for (NodeID src : ags[a].sources) {
+            if (sel.contains(src)) { taps.push_back(a); break; }
+        }
+    }
+    return taps;
+}
+
 TargetID ChartLayout::outputAt(float x, float y) const {
     for (const ChartBar& b : bars) {
         if (b.kind != ChartBar::Kind::Output) continue;

@@ -89,7 +89,7 @@ void Model::loadExample() {
     mapping_.addDerived("sub", 4, 1.0f, SumMode::Linear, {{N, 1.0f}, {O, 1.0f}});
     (void)A;
 
-    currentOutput_ = front;
+    selectOnlyOutput(front);
     settleCurrentOutput();
     refreshTopology();
 }
@@ -97,7 +97,7 @@ void Model::loadExample() {
 void Model::newEmpty() {
     manifold_ = Manifold2D();
     mapping_ = Mapping();
-    currentOutput_ = InvalidTarget;
+    selectOnlyOutput(InvalidTarget);
     settleCurrentOutput();
     refreshTopology();
 }
@@ -105,7 +105,7 @@ void Model::newEmpty() {
 void Model::adopt(Manifold2D m, Mapping mp) {
     manifold_ = std::move(m);
     mapping_ = std::move(mp);
-    currentOutput_ = InvalidTarget;
+    selectOnlyOutput(InvalidTarget);
     settleCurrentOutput();
     refreshTopology();
 }
@@ -120,6 +120,34 @@ void Model::settleCurrentOutput() {
     if (currentOutput_ == InvalidTarget && mapping_.targetCount() > 0) {
         currentOutput_ = 0;
     }
+    // The selected outputs follow: none that no longer exist, and the
+    // current output always among them.
+    std::vector<TargetID> kept;
+    for (TargetID t : outputSel_) {
+        if (t < mapping_.targetCount()) kept.push_back(t);
+    }
+    outputSel_ = kept;
+    if (currentOutput_ == InvalidTarget) outputSel_.clear();
+    else if (!outputSelected(currentOutput_)) outputSel_.push_back(currentOutput_);
+}
+
+void Model::selectOnlyOutput(TargetID t) {
+    currentOutput_ = t;
+    outputSel_.clear();
+    if (t != InvalidTarget) outputSel_.push_back(t);
+}
+
+bool Model::outputSelected(TargetID t) const {
+    for (TargetID s : outputSel_) if (s == t) return true;
+    return false;
+}
+
+std::string Model::selectedOutputNames() const {
+    std::string names;
+    for (TargetID t : outputSel_) {
+        names += (names.empty() ? "" : ", ") + mapping_.targetName(t);
+    }
+    return names;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +247,7 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
             // the one the newest node already fed -- and b, a toggle, then
             // UNBOUND it, leaving it silent. The current output is the one
             // the user picked, and placing a node must not move it.
-            if (currentOutput_ == InvalidTarget) currentOutput_ = t;
+            if (currentOutput_ == InvalidTarget) selectOnlyOutput(t);
         }
     }
     refreshTopology();
@@ -351,7 +379,7 @@ Result Model::newOutput() {
     for (int k = 2; mapping_.findTarget(nm) != InvalidTarget; ++k) {
         nm = "out" + std::to_string(ch) + "_" + std::to_string(k);
     }
-    currentOutput_ = mapping_.addOutput(nm, ch);
+    selectOnlyOutput(mapping_.addOutput(nm, ch));
     return changed("new output " + nm + " on channel " + std::to_string(ch)
                    + " -- select nodes and press b", 3.0f);
 }
@@ -372,27 +400,37 @@ Result Model::newDerived(const Selection& sel) {
 }
 
 Result Model::bind(const Selection& sel) {
-    if (currentOutput_ == InvalidTarget) {
+    if (outputSel_.empty()) {
         return refusal("no output yet -- press o to make one", 2.5f);
     }
     if (sel.empty()) return Result{};
-    const TargetID t = currentOutput_;
 
+    // One output selected, or several (shift-click on faders): the toggle
+    // works across all of them. If every selected node already feeds every
+    // selected output, unbind them all; otherwise bind what is missing.
     bool all = true;
     for (NodeID id : sel.nodes()) {
-        if (!feeds(id, t)) { all = false; break; }
+        for (TargetID t : outputSel_) {
+            if (!feeds(id, t)) { all = false; break; }
+        }
+        if (!all) break;
     }
 
     std::size_t n = 0;
     std::vector<std::string> silenced;
     for (NodeID id : sel.nodes()) {
-        if (all == !feeds(id, t)) continue;       // already as wanted
         // The fill a node had, kept through the change: removing a binding
         // would otherwise make the node louder or quieter as a side effect.
         const float fill = outputCount(id) > 0 ? mapping_.outputFraction(id)
                                                : 1.0f;
-        if (all) mapping_.unbind(id, t);
-        else     mapping_.bind(id, t);
+        bool touched = false;
+        for (TargetID t : outputSel_) {
+            if (all == !feeds(id, t)) continue;   // already as wanted
+            if (all) mapping_.unbind(id, t);
+            else     mapping_.bind(id, t);
+            touched = true;
+        }
+        if (!touched) continue;
         if (outputCount(id) == 0) {
             // Its last output gone: null, with no silence binding left behind
             // -- a stray one behaves the same but pushes the outputs file to
@@ -406,7 +444,7 @@ Result Model::bind(const Selection& sel) {
     }
     Result r = changed(std::string(all ? "unbound " : "bound ")
                        + std::to_string(n) + (all ? " from " : " to ")
-                       + mapping_.targetName(t), 2.0f);
+                       + selectedOutputNames(), 2.0f);
     // An unbind that leaves a node with no output at all makes it silent,
     // which is easy to do without meaning to. Say so, by name when it is one
     // node, and flag it so an editor shows it as a warning.
@@ -492,8 +530,8 @@ Result Model::clear(const Selection& sel) {
 
 Result Model::cycleOutput() {
     if (mapping_.targetCount() == 0) return Result{};
-    currentOutput_ = (currentOutput_ == InvalidTarget)
-                  ? 0 : (currentOutput_ + 1) % mapping_.targetCount();
+    selectOnlyOutput((currentOutput_ == InvalidTarget)
+                     ? 0 : (currentOutput_ + 1) % mapping_.targetCount());
     Result r;
     r.message = "current output: " + mapping_.targetName(currentOutput_);
     r.seconds = 2.0f;
@@ -502,19 +540,40 @@ Result Model::cycleOutput() {
 
 Result Model::pickOutput(TargetID t) {
     if (t == InvalidTarget || t >= mapping_.targetCount()) return Result{};
-    currentOutput_ = t;
+    selectOnlyOutput(t);
     Result r;
     r.message = "current output: " + mapping_.targetName(t);
     r.seconds = 2.0f;
     return r;
 }
 
+Result Model::toggleOutput(TargetID t) {
+    if (t == InvalidTarget || t >= mapping_.targetCount()) return Result{};
+    if (outputSelected(t)) {
+        if (outputSel_.size() == 1) return Result{};   // keep at least one
+        std::vector<TargetID> kept;
+        for (TargetID s : outputSel_) if (s != t) kept.push_back(s);
+        outputSel_ = kept;
+        if (currentOutput_ == t) currentOutput_ = outputSel_.front();
+    } else {
+        outputSel_.push_back(t);
+        currentOutput_ = t;
+    }
+    Result r;
+    r.message = (outputSel_.size() == 1 ? "current output: " : "outputs: ")
+              + selectedOutputNames();
+    r.seconds = 2.0f;
+    return r;
+}
+
 // Trim in dB, stored as a linear gain, capped at +12 dB.
 Result Model::trimCurrent(float dB) {
-    if (currentOutput_ == InvalidTarget) return Result{};
-    const float t = mapping_.targetTrim(currentOutput_)
-                  * std::pow(10.0f, dB / 20.0f);
-    mapping_.setTargetTrim(currentOutput_, std::min(t, 3.9810717f));
+    if (outputSel_.empty()) return Result{};
+    // Every selected output, by the same number of dB.
+    for (TargetID t : outputSel_) {
+        const float g = mapping_.targetTrim(t) * std::pow(10.0f, dB / 20.0f);
+        mapping_.setTargetTrim(t, std::min(g, 3.9810717f));
+    }
     Result r;
     r.changed = true;
     return r;
@@ -523,9 +582,18 @@ Result Model::trimCurrent(float dB) {
 // TargetIDs after a removed output shift down by one, so the current output
 // has to follow -- the same rule removeNodes() taught for NodeIDs.
 void Model::afterOutputRemoved(TargetID t) {
-    if (currentOutput_ == InvalidTarget) return;
-    if (currentOutput_ == t) currentOutput_ = InvalidTarget;
-    else if (currentOutput_ > t) --currentOutput_;
+    // Selected outputs after t shift down by one; t itself leaves the set.
+    std::vector<TargetID> kept;
+    for (TargetID s : outputSel_) {
+        if (s == t) continue;
+        kept.push_back(s > t ? s - 1 : s);
+    }
+    outputSel_ = kept;
+    if (currentOutput_ == t) {
+        currentOutput_ = outputSel_.empty() ? InvalidTarget : outputSel_.front();
+    } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {
+        --currentOutput_;
+    }
     settleCurrentOutput();
 }
 
@@ -533,6 +601,13 @@ void Model::afterOutputRemoved(TargetID t) {
 // only it go silent. The message says how many.
 Result Model::removeCurrentOutput() {
     if (currentOutput_ == InvalidTarget) return Result{};
+    // Removing several speakers in one keypress is too easy to do by
+    // accident, so it takes exactly one selected output.
+    if (outputSel_.size() > 1) {
+        return refusal("select one output to remove -- "
+                       + std::to_string(outputSel_.size())
+                       + " are selected", 2.5f);
+    }
     std::size_t feeders = 0;
     for (NodeID n : mapping_.boundNodes()) {
         for (std::size_t k = 0; k < mapping_.linkCount(n); ++k) {
@@ -566,6 +641,42 @@ Result Model::toggleAutoOutput() {
         : "auto-output off: new nodes start unbound";
     r.seconds = 3.0f;
     return r;
+}
+
+std::vector<LinkLine> linkLines(const Model& model, const Selection& sel) {
+    const Manifold2D& m = model.manifold();
+    const Mapping& mp = model.mapping();
+    std::vector<LinkLine> lines;
+    for (NodeID n = 0; n < m.nodeCount(); ++n) {
+        float total = 0.0f;
+        for (std::size_t k = 0; k < mp.linkCount(n); ++k) {
+            total += mp.link(n, k).weight;
+        }
+        for (std::size_t k = 0; k < mp.linkCount(n); ++k) {
+            const Link& l = mp.link(n, k);
+            if (l.kind != DestKind::Output) continue;
+            const NodeID to = m.findNode(mp.targetName(l.id));
+            if (to == InvalidNode || to == n) continue;   // no node, or itself
+            const bool out = sel.contains(n), in = sel.contains(to);
+            if (!out && !in) continue;
+            LinkLine ln;
+            ln.from = n;
+            ln.to = to;
+            ln.output = l.id;
+            ln.share = total > 0.0f ? l.weight / total : 0.0f;
+            ln.heavy = out;
+            lines.push_back(ln);
+        }
+    }
+    // Two nodes feeding each other: each line takes a side.
+    for (LinkLine& a : lines) {
+        for (const LinkLine& b : lines) {
+            if (a.from == b.to && a.to == b.from) {
+                a.lane = (a.from < a.to) ? +1 : -1;
+            }
+        }
+    }
+    return lines;
 }
 
 } // namespace editor

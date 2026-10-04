@@ -86,6 +86,11 @@ std::string dump(const Model& md) {
     }
     o << " | C " << (md.currentOutput() == InvalidTarget
                      ? std::string("-") : mp.targetName(md.currentOutput()));
+    o << " | S ";
+    if (md.selectedOutputs().empty()) o << "-";
+    for (std::size_t k = 0; k < md.selectedOutputs().size(); ++k) {
+        o << (k ? "," : "") << mp.targetName(md.selectedOutputs()[k]);
+    }
     o << " | A " << (md.autoOutput() ? "1" : "0");
     return o.str();
 }
@@ -262,6 +267,11 @@ int main(int argc, char** argv) {
                 op = [&, nm](Model& m) {
                     return m.pickOutput(m.mapping().findTarget(nm)); };
             }
+            else if (lastOp == "toggleout") {
+                std::string nm; in >> nm;
+                op = [&, nm](Model& m) {
+                    return m.toggleOutput(m.mapping().findTarget(nm)); };
+            }
             else if (lastOp == "auto")    op = [&](Model& m) { return m.toggleAutoOutput(); };
             else if (lastOp == "move") {
                 std::string nm; float x, y; in >> nm >> x >> y;
@@ -334,6 +344,56 @@ int main(int argc, char** argv) {
                 ok = false;
                 why << "pairFor(" << chosen << ") gave " << p.map << " "
                     << p.outputs << " " << p.legacy << " " << p.name;
+            }
+        } else if (kind == "LINKS") {
+            std::string want, tok;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            for (const LinkLine& l : linkLines(md, sel)) {
+                got += (got.empty() ? "" : " ")
+                     + md.manifold().node(l.from).name + ">"
+                     + md.manifold().node(l.to).name + ":" + num(l.share) + ":"
+                     + (l.heavy ? "1" : "0") + ":" + std::to_string(l.lane);
+            }
+            if (got.empty()) got = "NONE";
+            if (ok && !sameState(want, got)) {
+                ok = false;
+                why << "link lines after step " << step << ": want " << want
+                    << ", got " << got;
+            }
+        } else if (kind == "CONTRIB") {
+            WeightVector w;
+            std::string tok;
+            while (in >> tok && tok != "EXPECT") {
+                const std::size_t eq = tok.find('=');
+                w.push_back(WeightedNode{
+                    md.manifold().findNode(tok.substr(0, eq)),
+                    std::stof(tok.substr(eq + 1))});
+            }
+            std::string want;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            for (float v : contributions(md, sel, w)) {
+                got += (got.empty() ? "" : " ") + num(v);
+            }
+            if (got.empty()) got = "NONE";
+            if (ok && !sameState(want, got)) {
+                ok = false;
+                why << "contributions after step " << step << ": want "
+                    << want << ", got " << got;
+            }
+        } else if (kind == "TAPS") {
+            std::string want, tok;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            for (std::size_t a : tapsOf(md, sel)) {
+                got += (got.empty() ? "" : " ")
+                     + md.mapping().aggregators()[a].name;
+            }
+            if (got.empty()) got = "NONE";
+            if (ok && got != want) {
+                ok = false;
+                why << "taps: want " << want << ", got " << got;
             }
         } else if (kind == "FILLMARKS") {
             std::string want, tok;

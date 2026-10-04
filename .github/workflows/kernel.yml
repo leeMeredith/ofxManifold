@@ -1028,9 +1028,9 @@ jobs:
 
       - name: Editor current output stranded by removal must be caught
         run: |
-          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '    else if (currentOutput_ > t) --currentOutput_;' \
-            '    (void)0;'
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {\n        --currentOutput_;' \
+            '    } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {\n        (void)0;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1074,8 +1074,8 @@ jobs:
       - name: Picking an output does nothing must be caught
         run: |
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '    currentOutput_ = t;\n    Result r;\n    r.message = "current output: " + mapping_.targetName(t);' \
-            '    Result r;\n    r.message = "current output: " + mapping_.targetName(t);'
+            '    selectOnlyOutput(t);\n    Result r;' \
+            '    Result r;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1164,8 +1164,8 @@ jobs:
       - name: Binding twice feeds an output double must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '        if (all == !feeds(id, t)) continue;       // already as wanted' \
-            '        (void)0;'
+            '            if (all == !feeds(id, t)) continue;   // already as wanted' \
+            '            (void)0;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1227,8 +1227,8 @@ jobs:
       - name: Placing a node moves the current output must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '            if (currentOutput_ == InvalidTarget) currentOutput_ = t;' \
-            '            currentOutput_ = t;'
+            '            if (currentOutput_ == InvalidTarget) selectOnlyOutput(t);' \
+            '            selectOnlyOutput(t);'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1241,6 +1241,60 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Selected outputs not shifted on removal must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        kept.push_back(s > t ? s - 1 : s);' \
+            '        kept.push_back(s);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: b ignores the other selected outputs must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        for (TargetID t : outputSel_) {\n            if (all == !feeds(id, t)) continue;   // already as wanted' \
+            '        for (TargetID t : {currentOutput_}) {\n            if (all == !feeds(id, t)) continue;   // already as wanted'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Removing outputs with several selected must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    if (outputSel_.size() > 1) {\n        return refusal("select one output' \
+            '    if (false) {\n        return refusal("select one output'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Incoming link lines drawn heavy must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '            ln.heavy = out;' \
+            '            ln.heavy = true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Mutual link lines drawn on top of each other must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '                a.lane = (a.from < a.to) ? +1 : -1;' \
+            '                a.lane = 0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Fader contribution ignores silence must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '                out[std::size_t(ch)] += wn.weight * l.weight / total;' \
+            '                out[std::size_t(ch)] += wn.weight * l.weight;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Restored tree must be green
         run: |

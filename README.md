@@ -189,7 +189,8 @@ outputs as a pair of files, ⇧⌘S under a new name, ⌘O opens either file of 
 pair. Node shape
 shows what a node does with its share -- circle for one output, triangle for
 several, hollow square for none -- and its fill shows how much reaches an
-output. Hold space to audition: dragging moves a listening point and never a
+output. The listening point stays on the map and the faders always show its levels;
+hold space to audition, so dragging moves that point and never a
 node, and the chart along the bottom shows every output, and silence, live,
 while a halo on each node shows its share -- green where it reaches an output,
 grey where it goes to silence. With auto-output on (the default, `p` to
@@ -251,7 +252,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-614 vectors across eleven suites, plus 126 mutation gates that introduce known
+617 vectors across eleven suites, plus 132 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

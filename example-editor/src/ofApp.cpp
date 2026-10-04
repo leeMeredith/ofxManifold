@@ -54,14 +54,13 @@ void ofApp::update() {
     chart = layoutChart(mapping, 24.0f, chartTop, ofGetWidth() - 48.0f,
                         ofGetHeight() - chartTop - 20.0f);
 
-    if (auditioning()) {
-        // The hint is forgotten every frame: an edit made between frames can
-        // renumber regions (unjoin, delete), and a stale hint would name a
-        // region that no longer means what it did. At editor sizes the scan
-        // costs nothing (D-015).
-        evaluator->reset();
-        evaluation = evaluator->evaluate(auditionPoint);
-    }
+    // The listening point is permanent, so the levels are always live: an
+    // edit -- a moved node, a fill step, a binding -- shows on the faders at
+    // once, without holding space. Audition only decides what a drag does.
+    // The hint is forgotten every frame, since an edit between frames can
+    // renumber regions (D-015: at editor sizes the scan costs nothing).
+    evaluator->reset();
+    evaluation = evaluator->evaluate(auditionPoint);
     if (refusedFlash > 0.0f) refusedFlash -= 1.0f / 60.0f;
     if (messageTime > 0.0f) messageTime -= 1.0f / 60.0f;
 
@@ -78,13 +77,14 @@ void ofApp::update() {
 
 void ofApp::draw() {
     drawGrid();
-    renderer->draw(auditioning() && evaluation.inside ? evaluation.regionID
-                                                      : InvalidRegion);
+    renderer->draw(evaluation.inside ? evaluation.regionID : InvalidRegion);
 
     // Halos first, so they sit behind the nodes.
-    if (auditioning()) {
-        for (const auto& wn : evaluation.weights) drawHalo(wn.id, wn.weight);
-    }
+    // Halos always: each node's live share, the quantity the faders add up.
+    for (const auto& wn : evaluation.weights) drawHalo(wn.id, wn.weight);
+
+    // Link lines, under the nodes: how the selected nodes connect to others.
+    drawLinks();
     for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
         drawNode(NodeID(i));
     }
@@ -95,9 +95,13 @@ void ofApp::draw() {
     ofPushStyle();
     ofNoFill();
     ofSetLineWidth(1.5f);
-    if (currentOutput != InvalidTarget) {
+    if (!model.selectedOutputs().empty()) {
         for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
-            if (!model.feeds(NodeID(i), currentOutput)) continue;
+            bool feedsAny = false;
+            for (TargetID t : model.selectedOutputs()) {
+                if (model.feeds(NodeID(i), t)) { feedsAny = true; break; }
+            }
+            if (!feedsAny) continue;
             const glm::vec2 p = renderer->toScreen(manifold.node(NodeID(i)).position);
             ofSetColor(120, 200, 160);
             ofDrawCircle(p.x, p.y, 18.0f);
@@ -125,7 +129,24 @@ void ofApp::draw() {
     }
     ofPopStyle();
 
-    if (auditioning()) renderer->drawEvaluation(evaluation, auditionPoint);
+    // The listening point, always. Its influence lines only while
+    // auditioning; otherwise just the point, quieter, so it is there without
+    // competing with editing.
+    if (auditioning()) {
+        renderer->drawEvaluation(evaluation, auditionPoint);
+    } else {
+        const glm::vec2 lp = renderer->toScreen(auditionPoint);
+        ofPushStyle();
+        ofNoFill();
+        ofSetLineWidth(1.5f);
+        ofSetColor(235, 238, 245, 140);
+        ofDrawCircle(lp.x, lp.y, 7.0f);
+        ofDrawLine(lp.x - 11.0f, lp.y, lp.x - 4.0f, lp.y);
+        ofDrawLine(lp.x + 4.0f, lp.y, lp.x + 11.0f, lp.y);
+        ofDrawLine(lp.x, lp.y - 11.0f, lp.x, lp.y - 4.0f);
+        ofDrawLine(lp.x, lp.y + 4.0f, lp.x, lp.y + 11.0f);
+        ofPopStyle();
+    }
 
     drawChart();
     drawPanel();
@@ -213,7 +234,11 @@ void ofApp::mousePressed(int x, int y, int) {
     // A click on the chart picks an output. It never edits the map.
     pressInChart = (y >= chartTop);
     if (pressInChart) {
-        show(model.pickOutput(chart.outputAt(float(x), float(y))));
+        // Click picks one output; shift-click adds or removes one, as with
+        // nodes.
+        const TargetID hit = chart.outputAt(float(x), float(y));
+        if (ofGetKeyPressed(OF_KEY_SHIFT)) show(model.toggleOutput(hit));
+        else show(model.pickOutput(hit));
         return;
     }
 
@@ -575,6 +600,62 @@ void ofApp::drawGrid() const {
 }
 
 // ===========================================================================
+// links -- how the selected nodes connect to other nodes. Reads only.
+// ===========================================================================
+
+// Plug at the sending end, socket at the receiving end, as on gear: outputs
+// male, inputs female. Heavy when the sender is selected, its thickness its
+// share; light when only the receiver is. Two nodes feeding each other get a
+// line each, side by side. Percentages only for a single selected node, since
+// with many lines the numbers overlap long before the lines do.
+void ofApp::drawLinks() const {
+    const std::vector<LinkLine> lines = linkLines(model, selection);
+    if (lines.empty()) return;
+    ofPushStyle();
+    for (const LinkLine& l : lines) {
+        glm::vec2 a = renderer->toScreen(manifold.node(l.from).position);
+        glm::vec2 b = renderer->toScreen(manifold.node(l.to).position);
+        const float len = glm::distance(a, b);
+        if (len < 1.0f) continue;
+        const glm::vec2 dir = (b - a) / len;
+        // Side by side for a mutual pair: offset across a direction both
+        // lines agree on, so each lands on its own side.
+        const glm::vec2 canon = (l.from < l.to) ? dir : -dir;
+        const glm::vec2 side(-canon.y, canon.x);
+        a += side * (4.0f * float(l.lane));
+        b += side * (4.0f * float(l.lane));
+        // Ends at the node edges, so the plug and socket are visible. Two
+        // nodes almost touching would have their ends pulled past each other
+        // and the line drawn backwards, so such a pair gets no line.
+        const float pullA = nodeRadius(l.from) + 4.0f;
+        const float pullB = nodeRadius(l.to) + 5.0f;
+        if (len <= pullA + pullB + 6.0f) continue;
+        a += dir * pullA;
+        b -= dir * pullB;
+
+        if (l.heavy) {
+            ofSetColor(215, 220, 232);
+            ofSetLineWidth(1.0f + 5.0f * ofClamp(l.share, 0.0f, 1.0f));
+        } else {
+            ofSetColor(150, 156, 172, 170);
+            ofSetLineWidth(1.0f);
+        }
+        ofDrawLine(a.x, a.y, b.x, b.y);
+        ofSetLineWidth(1.5f);
+        ofFill();
+        ofDrawCircle(a.x, a.y, 3.5f);                 // plug
+        ofNoFill();
+        ofDrawCircle(b.x, b.y, 4.5f);                 // socket
+        if (selection.size() == 1) {
+            const glm::vec2 m = (a + b) * 0.5f + side * 10.0f;
+            ofDrawBitmapString(ofToString(int(std::lround(l.share * 100))) + "%",
+                               m.x, m.y);
+        }
+    }
+    ofPopStyle();
+}
+
+// ===========================================================================
 // NodeGlyph -- one node's shape, fill and audition halo. Reads only.
 // ===========================================================================
 
@@ -726,10 +807,15 @@ void ofApp::drawChart() const {
     }
 
     const WeightVector none;
-    const WeightVector& wv = auditioning() ? evaluation.weights : none;
+    const WeightVector& wv = evaluation.inside ? evaluation.weights : none;
+    (void)none;
     const std::vector<float> routed = mapping.toChannels(wv);
     const std::vector<float> levels = mapping.toChannelLevels(wv);
-    const float silence = auditioning() ? mapping.silenceShare(wv) : 0.0f;
+    const float silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
+    // How much of each output's level comes from the selected nodes.
+    const std::vector<float> fromSel = selection.empty()
+        ? std::vector<float>() : contributions(model, selection, wv);
+    const std::vector<std::size_t> taps = tapsOf(model, selection);
     const float bw = chart.barWidth;
     const float rise = chart.barArea - 6.0f;
 
@@ -768,10 +854,34 @@ void ofApp::drawChart() const {
             }
         }
 
-        if (!derived && b.output == currentOutput) {
+        // The selected nodes' part of this output, as a brighter segment
+        // from the bottom of the bar: "this much of it is them".
+        if (!derived && ch < fromSel.size() && fromSel[ch] > 0.0f) {
+            const float c = ofClamp(fromSel[ch], 0.0f, 1.0f);
+            ofSetColor(200, 245, 220);
+            ofDrawRectangle(b.x + 2.0f, chart.base - c * rise, bw - 4.0f,
+                            c * rise);
+        }
+
+        // A derived output that reads a selected node: a purple dot -- a
+        // tap, a copy the node loses nothing to.
+        if (derived) {
+            for (std::size_t a : taps) {
+                if (mapping.aggregators()[a].name == b.name) {
+                    ofSetColor(180, 140, 230);
+                    ofDrawCircle(b.x + bw * 0.5f, chart.top + 1.0f, 3.0f);
+                }
+            }
+        }
+
+        bool picked = false;
+        for (TargetID t : model.selectedOutputs()) {
+            if (!derived && b.output == t) picked = true;
+        }
+        if (picked) {
             ofNoFill();
             ofSetColor(255, 214, 90);
-            ofSetLineWidth(2.0f);
+            ofSetLineWidth(b.output == currentOutput ? 2.0f : 1.0f);
             ofDrawRectangle(b.x - 2.0f, chart.top + 4.0f, bw + 4.0f,
                             chart.barArea - 2.0f);
             ofFill();
@@ -807,12 +917,12 @@ void ofApp::drawChart() const {
     ofSetColor(200, 205, 215);
     ofDrawBitmapString("silent", chart.silenceX, chart.base + 14.0f);
 
-    ofSetColor(auditioning() ? ofColor(235, 238, 245) : ofColor(110, 116, 130));
-    const std::string total = auditioning()
+    ofSetColor(235, 238, 245);
+    const std::string total = evaluation.inside
         ? "outputs " + ofToString(outputsTotal, 3) + " + silence "
           + ofToString(silence, 3) + " = "
           + ofToString(outputsTotal + silence, 3)
-        : "hold space to audition";
+        : "the listening point is outside the map";
     ofDrawBitmapString(total, chart.totalX, chart.top + 22.0f);
     ofPopStyle();
 }
@@ -884,9 +994,11 @@ void ofApp::drawPanel() const {
         const float tr = mapping.targetTrim(t);
         const std::string dB = tr > 0.0f
             ? ofToString(20.0f * std::log10(tr), 1) + " dB" : "off";
-        ofSetColor(t == currentOutput ? ofColor(255, 214, 90)
-                                      : ofColor(180, 186, 200));
-        ofDrawBitmapString(std::string(t == currentOutput ? "> " : "  ")
+        bool picked = false;
+        for (TargetID s2 : model.selectedOutputs()) if (s2 == t) picked = true;
+        ofSetColor(picked ? ofColor(255, 214, 90) : ofColor(180, 186, 200));
+        ofDrawBitmapString(std::string(t == currentOutput ? "> "
+                                       : picked ? "+ " : "  ")
                            + mapping.targetName(t) + "  ch "
                            + ofToString(mapping.targetChannel(t)) + "  " + dB,
                            x, y);
@@ -921,7 +1033,8 @@ void ofApp::drawPanel() const {
     };
     const char* right[] = {
         "o     new output",         "d     derived from selection",
-        "tab   next output",        "b     bind/unbind current",
+        "tab   next output",        "b     bind/unbind selected",
+        "shift-click bars: several",
         "B     bind to every output", "q w   fill -/+ 5% (shift 1%)",
         "c     clear bindings",     "t T   trim -/+ 1 dB",
         "O     remove current output", "p     auto-output on/off",

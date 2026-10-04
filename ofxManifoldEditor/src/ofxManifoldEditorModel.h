@@ -48,6 +48,11 @@ public:
     const Mapping&    mapping() const { return mapping_; }
     const TargetID&   currentOutput() const { return currentOutput_; }
 
+    // The selected outputs: shift-click on faders selects several. The
+    // current output is always one of them. b binds to all of them, t and T
+    // trim all of them; removing an output needs exactly one selected.
+    const std::vector<TargetID>& selectedOutputs() const { return outputSel_; }
+
     // Placing a node also makes an output named after it, on the next free
     // channel, and binds the node to it. On by default: speaker layout is the
     // common case. Changed only through toggleAutoOutput().
@@ -110,6 +115,11 @@ public:
     // Make `t` the current output, as clicking its fader does. Through the
     // model like every other change, so nothing edits its state from outside.
     Result pickOutput(TargetID t);
+
+    // Shift-click on a fader: add it to the selected outputs, or take it
+    // out. The last output selected can't be taken out, so there is always
+    // a current output once any exist.
+    Result toggleOutput(TargetID t);
     Result trimCurrent(float dB);
     Result removeCurrentOutput();
     Result toggleAutoOutput();
@@ -129,13 +139,43 @@ public:
 private:
     void afterOutputRemoved(TargetID t);
     void settleCurrentOutput();
+    void selectOnlyOutput(TargetID t);
+    bool outputSelected(TargetID t) const;
+    std::string selectedOutputNames() const;
 
     Manifold2D     manifold_;
     Mapping        mapping_;
     TargetID       currentOutput_ = InvalidTarget;
+    std::vector<TargetID> outputSel_;
     bool           autoOutput_ = true;
     TopologyReport topology_;
 };
+
+// A line on the map from one node to another: `from` feeds the output named
+// after `to`. Only links between two NODES are drawn -- an output with no node
+// of its own is shown by its fader, not by a line.
+//
+//   heavy   the sender is selected; light when only the receiver is
+//   share   this link's part of the sender's whole share, silence included.
+//           A node's lines, plus its own output (which draws no line, since
+//           it would join the node to itself), plus its silence, add up to
+//           100%.
+//   lane    0 alone; +1 or -1 when the two nodes also feed each other the
+//           other way, so the two lines are drawn side by side, not on top
+//           of each other
+struct LinkLine {
+    NodeID   from   = InvalidNode;
+    NodeID   to     = InvalidNode;
+    TargetID output = InvalidTarget;
+    float    share  = 0.0f;
+    bool     heavy  = false;
+    int      lane   = 0;
+};
+
+// The lines to draw for a selection: every link out of a selected node, and
+// every link into one, each ONCE -- a link between two selected nodes is both
+// and is drawn once, heavy.
+std::vector<LinkLine> linkLines(const Model& model, const Selection& sel);
 
 } // namespace editor
 } // namespace ofxManifold

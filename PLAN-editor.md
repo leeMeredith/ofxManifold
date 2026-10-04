@@ -142,7 +142,7 @@ Coarse steps land on multiples of 5 in their direction (73% then `q` gives
 | 2a+ | `b` toggles the binding to the current output; binding marks on faders and map — **DONE** |
 | 2b | named saves as a pair through the Mac dialogs, and the fader fill line — **DONE** |
 | 2b+ | binding fixes: placing a node leaves the current output alone; an unbind that silences a node says so — **DONE** |
-| 2c | listening: permanent listening point and levels, halos always, a selected node's contribution in each fader, shift-click several faders |
+| 2c | listening: permanent listening point and levels, halos always, a selected node's contribution in each fader, shift-click several faders, link lines between nodes — **DONE** |
 | 2d | the screen: window at 90%, full screen, fader narrowing, labels that fit, hover, slivers, scaled text |
 | 2e | keys grouped and lit when usable, `b` previewing its action; views lifted into files |
 
@@ -175,6 +175,28 @@ silence binding reaching the fader line was looked up as an output name and
 ran off the end -- so the runner now reports an id that names no output
 instead of looking it up. Undefined behaviour that fails on one machine can
 pass on another.
+
+**Slice 2c, done.** The listening point is permanent and the levels always
+live, so an edit shows on the faders at once; halos always. Shift-click
+selects several faders: `b` binds or unbinds every selected node to every
+selected output, `t` and `T` trim them all, and removing an output needs
+exactly one selected. The model's single current output became a SET with the
+current always in it, kept in step at every place it changes -- seven entry
+points converted deliberately, since one missed would leave the two
+disagreeing, D-018's pattern.
+
+Link lines, designed in text first: only between two NODES (an output with no
+node is shown by its fader); plug at the sending end, socket at the receiving
+end, as gear has outputs male and inputs female; heavy and sized by share when
+the sender is selected, light when only the receiver is; side by side when two
+nodes feed each other; percentages for a single selection. Silence and taps
+draw no line: fill shows silence, a purple fader dot shows a tap.
+
+`linkLines()`, `contributions()`, `tapsOf()` and the output set are tested;
+25 scripts, 285 steps; 11 of 11 mutations caught first time; four existing
+gates repointed at rewritten lines and shown to still catch. A comment claimed
+a node's heavy lines plus silence make 100%; the vectors showed its own output,
+which draws no line, is the rest -- the wording was corrected, not the numbers.
 
 **Slice 2b+, done.** Reported in use: selecting a node and pressing `b` made
 it SILENT, and binding seemed not to work once nodes were bound. Reproduced:

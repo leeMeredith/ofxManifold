@@ -66,5 +66,16 @@ struct FillMark {
 
 std::vector<FillMark> fillMarks(const Model& model, const Selection& sel);
 
+// How much of each output's level comes from the selected nodes, at the
+// listening point described by `weights`, indexed by channel like
+// Mapping::toChannels. Drawn as a segment inside each fader: "this much of
+// front's bar is this node".
+std::vector<float> contributions(const Model& model, const Selection& sel,
+                                 const WeightVector& weights);
+
+// The derived outputs a selected node is a source of -- a tap, a copy the
+// node loses nothing to -- by aggregator index.
+std::vector<std::size_t> tapsOf(const Model& model, const Selection& sel);
+
 } // namespace editor
 } // namespace ofxManifold
