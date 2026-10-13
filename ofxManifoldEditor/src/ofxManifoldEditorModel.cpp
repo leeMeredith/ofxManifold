@@ -643,6 +643,45 @@ Result Model::toggleAutoOutput() {
     return r;
 }
 
+namespace {
+
+// The arc a link is drawn along: a quadratic curve from p to q, p the node
+// with the lower id. Its control point sits kArcBend of the line's length out
+// from the middle, on side +1 or -1; the curve's peak is half that.
+constexpr float kArcBend = 0.25f;
+
+glm::vec2 arcControl(glm::vec2 p, glm::vec2 q, int side) {
+    const glm::vec2 d = q - p;
+    return (p + q) * 0.5f + glm::vec2(-d.y, d.x) * (kArcBend * float(side));
+}
+
+glm::vec2 arcPoint(glm::vec2 p, glm::vec2 c, glm::vec2 q, float t) {
+    const float u = 1.0f - t;
+    return p * (u * u) + c * (2.0f * u * t) + q * (t * t);
+}
+
+float distanceToSegment(glm::vec2 x, glm::vec2 a, glm::vec2 b) {
+    const glm::vec2 ab = b - a;
+    const float len2 = glm::dot(ab, ab);
+    float t = len2 > 0.0f ? glm::dot(x - a, ab) / len2 : 0.0f;
+    t = std::min(1.0f, std::max(0.0f, t));
+    return glm::length(x - (a + ab * t));
+}
+
+// Sampled as 16 straight pieces: plenty at the size arcs are drawn.
+float distanceToArc(glm::vec2 x, glm::vec2 p, glm::vec2 c, glm::vec2 q) {
+    float best = 1e9f;
+    glm::vec2 prev = p;
+    for (int k = 1; k <= 16; ++k) {
+        const glm::vec2 cur = arcPoint(p, c, q, float(k) / 16.0f);
+        best = std::min(best, distanceToSegment(x, prev, cur));
+        prev = cur;
+    }
+    return best;
+}
+
+} // namespace
+
 std::vector<LinkLine> linkLines(const Model& model, const Selection& sel) {
     const Manifold2D& m = model.manifold();
     const Mapping& mp = model.mapping();
@@ -676,7 +715,31 @@ std::vector<LinkLine> linkLines(const Model& model, const Selection& sel) {
             }
         }
     }
+    for (LinkLine& l : lines) {
+        if (l.lane != 0) { l.bend = l.lane; continue; }
+        const NodeID lo = std::min(l.from, l.to), hi = std::max(l.from, l.to);
+        const glm::vec2 p = m.node(lo).position, q = m.node(hi).position;
+        float clearance[2] = {1e9f, 1e9f};
+        for (int k = 0; k < 2; ++k) {
+            const glm::vec2 c = arcControl(p, q, k == 0 ? +1 : -1);
+            for (NodeID o = 0; o < m.nodeCount(); ++o) {
+                if (o == l.from || o == l.to) continue;
+                clearance[k] = std::min(clearance[k],
+                    distanceToArc(m.node(o).position, p, c, q));
+            }
+        }
+        l.bend = (clearance[1] > clearance[0] + 1e-4f) ? -1 : +1;
+    }
     return lines;
+}
+
+glm::vec2 linkPoint(const Model& model, const LinkLine& line, float t) {
+    const Manifold2D& m = model.manifold();
+    const NodeID lo = std::min(line.from, line.to);
+    const NodeID hi = std::max(line.from, line.to);
+    const glm::vec2 p = m.node(lo).position, q = m.node(hi).position;
+    const glm::vec2 c = arcControl(p, q, line.bend);
+    return arcPoint(p, c, q, line.from < line.to ? t : 1.0f - t);
 }
 
 } // namespace editor

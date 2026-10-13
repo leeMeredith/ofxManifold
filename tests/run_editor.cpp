@@ -353,7 +353,10 @@ int main(int argc, char** argv) {
                 got += (got.empty() ? "" : " ")
                      + md.manifold().node(l.from).name + ">"
                      + md.manifold().node(l.to).name + ":" + num(l.share) + ":"
-                     + (l.heavy ? "1" : "0") + ":" + std::to_string(l.lane);
+                     + (l.heavy ? "1" : "0") + ":" + std::to_string(l.lane)
+                     + ":" + std::to_string(l.bend) + ":";
+                const glm::vec2 at = linkPoint(md, l, 0.25f);
+                got += num(at.x) + "," + num(at.y);
             }
             if (got.empty()) got = "NONE";
             if (ok && !sameState(want, got)) {

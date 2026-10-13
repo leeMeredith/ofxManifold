@@ -176,6 +176,33 @@ ran off the end -- so the runner now reports an id that names no output
 instead of looking it up. Undefined behaviour that fails on one machine can
 pass on another.
 
+**Slice 2c+, after first use.** Three asks: colour, curves, and percentages
+that overlapped.
+
+- **Colour per output**, by channel so it survives removals, from a
+  colour-blind-safe set minus the yellow (selected) and purple (derived)
+  already in use. A line, its socket, its output's fader and the name of the
+  node that output belongs to share one colour. An added cue only: lines,
+  plugs and labels carry the meaning without it.
+- **Lines are arcs**, decided in the package and tested. A mutual pair arcs
+  to opposite sides; otherwise the side with more CLEARANCE from other nodes.
+  The first rule counted nodes near each side, and mutation testing showed
+  the count was never reached -- in the fixture both sides counted zero and a
+  tie-break decided. Building a fixture where counting and clearance DISAGREE
+  showed counting was the wrong rule: it sent an arc within 0.01 of one node
+  to avoid two at 0.028. What makes a line look connected is the nearest node,
+  so clearance alone is the rule now. Fixing the test changed the design --
+  the fifth appearance of one step reaching a different check than intended.
+- **Percentages a quarter of the way from the sender**, where lines leaving a
+  node fan apart, instead of at the middle where they crossed.
+
+`linkPoint()` gives any point along a link from the sender; 27 scripts, 302
+steps. The test stand-in for openFrameworks lacked `ofColor`'s public `a`;
+added, matching the real class.
+
+Waiting on the user: whether a node's SHAPE should show what it is (round if
+it has its own output, however many others it feeds) or something else.
+
 **Slice 2c, done.** The listening point is permanent and the levels always
 live, so an edit shows on the faders at once; halos always. Shift-click
 selects several faders: `b` binds or unbinds every selected node to every

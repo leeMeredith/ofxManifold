@@ -1296,6 +1296,33 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
+      - name: Link arc bends toward the nearest node must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        l.bend = (clearance[1] > clearance[0] + 1e-4f) ? -1 : +1;' \
+            '        l.bend = (clearance[1] > clearance[0] + 1e-4f) ? +1 : -1;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Mutual link arcs bend to the same side must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (l.lane != 0) { l.bend = l.lane; continue; }' \
+            '        if (l.lane != 0) { l.bend = +1; continue; }'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Link labels measured from the receiver must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    return arcPoint(p, c, q, line.from < line.to ? t : 1.0f - t);' \
+            '    return arcPoint(p, c, q, t);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
       - name: Restored tree must be green
         run: |
           make clean

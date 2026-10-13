@@ -665,12 +665,12 @@ DO fill -1 0
 EXPECT 1 0 "fill 90%"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n0>n1:1 n0>n2:1 n0>~:0.333333 n1>n1:1 n1>n0:1 n2>n2:1 n3>n3:1 | D  | C n2 | S n2 | A 1
 SEL only n0
-LINKS n0>n1:0.3:1:1 n0>n2:0.3:1:0 n1>n0:0.5:0:-1
+LINKS n0>n1:0.3:1:1:1:0.35,0.25625 n0>n2:0.3:1:0:1:0.21875,0.378125 n1>n0:0.5:0:-1:-1:0.65,0.14375
 SEL only n0
 SEL toggle n1
-LINKS n0>n1:0.3:1:1 n0>n2:0.3:1:0 n1>n0:0.5:1:-1
+LINKS n0>n1:0.3:1:1:1:0.35,0.25625 n0>n2:0.3:1:0:1:0.21875,0.378125 n1>n0:0.5:1:-1:-1:0.65,0.14375
 SEL only n2
-LINKS n0>n2:0.3:0:0
+LINKS n0>n2:0.3:0:0:1:0.21875,0.378125
 SEL only n3
 LINKS NONE
 SEL clear
@@ -680,6 +680,79 @@ CONTRIB n0=0.5 n1=0.3 n2=0.2 EXPECT 0.15 0.15 0.15 0
 SEL only n0
 SEL toggle n1
 CONTRIB n0=0.5 n1=0.3 n2=0.2 EXPECT 0.3 0.3 0.15 0
+ENDEDIT
+
+# a link arcs to the side with more CLEARANCE from other nodes, so a line never looks as if it connects to a node it passes. n2 sits just above the straight path from n0 to n1, so that line arcs BELOW; n2 to n3 has nothing near either side and takes +1; a mutual pair arcs to opposite sides. The point a quarter of the way from the sender is where its percentage goes
+EDIT link_arcs_avoid_nodes ANALYTIC
+GRID FREE
+DO place 0.2 0.5
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | S n0 | A 1
+DO place 0.8 0.5
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | S n0 | A 1
+DO place 0.5 0.52
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
+DO place 0.9 0.9
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | S n0 | A 1
+DO pick n1
+EXPECT 0 0 "current output: n1"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n1 | S n1 | A 1
+SEL only n0
+DO bind
+EXPECT 1 0 "bound 1 to n1"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n0>n1:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n1 | S n1 | A 1
+SEL only n0
+LINKS n0>n1:0.5:1:0:-1:0.35,0.44375
+DO pick n0
+EXPECT 0 0 "current output: n0"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n0>n1:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | S n0 | A 1
+SEL only n1
+DO bind
+EXPECT 1 0 "bound 1 to n0"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n0>n1:1 n1>n1:1 n1>n0:1 n2>n2:1 n3>n3:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+LINKS n0>n1:0.5:1:1:1:0.35,0.55625 n1>n0:0.5:0:-1:-1:0.65,0.44375
+DO pick n3
+EXPECT 0 0 "current output: n3"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n0>n1:1 n1>n1:1 n1>n0:1 n2>n2:1 n3>n3:1 | D  | C n3 | S n3 | A 1
+SEL only n2
+DO bind
+EXPECT 1 0 "bound 1 to n3"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.5,0.52 n3@0.9,0.9 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n0>n1:1 n1>n1:1 n1>n0:1 n2>n2:1 n2>n3:1 n3>n3:1 | D  | C n3 | S n3 | A 1
+SEL only n2
+LINKS n2>n3:0.5:1:0:1:0.564375,0.6525
+ENDEDIT
+
+# TWO nodes a comfortable 0.028 from the upper arc, ONE just 0.01 from the lower. Clearance sends the line ABOVE, past the pair: counting nodes would have sent it within a hair of the single one. Built so the two rules disagree, which the first fixture did not -- there both sides counted zero, and the count rule was never reached
+EDIT link_arcs_nearest_not_count ANALYTIC
+GRID FREE
+DO place 0.2 0.5
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | S n0 | A 1
+DO place 0.8 0.5
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | S n0 | A 1
+DO place 0.35 0.585
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.35,0.585 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
+DO place 0.65 0.585
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.35,0.585 n3@0.65,0.585 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | S n0 | A 1
+DO place 0.5 0.415
+EXPECT 1 0 ""
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.35,0.585 n3@0.65,0.585 n4@0.5,0.415 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n0 | S n0 | A 1
+DO pick n1
+EXPECT 0 0 "current output: n1"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.35,0.585 n3@0.65,0.585 n4@0.5,0.415 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n1 | S n1 | A 1
+SEL only n0
+DO bind
+EXPECT 1 0 "bound 1 to n1"
+STATE N n0@0.2,0.5 n1@0.8,0.5 n2@0.35,0.585 n3@0.65,0.585 n4@0.5,0.415 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n0>n1:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n1 | S n1 | A 1
+SEL only n0
+LINKS n0>n1:0.5:1:0:1:0.35,0.55625
 ENDEDIT
 
 # a selected node that a derived output reads from is marked on that fader: a tap, a copy the node loses nothing to

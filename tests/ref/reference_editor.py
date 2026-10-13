@@ -468,7 +468,40 @@ class Editor:
         for a in lines:
             if any(b[0] == a[1] and b[1] == a[0] for b in lines):
                 a[4] = 1 if names.index(a[0]) < names.index(a[1]) else -1
+        for a in lines:
+            a.append(a[4] if a[4] else self.arc_side(a[0], a[1]))
         return lines
+
+    # ---- arcs, restated: distance by DENSE POINT SAMPLING, where the C++
+    # measures to sixteen straight pieces. Agreement means the side chosen
+    # does not hang on how the arc is measured.
+    def canon(self, a, b):
+        names = self.names()
+        return (a, b) if names.index(a) < names.index(b) else (b, a)
+
+    @staticmethod
+    def arc(p, q, side, t):
+        cx = (p[0] + q[0]) / 2 - (q[1] - p[1]) * 0.25 * side
+        cy = (p[1] + q[1]) / 2 + (q[0] - p[0]) * 0.25 * side
+        u = 1 - t
+        return (u * u * p[0] + 2 * u * t * cx + t * t * q[0],
+                u * u * p[1] + 2 * u * t * cy + t * t * q[1])
+
+    def arc_side(self, a, b):
+        lo, hi = self.canon(a, b)
+        p, q = self.pos(lo), self.pos(hi)
+        clear = {}
+        for side in (+1, -1):
+            pts = [self.arc(p, q, side, k / 400) for k in range(401)]
+            clear[side] = min((min(math.dist(x, s) for s in pts)
+                               for n, x in self.nodes if n not in (a, b)),
+                              default=1e9)
+        return -1 if clear[-1] > clear[+1] + 1e-4 else +1
+
+    def link_point(self, a, b, bend, t):
+        lo, hi = self.canon(a, b)
+        return self.arc(self.pos(lo), self.pos(hi), bend,
+                        t if lo == a else 1 - t)
 
     def contributions(self, sel, weights):
         used = [o[1] for o in self.outputs] + [d[1] for d in self.derived]
@@ -718,9 +751,12 @@ class Script:
 
     def lines(self):
         ls = self.ed.link_lines(self.sel)
+        def at(a, b, bd):
+            x, y = self.ed.link_point(a, b, bd, 0.25)
+            return f"{fmt(x)},{fmt(y)}"
         self.out.append("LINKS " + (" ".join(
-            f"{a}>{b}:{fmt(sh)}:{1 if hv else 0}:{ln}"
-            for a, b, sh, hv, ln in ls) or "NONE"))
+            f"{a}>{b}:{fmt(sh)}:{1 if hv else 0}:{ln}:{bd}:{at(a, b, bd)}"
+            for a, b, sh, hv, ln, bd in ls) or "NONE"))
 
     def contrib(self, weights):
         c = self.ed.contributions(self.sel, weights)
@@ -999,6 +1035,38 @@ def build():
     t.contrib([("n0", 0.5), ("n1", 0.3), ("n2", 0.2)])
     t.select("n0", "n1")
     t.contrib([("n0", 0.5), ("n1", 0.3), ("n2", 0.2)])
+    t.end()
+
+    t = Script(out, "link_arcs_avoid_nodes",
+               "a link arcs to the side with more CLEARANCE from other "
+               "nodes, so a line never looks as if it connects to a node it "
+               "passes. n2 sits just above the straight path from n0 to n1, "
+               "so that line arcs BELOW; n2 to n3 has nothing near either "
+               "side and takes +1; a mutual pair arcs to opposite sides. The "
+               "point a quarter of the way from the sender is where its "
+               "percentage goes")
+    for p in [(0.2, 0.5), (0.8, 0.5), (0.5, 0.52), (0.9, 0.9)]:
+        t.do("place", p)
+    t.do("pick", "n1"); t.select("n0"); t.do("bind")      # n0 -> n1, past n2
+    t.select("n0"); t.lines()
+    t.do("pick", "n0"); t.select("n1"); t.do("bind")      # n1 -> n0: mutual
+    t.select("n0"); t.lines()
+    t.do("pick", "n3"); t.select("n2"); t.do("bind")      # n2 -> n3, clear
+    t.select("n2"); t.lines()
+    t.end()
+
+    t = Script(out, "link_arcs_nearest_not_count",
+               "TWO nodes a comfortable 0.028 from the upper arc, ONE just "
+               "0.01 from the lower. Clearance sends the line ABOVE, past the "
+               "pair: counting nodes would have sent it within a hair of the "
+               "single one. Built so the two rules disagree, which the first "
+               "fixture did not -- there both sides counted zero, and the "
+               "count rule was never reached")
+    for p in [(0.2, 0.5), (0.8, 0.5), (0.35, 0.585), (0.65, 0.585),
+              (0.5, 0.415)]:
+        t.do("place", p)
+    t.do("pick", "n1"); t.select("n0"); t.do("bind")
+    t.select("n0"); t.lines()
     t.end()
 
     t = Script(out, "derived_taps",

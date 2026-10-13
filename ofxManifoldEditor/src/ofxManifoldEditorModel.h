@@ -161,8 +161,16 @@ private:
 //           it would join the node to itself), plus its silence, add up to
 //           100%.
 //   lane    0 alone; +1 or -1 when the two nodes also feed each other the
-//           other way, so the two lines are drawn side by side, not on top
-//           of each other
+//           other way
+//   bend    which side the line arcs to, +1 or -1, in the frame running from
+//           the lower node id to the higher. Two nodes feeding each other
+//           arc to opposite sides. Otherwise the side with more CLEARANCE:
+//           the one whose nearest other node is farther away, so a line never
+//           looks as if it connects to a node it merely passes. What makes a
+//           line look connected is how close it comes to the nearest node,
+//           not how many it passes -- counting nodes would send an arc to
+//           within a hair of one node to avoid two at a comfortable distance.
+//           +1 when the two sides are equal.
 struct LinkLine {
     NodeID   from   = InvalidNode;
     NodeID   to     = InvalidNode;
@@ -170,12 +178,20 @@ struct LinkLine {
     float    share  = 0.0f;
     bool     heavy  = false;
     int      lane   = 0;
+    int      bend   = +1;
 };
 
 // The lines to draw for a selection: every link out of a selected node, and
 // every link into one, each ONCE -- a link between two selected nodes is both
 // and is drawn once, heavy.
 std::vector<LinkLine> linkLines(const Model& model, const Selection& sel);
+
+// A point on a link's arc, in MAP coordinates, `t` measured from the SENDING
+// node (0) to the receiving one (1). The arc is a quadratic curve whose
+// control point sits a quarter of the line's length out from its middle. An
+// editor draws the line by sampling this, and puts the percentage near the
+// sender, where lines leaving one node fan apart, instead of at the middle.
+glm::vec2 linkPoint(const Model& model, const LinkLine& line, float t);
 
 } // namespace editor
 } // namespace ofxManifold

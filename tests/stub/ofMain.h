@@ -15,7 +15,9 @@
 #define TWO_PI 6.28318530718f
 #define PI 3.14159265359f
 #define HALF_PI 1.57079632679f
+// r, g, b, a are public members in real openFrameworks, and code sets them.
 struct ofColor {
+    unsigned char r = 255, g = 255, b = 255, a = 255;
     ofColor(){} ofColor(int,int,int){} ofColor(int,int,int,int){}
 };
 struct ofRectangle {

@@ -69,6 +69,9 @@ private:
     // ---- links --------------------------------------------------------------
     void drawLinks() const;
 
+    // ---- colour: one per output, shared by everything that refers to it ---
+    ofColor outputColour(ofxManifold::TargetID t) const;
+
     // ---- NodeGlyph --------------------------------------------------------
     void  drawNode(ofxManifold::NodeID id) const;
     void  drawHalo(ofxManifold::NodeID id, float weight) const;

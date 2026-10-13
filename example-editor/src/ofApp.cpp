@@ -97,13 +97,13 @@ void ofApp::draw() {
     ofSetLineWidth(1.5f);
     if (!model.selectedOutputs().empty()) {
         for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
-            bool feedsAny = false;
+            TargetID fed = InvalidTarget;
             for (TargetID t : model.selectedOutputs()) {
-                if (model.feeds(NodeID(i), t)) { feedsAny = true; break; }
+                if (model.feeds(NodeID(i), t)) { fed = t; break; }
             }
-            if (!feedsAny) continue;
+            if (fed == InvalidTarget) continue;
             const glm::vec2 p = renderer->toScreen(manifold.node(NodeID(i)).position);
-            ofSetColor(120, 200, 160);
+            ofSetColor(outputColour(fed));
             ofDrawCircle(p.x, p.y, 18.0f);
         }
     }
@@ -604,55 +604,101 @@ void ofApp::drawGrid() const {
 // ===========================================================================
 
 // Plug at the sending end, socket at the receiving end, as on gear: outputs
-// male, inputs female. Heavy when the sender is selected, its thickness its
-// share; light when only the receiver is. Two nodes feeding each other get a
-// line each, side by side. Percentages only for a single selected node, since
-// with many lines the numbers overlap long before the lines do.
+// male, inputs female. Each line in the colour of the output it feeds -- the
+// same colour as that output's fader and its node's name -- heavy and sized
+// by share when the sender is selected, faint when only the receiver is.
+//
+// Lines are ARCS, bending to the side with more clearance from other nodes
+// (editor::linkLines decides, tested), so a line never seems to join a node
+// it only passes; two nodes feeding each other arc to opposite sides. The
+// percentage sits a quarter of the way from the SENDER: lines leaving one
+// node fan apart there, where at their middles they crossed and overlapped.
 void ofApp::drawLinks() const {
     const std::vector<LinkLine> lines = linkLines(model, selection);
     if (lines.empty()) return;
     ofPushStyle();
     for (const LinkLine& l : lines) {
-        glm::vec2 a = renderer->toScreen(manifold.node(l.from).position);
-        glm::vec2 b = renderer->toScreen(manifold.node(l.to).position);
-        const float len = glm::distance(a, b);
-        if (len < 1.0f) continue;
-        const glm::vec2 dir = (b - a) / len;
-        // Side by side for a mutual pair: offset across a direction both
-        // lines agree on, so each lands on its own side.
-        const glm::vec2 canon = (l.from < l.to) ? dir : -dir;
-        const glm::vec2 side(-canon.y, canon.x);
-        a += side * (4.0f * float(l.lane));
-        b += side * (4.0f * float(l.lane));
-        // Ends at the node edges, so the plug and socket are visible. Two
-        // nodes almost touching would have their ends pulled past each other
-        // and the line drawn backwards, so such a pair gets no line.
+        const glm::vec2 a = renderer->toScreen(manifold.node(l.from).position);
+        const glm::vec2 b = renderer->toScreen(manifold.node(l.to).position);
         const float pullA = nodeRadius(l.from) + 4.0f;
         const float pullB = nodeRadius(l.to) + 5.0f;
-        if (len <= pullA + pullB + 6.0f) continue;
-        a += dir * pullA;
-        b -= dir * pullB;
+        if (glm::distance(a, b) <= pullA + pullB + 6.0f) continue;
 
+        // The arc, sampled, trimmed back to the edges of both nodes so the
+        // plug and the socket stay visible.
+        std::vector<glm::vec2> pts;
+        for (int k = 0; k <= 40; ++k) {
+            const glm::vec2 p =
+                renderer->toScreen(linkPoint(model, l, float(k) / 40.0f));
+            if (glm::distance(p, a) < pullA || glm::distance(p, b) < pullB) {
+                continue;
+            }
+            pts.push_back(p);
+        }
+        if (pts.size() < 2) continue;
+
+        ofColor c = outputColour(l.output);
         if (l.heavy) {
-            ofSetColor(215, 220, 232);
             ofSetLineWidth(1.0f + 5.0f * ofClamp(l.share, 0.0f, 1.0f));
         } else {
-            ofSetColor(150, 156, 172, 170);
+            c.a = 120;
             ofSetLineWidth(1.0f);
         }
-        ofDrawLine(a.x, a.y, b.x, b.y);
+        ofSetColor(c);
+        ofNoFill();
+        ofBeginShape();
+        for (const glm::vec2& p : pts) ofVertex(p.x, p.y);
+        ofEndShape(false);
+
         ofSetLineWidth(1.5f);
         ofFill();
-        ofDrawCircle(a.x, a.y, 3.5f);                 // plug
+        ofDrawCircle(pts.front().x, pts.front().y, 3.5f);   // plug
         ofNoFill();
-        ofDrawCircle(b.x, b.y, 4.5f);                 // socket
-        if (selection.size() == 1) {
-            const glm::vec2 m = (a + b) * 0.5f + side * 10.0f;
-            ofDrawBitmapString(ofToString(int(std::lround(l.share * 100))) + "%",
-                               m.x, m.y);
+        ofDrawCircle(pts.back().x, pts.back().y, 4.5f);     // socket
+
+        if (selection.size() == 1 && l.heavy) {
+            // Near the sender, nudged off the line to the outside of the arc.
+            const glm::vec2 at =
+                renderer->toScreen(linkPoint(model, l, 0.25f));
+            const glm::vec2 ahead =
+                renderer->toScreen(linkPoint(model, l, 0.30f));
+            glm::vec2 dir = ahead - at;
+            const float dl = glm::length(dir);
+            dir = dl > 0.0f ? dir / dl : glm::vec2(1.0f, 0.0f);
+            const glm::vec2 mid = renderer->toScreen(linkPoint(model, l, 0.5f));
+            glm::vec2 out(-dir.y, dir.x);
+            if (glm::dot(out, mid - (a + b) * 0.5f) < 0.0f) out = -out;
+            const glm::vec2 tp = at + out * 10.0f;
+            const std::string pct =
+                ofToString(int(std::lround(l.share * 100))) + "%";
+            ofSetColor(c);
+            ofDrawBitmapString(pct, tp.x - 4.0f * float(pct.size()), tp.y + 4.0f);
         }
     }
     ofPopStyle();
+}
+
+// One colour per output, by CHANNEL rather than by position in the list, so
+// an output keeps its colour when another is removed and the ids shift.
+// Drawn from Okabe and Ito's colour-blind-safe set, lifted for a dark
+// background, leaving out the yellow already meaning "selected" and the
+// purple already meaning "derived". Colour is an added cue: the lines, the
+// plugs and sockets, and the labels carry the meaning without it. More than
+// six outputs and colours repeat; names still tell them apart.
+ofColor ofApp::outputColour(TargetID t) const {
+    static const ofColor palette[] = {
+        ofColor(86, 180, 233),     // sky blue
+        ofColor(230, 159, 0),      // orange
+        ofColor(40, 190, 140),     // bluish green
+        ofColor(235, 110, 70),     // vermilion
+        ofColor(110, 150, 235),    // blue
+        ofColor(225, 135, 180),    // pink
+    };
+    if (t == InvalidTarget || t >= mapping.targetCount()) {
+        return ofColor(150, 156, 172);
+    }
+    const int ch = std::max(0, mapping.targetChannel(t));
+    return palette[ch % 6];
 }
 
 // ===========================================================================
@@ -746,6 +792,11 @@ void ofApp::drawNode(NodeID id) const {
         ofDrawLine(a.x, a.y, b.x, b.y);
     }
     ofSetColor(180, 186, 200);
+    // A node with an output of its own -- one named after it -- has its name
+    // in that output's colour, so a line's colour leads to its node, and on
+    // to the fader of the same colour.
+    const TargetID own = mapping.findTarget(n.name);
+    if (own != InvalidTarget) ofSetColor(outputColour(own));
     ofDrawBitmapString(n.name, p.x + r + 6.0f, p.y - 6.0f);
     ofPopStyle();
 }
@@ -833,7 +884,7 @@ void ofApp::drawChart() const {
         if (!derived) outputsTotal += routed[ch];
 
         const float v = ofClamp(routed[ch], 0.0f, 1.0f);
-        ofSetColor(derived ? ofColor(180, 140, 230) : ofColor(120, 200, 160));
+        ofSetColor(derived ? ofColor(180, 140, 230) : outputColour(b.output));
         ofDrawRectangle(b.x, chart.base - v * rise, bw, v * rise);
         // The level after trim, as a tick across the bar.
         const float lv = ofClamp(levels[ch], 0.0f, 1.0f);
@@ -888,6 +939,7 @@ void ofApp::drawChart() const {
             ofSetLineWidth(1.0f);
         }
         ofSetColor(200, 205, 215);
+        if (!derived) ofSetColor(outputColour(b.output));
         ofDrawBitmapString(b.name.substr(0, 6), b.x, chart.base + 14.0f);
         ofSetColor(140, 146, 160);
         ofDrawBitmapString(ofToString(ch), b.x, chart.base + 26.0f);
@@ -996,6 +1048,9 @@ void ofApp::drawPanel() const {
             ? ofToString(20.0f * std::log10(tr), 1) + " dB" : "off";
         bool picked = false;
         for (TargetID s2 : model.selectedOutputs()) if (s2 == t) picked = true;
+        ofSetColor(outputColour(t));
+        ofFill();
+        ofDrawRectangle(x - 12.0f, y - 9.0f, 7.0f, 9.0f);
         ofSetColor(picked ? ofColor(255, 214, 90) : ofColor(180, 186, 200));
         ofDrawBitmapString(std::string(t == currentOutput ? "> "
                                        : picked ? "+ " : "  ")
