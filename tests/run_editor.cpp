@@ -420,9 +420,22 @@ int main(int argc, char** argv) {
                 why << "fill marks after step " << step << ": want " << want
                     << ", got " << got;
             }
+        } else if (kind == "CHARTMAP") {
+            // A chart for an outputs list given directly.
+            ChartText tx;
+            in >> chX >> chTop >> chW >> chH >> tx.charWidth >> tx.lineHeight;
+            { std::string kw; in >> kw; }       // OUT
+            Mapping mp;
+            std::string tok;
+            while (in >> tok) {
+                const std::size_t c = tok.rfind(':');
+                mp.addOutput(tok.substr(0, c), std::stoi(tok.substr(c + 1)));
+            }
+            layout = layoutChart(mp, chX, chTop, chW, chH, tx);
         } else if (kind == "CHART") {
-            in >> chX >> chTop >> chW >> chH;
-            layout = layoutChart(md.mapping(), chX, chTop, chW, chH);
+            ChartText tx;
+            in >> chX >> chTop >> chW >> chH >> tx.charWidth >> tx.lineHeight;
+            layout = layoutChart(md.mapping(), chX, chTop, chW, chH, tx);
         } else if (kind == "EXPECTCHART") {
             std::string first; in >> first;
             if (first == "EMPTY") {
@@ -431,35 +444,69 @@ int main(int argc, char** argv) {
                 }
                 continue;
             }
-            const float bw = std::stof(first);
-            float sx, tx; in >> sx >> tx;
-            bool good = !layout.empty && std::fabs(layout.barWidth - bw) < 1e-3
-                     && std::fabs(layout.silenceX - sx) < 1e-3
-                     && std::fabs(layout.totalX - tx) < 1e-3;
+            const float gap = std::stof(first);
+            float bw, sx, tx, base; std::string sl; int step;
+            in >> bw >> sx >> sl >> tx >> base >> step;
+            if (sl == "-") sl.clear();
+            // The vectors carry six significant digits, so past 1000 pixels
+            // only two decimals survive: the tolerance must be relative.
+            auto near = [](float a, float b) {
+                return std::fabs(a - b) <= 1e-5f * std::max(1.0f, std::fabs(b))
+                                           + 1e-4f;
+            };
+            bool good = !layout.empty && near(layout.gap, gap)
+                     && near(layout.barWidth, bw) && near(layout.silenceX, sx)
+                     && layout.silenceLabel == sl && near(layout.totalX, tx)
+                     // Where bars rise from: the label rows below them are
+                     // two lines of text, so a bigger font raises it.
+                     && near(layout.base, base)
+                     && layout.labelStep == step;
             std::string tok;
             std::size_t i = 0;
             while (good && in >> tok) {
-                // ch:kind:x:name
+                // ch:kind:x:w:label:sub
                 std::vector<std::string> f;
                 std::stringstream ss(tok);
                 std::string part;
                 while (std::getline(ss, part, ':')) f.push_back(part);
-                if (i >= layout.bars.size()) { good = false; break; }
+                if (f.size() != 6 || i >= layout.bars.size()) { good = false; break; }
                 const ChartBar& b = layout.bars[i];
                 const char* k = b.kind == ChartBar::Kind::Output ? "output"
                               : b.kind == ChartBar::Kind::Derived ? "derived"
                               : "unused";
-                const std::string nm = b.name.empty() ? "-" : b.name;
+                const std::string lb = b.label.empty() ? "-" : b.label;
+                const std::string sb = b.sub.empty() ? "-" : b.sub;
                 good = b.channel == std::stoi(f[0]) && f[1] == k
-                    && std::fabs(b.x - std::stof(f[2])) < 1e-3 && f[3] == nm;
+                    && near(b.x, std::stof(f[2])) && near(b.w, std::stof(f[3]))
+                    && f[4] == lb && f[5] == sb;
+                if (!good) {
+                    why << "bar " << i << " is ch " << b.channel << " " << k
+                        << " at " << b.x << " w " << b.w << " '" << lb << "' '"
+                        << sb << "'; wanted " << tok << "\n      ";
+                }
                 ++i;
             }
             if (good && i != layout.bars.size()) good = false;
             if (ok && !good) {
                 ok = false;
                 why << "chart layout differs after step " << step
-                    << ": bar width " << layout.barWidth << ", silence at "
-                    << layout.silenceX << ", " << layout.bars.size() << " bars";
+                    << ": gap " << layout.gap << ", bar width "
+                    << layout.barWidth << ", silence at " << layout.silenceX
+                    << " '" << layout.silenceLabel << "', total at "
+                    << layout.totalX << ", " << layout.bars.size() << " bars";
+            }
+        } else if (kind == "HOVER") {
+            float x, y; std::string want;
+            in >> x >> y >> want;
+            const int h = layout.hoverAt(x, y);
+            const std::string got =
+                h == ChartLayout::kSilence ? std::string("silence")
+                : h == ChartLayout::kNothing ? std::string("none")
+                : "bar:" + std::to_string(layout.bars[std::size_t(h)].channel);
+            if (ok && got != want) {
+                ok = false;
+                why << "hover at (" << x << ", " << y << ") found " << got
+                    << ", expected " << want;
             }
         } else if (kind == "CLICK") {
             float x, y; std::string want;

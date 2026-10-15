@@ -38,6 +38,7 @@ public:
     void mousePressed(int x, int y, int button) override;
     void mouseDragged(int x, int y, int button) override;
     void mouseReleased(int x, int y, int button) override;
+    void mouseMoved(int x, int y) override;
     void keyPressed(int key) override;
     void keyReleased(int key) override;
 
@@ -79,6 +80,24 @@ private:
 
     // ---- OutputChart ------------------------------------------------------
     void drawChart() const;
+
+    // ---- Text: the system's monospaced font, at a size you choose -------
+    //
+    // A fixed reading size, NOT one following the window: a bigger window is
+    // for more room, not bigger letters. (2d tied it to the window's height,
+    // and on a large screen it came out far too big.) Command-plus and
+    // command-minus change it, and the choice is kept between launches. If
+    // the font cannot be loaded, the bitmap font is used, and cw and lh say
+    // so.
+    void  fitText();
+    void  setTextSize(int size);
+    void  text(const std::string& s, float x, float y) const;
+    ofTrueTypeFont font;
+    int   textSize = 12;      // what you chose
+    int   fontSize = 0;       // what is loaded
+    float cw = 8.0f;          // character width
+    float lh = 13.0f;         // line height
+    glm::vec2 mouse{-1.0f, -1.0f};
 
     // ---- KeyPanel ---------------------------------------------------------
     void drawPanel() const;

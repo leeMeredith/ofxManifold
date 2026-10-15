@@ -15,6 +15,19 @@ void ofApp::setup() {
     // openFrameworks quits on escape by default. Here escape clears the
     // selection, which is what every editor uses it for.
     ofSetEscapeQuitsApp(false);
+    // The text size chosen last time, if any.
+    const std::string sizeFile = ofToDataPath("editor-text-size.txt");
+    if (ofFile::doesFileExist(sizeFile)) {
+        const int sz = ofToInt(ofBufferFromFile(sizeFile).getText());
+        if (sz >= 8 && sz <= 24) textSize = sz;
+    }
+    // Nine-tenths of the screen, centred, rather than a fixed 1024 x 640:
+    // everything is laid out from the window's size, so it fits any screen.
+    const int sw = ofGetScreenWidth(), sh = ofGetScreenHeight();
+    if (sw > 0 && sh > 0) {
+        ofSetWindowShape(int(sw * 0.9f), int(sh * 0.9f));
+        ofSetWindowPosition(int(sw * 0.05f), int(sh * 0.05f));
+    }
     // Reopen the last saved map, and its outputs, if there is one, so work
     // carries over between sessions. Otherwise start from the example.
     model.loadExample();
@@ -43,8 +56,10 @@ void ofApp::setup() {
 }
 
 void ofApp::update() {
-    // The map keeps a square; the band under it holds the output chart.
-    const float chartH = 130.0f;
+    fitText();
+    // The map keeps a square; the band under it holds the output chart,
+    // taller on a taller window, and never too short for its two label rows.
+    const float chartH = std::max(130.0f, ofGetHeight() * 0.2f);
     const float side = std::max(160.0f, ofGetHeight() - 48.0f - chartH);
     renderer->setViewport(ofRectangle(24, 24, side, side));
     chartTop = 24.0f + side + 16.0f;
@@ -52,7 +67,7 @@ void ofApp::update() {
     // The faders' geometry, laid out by the package from the model. Drawing
     // and clicking both read this one layout, so they cannot disagree.
     chart = layoutChart(mapping, 24.0f, chartTop, ofGetWidth() - 48.0f,
-                        ofGetHeight() - chartTop - 20.0f);
+                        ofGetHeight() - chartTop - 20.0f, ChartText{cw, lh});
 
     // The listening point is permanent, so the levels are always live: an
     // edit -- a moved node, a fill step, a binding -- shows on the faders at
@@ -295,6 +310,7 @@ void ofApp::mousePressed(int x, int y, int) {
 
 void ofApp::mouseDragged(int x, int y, int) {
     const glm::vec2 screen(x, y);
+    mouse = screen;
     if (pressInChart) return;
     if (pressAudition) {
         auditionPoint = renderer->toManifold(screen);
@@ -377,11 +393,25 @@ void ofApp::mouseReleased(int x, int y, int) {
     anchor = InvalidNode;
 }
 
+void ofApp::mouseMoved(int x, int y) {
+    mouse = glm::vec2(float(x), float(y));
+}
+
 void ofApp::keyPressed(int key) {
     // ---- undo, redo: command-Z and shift-command-Z ----
     const bool command = ofGetKeyPressed(OF_KEY_COMMAND);
     if (command) {
         const bool shift = ofGetKeyPressed(OF_KEY_SHIFT);
+        // Control-command-F, the Mac's full-screen key. Checked first: with
+        // control held, f may arrive as its control code, 6.
+        if (ofGetKeyPressed(OF_KEY_CONTROL)
+            && (key == 'f' || key == 'F' || key == 6)) {
+            ofToggleFullscreen();
+            return;
+        }
+        // Command-plus and command-minus: the text size.
+        if (key == '=' || key == '+') { setTextSize(textSize + 1); return; }
+        if (key == '-' || key == '_') { setTextSize(textSize - 1); return; }
         if (key == 'z' || key == 'Z' || key == 26) {
             if (key == 'Z' || shift) redo(); else undo();
         } else if (key == 's' || key == 'S' || key == 19) {
@@ -672,7 +702,7 @@ void ofApp::drawLinks() const {
             const std::string pct =
                 ofToString(int(std::lround(l.share * 100))) + "%";
             ofSetColor(c);
-            ofDrawBitmapString(pct, tp.x - 4.0f * float(pct.size()), tp.y + 4.0f);
+            text(pct, tp.x - 0.5f * cw * float(pct.size()), tp.y + 0.3f * lh);
         }
     }
     ofPopStyle();
@@ -797,7 +827,7 @@ void ofApp::drawNode(NodeID id) const {
     // to the fader of the same colour.
     const TargetID own = mapping.findTarget(n.name);
     if (own != InvalidTarget) ofSetColor(outputColour(own));
-    ofDrawBitmapString(n.name, p.x + r + 6.0f, p.y - 6.0f);
+    text(n.name, p.x + r + 6.0f, p.y - 6.0f);
     ofPopStyle();
 }
 
@@ -851,15 +881,14 @@ void ofApp::drawChart() const {
 
     if (chart.empty) {
         ofSetColor(140, 146, 160);
-        ofDrawBitmapString("no outputs yet -- press o to make one",
-                           chart.x0 + 12.0f, chart.top + 24.0f);
+        text("no outputs yet -- press o to make one",
+             chart.x0 + 12.0f, chart.top + lh + 8.0f);
         ofPopStyle();
         return;
     }
 
     const WeightVector none;
     const WeightVector& wv = evaluation.inside ? evaluation.weights : none;
-    (void)none;
     const std::vector<float> routed = mapping.toChannels(wv);
     const std::vector<float> levels = mapping.toChannelLevels(wv);
     const float silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
@@ -867,19 +896,25 @@ void ofApp::drawChart() const {
     const std::vector<float> fromSel = selection.empty()
         ? std::vector<float>() : contributions(model, selection, wv);
     const std::vector<std::size_t> taps = tapsOf(model, selection);
-    const float bw = chart.barWidth;
     const float rise = chart.barArea - 6.0f;
+    const float row1 = chart.base + lh + 1.0f;      // label rows under bars
+    const float row2 = row1 + lh;
 
     float outputsTotal = 0.0f;
     for (const ChartBar& b : chart.bars) {
         const std::size_t ch = std::size_t(b.channel);
-        ofSetColor(58, 62, 74);
-        ofDrawRectangle(b.x, chart.top + 6.0f, bw, rise);
+        const float bw = b.w;
         if (b.kind == ChartBar::Kind::Unused) {
-            ofSetColor(90, 96, 110);
-            ofDrawBitmapString(ofToString(ch), b.x + 2.0f, chart.base + 14.0f);
+            // A sliver: a channel nothing is on. Hover names it; a ruler mark
+            // may still number it, so the count along the row stays even.
+            ofSetColor(52, 56, 66);
+            ofDrawRectangle(b.x, chart.top + 6.0f, bw, rise);
+            ofSetColor(140, 146, 160);
+            if (!b.label.empty()) text(b.label, b.x, row1);
             continue;
         }
+        ofSetColor(58, 62, 74);
+        ofDrawRectangle(b.x, chart.top + 6.0f, bw, rise);
         const bool derived = (b.kind == ChartBar::Kind::Derived);
         if (!derived) outputsTotal += routed[ch];
 
@@ -909,9 +944,10 @@ void ofApp::drawChart() const {
         // from the bottom of the bar: "this much of it is them".
         if (!derived && ch < fromSel.size() && fromSel[ch] > 0.0f) {
             const float c = ofClamp(fromSel[ch], 0.0f, 1.0f);
+            const float inset = std::min(2.0f, bw * 0.2f);
             ofSetColor(200, 245, 220);
-            ofDrawRectangle(b.x + 2.0f, chart.base - c * rise, bw - 4.0f,
-                            c * rise);
+            ofDrawRectangle(b.x + inset, chart.base - c * rise,
+                            bw - 2.0f * inset, c * rise);
         }
 
         // A derived output that reads a selected node: a purple dot -- a
@@ -938,11 +974,12 @@ void ofApp::drawChart() const {
             ofFill();
             ofSetLineWidth(1.0f);
         }
-        ofSetColor(200, 205, 215);
-        if (!derived) ofSetColor(outputColour(b.output));
-        ofDrawBitmapString(b.name.substr(0, 6), b.x, chart.base + 14.0f);
+        // Labels as the layout fitted them: the name over its channel, or
+        // the channel alone, or nothing when even that will not fit.
+        ofSetColor(derived ? ofColor(200, 205, 215) : outputColour(b.output));
+        if (!b.label.empty()) text(b.label, b.x, row1);
         ofSetColor(140, 146, 160);
-        ofDrawBitmapString(ofToString(ch), b.x, chart.base + 26.0f);
+        if (!b.sub.empty()) text(b.sub, b.x, row2);
     }
 
     // The fader line: each selected node's fill, on each output it feeds --
@@ -955,27 +992,81 @@ void ofApp::drawChart() const {
         for (const ChartBar& b : chart.bars) {
             if (b.kind != ChartBar::Kind::Output || b.output != m.output) continue;
             const float y = chart.base - ofClamp(m.fill, 0.0f, 1.0f) * rise;
-            ofDrawLine(b.x, y, b.x + bw, y);
+            ofDrawLine(b.x, y, b.x + b.w, y);
         }
     }
     ofSetLineWidth(1.0f);
 
     // Silence, so the whole share is accounted for.
     ofSetColor(58, 62, 74);
-    ofDrawRectangle(chart.silenceX, chart.top + 6.0f, bw, rise);
+    ofDrawRectangle(chart.silenceX, chart.top + 6.0f, chart.barWidth, rise);
     const float sv = ofClamp(silence, 0.0f, 1.0f);
     ofSetColor(120, 126, 140);
-    ofDrawRectangle(chart.silenceX, chart.base - sv * rise, bw, sv * rise);
+    ofDrawRectangle(chart.silenceX, chart.base - sv * rise, chart.barWidth,
+                    sv * rise);
     ofSetColor(200, 205, 215);
-    ofDrawBitmapString("silent", chart.silenceX, chart.base + 14.0f);
+    if (!chart.silenceLabel.empty()) text(chart.silenceLabel, chart.silenceX, row1);
 
+    // The total, in the column kept for it, one figure a line, so it never
+    // runs past the window however many outputs there are.
     ofSetColor(235, 238, 245);
-    const std::string total = evaluation.inside
-        ? "outputs " + ofToString(outputsTotal, 3) + " + silence "
-          + ofToString(silence, 3) + " = "
-          + ofToString(outputsTotal + silence, 3)
-        : "the listening point is outside the map";
-    ofDrawBitmapString(total, chart.totalX, chart.top + 22.0f);
+    const float tx = chart.totalX;
+    if (evaluation.inside) {
+        text("outputs " + ofToString(outputsTotal, 3), tx, chart.top + lh + 6.0f);
+        text("silence " + ofToString(silence, 3), tx, chart.top + 2.0f * lh + 6.0f);
+        text("total   " + ofToString(outputsTotal + silence, 3), tx,
+             chart.top + 3.0f * lh + 6.0f);
+    } else {
+        text("listening point", tx, chart.top + lh + 6.0f);
+        text("outside the map", tx, chart.top + 2.0f * lh + 6.0f);
+    }
+
+    // Hover: the full name and level of whatever bar is under the mouse, so
+    // nothing becomes unreadable when the bars get narrow.
+    const int h = chart.hoverAt(mouse.x, mouse.y);
+    if (h != ChartLayout::kNothing) {
+        std::vector<std::string> lines;
+        float x;
+        if (h == ChartLayout::kSilence) {
+            x = chart.silenceX;
+            lines = {"silent", "share " + ofToString(silence, 3)};
+        } else {
+            const ChartBar& b = chart.bars[std::size_t(h)];
+            const std::size_t ch = std::size_t(b.channel);
+            x = b.x;
+            if (b.kind == ChartBar::Kind::Unused) {
+                lines = {"channel " + ofToString(ch), "unused"};
+            } else if (b.kind == ChartBar::Kind::Derived) {
+                lines = {b.name + "  ch " + ofToString(ch) + "  derived",
+                         "level " + ofToString(levels[ch], 3)};
+            } else {
+                const float tr = mapping.targetTrim(b.output);
+                lines = {b.name + "  ch " + ofToString(ch),
+                         "share " + ofToString(routed[ch], 3) + "  level "
+                         + ofToString(levels[ch], 3) + "  trim "
+                         + (tr > 0.0f ? ofToString(20.0f * std::log10(tr), 1)
+                                        + " dB"
+                                      : std::string("off"))};
+            }
+        }
+        std::size_t longest = 0;
+        for (const std::string& l : lines) longest = std::max(longest, l.size());
+        const float bwid = float(longest) * cw + 12.0f;
+        const float bh = float(lines.size()) * lh + 8.0f;
+        // Above the chart, kept inside the window.
+        const float bx = std::min(x, float(ofGetWidth()) - bwid - 8.0f);
+        const float by = chart.top - bh - 4.0f;
+        ofSetColor(24, 26, 32, 235);
+        ofDrawRectangle(bx, by, bwid, bh);
+        ofNoFill();
+        ofSetColor(140, 146, 160);
+        ofDrawRectangle(bx, by, bwid, bh);
+        ofFill();
+        ofSetColor(235, 238, 245);
+        for (std::size_t k = 0; k < lines.size(); ++k) {
+            text(lines[k], bx + 6.0f, by + 4.0f + float(k + 1) * lh - 3.0f);
+        }
+    }
     ofPopStyle();
 }
 
@@ -986,37 +1077,47 @@ void ofApp::drawChart() const {
 // ---------------------------------------------------------------------------
 // the panel
 // ---------------------------------------------------------------------------
+// The panel in FIXED zones, so nothing pushes anything else: status lines
+// that are always in the same places, one line for the message, a few lines
+// for the output you are acting on, then the keys. The full list of outputs
+// used to sit in the middle and grow with every output, pushing the keys off
+// the bottom of the window; the faders already show every output, and hover
+// gives any one's details.
 void ofApp::drawPanel() const {
     const float x = renderer->viewport().getRight() + 30.0f;
-    float y = 40.0f;
+    const float room = float(ofGetWidth()) - x - 16.0f;
+    const std::size_t width = std::size_t(std::max(12.0f, room / cw));
+    // Any line longer than the panel is shortened rather than run off it.
+    auto fit = [width](std::string s) {
+        if (s.size() > width) s = s.substr(0, width - 3) + "...";
+        return s;
+    };
+    const float step = lh + 2.0f;
+    float y = 24.0f + lh;
     static const char* names[] = {"free", "square", "triangular", "polar"};
 
+    // ---- status: seven lines, each always in its place ----
     ofSetColor(auditioning() ? ofColor(120, 200, 160) : ofColor(235, 238, 245));
-    ofDrawBitmapString(auditioning()
+    text(fit(auditioning()
         ? (auditionLocked ? "AUDITION  (locked -- v to edit)"
                           : "AUDITION  (release space to edit)")
-        : "EDIT", x, y);
-    y += 20.0f;
-
+        : "EDIT"), x, y);
     ofSetColor(180, 186, 200);
-    ofDrawBitmapString((currentPath.empty() ? std::string("untitled")
-                                            : pairFor(currentPath).name)
-                       + (unsaved ? "   (unsaved)" : ""), x, y);
-    y += 15.0f;
+    text(fit((currentPath.empty() ? std::string("untitled")
+                                  : pairFor(currentPath).name)
+             + (unsaved ? "   (unsaved)" : "")), x, y + step);
     std::string g = std::string("grid ") + names[int(kind)];
     if (kind != GridKind::Free) {
         g += "  " + ofToString(spacing, 3) + "  "
            + ofToString(ofRadToDeg(rotation), 0) + " deg";
         if (kind == GridKind::Polar) g += "  " + ofToString(spokes) + " spokes";
     }
-    ofDrawBitmapString(g, x, y);                                  y += 15.0f;
-    ofDrawBitmapString(std::string("auto-output ")
-                       + (autoOutput ? "on" : "off") + "  (p)", x, y);
-    y += 15.0f;
-    ofDrawBitmapString("nodes " + ofToString(manifold.nodeCount())
-                       + "   regions " + ofToString(manifold.regionCount())
-                       + "   selected " + ofToString(selection.size()), x, y);
-    y += 15.0f;
+    text(fit(g), x, y + 2.0f * step);
+    text(fit(std::string("auto-output ") + (autoOutput ? "on" : "off")
+             + "  (p)"), x, y + 3.0f * step);
+    text(fit("nodes " + ofToString(manifold.nodeCount())
+             + "   regions " + ofToString(manifold.regionCount())
+             + "   selected " + ofToString(selection.size())), x, y + 4.0f * step);
     // The selection's fill, so a q or w press can be read before and after.
     if (!selection.empty()) {
         float lo = 2.0f, hi = -1.0f;
@@ -1029,54 +1130,66 @@ void ofApp::drawPanel() const {
             : ofToString(int(std::lround(lo * 100))) + "%"
               + (std::lround(lo * 100) == std::lround(hi * 100) ? std::string()
                  : " to " + ofToString(int(std::lround(hi * 100))) + "%");
-        ofDrawBitmapString("fill " + fill, x, y);
-        y += 15.0f;
+        text(fit("fill " + fill), x, y + 5.0f * step);
     }
     if (!model.topology().orphans.empty()) {
         ofSetColor(140, 146, 160);
-        ofDrawBitmapString("orphans " + ofToString(model.topology().orphans.size())
-                           + "  (in no region yet)", x, y);
-        y += 15.0f;
+        text(fit("orphans " + ofToString(model.topology().orphans.size())
+                 + "  (in no region yet)"), x, y + 6.0f * step);
     }
-    y += 8.0f;
+    y += 7.0f * step + lh * 0.5f;
 
-    ofSetColor(235, 238, 245);
-    ofDrawBitmapString("outputs", x, y);                          y += 16.0f;
-    for (TargetID t = 0; t < mapping.targetCount(); ++t) {
-        const float tr = mapping.targetTrim(t);
-        const std::string dB = tr > 0.0f
-            ? ofToString(20.0f * std::log10(tr), 1) + " dB" : "off";
-        bool picked = false;
-        for (TargetID s2 : model.selectedOutputs()) if (s2 == t) picked = true;
-        ofSetColor(outputColour(t));
-        ofFill();
-        ofDrawRectangle(x - 12.0f, y - 9.0f, 7.0f, 9.0f);
-        ofSetColor(picked ? ofColor(255, 214, 90) : ofColor(180, 186, 200));
-        ofDrawBitmapString(std::string(t == currentOutput ? "> "
-                                       : picked ? "+ " : "  ")
-                           + mapping.targetName(t) + "  ch "
-                           + ofToString(mapping.targetChannel(t)) + "  " + dB,
-                           x, y);
-        y += 14.0f;
-    }
-    for (const auto& a : mapping.aggregators()) {
-        ofSetColor(180, 140, 230);
-        ofDrawBitmapString("  " + a.name + "  ch "
-                           + (a.channel >= 0 ? ofToString(a.channel)
-                                             : std::string("-"))
-                           + "  sum of " + ofToString(a.sources.size()),
-                           x, y);
-        y += 14.0f;
-    }
-    y += 8.0f;
+    // ---- the message: one line, always here ----
     if (messageTime > 0.0f) {
         ofSetColor(refusedFlash > 0.0f ? ofColor(232, 96, 88)
                                        : ofColor(120, 200, 160));
-        ofDrawBitmapString(message, x, y);
+        text(fit(message), x, y);
     }
-    y += 24.0f;
+    y += step + lh * 0.5f;
 
-    // Help, in two columns: editing the map, and its outputs.
+    // ---- the output you are acting on: three lines, never more ----
+    const auto& sel = model.selectedOutputs();
+    if (mapping.targetCount() == 0) {
+        ofSetColor(140, 146, 160);
+        text(fit("no outputs yet -- o makes one"), x, y);
+    } else if (sel.size() == 1) {
+        const TargetID t = sel.front();
+        const float tr = mapping.targetTrim(t);
+        std::size_t feeders = 0;
+        for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
+            if (model.feeds(NodeID(i), t)) ++feeders;
+        }
+        ofSetColor(outputColour(t));
+        ofFill();
+        ofDrawRectangle(x - 12.0f, y - lh * 0.7f, 7.0f, lh * 0.7f);
+        ofSetColor(255, 214, 90);
+        text(fit("> " + mapping.targetName(t) + "  ch "
+                 + ofToString(mapping.targetChannel(t)) + "  "
+                 + (tr > 0.0f ? ofToString(20.0f * std::log10(tr), 1) + " dB"
+                              : std::string("off"))), x, y);
+        ofSetColor(180, 186, 200);
+        text(fit("fed by " + ofToString(feeders)
+                 + (feeders == 1 ? " node" : " nodes")), x, y + step);
+    } else {
+        std::string list;
+        for (TargetID t : sel) {
+            list += (list.empty() ? "" : ", ") + mapping.targetName(t);
+        }
+        ofSetColor(255, 214, 90);
+        text(fit("+ " + ofToString(sel.size()) + " outputs: " + list), x, y);
+        ofSetColor(180, 186, 200);
+        text(fit("b and t act on all " + ofToString(sel.size())), x, y + step);
+    }
+    ofSetColor(140, 146, 160);
+    const std::size_t derived = mapping.aggregators().size();
+    text(fit(ofToString(mapping.targetCount()) + " outputs"
+             + (derived ? ", " + ofToString(derived) + " derived" : std::string())
+             + " -- hover a fader for details"), x, y + 2.0f * step);
+    y += 3.0f * step + lh * 0.5f;
+
+    // ---- the keys: always starting here ----
+    // Two columns when the panel is wide enough, one beneath the other when
+    // the text is large or the window narrow.
     const char* left[] = {
         "click empty  place node",   "drag empty   box select",
         "shift        add to select", "drag node    move selection",
@@ -1084,7 +1197,8 @@ void ofApp::drawPanel() const {
         "delete       remove nodes", "1-4          grid kind",
         "r R 0        rotate grid",  "- = [ ]      spacing spokes",
         "x  e         empty  example", "cmd-s  save   (+shift: as)",
-        "cmd-o  open a pair",
+        "cmd-o  open a pair",       "ctrl-cmd-f  full screen",
+        "cmd-+ cmd--  text size",
     };
     const char* right[] = {
         "o     new output",         "d     derived from selection",
@@ -1097,13 +1211,46 @@ void ofApp::drawPanel() const {
         "cmd-z undo, shift redo",   "click a bar: pick output",
     };
     ofSetColor(140, 146, 160);
+    const bool twoColumns = room >= 60.0f * cw;
     float yl = y;
-    for (const char* hl : left) { ofDrawBitmapString(hl, x, yl); yl += 14.0f; }
-    float yr = y;
-    for (const char* hr : right) {
-        ofDrawBitmapString(hr, x + 232.0f, yr);
-        yr += 14.0f;
+    for (const char* hl : left) { text(fit(hl), x, yl); yl += lh + 1.0f; }
+    float yr = twoColumns ? y : yl + lh * 0.6f;
+    const float xr = twoColumns ? x + 31.0f * cw : x;
+    for (const char* hr : right) { text(fit(hr), xr, yr); yr += lh + 1.0f; }
+}
+
+// ===========================================================================
+// Text
+// ===========================================================================
+
+// Loaded at 72 dots per inch, so a size in points is a size in pixels, as
+// on the rest of the Mac; openFrameworks' default of 96 made every size a
+// third larger than asked. Reloaded only when the size changes. Character
+// width is measured over ten characters, since a single one can round.
+void ofApp::fitText() {
+    if (textSize == fontSize) return;
+    fontSize = textSize;
+    if (font.load(OF_TTF_MONO, fontSize, true, true, false, 0.3f, 72)) {
+        cw = font.stringWidth("0000000000") / 10.0f;
+        lh = font.getLineHeight();
+    } else {
+        cw = 8.0f;
+        lh = 13.0f;
     }
+}
+
+void ofApp::setTextSize(int size) {
+    textSize = std::max(8, std::min(24, size));
+    ofBuffer b;
+    b.set(ofToString(textSize));
+    ofBufferToFile(ofToDataPath("editor-text-size.txt"), b);
+    message = "text size " + ofToString(textSize);
+    messageTime = 1.5f;
+}
+
+void ofApp::text(const std::string& s, float x, float y) const {
+    if (font.isLoaded()) font.drawString(s, x, y);
+    else ofDrawBitmapString(s, x, y);
 }
 
 // ===========================================================================

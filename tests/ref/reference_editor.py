@@ -532,40 +532,94 @@ class Editor:
         return marks
 
     # ---- the fader layout ----------------------------------------------
-    def chart(self, x0, top, w, h):
-        """Geometry only, as a list; restated from the rules, not the C++."""
-        empty = not self.outputs and not self.derived
-        if empty:
+    def chart(self, x0, top, w, h, cw=8.0, lh=13.0):
+        """Fader geometry, restated from the rules. Every used channel and
+        silence get a full bar; an unused channel a 4-pixel sliver; a gap
+        before each item, after the last, and once more before silence; a
+        column 16 characters wide kept at the right for the total. Gaps are
+        8 until a bar would be narrower than 32, then a quarter of a bar."""
+        if not self.outputs and not self.derived:
             return {"empty": True}
-        used = [o[1] for o in self.outputs] + [d[1] for d in self.derived]
-        channels = max(used) + 1
-        gap = 8.0
-        slots = channels + 1
-        bw = min(46.0, (w - gap * (slots + 1)) / max(slots, 1))
-        bars = []
-        for ch in range(channels):
-            x = x0 + gap + ch * (bw + gap)
-            kind, name, out = "unused", "", None
-            for o in self.outputs:
-                if o[1] == ch:
-                    kind, name, out = "output", o[0], o[0]
-            if kind == "unused":
-                for d in self.derived:
-                    if d[1] == ch:
-                        kind, name = "derived", d[0]
-            bars.append((ch, kind, x, name, out))
-        sx = x0 + gap + channels * (bw + gap) + gap
-        return {"empty": False, "bw": bw, "sx": sx, "tx": sx + bw + 16.0,
-                "bars": bars, "top": top, "h": h}
+        owner = {}
+        for o in self.outputs:
+            owner[o[1]] = ("output", o[0], o[0])
+        for d in self.derived:
+            owner.setdefault(d[1], ("derived", d[0], None))
+        channels = max(owner) + 1
+        kinds = [owner.get(ch, ("unused", "", None)) for ch in range(channels)]
+        room = w - 16 * cw
+        full = 1 + sum(k[0] != "unused" for k in kinds)
+        thin = channels - (full - 1)
+        ngaps = full + thin + 2
+        bw, gap = (room - 4 * thin - 8 * ngaps) / full, 8.0
+        if bw < 32:
+            bw = (room - 4 * thin) / (full + ngaps / 4)
+            gap = max(1.0, bw / 4)
+        bw = min(46.0, max(2.0, bw))
+        room_for_label = bw + gap - 1
+        x, bars = x0 + gap, []
+        for ch, (kind, name, out) in enumerate(kinds):
+            width = min(4.0, bw) if kind == "unused" else bw
+            bars.append(dict(ch=ch, kind=kind, x=x, w=width, name=name,
+                             out=out, label="", sub=""))
+            x += width + gap
+        sx = x + gap
+        # Labels for the whole row: names on all, else numbers on all, else
+        # a ruler -- the smallest step whose marks each fit before the next.
+        used = [b for b in bars if b["kind"] != "unused"]
+        fit = lambda t, room=room_for_label: len(t) * cw <= room
+        all_names = all(fit(b["name"]) for b in used)
+        all_numbers = all(fit(str(b["ch"])) for b in used)
+        step = 0
+        if all_names or all_numbers:
+            for b in used:
+                if all_names:
+                    b["label"] = b["name"]
+                    b["sub"] = str(b["ch"]) if all_numbers else ""
+                else:
+                    b["label"] = str(b["ch"])
+        else:
+            for k in (2, 5, 10, 20, 50, 100, 200, 500, 1000):
+                marks = [i for i, b in enumerate(bars) if b["ch"] % k == 0]
+                def mark_room(i):
+                    end = bars[i + k]["x"] if i + k < len(bars) else sx
+                    return end - bars[i]["x"] - 1
+                if all(fit(str(bars[i]["ch"]), mark_room(i)) for i in marks):
+                    step = k
+                    for i in marks:
+                        bars[i]["label"] = str(bars[i]["ch"])
+                    break
+        sl = next((o for o in ("silent", "sil")
+                   if len(o) * cw <= room_for_label), "")
+        lay = dict(empty=False, bw=bw, gap=gap, sx=sx, sl=sl, step=step,
+                   tx=x0 + room + 8, bars=bars, top=top, h=h, x0=x0, w=w,
+                   cw=cw, base=top + h - (2 * lh + 4))
+        # The point of the reserved column: whatever the outputs, the bars
+        # end before it and the total ends inside the chart. Asserted here,
+        # so a layout that broke it would not even generate its vectors.
+        if bw > 2.0:
+            assert sx + bw <= x0 + room + 1e-3, ("bars overrun", sx + bw)
+        assert lay["tx"] + 16 * cw - 8 <= x0 + w + 1e-3
+        return lay
+
+    @staticmethod
+    def hover(lay, x, y):
+        if lay["empty"] or not (lay["top"] <= y <= lay["top"] + lay["h"]):
+            return "none"
+        half = lay["gap"] / 2
+        for b in lay["bars"]:
+            if b["x"] - half <= x <= b["x"] + b["w"] + half:
+                return f"bar:{b['ch']}"
+        if lay["sx"] - half <= x <= lay["sx"] + lay["bw"] + half:
+            return "silence"
+        return "none"
 
     def output_at(self, lay, x, y):
-        if lay["empty"]:
+        h = self.hover(lay, x, y)
+        if not h.startswith("bar:"):
             return None
-        for ch, kind, bx, name, out in lay["bars"]:
-            if kind == "output" and bx <= x <= bx + lay["bw"] \
-                    and lay["top"] <= y <= lay["top"] + lay["h"]:
-                return out
-        return None
+        b = lay["bars"][int(h[4:])]
+        return b["out"] if b["kind"] == "output" else None
 
     # ---- the state, canonically ----------------------------------------
     def dump(self):
@@ -691,19 +745,61 @@ class Script:
             self.out.append("SEL clear")
         return res
 
-    def chart(self, x0, top, w, h, clicks=()):
-        lay = self.ed.chart(x0, top, w, h)
-        self.out.append(f"CHART {fmt(x0)} {fmt(top)} {fmt(w)} {fmt(h)}")
+    def chart(self, x0, top, w, h, probes=(), cw=8.0, lh=13.0):
+        lay = self.ed.chart(x0, top, w, h, cw, lh)
+        self.out.append(f"CHART {fmt(x0)} {fmt(top)} {fmt(w)} {fmt(h)} "
+                        f"{fmt(cw)} {fmt(lh)}")
         if lay["empty"]:
             self.out.append("EXPECTCHART EMPTY")
         else:
-            bars = " ".join(f"{c}:{k}:{fmt(x)}:{n or '-'}"
-                            for c, k, x, n, _o in lay["bars"])
-            self.out.append(f"EXPECTCHART {fmt(lay['bw'])} {fmt(lay['sx'])} "
-                            f"{fmt(lay['tx'])} {bars}")
-        for x, y in clicks:
+            d = lambda v: v if v else "-"
+            bars = " ".join(f"{b['ch']}:{b['kind']}:{fmt(b['x'])}:"
+                            f"{fmt(b['w'])}:{d(b['label'])}:{d(b['sub'])}"
+                            for b in lay["bars"])
+            self.out.append(f"EXPECTCHART {fmt(lay['gap'])} {fmt(lay['bw'])} "
+                            f"{fmt(lay['sx'])} {d(lay['sl'])} "
+                            f"{fmt(lay['tx'])} {fmt(lay['base'])} "
+                            f"{lay['step']} {bars}")
+        # Probes name a place in the reference's OWN layout -- the middle of
+        # channel 3, the edge of its hit area -- and become coordinates. The
+        # C++ lays out independently, so a disagreement lands a probe wrong.
+        y_in = top + h / 2
+        for p in probes:
+            if lay["empty"]:
+                x, y = x0 + 20, y_in
+            else:
+                bar = lambda ch: lay["bars"][ch]
+                half = lay["gap"] / 2
+                x, y = {
+                    "mid": lambda: (bar(p[1])["x"] + bar(p[1])["w"] / 2, y_in),
+                    "edge": lambda: (bar(p[1])["x"] + bar(p[1])["w"]
+                                     + half - 0.25, y_in),
+                    "below": lambda: (bar(p[1])["x"] + bar(p[1])["w"] / 2,
+                                      top + h + 5),
+                    "silence": lambda: (lay["sx"] + lay["bw"] / 2, y_in),
+                    "before": lambda: (x0 + half - 1, y_in),
+                }[p[0]]()
             hit = None if lay["empty"] else self.ed.output_at(lay, x, y)
+            hov = "none" if lay["empty"] else self.ed.hover(lay, x, y)
             self.out.append(f"CLICK {fmt(x)} {fmt(y)} {hit or '-'}")
+            self.out.append(f"HOVER {fmt(x)} {fmt(y)} {hov}")
+
+    def chart_of(self, outputs, x0, top, w, h, cw=8.0, lh=13.0):
+        """A chart for an outputs list given directly, as name:channel --
+        for rows the editing operations reach only in hundreds of steps."""
+        e = Editor()
+        e.outputs = [[n, ch, 1.0] for n, ch in outputs]
+        lay = e.chart(x0, top, w, h, cw, lh)
+        d = lambda v: v if v else "-"
+        self.out.append(f"CHARTMAP {fmt(x0)} {fmt(top)} {fmt(w)} {fmt(h)} "
+                        f"{fmt(cw)} {fmt(lh)} OUT "
+                        + " ".join(f"{n}:{ch}" for n, ch in outputs))
+        bars = " ".join(f"{b['ch']}:{b['kind']}:{fmt(b['x'])}:"
+                        f"{fmt(b['w'])}:{d(b['label'])}:{d(b['sub'])}"
+                        for b in lay["bars"])
+        self.out.append(f"EXPECTCHART {fmt(lay['gap'])} {fmt(lay['bw'])} "
+                        f"{fmt(lay['sx'])} {d(lay['sl'])} {fmt(lay['tx'])} "
+                        f"{fmt(lay['base'])} {lay['step']} {bars}")
 
     @staticmethod
     def base(chosen):
@@ -941,16 +1037,17 @@ def build():
     t = Script(out, "example",
                "the example map, and its outputs, exactly")
     t.do("example")
-    # The window as it is today: 1024 x 640, chart 118 high from y 502.
+    # The window as it was: 1024 x 640, chart 118 high from y 502.
     t.chart(24, 502, 976, 118,
-            clicks=[(24 + 8 + 1 * 54 + 20, 560),     # inside left's bar
-                    (24 + 8 + 4 * 54 + 20, 560),     # the derived sub: no
-                    (24 + 8 + 5 * 54 + 8 + 20, 560), # the silence bar: no
-                    (24 + 8 + 0 * 54 + 20, 700),     # below the chart: no
-                    (24 + 8 + 0 * 54 + 50, 560)])    # in the gap: no
+            probes=[("mid", 1),         # left's bar
+                    ("mid", 4),         # the derived sub: hovered, not picked
+                    ("silence",),       # hovered, not picked
+                    ("below", 0),       # under the chart: nothing
+                    ("edge", 0),        # in front's half of the gap: front
+                    ("before",)])       # left of the first bar: nothing
     t.select("B"); t.do("fill", +1, False)
     t.do("empty")
-    t.chart(24, 502, 976, 118, clicks=[(60, 560)])
+    t.chart(24, 502, 976, 118, probes=[("mid", 0)])
     t.end()
 
     t = Script(out, "fill_same_step_every_shape",
@@ -1196,20 +1293,60 @@ def build():
     t.end()
 
     t = Script(out, "chart_layout",
-               "the fader layout: a gap left by a deleted node's output shows "
-               "as an unused channel, and thirty outputs narrow every bar. "
-               "Round 2 changes this layout on purpose, and this vector with "
-               "it")
+               "the fader layout. Changed ON PURPOSE in round 2: unused "
+               "channels are slivers; bars narrow, and their gaps with them, "
+               "to fit however many outputs; a label is the name if it fits, "
+               "else the channel number, else nothing; a column at the right "
+               "keeps the total on screen -- with thirty outputs it used to "
+               "be drawn past the window's edge. Every bar's hit area takes "
+               "in half the gap each side, for hover and click alike")
     for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
         t.do("place", p)
     t.select("n1"); t.do("remove")          # channel 1 left unused
     t.chart(24, 502, 976, 118,
-            clicks=[(24 + 8 + 1 * 54 + 20, 560),     # unused: no
-                    (24 + 8 + 2 * 54 + 20, 560)])    # n2, channel 2
+            probes=[("mid", 1),             # the sliver: hovered, not picked
+                    ("mid", 2), ("edge", 2)])
     t.do("auto")
     for _ in range(28):
         t.do("newoutput")
-    t.chart(24, 502, 976, 118)
+    t.chart(24, 502, 976, 118, probes=[("mid", 17), ("edge", 29)])
+    # The same thirty outputs in a larger font, as text scaled to a big
+    # window would be: names give way to channel numbers.
+    t.chart(24, 900, 1700, 220, probes=[("mid", 17)], cw=13.0, lh=26.0)
+    t.end()
+
+    t = Script(out, "chart_labels_ruler",
+               "a hundred channels: too narrow for any label of its own, so "
+               "the row is marked like a ruler, every fifth channel. Under "
+               "the old bar-by-bar rule nothing at all was written; with "
+               "thirty, some bars kept a name, others a number, others "
+               "nothing -- the patchwork reported in use")
+    t.do("auto")
+    for _ in range(100):
+        t.do("newoutput")
+    t.chart(24, 502, 976, 118, probes=[("mid", 55)])
+    t.end()
+
+    t = Script(out, "chart_labels_names_without_numbers",
+               "names that fit where channel numbers do not: n0 on channel "
+               "100, reachable by making a hundred outputs, then a node, "
+               "then removing the hundred. Every name fits, so names are "
+               "shown; not every number does, so no number line beneath. "
+               "The second row is the reverse: numbers fit, names do not")
+    t.chart_of([("n0", 100)], 24, 502, 976, 118)
+    t.chart_of([("a", 3), ("loudspeaker", 4)], 24, 502, 260, 118)
+    t.end()
+
+    t = Script(out, "chart_slivers",
+               "ten nodes, the middle eight deleted: outputs on channels 0 "
+               "and 9 only. Eight unused channels become slivers, so the two "
+               "real bars keep their full width")
+    for k in range(10):
+        t.do("place", (0.05 + 0.09 * k, 0.5))
+    t.select(*[f"n{k}" for k in range(1, 9)]); t.do("remove")
+    t.chart(24, 502, 976, 118,
+            probes=[("mid", 0), ("mid", 5), ("edge", 5), ("mid", 9),
+                    ("silence",)])
     t.end()
     return out
 

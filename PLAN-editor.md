@@ -143,7 +143,7 @@ Coarse steps land on multiples of 5 in their direction (73% then `q` gives
 | 2b | named saves as a pair through the Mac dialogs, and the fader fill line — **DONE** |
 | 2b+ | binding fixes: placing a node leaves the current output alone; an unbind that silences a node says so — **DONE** |
 | 2c | listening: permanent listening point and levels, halos always, a selected node's contribution in each fader, shift-click several faders, link lines between nodes — **DONE** |
-| 2d | the screen: window at 90%, full screen, fader narrowing, labels that fit, hover, slivers, scaled text |
+| 2d | the screen: window at 90%, full screen, fader narrowing, labels that fit, hover, slivers, scaled text — **DONE** |
 | 2e | keys grouped and lit when usable, `b` previewing its action; views lifted into files |
 
 The slices from 2c on were reordered after using 2b, around three kinds of
@@ -175,6 +175,64 @@ silence binding reaching the fader line was looked up as an output name and
 ran off the end -- so the runner now reports an id that names no output
 instead of looking it up. Undefined behaviour that fails on one machine can
 pass on another.
+
+**Slice 2d+, after first use.** Three reports: the text far too big; the key
+help pushed off the window as outputs were added; fader labels where some
+numbers stayed and others vanished.
+
+- **Text at a fixed size,** 12 by default, chosen with command-plus and
+  command-minus and kept between launches. 2d sized it from the window's
+  height, which was wrong in principle -- a bigger window is for more room,
+  not bigger letters -- and doubly so because openFrameworks loads fonts at
+  96 dots per inch, a third larger than the Mac's 72. Loaded at 72 now.
+- **The panel in fixed zones:** seven status lines always in the same
+  places, one message line, three lines for the output being acted on, then
+  the keys. The full output list is gone -- it grew with every output and
+  pushed the keys off the bottom. The faders show every output; hover gives
+  any one's details. Over-long lines are shortened, never run off the panel.
+- **Fader labels for the whole row at once:** names on every bar if every
+  name fits, else channel numbers on every bar, else a ruler -- every 2nd,
+  5th, 10th... channel, unused ones included so the count stays even. The
+  bar-by-bar rule gave a patchwork: a short name like `n2` fitted where
+  `out14` did not, and `9` where `10` did not.
+
+Mutation testing found no row where every name fits but not every channel
+number, which happens when a short name sits on a high channel (`n0` on
+channel 100) -- reachable through editing only in hundreds of steps. A
+`CHARTMAP` record lays out a chart for an outputs list given directly. One
+equivalent mutant: a ruler step of 1 has exactly the room of the
+every-number test before it, so it can never succeed there.
+
+30 scripts. No new source file.
+
+**Slice 2d, done.** The window opens at nine-tenths of the screen, centred;
+control-command-F toggles full screen. Text is the system's monospaced font,
+sized to about a fiftieth of the window's height (12 to 22 points) and reloaded
+when that changes, with the bitmap font as a fallback; every line step and
+column in the panel follows the font, and the help drops to one column when
+two will not fit.
+
+The fader layout, tested: unused channels are 4-pixel slivers; gaps are 8
+until a bar would be narrower than 32, then a quarter of a bar; a label is the
+name if it fits, else the channel number, else nothing; a column 16 characters
+wide is kept at the right for the total, which with thirty outputs used to be
+drawn past the window's edge; each bar's hit area takes half the gap either
+side, the same for hover and click. Hover shows the full name, share, level
+and trim. The chart vectors changed on purpose, as round 1 said they would.
+
+Found along the way: the runner compared chart positions to within 0.001,
+but the vectors carry six significant digits, so past 1000 pixels only two
+decimals survive -- a tolerance bug in the runner, now relative. No vector
+recorded where the bars' baseline sits, so a font-size change to the label
+rows could not fail anything; it is recorded now. The stand-in for
+openFrameworks returned float from ofGetWidth and ofGetHeight, where the real
+ones return int: corrected, as a stub must never be more permissive than the
+library. One equivalent mutant: a derived bar carries no output id.
+
+DEFERRED by the user: halos in the node's own shape -- a triangle node's halo
+a triangle -- each shape scaled so equal share gives equal area.
+
+28 scripts, 313 steps. No new source file.
 
 **Slice 2c+, after first use.** Three asks: colour, curves, and percentages
 that overlapped.

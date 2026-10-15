@@ -373,13 +373,20 @@ GRID FREE
 DO example
 EXPECT 1 0 ""
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
-CHART 24 502 976 118
-EXPECTCHART 46 310 372 0:output:32:front 1:output:86:left 2:output:140:right 3:output:194:rear 4:derived:248:sub
-CLICK 106 560 left
-CLICK 268 560 -
-CLICK 330 560 -
-CLICK 52 700 -
-CLICK 82 560 -
+CHART 24 502 976 118 8 13
+EXPECTCHART 8 46 310 silent 880 590 0 0:output:32:46:front:0 1:output:86:46:left:1 2:output:140:46:right:2 3:output:194:46:rear:3 4:derived:248:46:sub:4
+CLICK 109 561 left
+HOVER 109 561 bar:1
+CLICK 271 561 -
+HOVER 271 561 bar:4
+CLICK 333 561 -
+HOVER 333 561 silence
+CLICK 55 625 -
+HOVER 55 625 none
+CLICK 81.75 561 front
+HOVER 81.75 561 bar:0
+CLICK 27 561 -
+HOVER 27 561 none
 SEL only B
 DO fill 1 0
 EXPECT 1 0 "fill 55%"
@@ -387,9 +394,10 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | S - | A 1
-CHART 24 502 976 118
+CHART 24 502 976 118 8 13
 EXPECTCHART EMPTY
-CLICK 60 560 -
+CLICK 44 561 -
+HOVER 44 561 none
 ENDEDIT
 
 # THE REPORTED PROBLEM: a quarter share of silence stepped a triangle feeding four outputs far less than a circle feeding one. A fill step now moves every shape by exactly 5%
@@ -1103,7 +1111,7 @@ EXPECT 0 1 "nothing to undo"
 STATE N n0@0.1,0.1 n1@0.3,0.1 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | S n0 | A 1
 ENDEDIT
 
-# the fader layout: a gap left by a deleted node's output shows as an unused channel, and thirty outputs narrow every bar. Round 2 changes this layout on purpose, and this vector with it
+# the fader layout. Changed ON PURPOSE in round 2: unused channels are slivers; bars narrow, and their gaps with them, to fit however many outputs; a label is the name if it fits, else the channel number, else nothing; a column at the right keeps the total on screen -- with thirty outputs it used to be drawn past the window's edge. Every bar's hit area takes in half the gap each side, for hover and click alike
 EDIT chart_layout ANALYTIC
 GRID FREE
 DO place 0.2 0.2
@@ -1120,10 +1128,14 @@ DO remove
 EXPECT 1 0 "removed 1 node, and 1 output"
 STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 | L n0>n0:1 n2>n2:1 | D  | C n0 | S n0 | A 1
 SEL clear
-CHART 24 502 976 118
-EXPECTCHART 46 202 264 0:output:32:n0 1:unused:86:- 2:output:140:n2
-CLICK 106 560 -
-CLICK 160 560 n2
+CHART 24 502 976 118 8 13
+EXPECTCHART 8 46 160 silent 880 590 0 0:output:32:46:n0:0 1:unused:86:4:-:- 2:output:98:46:n2:2
+CLICK 88 561 -
+HOVER 88 561 bar:1
+CLICK 121 561 n2
+HOVER 121 561 bar:2
+CLICK 147.75 561 n2
+HOVER 147.75 561 bar:2
 DO auto
 EXPECT 0 0 "auto-output off: new nodes start unbound"
 STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 | L n0>n0:1 n2>n2:1 | D  | C n0 | S n0 | A 0
@@ -1211,7 +1223,395 @@ STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 out1:1:1 out3:3:1 out4:4:1 
 DO newoutput
 EXPECT 1 0 "new output out29 on channel 29 -- select nodes and press b"
 STATE N n0@0.2,0.2 n2@0.5,0.8 | R  | O n0:0:1 n2:2:1 out1:1:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 | L n0>n0:1 n2>n2:1 | D  | C out29 | S out29 | A 0
-CHART 24 502 976 118
-EXPECTCHART 23.2258 976.774 1016 0:output:32:n0 1:output:63.2258:out1 2:output:94.4516:n2 3:output:125.677:out3 4:output:156.903:out4 5:output:188.129:out5 6:output:219.355:out6 7:output:250.581:out7 8:output:281.806:out8 9:output:313.032:out9 10:output:344.258:out10 11:output:375.484:out11 12:output:406.71:out12 13:output:437.935:out13 14:output:469.161:out14 15:output:500.387:out15 16:output:531.613:out16 17:output:562.839:out17 18:output:594.065:out18 19:output:625.29:out19 20:output:656.516:out20 21:output:687.742:out21 22:output:718.968:out22 23:output:750.194:out23 24:output:781.419:out24 25:output:812.645:out25 26:output:843.871:out26 27:output:875.097:out27 28:output:906.323:out28 29:output:937.548:out29
+CHART 24 502 976 118 8 13
+EXPECTCHART 5.40127 21.6051 844.994 sil 880 590 0 0:output:29.4013:21.6051:0:- 1:output:56.4076:21.6051:1:- 2:output:83.414:21.6051:2:- 3:output:110.42:21.6051:3:- 4:output:137.427:21.6051:4:- 5:output:164.433:21.6051:5:- 6:output:191.439:21.6051:6:- 7:output:218.446:21.6051:7:- 8:output:245.452:21.6051:8:- 9:output:272.459:21.6051:9:- 10:output:299.465:21.6051:10:- 11:output:326.471:21.6051:11:- 12:output:353.478:21.6051:12:- 13:output:380.484:21.6051:13:- 14:output:407.49:21.6051:14:- 15:output:434.497:21.6051:15:- 16:output:461.503:21.6051:16:- 17:output:488.51:21.6051:17:- 18:output:515.516:21.6051:18:- 19:output:542.522:21.6051:19:- 20:output:569.529:21.6051:20:- 21:output:596.535:21.6051:21:- 22:output:623.541:21.6051:22:- 23:output:650.548:21.6051:23:- 24:output:677.554:21.6051:24:- 25:output:704.561:21.6051:25:- 26:output:731.567:21.6051:26:- 27:output:758.573:21.6051:27:- 28:output:785.58:21.6051:28:- 29:output:812.586:21.6051:29:-
+CLICK 499.312 561 out17
+HOVER 499.312 561 bar:17
+CLICK 836.642 561 out29
+HOVER 836.642 561 bar:29
+CHART 24 900 1700 220 13 26
+EXPECTCHART 8 39.6129 1468.39 sil 1524 1064 0 0:output:32:39.6129:0:- 1:output:79.6129:39.6129:1:- 2:output:127.226:39.6129:2:- 3:output:174.839:39.6129:3:- 4:output:222.452:39.6129:4:- 5:output:270.065:39.6129:5:- 6:output:317.677:39.6129:6:- 7:output:365.29:39.6129:7:- 8:output:412.903:39.6129:8:- 9:output:460.516:39.6129:9:- 10:output:508.129:39.6129:10:- 11:output:555.742:39.6129:11:- 12:output:603.355:39.6129:12:- 13:output:650.968:39.6129:13:- 14:output:698.581:39.6129:14:- 15:output:746.194:39.6129:15:- 16:output:793.806:39.6129:16:- 17:output:841.419:39.6129:17:- 18:output:889.032:39.6129:18:- 19:output:936.645:39.6129:19:- 20:output:984.258:39.6129:20:- 21:output:1031.87:39.6129:21:- 22:output:1079.48:39.6129:22:- 23:output:1127.1:39.6129:23:- 24:output:1174.71:39.6129:24:- 25:output:1222.32:39.6129:25:- 26:output:1269.94:39.6129:26:- 27:output:1317.55:39.6129:27:- 28:output:1365.16:39.6129:28:- 29:output:1412.77:39.6129:29:-
+CLICK 861.226 1010 out17
+HOVER 861.226 1010 bar:17
+ENDEDIT
+
+# a hundred channels: too narrow for any label of its own, so the row is marked like a ruler, every fifth channel. Under the old bar-by-bar rule nothing at all was written; with thirty, some bars kept a name, others a number, others nothing -- the patchwork reported in use
+EDIT chart_labels_ruler ANALYTIC
+GRID FREE
+DO auto
+EXPECT 0 0 "auto-output off: new nodes start unbound"
+STATE N  | R  | O  | L  | D  | C - | S - | A 0
+DO newoutput
+EXPECT 1 0 "new output out0 on channel 0 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 | L  | D  | C out0 | S out0 | A 0
+DO newoutput
+EXPECT 1 0 "new output out1 on channel 1 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 | L  | D  | C out1 | S out1 | A 0
+DO newoutput
+EXPECT 1 0 "new output out2 on channel 2 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 | L  | D  | C out2 | S out2 | A 0
+DO newoutput
+EXPECT 1 0 "new output out3 on channel 3 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 | L  | D  | C out3 | S out3 | A 0
+DO newoutput
+EXPECT 1 0 "new output out4 on channel 4 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 | L  | D  | C out4 | S out4 | A 0
+DO newoutput
+EXPECT 1 0 "new output out5 on channel 5 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 | L  | D  | C out5 | S out5 | A 0
+DO newoutput
+EXPECT 1 0 "new output out6 on channel 6 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 | L  | D  | C out6 | S out6 | A 0
+DO newoutput
+EXPECT 1 0 "new output out7 on channel 7 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 | L  | D  | C out7 | S out7 | A 0
+DO newoutput
+EXPECT 1 0 "new output out8 on channel 8 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 | L  | D  | C out8 | S out8 | A 0
+DO newoutput
+EXPECT 1 0 "new output out9 on channel 9 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 | L  | D  | C out9 | S out9 | A 0
+DO newoutput
+EXPECT 1 0 "new output out10 on channel 10 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 | L  | D  | C out10 | S out10 | A 0
+DO newoutput
+EXPECT 1 0 "new output out11 on channel 11 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 | L  | D  | C out11 | S out11 | A 0
+DO newoutput
+EXPECT 1 0 "new output out12 on channel 12 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 | L  | D  | C out12 | S out12 | A 0
+DO newoutput
+EXPECT 1 0 "new output out13 on channel 13 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 | L  | D  | C out13 | S out13 | A 0
+DO newoutput
+EXPECT 1 0 "new output out14 on channel 14 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 | L  | D  | C out14 | S out14 | A 0
+DO newoutput
+EXPECT 1 0 "new output out15 on channel 15 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 | L  | D  | C out15 | S out15 | A 0
+DO newoutput
+EXPECT 1 0 "new output out16 on channel 16 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 | L  | D  | C out16 | S out16 | A 0
+DO newoutput
+EXPECT 1 0 "new output out17 on channel 17 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 | L  | D  | C out17 | S out17 | A 0
+DO newoutput
+EXPECT 1 0 "new output out18 on channel 18 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 | L  | D  | C out18 | S out18 | A 0
+DO newoutput
+EXPECT 1 0 "new output out19 on channel 19 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 | L  | D  | C out19 | S out19 | A 0
+DO newoutput
+EXPECT 1 0 "new output out20 on channel 20 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 | L  | D  | C out20 | S out20 | A 0
+DO newoutput
+EXPECT 1 0 "new output out21 on channel 21 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 | L  | D  | C out21 | S out21 | A 0
+DO newoutput
+EXPECT 1 0 "new output out22 on channel 22 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 | L  | D  | C out22 | S out22 | A 0
+DO newoutput
+EXPECT 1 0 "new output out23 on channel 23 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 | L  | D  | C out23 | S out23 | A 0
+DO newoutput
+EXPECT 1 0 "new output out24 on channel 24 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 | L  | D  | C out24 | S out24 | A 0
+DO newoutput
+EXPECT 1 0 "new output out25 on channel 25 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 | L  | D  | C out25 | S out25 | A 0
+DO newoutput
+EXPECT 1 0 "new output out26 on channel 26 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 | L  | D  | C out26 | S out26 | A 0
+DO newoutput
+EXPECT 1 0 "new output out27 on channel 27 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 | L  | D  | C out27 | S out27 | A 0
+DO newoutput
+EXPECT 1 0 "new output out28 on channel 28 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 | L  | D  | C out28 | S out28 | A 0
+DO newoutput
+EXPECT 1 0 "new output out29 on channel 29 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 | L  | D  | C out29 | S out29 | A 0
+DO newoutput
+EXPECT 1 0 "new output out30 on channel 30 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 | L  | D  | C out30 | S out30 | A 0
+DO newoutput
+EXPECT 1 0 "new output out31 on channel 31 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 | L  | D  | C out31 | S out31 | A 0
+DO newoutput
+EXPECT 1 0 "new output out32 on channel 32 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 | L  | D  | C out32 | S out32 | A 0
+DO newoutput
+EXPECT 1 0 "new output out33 on channel 33 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 | L  | D  | C out33 | S out33 | A 0
+DO newoutput
+EXPECT 1 0 "new output out34 on channel 34 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 | L  | D  | C out34 | S out34 | A 0
+DO newoutput
+EXPECT 1 0 "new output out35 on channel 35 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 | L  | D  | C out35 | S out35 | A 0
+DO newoutput
+EXPECT 1 0 "new output out36 on channel 36 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 | L  | D  | C out36 | S out36 | A 0
+DO newoutput
+EXPECT 1 0 "new output out37 on channel 37 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 | L  | D  | C out37 | S out37 | A 0
+DO newoutput
+EXPECT 1 0 "new output out38 on channel 38 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 | L  | D  | C out38 | S out38 | A 0
+DO newoutput
+EXPECT 1 0 "new output out39 on channel 39 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 | L  | D  | C out39 | S out39 | A 0
+DO newoutput
+EXPECT 1 0 "new output out40 on channel 40 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 | L  | D  | C out40 | S out40 | A 0
+DO newoutput
+EXPECT 1 0 "new output out41 on channel 41 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 | L  | D  | C out41 | S out41 | A 0
+DO newoutput
+EXPECT 1 0 "new output out42 on channel 42 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 | L  | D  | C out42 | S out42 | A 0
+DO newoutput
+EXPECT 1 0 "new output out43 on channel 43 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 | L  | D  | C out43 | S out43 | A 0
+DO newoutput
+EXPECT 1 0 "new output out44 on channel 44 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 | L  | D  | C out44 | S out44 | A 0
+DO newoutput
+EXPECT 1 0 "new output out45 on channel 45 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 | L  | D  | C out45 | S out45 | A 0
+DO newoutput
+EXPECT 1 0 "new output out46 on channel 46 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 | L  | D  | C out46 | S out46 | A 0
+DO newoutput
+EXPECT 1 0 "new output out47 on channel 47 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 | L  | D  | C out47 | S out47 | A 0
+DO newoutput
+EXPECT 1 0 "new output out48 on channel 48 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 | L  | D  | C out48 | S out48 | A 0
+DO newoutput
+EXPECT 1 0 "new output out49 on channel 49 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 | L  | D  | C out49 | S out49 | A 0
+DO newoutput
+EXPECT 1 0 "new output out50 on channel 50 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 | L  | D  | C out50 | S out50 | A 0
+DO newoutput
+EXPECT 1 0 "new output out51 on channel 51 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 | L  | D  | C out51 | S out51 | A 0
+DO newoutput
+EXPECT 1 0 "new output out52 on channel 52 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 | L  | D  | C out52 | S out52 | A 0
+DO newoutput
+EXPECT 1 0 "new output out53 on channel 53 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 | L  | D  | C out53 | S out53 | A 0
+DO newoutput
+EXPECT 1 0 "new output out54 on channel 54 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 | L  | D  | C out54 | S out54 | A 0
+DO newoutput
+EXPECT 1 0 "new output out55 on channel 55 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 | L  | D  | C out55 | S out55 | A 0
+DO newoutput
+EXPECT 1 0 "new output out56 on channel 56 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 | L  | D  | C out56 | S out56 | A 0
+DO newoutput
+EXPECT 1 0 "new output out57 on channel 57 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 | L  | D  | C out57 | S out57 | A 0
+DO newoutput
+EXPECT 1 0 "new output out58 on channel 58 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 | L  | D  | C out58 | S out58 | A 0
+DO newoutput
+EXPECT 1 0 "new output out59 on channel 59 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 | L  | D  | C out59 | S out59 | A 0
+DO newoutput
+EXPECT 1 0 "new output out60 on channel 60 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 | L  | D  | C out60 | S out60 | A 0
+DO newoutput
+EXPECT 1 0 "new output out61 on channel 61 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 | L  | D  | C out61 | S out61 | A 0
+DO newoutput
+EXPECT 1 0 "new output out62 on channel 62 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 | L  | D  | C out62 | S out62 | A 0
+DO newoutput
+EXPECT 1 0 "new output out63 on channel 63 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 | L  | D  | C out63 | S out63 | A 0
+DO newoutput
+EXPECT 1 0 "new output out64 on channel 64 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 | L  | D  | C out64 | S out64 | A 0
+DO newoutput
+EXPECT 1 0 "new output out65 on channel 65 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 | L  | D  | C out65 | S out65 | A 0
+DO newoutput
+EXPECT 1 0 "new output out66 on channel 66 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 | L  | D  | C out66 | S out66 | A 0
+DO newoutput
+EXPECT 1 0 "new output out67 on channel 67 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 | L  | D  | C out67 | S out67 | A 0
+DO newoutput
+EXPECT 1 0 "new output out68 on channel 68 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 | L  | D  | C out68 | S out68 | A 0
+DO newoutput
+EXPECT 1 0 "new output out69 on channel 69 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 | L  | D  | C out69 | S out69 | A 0
+DO newoutput
+EXPECT 1 0 "new output out70 on channel 70 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 | L  | D  | C out70 | S out70 | A 0
+DO newoutput
+EXPECT 1 0 "new output out71 on channel 71 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 | L  | D  | C out71 | S out71 | A 0
+DO newoutput
+EXPECT 1 0 "new output out72 on channel 72 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 | L  | D  | C out72 | S out72 | A 0
+DO newoutput
+EXPECT 1 0 "new output out73 on channel 73 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 | L  | D  | C out73 | S out73 | A 0
+DO newoutput
+EXPECT 1 0 "new output out74 on channel 74 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 | L  | D  | C out74 | S out74 | A 0
+DO newoutput
+EXPECT 1 0 "new output out75 on channel 75 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 | L  | D  | C out75 | S out75 | A 0
+DO newoutput
+EXPECT 1 0 "new output out76 on channel 76 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 | L  | D  | C out76 | S out76 | A 0
+DO newoutput
+EXPECT 1 0 "new output out77 on channel 77 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 | L  | D  | C out77 | S out77 | A 0
+DO newoutput
+EXPECT 1 0 "new output out78 on channel 78 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 | L  | D  | C out78 | S out78 | A 0
+DO newoutput
+EXPECT 1 0 "new output out79 on channel 79 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 | L  | D  | C out79 | S out79 | A 0
+DO newoutput
+EXPECT 1 0 "new output out80 on channel 80 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 | L  | D  | C out80 | S out80 | A 0
+DO newoutput
+EXPECT 1 0 "new output out81 on channel 81 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 | L  | D  | C out81 | S out81 | A 0
+DO newoutput
+EXPECT 1 0 "new output out82 on channel 82 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 | L  | D  | C out82 | S out82 | A 0
+DO newoutput
+EXPECT 1 0 "new output out83 on channel 83 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 | L  | D  | C out83 | S out83 | A 0
+DO newoutput
+EXPECT 1 0 "new output out84 on channel 84 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 | L  | D  | C out84 | S out84 | A 0
+DO newoutput
+EXPECT 1 0 "new output out85 on channel 85 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 | L  | D  | C out85 | S out85 | A 0
+DO newoutput
+EXPECT 1 0 "new output out86 on channel 86 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 | L  | D  | C out86 | S out86 | A 0
+DO newoutput
+EXPECT 1 0 "new output out87 on channel 87 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 | L  | D  | C out87 | S out87 | A 0
+DO newoutput
+EXPECT 1 0 "new output out88 on channel 88 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 | L  | D  | C out88 | S out88 | A 0
+DO newoutput
+EXPECT 1 0 "new output out89 on channel 89 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 | L  | D  | C out89 | S out89 | A 0
+DO newoutput
+EXPECT 1 0 "new output out90 on channel 90 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 | L  | D  | C out90 | S out90 | A 0
+DO newoutput
+EXPECT 1 0 "new output out91 on channel 91 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 | L  | D  | C out91 | S out91 | A 0
+DO newoutput
+EXPECT 1 0 "new output out92 on channel 92 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 | L  | D  | C out92 | S out92 | A 0
+DO newoutput
+EXPECT 1 0 "new output out93 on channel 93 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 | L  | D  | C out93 | S out93 | A 0
+DO newoutput
+EXPECT 1 0 "new output out94 on channel 94 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 out94:94:1 | L  | D  | C out94 | S out94 | A 0
+DO newoutput
+EXPECT 1 0 "new output out95 on channel 95 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 out94:94:1 out95:95:1 | L  | D  | C out95 | S out95 | A 0
+DO newoutput
+EXPECT 1 0 "new output out96 on channel 96 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 out94:94:1 out95:95:1 out96:96:1 | L  | D  | C out96 | S out96 | A 0
+DO newoutput
+EXPECT 1 0 "new output out97 on channel 97 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 out94:94:1 out95:95:1 out96:96:1 out97:97:1 | L  | D  | C out97 | S out97 | A 0
+DO newoutput
+EXPECT 1 0 "new output out98 on channel 98 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 out94:94:1 out95:95:1 out96:96:1 out97:97:1 out98:98:1 | L  | D  | C out98 | S out98 | A 0
+DO newoutput
+EXPECT 1 0 "new output out99 on channel 99 -- select nodes and press b"
+STATE N  | R  | O out0:0:1 out1:1:1 out2:2:1 out3:3:1 out4:4:1 out5:5:1 out6:6:1 out7:7:1 out8:8:1 out9:9:1 out10:10:1 out11:11:1 out12:12:1 out13:13:1 out14:14:1 out15:15:1 out16:16:1 out17:17:1 out18:18:1 out19:19:1 out20:20:1 out21:21:1 out22:22:1 out23:23:1 out24:24:1 out25:25:1 out26:26:1 out27:27:1 out28:28:1 out29:29:1 out30:30:1 out31:31:1 out32:32:1 out33:33:1 out34:34:1 out35:35:1 out36:36:1 out37:37:1 out38:38:1 out39:39:1 out40:40:1 out41:41:1 out42:42:1 out43:43:1 out44:44:1 out45:45:1 out46:46:1 out47:47:1 out48:48:1 out49:49:1 out50:50:1 out51:51:1 out52:52:1 out53:53:1 out54:54:1 out55:55:1 out56:56:1 out57:57:1 out58:58:1 out59:59:1 out60:60:1 out61:61:1 out62:62:1 out63:63:1 out64:64:1 out65:65:1 out66:66:1 out67:67:1 out68:68:1 out69:69:1 out70:70:1 out71:71:1 out72:72:1 out73:73:1 out74:74:1 out75:75:1 out76:76:1 out77:77:1 out78:78:1 out79:79:1 out80:80:1 out81:81:1 out82:82:1 out83:83:1 out84:84:1 out85:85:1 out86:86:1 out87:87:1 out88:88:1 out89:89:1 out90:90:1 out91:91:1 out92:92:1 out93:93:1 out94:94:1 out95:95:1 out96:96:1 out97:97:1 out98:98:1 out99:99:1 | L  | D  | C out99 | S out99 | A 0
+CHART 24 502 976 118 8 13
+EXPECTCHART 1.67258 6.69034 863.637 - 880 590 5 0:output:25.6726:6.69034:0:- 1:output:34.0355:6.69034:-:- 2:output:42.3984:6.69034:-:- 3:output:50.7613:6.69034:-:- 4:output:59.1243:6.69034:-:- 5:output:67.4872:6.69034:5:- 6:output:75.8501:6.69034:-:- 7:output:84.213:6.69034:-:- 8:output:92.5759:6.69034:-:- 9:output:100.939:6.69034:-:- 10:output:109.302:6.69034:10:- 11:output:117.665:6.69034:-:- 12:output:126.028:6.69034:-:- 13:output:134.391:6.69034:-:- 14:output:142.753:6.69034:-:- 15:output:151.116:6.69034:15:- 16:output:159.479:6.69034:-:- 17:output:167.842:6.69034:-:- 18:output:176.205:6.69034:-:- 19:output:184.568:6.69034:-:- 20:output:192.931:6.69034:20:- 21:output:201.294:6.69034:-:- 22:output:209.657:6.69034:-:- 23:output:218.02:6.69034:-:- 24:output:226.383:6.69034:-:- 25:output:234.746:6.69034:25:- 26:output:243.108:6.69034:-:- 27:output:251.471:6.69034:-:- 28:output:259.834:6.69034:-:- 29:output:268.197:6.69034:-:- 30:output:276.56:6.69034:30:- 31:output:284.923:6.69034:-:- 32:output:293.286:6.69034:-:- 33:output:301.649:6.69034:-:- 34:output:310.012:6.69034:-:- 35:output:318.375:6.69034:35:- 36:output:326.738:6.69034:-:- 37:output:335.101:6.69034:-:- 38:output:343.464:6.69034:-:- 39:output:351.826:6.69034:-:- 40:output:360.189:6.69034:40:- 41:output:368.552:6.69034:-:- 42:output:376.915:6.69034:-:- 43:output:385.278:6.69034:-:- 44:output:393.641:6.69034:-:- 45:output:402.004:6.69034:45:- 46:output:410.367:6.69034:-:- 47:output:418.73:6.69034:-:- 48:output:427.093:6.69034:-:- 49:output:435.456:6.69034:-:- 50:output:443.819:6.69034:50:- 51:output:452.181:6.69034:-:- 52:output:460.544:6.69034:-:- 53:output:468.907:6.69034:-:- 54:output:477.27:6.69034:-:- 55:output:485.633:6.69034:55:- 56:output:493.996:6.69034:-:- 57:output:502.359:6.69034:-:- 58:output:510.722:6.69034:-:- 59:output:519.085:6.69034:-:- 60:output:527.448:6.69034:60:- 61:output:535.811:6.69034:-:- 62:output:544.174:6.69034:-:- 63:output:552.536:6.69034:-:- 64:output:560.899:6.69034:-:- 65:output:569.262:6.69034:65:- 66:output:577.625:6.69034:-:- 67:output:585.988:6.69034:-:- 68:output:594.351:6.69034:-:- 69:output:602.714:6.69034:-:- 70:output:611.077:6.69034:70:- 71:output:619.44:6.69034:-:- 72:output:627.803:6.69034:-:- 73:output:636.166:6.69034:-:- 74:output:644.529:6.69034:-:- 75:output:652.892:6.69034:75:- 76:output:661.254:6.69034:-:- 77:output:669.617:6.69034:-:- 78:output:677.98:6.69034:-:- 79:output:686.343:6.69034:-:- 80:output:694.706:6.69034:80:- 81:output:703.069:6.69034:-:- 82:output:711.432:6.69034:-:- 83:output:719.795:6.69034:-:- 84:output:728.158:6.69034:-:- 85:output:736.521:6.69034:85:- 86:output:744.884:6.69034:-:- 87:output:753.247:6.69034:-:- 88:output:761.609:6.69034:-:- 89:output:769.972:6.69034:-:- 90:output:778.335:6.69034:90:- 91:output:786.698:6.69034:-:- 92:output:795.061:6.69034:-:- 93:output:803.424:6.69034:-:- 94:output:811.787:6.69034:-:- 95:output:820.15:6.69034:95:- 96:output:828.513:6.69034:-:- 97:output:836.876:6.69034:-:- 98:output:845.239:6.69034:-:- 99:output:853.602:6.69034:-:-
+CLICK 488.978 561 out55
+HOVER 488.978 561 bar:55
+ENDEDIT
+
+# names that fit where channel numbers do not: n0 on channel 100, reachable by making a hundred outputs, then a node, then removing the hundred. Every name fits, so names are shown; not every number does, so no number line beneath. The second row is the reverse: numbers fit, names do not
+EDIT chart_labels_names_without_numbers ANALYTIC
+GRID FREE
+CHARTMAP 24 502 976 118 8 13 OUT n0:100
+EXPECTCHART 4 16 852 - 880 590 0 0:unused:28:4:-:- 1:unused:36:4:-:- 2:unused:44:4:-:- 3:unused:52:4:-:- 4:unused:60:4:-:- 5:unused:68:4:-:- 6:unused:76:4:-:- 7:unused:84:4:-:- 8:unused:92:4:-:- 9:unused:100:4:-:- 10:unused:108:4:-:- 11:unused:116:4:-:- 12:unused:124:4:-:- 13:unused:132:4:-:- 14:unused:140:4:-:- 15:unused:148:4:-:- 16:unused:156:4:-:- 17:unused:164:4:-:- 18:unused:172:4:-:- 19:unused:180:4:-:- 20:unused:188:4:-:- 21:unused:196:4:-:- 22:unused:204:4:-:- 23:unused:212:4:-:- 24:unused:220:4:-:- 25:unused:228:4:-:- 26:unused:236:4:-:- 27:unused:244:4:-:- 28:unused:252:4:-:- 29:unused:260:4:-:- 30:unused:268:4:-:- 31:unused:276:4:-:- 32:unused:284:4:-:- 33:unused:292:4:-:- 34:unused:300:4:-:- 35:unused:308:4:-:- 36:unused:316:4:-:- 37:unused:324:4:-:- 38:unused:332:4:-:- 39:unused:340:4:-:- 40:unused:348:4:-:- 41:unused:356:4:-:- 42:unused:364:4:-:- 43:unused:372:4:-:- 44:unused:380:4:-:- 45:unused:388:4:-:- 46:unused:396:4:-:- 47:unused:404:4:-:- 48:unused:412:4:-:- 49:unused:420:4:-:- 50:unused:428:4:-:- 51:unused:436:4:-:- 52:unused:444:4:-:- 53:unused:452:4:-:- 54:unused:460:4:-:- 55:unused:468:4:-:- 56:unused:476:4:-:- 57:unused:484:4:-:- 58:unused:492:4:-:- 59:unused:500:4:-:- 60:unused:508:4:-:- 61:unused:516:4:-:- 62:unused:524:4:-:- 63:unused:532:4:-:- 64:unused:540:4:-:- 65:unused:548:4:-:- 66:unused:556:4:-:- 67:unused:564:4:-:- 68:unused:572:4:-:- 69:unused:580:4:-:- 70:unused:588:4:-:- 71:unused:596:4:-:- 72:unused:604:4:-:- 73:unused:612:4:-:- 74:unused:620:4:-:- 75:unused:628:4:-:- 76:unused:636:4:-:- 77:unused:644:4:-:- 78:unused:652:4:-:- 79:unused:660:4:-:- 80:unused:668:4:-:- 81:unused:676:4:-:- 82:unused:684:4:-:- 83:unused:692:4:-:- 84:unused:700:4:-:- 85:unused:708:4:-:- 86:unused:716:4:-:- 87:unused:724:4:-:- 88:unused:732:4:-:- 89:unused:740:4:-:- 90:unused:748:4:-:- 91:unused:756:4:-:- 92:unused:764:4:-:- 93:unused:772:4:-:- 94:unused:780:4:-:- 95:unused:788:4:-:- 96:unused:796:4:-:- 97:unused:804:4:-:- 98:unused:812:4:-:- 99:unused:820:4:-:- 100:output:828:16:n0:-
+CHARTMAP 24 502 260 118 8 13 OUT a:3 loudspeaker:4
+EXPECTCHART 6 24 126 sil 164 590 0 0:unused:30:4:-:- 1:unused:40:4:-:- 2:unused:50:4:-:- 3:output:60:24:3:- 4:output:90:24:4:-
+ENDEDIT
+
+# ten nodes, the middle eight deleted: outputs on channels 0 and 9 only. Eight unused channels become slivers, so the two real bars keep their full width
+EDIT chart_slivers ANALYTIC
+GRID FREE
+DO place 0.05 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | S n0 | A 1
+DO place 0.14 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | S n0 | A 1
+DO place 0.23 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
+DO place 0.32 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 | D  | C n0 | S n0 | A 1
+DO place 0.41 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 n4@0.41,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 | D  | C n0 | S n0 | A 1
+DO place 0.5 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 n4@0.41,0.5 n5@0.5,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 | D  | C n0 | S n0 | A 1
+DO place 0.59 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 n4@0.41,0.5 n5@0.5,0.5 n6@0.59,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 | D  | C n0 | S n0 | A 1
+DO place 0.68 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 n4@0.41,0.5 n5@0.5,0.5 n6@0.59,0.5 n7@0.68,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 | D  | C n0 | S n0 | A 1
+DO place 0.77 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 n4@0.41,0.5 n5@0.5,0.5 n6@0.59,0.5 n7@0.68,0.5 n8@0.77,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+DO place 0.86 0.5
+EXPECT 1 0 ""
+STATE N n0@0.05,0.5 n1@0.14,0.5 n2@0.23,0.5 n3@0.32,0.5 n4@0.41,0.5 n5@0.5,0.5 n6@0.59,0.5 n7@0.68,0.5 n8@0.77,0.5 n9@0.86,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 | D  | C n0 | S n0 | A 1
+SEL only n1
+SEL toggle n2
+SEL toggle n3
+SEL toggle n4
+SEL toggle n5
+SEL toggle n6
+SEL toggle n7
+SEL toggle n8
+DO remove
+EXPECT 1 0 "removed 8 nodes, and 8 outputs"
+STATE N n0@0.05,0.5 n9@0.86,0.5 | R  | O n0:0:1 n9:9:1 | L n0>n0:1 n9>n9:1 | D  | C n0 | S n0 | A 1
+SEL clear
+CHART 24 502 976 118 8 13
+EXPECTCHART 8 46 244 silent 880 590 0 0:output:32:46:n0:0 1:unused:86:4:-:- 2:unused:98:4:-:- 3:unused:110:4:-:- 4:unused:122:4:-:- 5:unused:134:4:-:- 6:unused:146:4:-:- 7:unused:158:4:-:- 8:unused:170:4:-:- 9:output:182:46:n9:9
+CLICK 55 561 n0
+HOVER 55 561 bar:0
+CLICK 136 561 -
+HOVER 136 561 bar:5
+CLICK 141.75 561 -
+HOVER 141.75 561 bar:5
+CLICK 205 561 n9
+HOVER 205 561 bar:9
+CLICK 267 561 -
+HOVER 267 561 silence
 ENDEDIT
 

@@ -30,6 +30,7 @@ struct ofRectangle {
 struct ofBuffer { ofBuffer(){} void set(const std::string&){}
                   std::string getText() const {return "";} };
 inline ofBuffer ofBufferFromFile(const std::string&){return ofBuffer();}
+inline int ofToInt(const std::string&){return 0;}
 inline void ofPushStyle(){} inline void ofPopStyle(){}
 inline void ofPushMatrix(){} inline void ofPopMatrix(){}
 inline void ofFill(){} inline void ofNoFill(){}
@@ -57,6 +58,7 @@ inline float ofRadToDeg(float r){return r*57.2957795f;}
 #define OF_KEY_SHIFT 0x1
 #define OF_KEY_ALT 0x2
 #define OF_KEY_COMMAND 0x4
+#define OF_KEY_CONTROL 0x8
 inline bool ofGetKeyPressed(int){return false;}
 inline void ofDrawBitmapString(const std::string&,float,float){}
 inline void ofBeginShape(){} inline void ofEndShape(bool){}
@@ -65,7 +67,23 @@ inline void ofSetWindowTitle(const std::string&){}
 inline void ofSetFrameRate(int){}
 inline float ofGetElapsedTimef(){return 0.f;}
 inline void ofEnableAlphaBlending(){}
-inline float ofGetWidth(){return 1024;} inline float ofGetHeight(){return 640;}
+// int, as openFrameworks declares them; the stub once said float, which is
+// more permissive than the real thing (see the ofFileDialogResult note).
+inline int ofGetWidth(){return 1024;} inline int ofGetHeight(){return 640;}
+inline int ofGetScreenWidth(){return 1440;} inline int ofGetScreenHeight(){return 900;}
+inline void ofSetWindowShape(int,int){}
+inline void ofSetWindowPosition(int,int){}
+inline void ofToggleFullscreen(){}
+#define OF_TTF_MONO "mono"
+class ofTrueTypeFont {
+public:
+    bool load(const std::string&, int, bool = true, bool = true,
+              bool = false, float = 0.3f, int = 0) { return false; }
+    bool isLoaded() const { return false; }
+    void drawString(const std::string&, float, float) const {}
+    float stringWidth(const std::string&) const { return 0.0f; }
+    float getLineHeight() const { return 0.0f; }
+};
 inline float ofClamp(float v,float a,float b){return v<a?a:(v>b?b:v);}
 inline float ofRandom(float a,float b){return (a+b)*0.5f;}
 template<typename T> std::string ofToString(const T&){return "";}

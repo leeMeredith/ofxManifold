@@ -1047,8 +1047,8 @@ jobs:
       - name: Faders not narrowed as outputs are added must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
-            '    L.barWidth = std::min(46.0f,' \
-            '    L.barWidth = std::max(46.0f,'
+            '    bw = std::min(46.0f, std::max(2.0f, bw));' \
+            '    bw = std::max(46.0f, std::max(2.0f, bw));'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
@@ -1056,8 +1056,8 @@ jobs:
       - name: Silence fader loses its extra gap must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
-            '    L.silenceX = x0 + L.gap + float(channels) * (L.barWidth + L.gap) + L.gap;' \
-            '    L.silenceX = x0 + L.gap + float(channels) * (L.barWidth + L.gap);'
+            '    const float silenceX = x + gap;' \
+            '    const float silenceX = x;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
@@ -1065,8 +1065,8 @@ jobs:
       - name: Fader click ignores height must be caught
         run: |
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
-            '        if (x >= b.x && x <= b.x + barWidth && y >= top && y <= top + height) {' \
-            '        if (x >= b.x && x <= b.x + barWidth) {'
+            '    if (empty || y < top || y > top + height) return kNothing;' \
+            '    if (empty) return kNothing;'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
@@ -1322,6 +1322,69 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Faders take the total's column must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '    const float room = width - 16.0f * text.charWidth;   // the total'\''s column' \
+            '    const float room = width;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Unused channels drawn full width must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '        b.w = (b.kind == ChartBar::Kind::Unused) ? std::min(sliver, bw) : bw;' \
+            '        b.w = bw;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Fader labels ignore the text size must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '        if (!fits(b.name)) allNames = false;' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Fader hit area excludes the gap must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '    const float half = gap * 0.5f;' \
+            '    const float half = 0.0f;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Fader numbers decided bar by bar must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '        if (!fits(std::to_string(b.channel))) allNumbers = false;' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Fader ruler room ignores the next mark must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '                const float end = j < L.bars.size() ? L.bars[j].x : silenceX;' \
+            '                const float end = silenceX;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Channel line shown when numbers do not fit must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '                if (allNumbers) b.sub = ch;' \
+            '                b.sub = ch;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Restored tree must be green
         run: |
