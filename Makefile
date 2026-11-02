@@ -55,18 +55,20 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
 MAPPING  := src/mapping/ofxManifoldMapping.h
 
 # The editor package: an addon of its own, outside ofxManifold's src/ so it is
-# never compiled into projects that want only the manifold (PLAN-editor.md A).
+# never compiled into projects that want only the manifold (DECISIONS.md D-024 A).
 EDITOR_H   := ofxManifoldEditor/src/ofxManifoldEditor.h \
               ofxManifoldEditor/src/ofxManifoldEditorModel.h \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.h \
               ofxManifoldEditor/src/ofxManifoldEditorChartLayout.h \
               ofxManifoldEditor/src/ofxManifoldEditorHistory.h \
-              ofxManifoldEditor/src/ofxManifoldEditorFiles.h
+              ofxManifoldEditor/src/ofxManifoldEditorFiles.h \
+              ofxManifoldEditor/src/ofxManifoldEditorKeys.h
 EDITOR_CPP := ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
-              ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+              ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
+              ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 EDITOR_INC := -Isrc -IofxManifoldEditor/src
 
 AUTHORING := src/authoring/ofxManifoldGrid.h \
@@ -80,7 +82,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test reproducible door bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor headers workflow wrapper vectors clean
+.PHONY: all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor headers workflow wrapper vectors clean
 
 all: test
 
@@ -100,12 +102,43 @@ test: reproducible door headers workflow wrapper test-triangle test-manifold tes
 wrapper:
 	@$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
 		-fsyntax-only src/ofx/ofxManifoldRenderer.cpp
+	@for f in ofxManifoldEditor/src/views/*.cpp; do \
+		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
+			-IofxManifoldEditor/src -IofxManifoldEditor/src/views \
+			-fsyntax-only $$f || exit 1; \
+	done
 	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions example-editor; do \
 		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
-			-IofxManifoldEditor/src -I$$ex/src -fsyntax-only \
+			-IofxManifoldEditor/src -IofxManifoldEditor/src/views \
+			-I$$ex/src -fsyntax-only \
 			$$ex/src/ofApp.cpp || exit 1; \
 	done
-	@echo "wrapper and examples: syntax ok (stub, not real oF)"
+	@echo "wrapper, editor views and examples: syntax ok (stub, not real oF)"
+	@$(MAKE) --no-print-directory drawlog
+
+# Every drawing call of a scripted editing session, recorded through a
+# stand-in for openFrameworks that logs instead of drawing (tests/drawlog).
+# Run as part of `make test` so the session keeps building and running as the
+# editor changes. To check a change that should leave the screen alone --
+# moving drawing code, say -- record before, record after, and compare:
+#
+#     make drawlog && cp build/drawlog.txt build/drawlog-before.txt
+#     ...change...
+#     make drawlog && cmp build/drawlog-before.txt build/drawlog.txt
+#
+# Slice 2f was checked this way: 29,461 calls over 30 frames, identical. It
+# also caught a mistake the compiler could not: a rename that reached into
+# the on-screen text "(unsaved)".
+DRAWLOG_SRC := tests/drawlog/session.cpp example-editor/src/ofApp.cpp \
+               src/ofx/ofxManifoldRenderer.cpp $(EDITOR_CPP) \
+               $(wildcard ofxManifoldEditor/src/views/*.cpp)
+drawlog: $(DRAWLOG_SRC) tests/drawlog/ofMain.h
+	@mkdir -p $(BUILD)
+	@$(CXX) -std=c++17 -O1 -w -Ilibs -Itests/drawlog -Isrc \
+		-IofxManifoldEditor/src -IofxManifoldEditor/src/views \
+		-Iexample-editor/src -o $(BUILD)/drawlog $(DRAWLOG_SRC)
+	@./$(BUILD)/drawlog > $(BUILD)/drawlog.txt
+	@echo "drawlog: $$(grep -c '^==== frame' $(BUILD)/drawlog.txt) frames, $$(wc -l < $(BUILD)/drawlog.txt) drawing calls recorded in $(BUILD)/drawlog.txt"
 
 # The CI workflow must stay loadable by GitHub. Cheap, and it catches the
 # YAML 1.1 'on' -> true trap that silently invalidates the whole file.
@@ -301,7 +334,7 @@ reproducible:
 	if [ $$fail -ne 0 ]; then exit 1; fi
 	@echo "  ok  every reference reproduces its vectors exactly"
 
-# The editor's one door (PLAN-editor.md D): snippets that must FAIL to
+# The editor's one door (DECISIONS.md D-024 D): snippets that must FAIL to
 # compile, and a control that must compile. See tests/check_door.py.
 door:
 	@CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" python3 tests/check_door.py

@@ -399,6 +399,76 @@ Result Model::newDerived(const Selection& sel) {
                    + ", sum of " + std::to_string(srcs.size()), 3.0f);
 }
 
+BindPlan Model::planBind(const Selection& sel) const {
+    BindPlan p;
+    if (outputSel_.empty()) {
+        p.why = "no output yet -- press o to make one";
+        return p;
+    }
+    if (sel.empty()) {
+        p.why = "select the nodes to bind";
+        return p;
+    }
+    p.possible = true;
+    p.outputs = selectedOutputNames();
+    p.unbind = true;
+    for (NodeID id : sel.nodes()) {
+        for (TargetID t : outputSel_) {
+            if (!feeds(id, t)) p.unbind = false;
+        }
+    }
+    for (NodeID id : sel.nodes()) {
+        // A node changes if any selected output is not yet as wanted.
+        bool changes = false;
+        for (TargetID t : outputSel_) {
+            if (feeds(id, t) == p.unbind) changes = true;
+        }
+        if (!changes) continue;
+        ++p.count;
+        // Unbinding leaves a node silent when every output it feeds is one
+        // of the selected outputs, so none survives.
+        if (p.unbind) {
+            bool survives = false;
+            for (std::size_t k = 0; k < mapping_.linkCount(id); ++k) {
+                const Link& l = mapping_.link(id, k);
+                if (l.kind != DestKind::Output) continue;
+                if (!outputSelected(l.id)) survives = true;
+            }
+            if (!survives) p.silenced.push_back(manifold_.node(id).name);
+        }
+    }
+    return p;
+}
+
+namespace {
+std::string silencedNames(const std::vector<std::string>& s) {
+    return s.size() == 1 ? s[0] : std::to_string(s.size()) + " nodes";
+}
+} // namespace
+
+std::string BindPlan::preview() const {
+    if (!possible) return "bind or unbind selected";
+    std::string t = std::string(unbind ? "unbind " : "bind ")
+                  + std::to_string(count) + (unbind ? " from " : " to ")
+                  + outputs;
+    if (!silenced.empty()) {
+        t += " -- " + silencedNames(silenced)
+           + (silenced.size() == 1 ? " goes silent" : " go silent");
+    }
+    return t;
+}
+
+std::string BindPlan::outcome() const {
+    if (!possible) return why;
+    std::string t = std::string(unbind ? "unbound " : "bound ")
+                  + std::to_string(count) + (unbind ? " from " : " to ")
+                  + outputs;
+    if (!silenced.empty()) {
+        t += " -- " + silencedNames(silenced) + " now silent; cmd-z undoes";
+    }
+    return t;
+}
+
 Result Model::bind(const Selection& sel) {
     if (outputSel_.empty()) {
         return refusal("no output yet -- press o to make one", 2.5f);

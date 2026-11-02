@@ -1809,3 +1809,108 @@ refused" from "broken for another reason".
 Mutation testing also found a step that could not fail -- picking an output
 that was already current -- the fourth appearance of the same shape: a check
 whose starting state already equals its expected result.
+
+
+---
+
+## D-024 — The editor, round 2: built in use, and moved out of the app
+
+**Date:** 2026-11-01
+**Status:** round 2 complete; `PLAN-editor.md` folded in here and removed
+**Files:** `ofxManifoldEditor/` (logic in `src/`, drawing in `src/views/`),
+`example-editor/`, `tests/ref/reference_editor.py`, `tests/run_editor.cpp`,
+`tests/check_door.py`, `tests/drawlog/`
+
+### The decisions that shape the package
+
+Code comments refer to these by letter.
+
+- **A · A package outside the addon, and an addon itself.** Everything in
+  ofxManifold's `src/` is compiled into every project that uses it, and the
+  editor carries opinions about keys and layout that ofxManifold's users
+  should not have to take. It is still an addon, because Project Generator
+  compiles only a project's own sources and its addons. It lives in this
+  repository, sharing tests and CI; moving it out later is a `git mv`.
+- **B · The boundary rule.** A property of a map or its outputs goes in the
+  kernel, whoever needs it first -- `clearBindings()`, `removeOutput()` and
+  `setOutputFraction()` went there with vectors, because a show-control app
+  with no editor needs them too. Editing interaction goes in the editor.
+- **C · Two halves.** Logic -- `Model`, `Selection`, `History`, `ChartLayout`,
+  `Files`, `Keys` -- has no openFrameworks and is tested with vectors.
+  Drawing -- `MapView`, `NodeGlyph`, `OutputChart`, `KeyPanel`, `Text`,
+  `Style` -- needs openFrameworks, is reached only through
+  `ofxManifoldEditorViews.h`, and is judged on screen. The app is what is
+  left: events into model operations, and the file dialogs.
+- **D · The one door.** Every change to the map or its outputs is a `Model`
+  operation; views only read. Enforced by the compiler (D-023) and checked by
+  `make door`. Undo snapshots at the door, so nothing slips past it.
+
+### Round 2, in slices, each asked for after using the last
+
+| slice | what |
+|---|---|
+| 2a | fill steps (`q`/`w`, shift for 1%), bind to every output, undo and redo, placement leaves nothing selected |
+| 2a+ | `b` toggles; marks on faders and map for what feeds what |
+| 2b | named saves as a pair of files; a fader line at each selected node's fill |
+| 2b+ | the current output stays put when a node is placed; an unbind that silences a node says so |
+| 2c | a permanent listening point; live levels; several faders at once; link lines between nodes |
+| 2c+ | a colour per output; links as arcs; percentages by the sender |
+| 2d, 2d+ | the window, full screen, fader narrowing and hover; text at a chosen size; the panel in fixed zones; fader labels decided for the whole row |
+| 2e | keys grouped, lit when they act, `b` previewing its action |
+| 2f | the drawing moved out of `ofApp` into the package, unchanged |
+
+Considered and left out: **mute**, for the player example, where performing
+happens. **Deferred** by the user: halos in the node's own shape (ROADMAP).
+
+### What was learned
+
+**One rule, asked in one place.** The fifth, sixth and seventh appearances of
+the D-018 pattern were caught before they shipped by giving each question a
+single answer: the selected outputs are one set with the current output in it,
+kept in step at every one of seven places that change it (2c); a key is lit by
+the same function the key handler asks before acting, so a dim key cannot act
+(2e) -- which also closed a real hole, delete mid-drag; and `b`'s preview is a
+prediction checked, before every one of 33 `b` steps in the scripts, against
+what `b` then actually did.
+
+**A test that passes may have stopped testing.** Six times a step reached a
+different check from the one it was written for: a box join that hit the
+duplicate check before ordering; a pick that picked the output already current;
+an arc fixture where both sides counted zero, so a tie-break decided; a
+several-silent preview that would have bound instead; and, in 2b+, three scripts
+whose premise a behaviour change removed -- they stayed GREEN while two existing
+gates went DEAD. Mutation testing found most of these; reading the affected
+scripts found the rest. In 2c+ fixing the test changed the design: the fixture
+built so that counting nodes and measuring clearance disagree showed counting
+was the wrong rule.
+
+**A stand-in must be no more permissive than what it stands in for.** The
+openFrameworks stub accepted `getPath()` on a const dialog result, returned
+float window sizes where the real ones return int, and lacked `ofColor`'s alpha
+and `ofToInt`. The first reached Xcode as three errors; each is now matched,
+and the first is reproduced by the stub before the fix.
+
+**Drawing moved, checked rather than assumed (2f).** A recording stand-in for
+openFrameworks (`tests/drawlog/`) logs every drawing call -- colours,
+rectangles, the text of numbers -- instead of drawing. A scripted session of 30
+frames (selections, a drag, a box select, audition, picking faders, grids,
+thirty outputs, undo, delete) was recorded before the move and after: 29,461
+calls, identical. Each frame was first checked to reach the state it names --
+two did not, and were fixed before the "before" was taken. The check caught one
+mistake the compiler could not: a rename of the variable `unsaved` that also
+reached into the on-screen text `"(unsaved)"`. `make drawlog` keeps the session
+building and running on every `make test`.
+
+**In use, the screen is the test.** Fixed text sized from the window was wrong
+in principle -- a bigger window is for more room, not bigger letters -- and
+openFrameworks loads fonts at 96 dpi, a third larger than asked. A list that
+grows with the outputs pushed the keys off the window. Labels decided bar by bar
+made a patchwork. None of these would fail a vector; each was reported from the
+Mac and fixed in the next slice.
+
+### Counts at the end of round 2
+
+31 editor scripts, 428 checked steps, among 623 vectors in eleven suites; 148
+mutation gates; `ofApp.cpp` from 1,402 lines to 652, and from 1,260 before round
+1. The logic headers never reach openFrameworks; only `ofxManifoldEditorViews.h`
+does.

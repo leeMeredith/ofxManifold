@@ -19,7 +19,7 @@ void ofApp::setup() {
     const std::string sizeFile = ofToDataPath("editor-text-size.txt");
     if (ofFile::doesFileExist(sizeFile)) {
         const int sz = ofToInt(ofBufferFromFile(sizeFile).getText());
-        if (sz >= 8 && sz <= 24) textSize = sz;
+        if (sz >= 8 && sz <= 24) text.setSize(sz);
     }
     // Nine-tenths of the screen, centred, rather than a fixed 1024 x 640:
     // everything is laid out from the window's size, so it fits any screen.
@@ -56,7 +56,7 @@ void ofApp::setup() {
 }
 
 void ofApp::update() {
-    fitText();
+    text.fit();
     // The map keeps a square; the band under it holds the output chart,
     // taller on a taller window, and never too short for its two label rows.
     const float chartH = std::max(130.0f, ofGetHeight() * 0.2f);
@@ -67,7 +67,7 @@ void ofApp::update() {
     // The faders' geometry, laid out by the package from the model. Drawing
     // and clicking both read this one layout, so they cannot disagree.
     chart = layoutChart(mapping, 24.0f, chartTop, ofGetWidth() - 48.0f,
-                        ofGetHeight() - chartTop - 20.0f, ChartText{cw, lh});
+                        ofGetHeight() - chartTop - 20.0f, ChartText{text.charWidth(), text.lineHeight()});
 
     // The listening point is permanent, so the levels are always live: an
     // edit -- a moved node, a fill step, a binding -- shows on the faders at
@@ -91,80 +91,43 @@ void ofApp::update() {
 }
 
 void ofApp::draw() {
-    drawGrid();
-    renderer->draw(evaluation.inside ? evaluation.regionID : InvalidRegion);
+    // Everything drawn lives in the package's views (ofxManifoldEditorViews.h);
+    // the app only gathers what they read. They take it all as const.
+    Scene sc;
+    sc.model = &model;
+    sc.selection = &selection;
+    sc.renderer = renderer.get();
+    sc.evaluation = &evaluation;
+    sc.text = &text;
+    sc.listeningPoint = auditionPoint;
+    sc.auditioning = auditioning();
+    sc.mouse = mouse;
 
-    // Halos first, so they sit behind the nodes.
-    // Halos always: each node's live share, the quantity the faders add up.
-    for (const auto& wn : evaluation.weights) drawHalo(wn.id, wn.weight);
+    GridLook look;
+    look.kind = kind;
+    look.grid = &grid;
+    look.spacing = spacing;
+    look.rotation = rotation;
+    look.spokes = spokes;
 
-    // Link lines, under the nodes: how the selected nodes connect to others.
-    drawLinks();
-    for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
-        drawNode(NodeID(i));
-    }
+    MapOverlay over;
+    over.refused = refusedFlash > 0.0f;
+    over.boxing = pressingEmpty;
+    over.boxFrom = pressScreen;
+    over.boxTo = boxScreen;
 
-    // Nodes feeding the CURRENT output: a green ring, outside the selection
-    // ring so both can show at once. With the fader marks below, this is how
-    // a binding can be seen before and after pressing b.
-    ofPushStyle();
-    ofNoFill();
-    ofSetLineWidth(1.5f);
-    if (!model.selectedOutputs().empty()) {
-        for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
-            TargetID fed = InvalidTarget;
-            for (TargetID t : model.selectedOutputs()) {
-                if (model.feeds(NodeID(i), t)) { fed = t; break; }
-            }
-            if (fed == InvalidTarget) continue;
-            const glm::vec2 p = renderer->toScreen(manifold.node(NodeID(i)).position);
-            ofSetColor(outputColour(fed));
-            ofDrawCircle(p.x, p.y, 18.0f);
-        }
-    }
-    ofPopStyle();
+    PanelStatus st;
+    st.auditionLocked = auditionLocked;
+    st.name = currentPath.empty() ? std::string("untitled")
+                                  : pairFor(currentPath).name;
+    st.unsaved = unsaved;
+    st.message = message;
+    st.messageShown = messageTime > 0.0f;
+    st.warning = refusedFlash > 0.0f;
 
-    // Selection rings, over the nodes.
-    ofPushStyle();
-    ofNoFill();
-    ofSetLineWidth(2.0f);
-    for (NodeID id : selection.nodes()) {
-        const glm::vec2 p = renderer->toScreen(manifold.node(id).position);
-        ofSetColor(refusedFlash > 0.0f ? ofColor(232, 96, 88)
-                                       : ofColor(255, 214, 90));
-        ofDrawCircle(p.x, p.y, 13.0f);
-    }
-    if (pressingEmpty && glm::distance(boxScreen, pressScreen) >= 4.0f) {
-        ofSetColor(255, 214, 90, 160);
-        ofSetLineWidth(1.0f);
-        ofDrawRectangle(std::min(pressScreen.x, boxScreen.x),
-                        std::min(pressScreen.y, boxScreen.y),
-                        std::fabs(boxScreen.x - pressScreen.x),
-                        std::fabs(boxScreen.y - pressScreen.y));
-    }
-    ofPopStyle();
-
-    // The listening point, always. Its influence lines only while
-    // auditioning; otherwise just the point, quieter, so it is there without
-    // competing with editing.
-    if (auditioning()) {
-        renderer->drawEvaluation(evaluation, auditionPoint);
-    } else {
-        const glm::vec2 lp = renderer->toScreen(auditionPoint);
-        ofPushStyle();
-        ofNoFill();
-        ofSetLineWidth(1.5f);
-        ofSetColor(235, 238, 245, 140);
-        ofDrawCircle(lp.x, lp.y, 7.0f);
-        ofDrawLine(lp.x - 11.0f, lp.y, lp.x - 4.0f, lp.y);
-        ofDrawLine(lp.x + 4.0f, lp.y, lp.x + 11.0f, lp.y);
-        ofDrawLine(lp.x, lp.y - 11.0f, lp.x, lp.y - 4.0f);
-        ofDrawLine(lp.x, lp.y + 4.0f, lp.x, lp.y + 11.0f);
-        ofPopStyle();
-    }
-
-    drawChart();
-    drawPanel();
+    drawMap(sc, look, over);
+    drawChart(sc, chart);
+    drawPanel(sc, look, st, keyContext());
 }
 
 // ===========================================================================
@@ -397,58 +360,94 @@ void ofApp::mouseMoved(int x, int y) {
     mouse = glm::vec2(float(x), float(y));
 }
 
-void ofApp::keyPressed(int key) {
-    // ---- undo, redo: command-Z and shift-command-Z ----
-    const bool command = ofGetKeyPressed(OF_KEY_COMMAND);
-    if (command) {
+// What each key IS, by the key map's id. Command combinations come first:
+// command-O must never also count as a plain o.
+std::string ofApp::keyId(int key) const {
+    if (ofGetKeyPressed(OF_KEY_COMMAND)) {
         const bool shift = ofGetKeyPressed(OF_KEY_SHIFT);
-        // Control-command-F, the Mac's full-screen key. Checked first: with
-        // control held, f may arrive as its control code, 6.
-        if (ofGetKeyPressed(OF_KEY_CONTROL)
-            && (key == 'f' || key == 'F' || key == 6)) {
-            ofToggleFullscreen();
-            return;
+        // With control held, f may arrive as its control code, 6.
+        if (ofGetKeyPressed(OF_KEY_CONTROL) && (key == 'f' || key == 'F' || key == 6)) {
+            return "fullscreen";
         }
-        // Command-plus and command-minus: the text size.
-        if (key == '=' || key == '+') { setTextSize(textSize + 1); return; }
-        if (key == '-' || key == '_') { setTextSize(textSize - 1); return; }
+        if (key == '=' || key == '+' || key == '-' || key == '_') return "textsize";
         if (key == 'z' || key == 'Z' || key == 26) {
-            if (key == 'Z' || shift) redo(); else undo();
-        } else if (key == 's' || key == 'S' || key == 19) {
-            if (key == 'S' || shift) saveAs(); else save();
-        } else if (key == 'o' || key == 'O' || key == 15) {
-            open();
+            return (key == 'Z' || shift) ? "redo" : "undo";
         }
-        // Nothing else acts with command held: command-O must never also
-        // make a new output, as a plain o would.
+        if (key == 's' || key == 'S' || key == 19) {
+            return (key == 'S' || shift) ? "saveas" : "save";
+        }
+        if (key == 'o' || key == 'O' || key == 15) return "open";
+        return "";
+    }
+    switch (key) {
+    case '1': case '2': case '3': case '4':        return "gridkind";
+    case 'r': case 'R': case '0':                   return "rotate";
+    case '-': case '=': case '+':                   return "spacing";
+    case '[': case ']':                             return "spokes";
+    case ',': case '.':                             return "deadzone";
+    case 'a':                                       return "all";
+    case OF_KEY_ESC:                                return "none";
+    case 'x':                                       return "empty";
+    case 'e':                                       return "example";
+    case OF_KEY_BACKSPACE: case OF_KEY_DEL:         return "remove";
+    case 'u':                                       return "unjoin";
+    case 'f':                                       return "join";
+    case 'o':                                       return "newoutput";
+    case 'd':                                       return "derived";
+    case 'b':                                       return "bind";
+    case 'B':                                       return "bindall";
+    case 'q': case 'Q': case 'w': case 'W':         return "fill";
+    case 'c':                                       return "clear";
+    case OF_KEY_TAB:                                return "nextoutput";
+    case 't': case 'T':                             return "trim";
+    case 'O':                                       return "removeoutput";
+    case 'p':                                       return "autooutput";
+    case ' ':                                       return "audition";
+    case 'v':                                       return "lock";
+    default:                                        return "";
+    }
+}
+
+KeyContext ofApp::keyContext() const {
+    KeyContext ctx;
+    ctx.model = &model;
+    ctx.selection = &selection;
+    ctx.canUndo = history.canUndo();
+    ctx.canRedo = history.canRedo();
+    ctx.dragging = dragging;
+    ctx.auditioning = auditioning();
+    ctx.grid = kind == GridKind::Free ? GridShape::Free
+             : kind == GridKind::Polar ? GridShape::Polar
+             : GridShape::Lattice;
+    return ctx;
+}
+
+bool ofApp::allowed(const std::string& id) {
+    std::string why;
+    if (keyAvailable(keyContext(), id, &why)) return true;
+    if (!why.empty()) show(Result{false, true, why, 2.0f});
+    return false;
+}
+
+void ofApp::keyPressed(int key) {
+    // Every key asks the key map first: a dim key does not act, it says why.
+    const std::string id = keyId(key);
+    if (id.empty() || !allowed(id)) return;
+
+    // ---- window ----
+    if (id == "fullscreen") { ofToggleFullscreen(); return; }
+    if (id == "textsize") {
+        setTextSize(text.size() + ((key == '-' || key == '_') ? -1 : 1));
         return;
     }
 
-    // ---- grid tool ----
-    bool regrid = true;
-    if      (key == '1') kind = GridKind::Free;
-    else if (key == '2') kind = GridKind::Square;
-    else if (key == '3') kind = GridKind::Triangular;
-    else if (key == '4') kind = GridKind::Polar;
-    else if (key == 'r') rotation += ofDegToRad(5.0f);
-    else if (key == 'R') rotation -= ofDegToRad(5.0f);
-    else if (key == '0') rotation = 0.0f;
-    else if (key == '-') spacing = std::max(0.02f, spacing * 0.8f);
-    else if (key == '=' || key == '+') spacing = std::min(0.25f, spacing * 1.25f);
-    else if (key == '[') spokes = std::max(3, spokes - 1);
-    else if (key == ']') spokes = std::min(24, spokes + 1);
-    else regrid = false;
-    if (regrid) rebuildGrid();
-    // Dead zone for drag hysteresis, as a fraction of grid spacing.
-    if (key == ',') deadZone = std::max(0.0f, deadZone - 0.05f);
-    if (key == '.') deadZone = std::min(0.50f, deadZone + 0.05f);
-
-    // ---- selection ----
-    if (key == 'a') selection.selectAll(manifold.nodeCount());
-    if (key == OF_KEY_ESC) selection.clear();
-
-    // ---- the map ----
-    if (key == 'x') {
+    // ---- file ----
+    if (id == "undo")   { undo(); return; }
+    if (id == "redo")   { redo(); return; }
+    if (id == "save")   { save(); return; }
+    if (id == "saveas") { saveAs(); return; }
+    if (id == "open")   { open(); return; }
+    if (id == "empty") {
         currentPath.clear();
         act("new map", [](Model& m) {
             m.newEmpty();
@@ -456,51 +455,94 @@ void ofApp::keyPressed(int key) {
                           "new empty map -- click to place nodes", 3.0f};
         });
         adopt();
+        return;
     }
-    if (key == 'e') {
+    if (id == "example") {
         currentPath.clear();
         act("example map", [](Model& m) {
             m.loadExample();
             return Result{true, false, "", 0.0f};
         });
         adopt();
+        return;
     }
-    if (key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) {
+
+    // ---- grid tool ----
+    if (id == "gridkind" || id == "rotate" || id == "spacing" || id == "spokes") {
+        if      (key == '1') kind = GridKind::Free;
+        else if (key == '2') kind = GridKind::Square;
+        else if (key == '3') kind = GridKind::Triangular;
+        else if (key == '4') kind = GridKind::Polar;
+        else if (key == 'r') rotation += ofDegToRad(5.0f);
+        else if (key == 'R') rotation -= ofDegToRad(5.0f);
+        else if (key == '0') rotation = 0.0f;
+        else if (key == '-') spacing = std::max(0.02f, spacing * 0.8f);
+        else if (key == '=' || key == '+') spacing = std::min(0.25f, spacing * 1.25f);
+        else if (key == '[') spokes = std::max(3, spokes - 1);
+        else if (key == ']') spokes = std::min(24, spokes + 1);
+        rebuildGrid();
+        return;
+    }
+    // Dead zone for drag hysteresis, as a fraction of grid spacing.
+    if (id == "deadzone") {
+        if (key == ',') deadZone = std::max(0.0f, deadZone - 0.05f);
+        else            deadZone = std::min(0.50f, deadZone + 0.05f);
+        return;
+    }
+
+    // ---- selection ----
+    if (id == "all")  { selection.selectAll(manifold.nodeCount()); return; }
+    if (id == "none") { selection.clear(); return; }
+
+    // ---- the map ----
+    if (id == "remove") {
         // Removal renumbers NodeIDs; the selection holds them, so it clears.
         act("delete", [&](Model& m) { return m.remove(selection); });
         selection.clear();
+        return;
     }
-    if (key == 'u') act("unjoin", [&](Model& m) { return m.unjoin(selection); });
-    if (key == 'f') act("join", [&](Model& m) { return m.join(selection); });
+    if (id == "unjoin") { act("unjoin", [&](Model& m) { return m.unjoin(selection); }); return; }
+    if (id == "join")   { act("join", [&](Model& m) { return m.join(selection); }); return; }
 
     // ---- outputs ----
-    if (key == 'o') act("new output", [](Model& m) { return m.newOutput(); });
-    if (key == 'd') act("derived output",
-                        [&](Model& m) { return m.newDerived(selection); });
-    if (key == 'b') act("bind", [&](Model& m) { return m.bind(selection); });
-    if (key == 'B') act("bind to every output",
-                        [&](Model& m) { return m.bindAll(selection); });
+    if (id == "newoutput") { act("new output", [](Model& m) { return m.newOutput(); }); return; }
+    if (id == "derived") {
+        act("derived output", [&](Model& m) { return m.newDerived(selection); });
+        return;
+    }
+    if (id == "bind") { act("binding", [&](Model& m) { return m.bind(selection); }); return; }
+    if (id == "bindall") {
+        act("bind to every output", [&](Model& m) { return m.bindAll(selection); });
+        return;
+    }
     // Fill: q down, w up, 5% a step; shift for 1%. Shift arrives as the
     // capital letter, so the capital means "fine" and never "up".
-    if (key == 'q' || key == 'Q' || key == 'w' || key == 'W') {
+    if (id == "fill") {
         const int  dir  = (key == 'w' || key == 'W') ? +1 : -1;
         const bool fine = (key == 'Q' || key == 'W');
         act("fill", [&, dir, fine](Model& m) {
             return m.stepFill(selection, dir, fine); });
+        return;
     }
-    if (key == 'c') act("clear bindings",
-                        [&](Model& m) { return m.clear(selection); });
-    if (key == OF_KEY_TAB) show(model.cycleOutput());
-    if (key == 't') act("trim", [](Model& m) { return m.trimCurrent(-1.0f); });
-    if (key == 'T') act("trim", [](Model& m) { return m.trimCurrent(+1.0f); });
-    if (key == 'O') act("remove output",
-                        [](Model& m) { return m.removeCurrentOutput(); });
-    if (key == 'p') show(model.toggleAutoOutput());
-
+    if (id == "clear") {
+        act("clear bindings", [&](Model& m) { return m.clear(selection); });
+        return;
+    }
+    if (id == "nextoutput") { show(model.cycleOutput()); return; }
+    if (id == "trim") {
+        const float dB = (key == 'T') ? +1.0f : -1.0f;
+        act("trim", [dB](Model& m) { return m.trimCurrent(dB); });
+        return;
+    }
+    if (id == "removeoutput") {
+        act("remove output", [](Model& m) { return m.removeCurrentOutput(); });
+        return;
+    }
+    if (id == "autooutput") { show(model.toggleAutoOutput()); return; }
 
     // ---- listening ----
-    if (key == ' ') auditionHeld = true;
-    if (key == 'v') {
+    if (id == "audition") { auditionHeld = true; return; }
+    if (id == "lock") {
         auditionLocked = !auditionLocked;
         message = auditionLocked ? "audition locked on -- v to return to editing"
                                  : "editing";
@@ -536,721 +578,17 @@ void ofApp::rebuildGrid() {
 }
 
 // ===========================================================================
-// MapView -- grid lines. Regions, selection rings and the drag box are drawn
-// in draw() above and move here in round 2. Reads only.
+// Text -- the size is the app's to choose and remember; the drawing is the
+// package's (editor::Text).
 // ===========================================================================
-
-// A segment in manifold space, clipped to the unit square before drawing, so
-// grid lines stop at the map's edge instead of running into the panel.
-// Liang-Barsky: clip the parameter range against each of the four edges.
-void ofApp::drawSegment(glm::vec2 a, glm::vec2 b) const {
-    float t0 = 0.0f, t1 = 1.0f;
-    const glm::vec2 d = b - a;
-    const float p[4] = {-d.x, d.x, -d.y, d.y};
-    const float q[4] = {a.x, 1.0f - a.x, a.y, 1.0f - a.y};
-    for (int k = 0; k < 4; ++k) {
-        if (std::fabs(p[k]) < 1e-12f) {
-            if (q[k] < 0.0f) return;           // parallel and outside
-            continue;
-        }
-        const float t = q[k] / p[k];
-        if (p[k] < 0.0f) t0 = std::max(t0, t);
-        else             t1 = std::min(t1, t);
-        if (t0 > t1) return;
-    }
-    const glm::vec2 s0 = renderer->toScreen(a + d * t0);
-    const glm::vec2 s1 = renderer->toScreen(a + d * t1);
-    ofDrawLine(s0.x, s0.y, s1.x, s1.y);
-}
-
-void ofApp::drawGrid() const {
-    if (kind == GridKind::Free) return;
-    ofPushStyle();
-    ofSetLineWidth(1.0f);
-
-    // Faint lines first, so the points sit on top of them.
-    ofSetColor(70, 76, 92, 70);
-    if (kind == GridKind::Polar) {
-        const glm::vec2 c = grid.point({0, 0, true});
-        const int rings = int(0.75f / spacing) + 1;
-        // Rings, as polylines through many points, each piece clipped.
-        const int steps = 96;
-        for (int ring = 1; ring <= rings; ++ring) {
-            const float r = ring * spacing;
-            for (int k = 0; k < steps; ++k) {
-                const float a0 = rotation + k * TWO_PI / steps;
-                const float a1 = rotation + (k + 1) * TWO_PI / steps;
-                drawSegment({c.x + r * std::cos(a0), c.y + r * std::sin(a0)},
-                            {c.x + r * std::cos(a1), c.y + r * std::sin(a1)});
-            }
-        }
-        // Spokes, from the centre out past the last ring.
-        for (int k = 0; k < spokes; ++k) {
-            drawSegment(c, grid.point({rings, k, true}));
-        }
-    } else {
-        // Lattice lines: one family along each basis direction, and for a
-        // triangular grid a third along their difference, which is what makes
-        // the triangles visible rather than a skewed square mesh.
-        const int n = int(1.6f / spacing) + 2;
-        for (int i = -n; i <= n; ++i) {
-            drawSegment(grid.point({i, -n, true}), grid.point({i, n, true}));
-            drawSegment(grid.point({-n, i, true}), grid.point({n, i, true}));
-            if (kind == GridKind::Triangular) {
-                // Points (c - t, t): the direction v - u.
-                drawSegment(grid.point({i + n, -n, true}),
-                            grid.point({i - n,  n, true}));
-            }
-        }
-    }
-
-    // Points.
-    ofFill();
-    ofSetColor(90, 96, 112, 140);
-    auto dot = [&](glm::vec2 p) {
-        if (p.x < -0.001f || p.x > 1.001f || p.y < -0.001f || p.y > 1.001f) {
-            return;
-        }
-        const glm::vec2 s = renderer->toScreen(p);
-        ofDrawCircle(s.x, s.y, 1.6f);
-    };
-    if (kind == GridKind::Polar) {
-        dot(grid.point({0, 0, true}));
-        const int rings = int(0.75f / spacing) + 1;
-        for (int ring = 1; ring <= rings; ++ring) {
-            for (int k = 0; k < spokes; ++k) dot(grid.point({ring, k, true}));
-        }
-    } else {
-        const int n = int(1.6f / spacing) + 2;
-        for (int i = -n; i <= n; ++i) {
-            for (int j = -n; j <= n; ++j) dot(grid.point({i, j, true}));
-        }
-    }
-    ofPopStyle();
-}
-
-// ===========================================================================
-// links -- how the selected nodes connect to other nodes. Reads only.
-// ===========================================================================
-
-// Plug at the sending end, socket at the receiving end, as on gear: outputs
-// male, inputs female. Each line in the colour of the output it feeds -- the
-// same colour as that output's fader and its node's name -- heavy and sized
-// by share when the sender is selected, faint when only the receiver is.
-//
-// Lines are ARCS, bending to the side with more clearance from other nodes
-// (editor::linkLines decides, tested), so a line never seems to join a node
-// it only passes; two nodes feeding each other arc to opposite sides. The
-// percentage sits a quarter of the way from the SENDER: lines leaving one
-// node fan apart there, where at their middles they crossed and overlapped.
-void ofApp::drawLinks() const {
-    const std::vector<LinkLine> lines = linkLines(model, selection);
-    if (lines.empty()) return;
-    ofPushStyle();
-    for (const LinkLine& l : lines) {
-        const glm::vec2 a = renderer->toScreen(manifold.node(l.from).position);
-        const glm::vec2 b = renderer->toScreen(manifold.node(l.to).position);
-        const float pullA = nodeRadius(l.from) + 4.0f;
-        const float pullB = nodeRadius(l.to) + 5.0f;
-        if (glm::distance(a, b) <= pullA + pullB + 6.0f) continue;
-
-        // The arc, sampled, trimmed back to the edges of both nodes so the
-        // plug and the socket stay visible.
-        std::vector<glm::vec2> pts;
-        for (int k = 0; k <= 40; ++k) {
-            const glm::vec2 p =
-                renderer->toScreen(linkPoint(model, l, float(k) / 40.0f));
-            if (glm::distance(p, a) < pullA || glm::distance(p, b) < pullB) {
-                continue;
-            }
-            pts.push_back(p);
-        }
-        if (pts.size() < 2) continue;
-
-        ofColor c = outputColour(l.output);
-        if (l.heavy) {
-            ofSetLineWidth(1.0f + 5.0f * ofClamp(l.share, 0.0f, 1.0f));
-        } else {
-            c.a = 120;
-            ofSetLineWidth(1.0f);
-        }
-        ofSetColor(c);
-        ofNoFill();
-        ofBeginShape();
-        for (const glm::vec2& p : pts) ofVertex(p.x, p.y);
-        ofEndShape(false);
-
-        ofSetLineWidth(1.5f);
-        ofFill();
-        ofDrawCircle(pts.front().x, pts.front().y, 3.5f);   // plug
-        ofNoFill();
-        ofDrawCircle(pts.back().x, pts.back().y, 4.5f);     // socket
-
-        if (selection.size() == 1 && l.heavy) {
-            // Near the sender, nudged off the line to the outside of the arc.
-            const glm::vec2 at =
-                renderer->toScreen(linkPoint(model, l, 0.25f));
-            const glm::vec2 ahead =
-                renderer->toScreen(linkPoint(model, l, 0.30f));
-            glm::vec2 dir = ahead - at;
-            const float dl = glm::length(dir);
-            dir = dl > 0.0f ? dir / dl : glm::vec2(1.0f, 0.0f);
-            const glm::vec2 mid = renderer->toScreen(linkPoint(model, l, 0.5f));
-            glm::vec2 out(-dir.y, dir.x);
-            if (glm::dot(out, mid - (a + b) * 0.5f) < 0.0f) out = -out;
-            const glm::vec2 tp = at + out * 10.0f;
-            const std::string pct =
-                ofToString(int(std::lround(l.share * 100))) + "%";
-            ofSetColor(c);
-            text(pct, tp.x - 0.5f * cw * float(pct.size()), tp.y + 0.3f * lh);
-        }
-    }
-    ofPopStyle();
-}
-
-// One colour per output, by CHANNEL rather than by position in the list, so
-// an output keeps its colour when another is removed and the ids shift.
-// Drawn from Okabe and Ito's colour-blind-safe set, lifted for a dark
-// background, leaving out the yellow already meaning "selected" and the
-// purple already meaning "derived". Colour is an added cue: the lines, the
-// plugs and sockets, and the labels carry the meaning without it. More than
-// six outputs and colours repeat; names still tell them apart.
-ofColor ofApp::outputColour(TargetID t) const {
-    static const ofColor palette[] = {
-        ofColor(86, 180, 233),     // sky blue
-        ofColor(230, 159, 0),      // orange
-        ofColor(40, 190, 140),     // bluish green
-        ofColor(235, 110, 70),     // vermilion
-        ofColor(110, 150, 235),    // blue
-        ofColor(225, 135, 180),    // pink
-    };
-    if (t == InvalidTarget || t >= mapping.targetCount()) {
-        return ofColor(150, 156, 172);
-    }
-    const int ch = std::max(0, mapping.targetChannel(t));
-    return palette[ch % 6];
-}
-
-// ===========================================================================
-// NodeGlyph -- one node's shape, fill and audition halo. Reads only.
-// ===========================================================================
-
-// Keep the part of a polygon at or below screen height `cut` (screen y grows
-// downward, so "below" is a larger y). One edge of Sutherland-Hodgman.
-static std::vector<glm::vec2> keepBelow(const std::vector<glm::vec2>& poly,
-                                        float cut) {
-    std::vector<glm::vec2> out;
-    const std::size_t n = poly.size();
-    for (std::size_t i = 0; i < n; ++i) {
-        const glm::vec2 a = poly[i];
-        const glm::vec2 b = poly[(i + 1) % n];
-        const bool ina = a.y >= cut, inb = b.y >= cut;
-        if (ina) out.push_back(a);
-        if (ina != inb) {
-            const float t = (cut - a.y) / (b.y - a.y);
-            out.push_back(a + (b - a) * t);
-        }
-    }
-    return out;
-}
-
-float ofApp::nodeRadius(NodeID id) const {
-    return 6.0f * ofClamp(std::sqrt(std::max(manifold.node(id).weight, 0.0f)),
-                          0.35f, 2.5f);
-}
-
-// One property per visual channel (decision H):
-//
-//   shape  what the node does with its share
-//            no output      hollow square
-//            one output     circle
-//            several        triangle
-//   fill   how much of that share reaches an output, from the bottom up
-//   size   the node's bias weight, as the renderer draws it
-//
-// All of it computed from the mapping every frame, never stored: a stored
-// type that could disagree with the bindings would be the D-018/019/020
-// pattern again. Shape carries the meaning, not colour, so it still reads on
-// a projector or a monochrome printout.
-void ofApp::drawNode(NodeID id) const {
-    const Node& n = manifold.node(id);
-    const glm::vec2 p = renderer->toScreen(n.position);
-    const float r = nodeRadius(id);
-    const std::size_t outs = model.outputCount(id);
-    const float frac = mapping.outputFraction(id);
-
-    std::vector<glm::vec2> shape;
-    if (outs == 0) {
-        const float h = r * 0.95f;
-        shape = {{p.x - h, p.y - h}, {p.x + h, p.y - h},
-                 {p.x + h, p.y + h}, {p.x - h, p.y + h}};
-    } else if (outs == 1) {
-        for (int k = 0; k < 24; ++k) {
-            const float a = k * TWO_PI / 24.0f;
-            shape.push_back({p.x + r * std::cos(a), p.y + r * std::sin(a)});
-        }
-    } else {
-        // Pointing up, as if distributing outward.
-        const float R = r * 1.3f;
-        for (int k = 0; k < 3; ++k) {
-            const float a = -HALF_PI + k * TWO_PI / 3.0f;
-            shape.push_back({p.x + R * std::cos(a), p.y + R * std::sin(a)});
-        }
-    }
-
-    ofPushStyle();
-    const ofColor ink(215, 220, 232);
-    if (outs > 0 && frac > 0.0f) {
-        float top = shape[0].y, bottom = shape[0].y;
-        for (const glm::vec2& v : shape) {
-            top = std::min(top, v.y);
-            bottom = std::max(bottom, v.y);
-        }
-        const std::vector<glm::vec2> part =
-            keepBelow(shape, bottom - frac * (bottom - top));
-        ofFill();
-        ofSetColor(ink);
-        ofBeginShape();
-        for (const glm::vec2& v : part) ofVertex(v.x, v.y);
-        ofEndShape(true);
-    }
-    ofNoFill();
-    ofSetLineWidth(1.5f);
-    ofSetColor(ink);
-    for (std::size_t k = 0; k < shape.size(); ++k) {
-        const glm::vec2 a = shape[k], b = shape[(k + 1) % shape.size()];
-        ofDrawLine(a.x, a.y, b.x, b.y);
-    }
-    ofSetColor(180, 186, 200);
-    // A node with an output of its own -- one named after it -- has its name
-    // in that output's colour, so a line's colour leads to its node, and on
-    // to the fader of the same colour.
-    const TargetID own = mapping.findTarget(n.name);
-    if (own != InvalidTarget) ofSetColor(outputColour(own));
-    text(n.name, p.x + r + 6.0f, p.y - 6.0f);
-    ofPopStyle();
-}
-
-// A node's LIVE share while auditioning, as a halo behind it -- the glow from
-// example-spread, brought into the editor.
-//
-// Its own element, so it does not compete with the node's shape, fill or
-// size (decision H). Two tones, matching the chart:
-//
-//   green core   the share that reaches outputs
-//   grey rim     the share that goes to silence
-//
-// AREA grows in proportion to the share, not radius, because area is what
-// the eye compares: radius sqrt(r^2 + K w), so a node with twice the share
-// has twice the halo. A negative weight -- possible inside a non-convex
-// region -- draws no halo; the renderer already draws it as a red line.
-void ofApp::drawHalo(NodeID id, float weight) const {
-    if (weight <= 0.0f || id >= manifold.nodeCount()) return;
-    const glm::vec2 p = renderer->toScreen(manifold.node(id).position);
-    const float r = nodeRadius(id);
-    const float K = (r + 30.0f) * (r + 30.0f) - r * r;   // full share: +30 px
-    const float frac = mapping.outputFraction(id);
-    const float total = std::sqrt(r * r + K * weight);
-    const float core  = std::sqrt(r * r + K * weight * frac);
-
-    ofPushStyle();
-    ofFill();
-    ofSetColor(120, 126, 140, 110);
-    ofDrawCircle(p.x, p.y, total);
-    if (frac > 0.0f) {
-        ofSetColor(120, 200, 160, 130);
-        ofDrawCircle(p.x, p.y, core);
-    }
-    ofPopStyle();
-}
-
-// ===========================================================================
-// OutputChart -- the faders, drawn from the layout the package computed.
-// Reads only.
-// ===========================================================================
-
-// One bar per OUTPUT, not per node, in channel order -- outputs are what is
-// heard. Derived outputs in their own colour. A silence bar at the end, so
-// outputs plus silence always total exactly 1. Trim as a tick: the bar is the
-// routed share, the tick is the level that actually leaves.
-void ofApp::drawChart() const {
-    ofPushStyle();
-    ofSetColor(40, 43, 52);
-    ofFill();
-    ofDrawRectangle(chart.x0, chart.top, chart.width, chart.height);
-
-    if (chart.empty) {
-        ofSetColor(140, 146, 160);
-        text("no outputs yet -- press o to make one",
-             chart.x0 + 12.0f, chart.top + lh + 8.0f);
-        ofPopStyle();
-        return;
-    }
-
-    const WeightVector none;
-    const WeightVector& wv = evaluation.inside ? evaluation.weights : none;
-    const std::vector<float> routed = mapping.toChannels(wv);
-    const std::vector<float> levels = mapping.toChannelLevels(wv);
-    const float silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
-    // How much of each output's level comes from the selected nodes.
-    const std::vector<float> fromSel = selection.empty()
-        ? std::vector<float>() : contributions(model, selection, wv);
-    const std::vector<std::size_t> taps = tapsOf(model, selection);
-    const float rise = chart.barArea - 6.0f;
-    const float row1 = chart.base + lh + 1.0f;      // label rows under bars
-    const float row2 = row1 + lh;
-
-    float outputsTotal = 0.0f;
-    for (const ChartBar& b : chart.bars) {
-        const std::size_t ch = std::size_t(b.channel);
-        const float bw = b.w;
-        if (b.kind == ChartBar::Kind::Unused) {
-            // A sliver: a channel nothing is on. Hover names it; a ruler mark
-            // may still number it, so the count along the row stays even.
-            ofSetColor(52, 56, 66);
-            ofDrawRectangle(b.x, chart.top + 6.0f, bw, rise);
-            ofSetColor(140, 146, 160);
-            if (!b.label.empty()) text(b.label, b.x, row1);
-            continue;
-        }
-        ofSetColor(58, 62, 74);
-        ofDrawRectangle(b.x, chart.top + 6.0f, bw, rise);
-        const bool derived = (b.kind == ChartBar::Kind::Derived);
-        if (!derived) outputsTotal += routed[ch];
-
-        const float v = ofClamp(routed[ch], 0.0f, 1.0f);
-        ofSetColor(derived ? ofColor(180, 140, 230) : outputColour(b.output));
-        ofDrawRectangle(b.x, chart.base - v * rise, bw, v * rise);
-        // The level after trim, as a tick across the bar.
-        const float lv = ofClamp(levels[ch], 0.0f, 1.0f);
-        ofSetColor(255, 255, 255, 200);
-        const float ty = chart.base - lv * rise;
-        ofDrawLine(b.x - 2.0f, ty, b.x + bw + 2.0f, ty);
-
-        // A dot above each output a selected node feeds -- the other half of
-        // seeing a binding: which faders this selection reaches.
-        if (!derived) {
-            bool fed = false;
-            for (NodeID id : selection.nodes()) {
-                if (model.feeds(id, b.output)) { fed = true; break; }
-            }
-            if (fed) {
-                ofSetColor(255, 214, 90);
-                ofDrawCircle(b.x + bw * 0.5f, chart.top + 1.0f, 3.0f);
-            }
-        }
-
-        // The selected nodes' part of this output, as a brighter segment
-        // from the bottom of the bar: "this much of it is them".
-        if (!derived && ch < fromSel.size() && fromSel[ch] > 0.0f) {
-            const float c = ofClamp(fromSel[ch], 0.0f, 1.0f);
-            const float inset = std::min(2.0f, bw * 0.2f);
-            ofSetColor(200, 245, 220);
-            ofDrawRectangle(b.x + inset, chart.base - c * rise,
-                            bw - 2.0f * inset, c * rise);
-        }
-
-        // A derived output that reads a selected node: a purple dot -- a
-        // tap, a copy the node loses nothing to.
-        if (derived) {
-            for (std::size_t a : taps) {
-                if (mapping.aggregators()[a].name == b.name) {
-                    ofSetColor(180, 140, 230);
-                    ofDrawCircle(b.x + bw * 0.5f, chart.top + 1.0f, 3.0f);
-                }
-            }
-        }
-
-        bool picked = false;
-        for (TargetID t : model.selectedOutputs()) {
-            if (!derived && b.output == t) picked = true;
-        }
-        if (picked) {
-            ofNoFill();
-            ofSetColor(255, 214, 90);
-            ofSetLineWidth(b.output == currentOutput ? 2.0f : 1.0f);
-            ofDrawRectangle(b.x - 2.0f, chart.top + 4.0f, bw + 4.0f,
-                            chart.barArea - 2.0f);
-            ofFill();
-            ofSetLineWidth(1.0f);
-        }
-        // Labels as the layout fitted them: the name over its channel, or
-        // the channel alone, or nothing when even that will not fit.
-        ofSetColor(derived ? ofColor(200, 205, 215) : outputColour(b.output));
-        if (!b.label.empty()) text(b.label, b.x, row1);
-        ofSetColor(140, 146, 160);
-        if (!b.sub.empty()) text(b.sub, b.x, row2);
-    }
-
-    // The fader line: each selected node's fill, on each output it feeds --
-    // the same percentage its shape shows, so pressing q or w moves the line
-    // and the shape together. Yellow, as the selection is; the white tick is
-    // the level after trim, a different thing.
-    ofSetLineWidth(2.0f);
-    ofSetColor(255, 214, 90);
-    for (const FillMark& m : fillMarks(model, selection)) {
-        for (const ChartBar& b : chart.bars) {
-            if (b.kind != ChartBar::Kind::Output || b.output != m.output) continue;
-            const float y = chart.base - ofClamp(m.fill, 0.0f, 1.0f) * rise;
-            ofDrawLine(b.x, y, b.x + b.w, y);
-        }
-    }
-    ofSetLineWidth(1.0f);
-
-    // Silence, so the whole share is accounted for.
-    ofSetColor(58, 62, 74);
-    ofDrawRectangle(chart.silenceX, chart.top + 6.0f, chart.barWidth, rise);
-    const float sv = ofClamp(silence, 0.0f, 1.0f);
-    ofSetColor(120, 126, 140);
-    ofDrawRectangle(chart.silenceX, chart.base - sv * rise, chart.barWidth,
-                    sv * rise);
-    ofSetColor(200, 205, 215);
-    if (!chart.silenceLabel.empty()) text(chart.silenceLabel, chart.silenceX, row1);
-
-    // The total, in the column kept for it, one figure a line, so it never
-    // runs past the window however many outputs there are.
-    ofSetColor(235, 238, 245);
-    const float tx = chart.totalX;
-    if (evaluation.inside) {
-        text("outputs " + ofToString(outputsTotal, 3), tx, chart.top + lh + 6.0f);
-        text("silence " + ofToString(silence, 3), tx, chart.top + 2.0f * lh + 6.0f);
-        text("total   " + ofToString(outputsTotal + silence, 3), tx,
-             chart.top + 3.0f * lh + 6.0f);
-    } else {
-        text("listening point", tx, chart.top + lh + 6.0f);
-        text("outside the map", tx, chart.top + 2.0f * lh + 6.0f);
-    }
-
-    // Hover: the full name and level of whatever bar is under the mouse, so
-    // nothing becomes unreadable when the bars get narrow.
-    const int h = chart.hoverAt(mouse.x, mouse.y);
-    if (h != ChartLayout::kNothing) {
-        std::vector<std::string> lines;
-        float x;
-        if (h == ChartLayout::kSilence) {
-            x = chart.silenceX;
-            lines = {"silent", "share " + ofToString(silence, 3)};
-        } else {
-            const ChartBar& b = chart.bars[std::size_t(h)];
-            const std::size_t ch = std::size_t(b.channel);
-            x = b.x;
-            if (b.kind == ChartBar::Kind::Unused) {
-                lines = {"channel " + ofToString(ch), "unused"};
-            } else if (b.kind == ChartBar::Kind::Derived) {
-                lines = {b.name + "  ch " + ofToString(ch) + "  derived",
-                         "level " + ofToString(levels[ch], 3)};
-            } else {
-                const float tr = mapping.targetTrim(b.output);
-                lines = {b.name + "  ch " + ofToString(ch),
-                         "share " + ofToString(routed[ch], 3) + "  level "
-                         + ofToString(levels[ch], 3) + "  trim "
-                         + (tr > 0.0f ? ofToString(20.0f * std::log10(tr), 1)
-                                        + " dB"
-                                      : std::string("off"))};
-            }
-        }
-        std::size_t longest = 0;
-        for (const std::string& l : lines) longest = std::max(longest, l.size());
-        const float bwid = float(longest) * cw + 12.0f;
-        const float bh = float(lines.size()) * lh + 8.0f;
-        // Above the chart, kept inside the window.
-        const float bx = std::min(x, float(ofGetWidth()) - bwid - 8.0f);
-        const float by = chart.top - bh - 4.0f;
-        ofSetColor(24, 26, 32, 235);
-        ofDrawRectangle(bx, by, bwid, bh);
-        ofNoFill();
-        ofSetColor(140, 146, 160);
-        ofDrawRectangle(bx, by, bwid, bh);
-        ofFill();
-        ofSetColor(235, 238, 245);
-        for (std::size_t k = 0; k < lines.size(); ++k) {
-            text(lines[k], bx + 6.0f, by + 4.0f + float(k + 1) * lh - 3.0f);
-        }
-    }
-    ofPopStyle();
-}
-
-// ===========================================================================
-// KeyPanel -- the side panel and help. Reads only.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// the panel
-// ---------------------------------------------------------------------------
-// The panel in FIXED zones, so nothing pushes anything else: status lines
-// that are always in the same places, one line for the message, a few lines
-// for the output you are acting on, then the keys. The full list of outputs
-// used to sit in the middle and grow with every output, pushing the keys off
-// the bottom of the window; the faders already show every output, and hover
-// gives any one's details.
-void ofApp::drawPanel() const {
-    const float x = renderer->viewport().getRight() + 30.0f;
-    const float room = float(ofGetWidth()) - x - 16.0f;
-    const std::size_t width = std::size_t(std::max(12.0f, room / cw));
-    // Any line longer than the panel is shortened rather than run off it.
-    auto fit = [width](std::string s) {
-        if (s.size() > width) s = s.substr(0, width - 3) + "...";
-        return s;
-    };
-    const float step = lh + 2.0f;
-    float y = 24.0f + lh;
-    static const char* names[] = {"free", "square", "triangular", "polar"};
-
-    // ---- status: seven lines, each always in its place ----
-    ofSetColor(auditioning() ? ofColor(120, 200, 160) : ofColor(235, 238, 245));
-    text(fit(auditioning()
-        ? (auditionLocked ? "AUDITION  (locked -- v to edit)"
-                          : "AUDITION  (release space to edit)")
-        : "EDIT"), x, y);
-    ofSetColor(180, 186, 200);
-    text(fit((currentPath.empty() ? std::string("untitled")
-                                  : pairFor(currentPath).name)
-             + (unsaved ? "   (unsaved)" : "")), x, y + step);
-    std::string g = std::string("grid ") + names[int(kind)];
-    if (kind != GridKind::Free) {
-        g += "  " + ofToString(spacing, 3) + "  "
-           + ofToString(ofRadToDeg(rotation), 0) + " deg";
-        if (kind == GridKind::Polar) g += "  " + ofToString(spokes) + " spokes";
-    }
-    text(fit(g), x, y + 2.0f * step);
-    text(fit(std::string("auto-output ") + (autoOutput ? "on" : "off")
-             + "  (p)"), x, y + 3.0f * step);
-    text(fit("nodes " + ofToString(manifold.nodeCount())
-             + "   regions " + ofToString(manifold.regionCount())
-             + "   selected " + ofToString(selection.size())), x, y + 4.0f * step);
-    // The selection's fill, so a q or w press can be read before and after.
-    if (!selection.empty()) {
-        float lo = 2.0f, hi = -1.0f;
-        for (NodeID id : selection.nodes()) {
-            if (model.outputCount(id) == 0) continue;
-            lo = std::min(lo, mapping.outputFraction(id));
-            hi = std::max(hi, mapping.outputFraction(id));
-        }
-        const std::string fill = hi < 0.0f ? std::string("- (no output)")
-            : ofToString(int(std::lround(lo * 100))) + "%"
-              + (std::lround(lo * 100) == std::lround(hi * 100) ? std::string()
-                 : " to " + ofToString(int(std::lround(hi * 100))) + "%");
-        text(fit("fill " + fill), x, y + 5.0f * step);
-    }
-    if (!model.topology().orphans.empty()) {
-        ofSetColor(140, 146, 160);
-        text(fit("orphans " + ofToString(model.topology().orphans.size())
-                 + "  (in no region yet)"), x, y + 6.0f * step);
-    }
-    y += 7.0f * step + lh * 0.5f;
-
-    // ---- the message: one line, always here ----
-    if (messageTime > 0.0f) {
-        ofSetColor(refusedFlash > 0.0f ? ofColor(232, 96, 88)
-                                       : ofColor(120, 200, 160));
-        text(fit(message), x, y);
-    }
-    y += step + lh * 0.5f;
-
-    // ---- the output you are acting on: three lines, never more ----
-    const auto& sel = model.selectedOutputs();
-    if (mapping.targetCount() == 0) {
-        ofSetColor(140, 146, 160);
-        text(fit("no outputs yet -- o makes one"), x, y);
-    } else if (sel.size() == 1) {
-        const TargetID t = sel.front();
-        const float tr = mapping.targetTrim(t);
-        std::size_t feeders = 0;
-        for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
-            if (model.feeds(NodeID(i), t)) ++feeders;
-        }
-        ofSetColor(outputColour(t));
-        ofFill();
-        ofDrawRectangle(x - 12.0f, y - lh * 0.7f, 7.0f, lh * 0.7f);
-        ofSetColor(255, 214, 90);
-        text(fit("> " + mapping.targetName(t) + "  ch "
-                 + ofToString(mapping.targetChannel(t)) + "  "
-                 + (tr > 0.0f ? ofToString(20.0f * std::log10(tr), 1) + " dB"
-                              : std::string("off"))), x, y);
-        ofSetColor(180, 186, 200);
-        text(fit("fed by " + ofToString(feeders)
-                 + (feeders == 1 ? " node" : " nodes")), x, y + step);
-    } else {
-        std::string list;
-        for (TargetID t : sel) {
-            list += (list.empty() ? "" : ", ") + mapping.targetName(t);
-        }
-        ofSetColor(255, 214, 90);
-        text(fit("+ " + ofToString(sel.size()) + " outputs: " + list), x, y);
-        ofSetColor(180, 186, 200);
-        text(fit("b and t act on all " + ofToString(sel.size())), x, y + step);
-    }
-    ofSetColor(140, 146, 160);
-    const std::size_t derived = mapping.aggregators().size();
-    text(fit(ofToString(mapping.targetCount()) + " outputs"
-             + (derived ? ", " + ofToString(derived) + " derived" : std::string())
-             + " -- hover a fader for details"), x, y + 2.0f * step);
-    y += 3.0f * step + lh * 0.5f;
-
-    // ---- the keys: always starting here ----
-    // Two columns when the panel is wide enough, one beneath the other when
-    // the text is large or the window narrow.
-    const char* left[] = {
-        "click empty  place node",   "drag empty   box select",
-        "shift        add to select", "drag node    move selection",
-        "alt+drag     free-hand",    "f  u         join  unjoin",
-        "delete       remove nodes", "1-4          grid kind",
-        "r R 0        rotate grid",  "- = [ ]      spacing spokes",
-        "x  e         empty  example", "cmd-s  save   (+shift: as)",
-        "cmd-o  open a pair",       "ctrl-cmd-f  full screen",
-        "cmd-+ cmd--  text size",
-    };
-    const char* right[] = {
-        "o     new output",         "d     derived from selection",
-        "tab   next output",        "b     bind/unbind selected",
-        "shift-click bars: several",
-        "B     bind to every output", "q w   fill -/+ 5% (shift 1%)",
-        "c     clear bindings",     "t T   trim -/+ 1 dB",
-        "O     remove current output", "p     auto-output on/off",
-        "space audition (hold)",    "v     lock audition",
-        "cmd-z undo, shift redo",   "click a bar: pick output",
-    };
-    ofSetColor(140, 146, 160);
-    const bool twoColumns = room >= 60.0f * cw;
-    float yl = y;
-    for (const char* hl : left) { text(fit(hl), x, yl); yl += lh + 1.0f; }
-    float yr = twoColumns ? y : yl + lh * 0.6f;
-    const float xr = twoColumns ? x + 31.0f * cw : x;
-    for (const char* hr : right) { text(fit(hr), xr, yr); yr += lh + 1.0f; }
-}
-
-// ===========================================================================
-// Text
-// ===========================================================================
-
-// Loaded at 72 dots per inch, so a size in points is a size in pixels, as
-// on the rest of the Mac; openFrameworks' default of 96 made every size a
-// third larger than asked. Reloaded only when the size changes. Character
-// width is measured over ten characters, since a single one can round.
-void ofApp::fitText() {
-    if (textSize == fontSize) return;
-    fontSize = textSize;
-    if (font.load(OF_TTF_MONO, fontSize, true, true, false, 0.3f, 72)) {
-        cw = font.stringWidth("0000000000") / 10.0f;
-        lh = font.getLineHeight();
-    } else {
-        cw = 8.0f;
-        lh = 13.0f;
-    }
-}
 
 void ofApp::setTextSize(int size) {
-    textSize = std::max(8, std::min(24, size));
+    text.setSize(std::max(8, std::min(24, size)));
     ofBuffer b;
-    b.set(ofToString(textSize));
+    b.set(ofToString(text.size()));
     ofBufferToFile(ofToDataPath("editor-text-size.txt"), b);
-    message = "text size " + ofToString(textSize);
+    message = "text size " + ofToString(text.size());
     messageTime = 1.5f;
-}
-
-void ofApp::text(const std::string& s, float x, float y) const {
-    if (font.isLoaded()) font.drawString(s, x, y);
-    else ofDrawBitmapString(s, x, y);
 }
 
 // ===========================================================================

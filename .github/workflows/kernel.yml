@@ -1235,9 +1235,9 @@ jobs:
 
       - name: An unbind silences a node without saying so must be caught
         run: |
-          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
-            '    if (!silenced.empty()) {' \
-            '    if (false) {'
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    if (!silenced.empty()) {\n        r.message += " -- "' \
+            '    if (false) {\n        r.message += " -- "'
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1385,6 +1385,60 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: Keys act in the middle of a drag must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+            '        entry("remove", "delete", "remove nodes", !drag && !sel.empty(),' \
+            '        entry("remove", "delete", "remove nodes", !sel.empty(),'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+
+      - name: Audition leaves mouse editing lit must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+            '    const bool mouse = !ctx.auditioning && !drag;   // mouse editing allowed' \
+            '    const bool mouse = !drag;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+
+      - name: Remove output lit with several picked must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+            '              !drag && picked == 1,' \
+            '              !drag && picked >= 1,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+
+      - name: Undo lit with nothing to undo must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+            '        entry("undo", "cmd-z", "undo", !drag && ctx.canUndo,' \
+            '        entry("undo", "cmd-z", "undo", !drag,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+
+      - name: b preview never predicts silence must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '            if (!survives) p.silenced.push_back(manifold_.node(id).name);' \
+            '            (void)survives;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: b preview counts nodes already as wanted must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (!changes) continue;\n        ++p.count;' \
+            '        ++p.count;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Restored tree must be green
         run: |

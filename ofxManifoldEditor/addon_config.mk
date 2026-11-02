@@ -5,7 +5,7 @@
 # layout and workflow that ofxManifold's users should not have to take.
 #
 # An addon rather than a plain folder because Project Generator compiles only a
-# project's own src/ and its addons (PLAN-editor.md decision A).
+# project's own src/ and its addons (DECISIONS.md D-024 A).
 
 meta:
 	ADDON_NAME = ofxManifoldEditor

@@ -3,7 +3,7 @@
 // ofxManifoldEditor — the model.
 //
 // A map and its outputs, and every operation an editor performs on them. The
-// ONE DOOR every change goes through (PLAN-editor.md decision D): views read
+// ONE DOOR every change goes through (DECISIONS.md D-024 D): views read
 // the model and never change it, and undo -- round 2 -- snapshots here, so
 // nothing can slip past it.
 //
@@ -34,6 +34,24 @@ struct Result {
     bool        refused = false;   // refused; the message says why
     std::string message;           // empty: nothing to say
     float       seconds = 0.0f;    // how long an editor shows the message
+};
+
+// What pressing b would do, worked out without doing it: the key panel shows
+// it before the key is pressed. bind() does not use it -- bind() builds its
+// message from what it actually changed -- so the tests can check, for every
+// b in every script, that the plan foretold exactly what happened.
+struct BindPlan {
+    bool        possible = false;   // false: b would do nothing
+    std::string why;                // why not, when it is not possible
+    bool        unbind   = false;   // true: every pair exists, b removes them
+    std::size_t count    = 0;       // nodes that would change
+    std::vector<std::string> silenced;   // nodes it would leave with no output
+    std::string outputs;            // the selected outputs, by name
+
+    // "bind 2 to front"; "unbind 1 from n2 -- n2 goes silent"
+    std::string preview() const;
+    // The message bind() should return when it carries this plan out.
+    std::string outcome() const;
 };
 
 class Model {
@@ -99,6 +117,7 @@ public:
     // Each node keeps its fill through the change. A node whose last output
     // is unbound becomes cleanly null, with no stray silence binding left.
     Result bind(const Selection& sel);
+    BindPlan planBind(const Selection& sel) const;
     // Step each selected node's fill: how much of its share reaches its
     // outputs. `direction` +1 up, -1 down; 5% a step, or 1% when `fine`.
     // A step lands on the next multiple of its size in its direction, so a

@@ -10,3 +10,4 @@
 #include "ofxManifoldEditorChartLayout.h"
 #include "ofxManifoldEditorHistory.h"
 #include "ofxManifoldEditorFiles.h"
+#include "ofxManifoldEditorKeys.h"

@@ -11,6 +11,7 @@
 #include "ofxManifoldEditorChartLayout.h"
 #include "ofxManifoldEditorHistory.h"
 #include "ofxManifoldEditorFiles.h"
+#include "ofxManifoldEditorKeys.h"
 #include "io/ofxManifoldSerialize.h"
 
 #include <filesystem>
@@ -307,7 +308,18 @@ int main(int argc, char** argv) {
             else if (lastOp == "empty")   op = [&](Model& m) {
                 m.newEmpty(); Result r; r.changed = true; return r; };
             else { std::cerr << "unknown op " << lastOp << "\n"; return 2; }
+            // b: what the plan foretold, before, must be what happened. The
+            // plan predicts; bind() builds its message from what it changed.
+            const BindPlan plan = md.planBind(sel);
             last = hist.apply(md, label(lastOp), op);
+            if (lastOp == "bind" && plan.possible && ok
+                && last.message != plan.outcome()) {
+                ok = false;
+                why << "step " << step << ": b was previewed as \""
+                    << plan.preview() << "\", which foretold \""
+                    << plan.outcome() << "\", but did \"" << last.message
+                    << "\"";
+            }
         } else if (kind == "EXPECT") {
             int ch, rf; in >> ch >> rf;
             std::string rest; std::getline(in, rest);
@@ -344,6 +356,59 @@ int main(int argc, char** argv) {
                 ok = false;
                 why << "pairFor(" << chosen << ") gave " << p.map << " "
                     << p.outputs << " " << p.legacy << " " << p.name;
+            }
+        } else if (kind == "KEYS") {
+            KeyContext ctx;
+            ctx.model = &md;
+            ctx.selection = &sel;
+            ctx.canUndo = hist.canUndo();
+            ctx.canRedo = hist.canRedo();
+            std::string tok;
+            while (in >> tok && tok != "EXPECT") {
+                const std::size_t eq = tok.find('=');
+                const std::string k = tok.substr(0, eq), v = tok.substr(eq + 1);
+                if (k == "drag") ctx.dragging = (v == "1");
+                else if (k == "aud") ctx.auditioning = (v == "1");
+                else if (k == "grid") {
+                    ctx.grid = v == "free" ? GridShape::Free
+                             : v == "polar" ? GridShape::Polar
+                             : GridShape::Lattice;
+                }
+            }
+            std::string want;
+            while (in >> tok && tok != "BIND") {
+                want += (want.empty() ? "" : " ") + tok;
+            }
+            std::string preview;
+            std::getline(in, preview);
+            if (!preview.empty() && preview[0] == ' ') preview.erase(0, 1);
+
+            const std::vector<KeyGroup> map = keyMap(ctx);
+            std::string got;
+            for (const KeyGroup& g : map) {
+                for (const KeyEntry& e : g.entries) {
+                    got += (got.empty() ? "" : " ") + e.id + ":"
+                         + (e.available ? "1" : "0");
+                    // keyAvailable must agree with the map it reads.
+                    std::string w;
+                    if (keyAvailable(ctx, e.id, &w) != e.available
+                        || (!e.available && w != e.why)) {
+                        got += "(keyAvailable disagrees)";
+                    }
+                    if (!e.available && e.why.empty()) {
+                        got += "(dim with no reason)";
+                    }
+                }
+            }
+            const KeyEntry* b = findKey(map, "bind");
+            if (ok && got != want) {
+                ok = false;
+                why << "keys after step " << step << ":\n      want " << want
+                    << "\n      got  " << got;
+            } else if (ok && (!b || b->action != preview)) {
+                ok = false;
+                why << "b after step " << step << ": want \"" << preview
+                    << "\", got \"" << (b ? b->action : "") << "\"";
             }
         } else if (kind == "LINKS") {
             std::string want, tok;

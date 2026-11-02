@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The editor's one door (PLAN-editor.md decision D): nothing outside
+The editor's one door (DECISIONS.md D-024 D): nothing outside
 editor::Model may change the map or its outputs.
 
 Enforced by the compiler -- the model's state is private, reachable only

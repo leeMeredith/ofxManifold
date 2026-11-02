@@ -14,13 +14,19 @@ serialization the standard library's own JSON parser against a hand-written one.
 | Layer | Suite | What it covers |
 |---|---|---|
 | `core` | 31 + 48 | triangle solve, bias, degeneracy, affine invariance, containment, topology, inverse evaluation, node movement, evaluator hint |
-| `interpretation` | 60 | curves, spread, blend, interpolate, coverage |
-| `mapping` | 35 | bindings, aggregators, dense output, cross-manifold blending by name |
-| `io` | 42 | JSON round trip, rejection, diagnosis |
-| `interpretation` (smoother) | 24 | exponential and slew smoothing, sequences |
+| `core` (regions) | 113 | polygons of N ≥ 3 by mean-value coordinates, non-convex regions, batch moves, removal |
+| `interpretation` | 69 | curves, spread, blend, interpolate, coverage, smoothing, negative weights |
+| `mapping` | 35 + 64 | bindings, aggregators, dense output, blending by name; outputs with channel and trim, silence, fill, derived outputs |
+| `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
 | `sources` | 51 | trajectories, real-time replay, velocity, the touring case |
+| `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
+| `ofxManifoldEditor` (logic) | 31 scripts, 428 steps | editing operations, selection, undo, files, fader layout, link lines, keys |
 
-**291 vectors, 58 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**623 vectors, 148 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+`make door` checks the editor's one door; `make drawlog` records every drawing
+call of a scripted editing session (DECISIONS.md D-024).
+
+---
 
 ## Built, judged on screen
 
@@ -43,18 +49,31 @@ It is checked for typos against a stub and judged by eye.
   spreading onto null nodes (D-014)
 - **`example-smoothing`** — raw against smoothed over time, and the four kinds
   of discontinuity worth smoothing
+- **`example-regions`** — triangle, hexagon, L-shape and star regions
+- **`example-editor`** and the **`ofxManifoldEditor`** views — place, select,
+  move, join; outputs, bindings, fill and trim; a permanent listening point
+  with live faders; link lines; undo; named saves as a pair of files; keys lit
+  when they act. Built over two rounds in use (DECISIONS.md D-023, D-024)
 
 ---
 
 ## Next
 
-Nothing outstanding. `WeightSmoother` (§12) was the last named item and is
-built — exponential and slew smoothing, frame-rate independent, with the
-project's first sequence-based vectors (DECISIONS.md D-016).
+**Round 3: several maps, one rig, and a player.** The editor authors one map at
+a time and stays that way; working with several maps belongs in a player.
 
-`example-smoothing` traces raw against smoothed over time, with jitter, jumps,
-hull exits and a T-junction to provoke. It is also the first thing worth
-reaching for in real use, since every live control source is jittery.
+- **3A, kernel and editor.** A **rig**: an outputs file with outputs and no
+  bindings, which any map can use, so maps authored against the same rig blend.
+  **Blending more than two maps** by output name, with a check that maps
+  sharing an output name agree on its channel. **Derived outputs fed before or
+  after the fader**: from source nodes, as now, or from outputs as they leave,
+  as a sub usually wants. In the editor, **one-step ring and grid layout** of
+  nodes, each with its channel. File format changes go first, before more files
+  exist.
+- **3B, the player example.** Several maps and one rig; one listening point
+  evaluated on every map; the blend, possibly controlled by a small map whose
+  nodes are the maps; **mute**; trajectory playback; spread; smoothing; OSC
+  out. It reuses the editor's views (`ofxManifoldEditorViews.h`).
 
 ### Larger mesh — MEASURED
 
@@ -79,11 +98,6 @@ which are the first thing to fail.
 
 ## Later
 
-**Interactive editor (§10).** Create, drag, name, connect, save.
-`example-basic` already does half of it by accident — node dragging with
-inversion refusal is the hard part and it works. What is missing is adding and
-removing nodes and regions, naming them, and saving.
-
 **Trajectory curve format.** Sampled points were the right first choice: it is
 what recording produces, it preserves timing exactly including pauses, and it
 needed no decision about curve families. A parametric format can be added later
@@ -92,20 +106,25 @@ what actually happened — cannot.
 
 ---
 
-## Editor — in planning
+## Editor — after round 2
 
-See `PLAN-authoring.md`. Grids with an explicit free-hand mode, rotation, and a
-batch move for multi-select. Two items belong to the editor but come after it:
+**Halos in the node's own shape.** A triangle node's halo a triangle, a square
+node's a square, each scaled so that equal share means equal area -- at the
+same size a triangle covers about 40% of a circle's area, and would read as a
+smaller share. Asked for, then deferred by the user.
 
-**Layers.** `blendByName()` already combines maps, and `example-blend` draws
-two stacked. What the editor needs is an **active layer**: edit one map, show
-the others dimmed. Node names may repeat across maps safely, since NodeIDs are
-per-manifold (D-013).
+**Layers and vias.** Maps nested within maps: a node that passes its share down
+to another map evaluated at the same point, which measured as smooth as a
+single map where re-reading a region in its own coordinates jumped by 0.57.
+Layer order makes loops impossible to build. After the player shows how
+multi-map work feels in use.
 
-**3D stacked view, for viewing only.** Each map as a plane at its own depth
-under a camera, which makes section 9.3's layered-2D-as-3D visible. View only,
-deliberately: picking nodes in 3D is hard to do well, and editing in 2D while
-viewing in 3D avoids the problem entirely. Wrapper code, no kernel change.
+**3D stacked view, for viewing only.** Each map as a plane at its own depth;
+vias as vertical lines between them. View only: editing stays 2D.
+
+**Node values.** The third part of a node beside geometry and routing: an
+attribute bundle interpolated across the map -- reverb send, filter, width --
+for parameter maps and authored distance cues.
 
 ---
 

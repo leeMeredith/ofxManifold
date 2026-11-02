@@ -4,28 +4,28 @@
 //
 // A thin app over ofxManifoldEditor. It owns the window, the mouse and the
 // keys, and draws; every change to the map or its outputs goes through
-// editor::Model, the ONE DOOR (PLAN-editor.md decision D).
+// editor::Model, the ONE DOOR (DECISIONS.md D-024 D).
 //
 // That rule is enforced, not just intended: this class holds the map and its
 // outputs only as CONST references for drawing. A line here that tried to
 // change them directly would not compile.
 //
-// The code falls into sections that become separate files in round 2:
+// What is left here is the app: the window, the mouse and the keys turned
+// into Model operations, the grid tool's settings, and the file dialogs. The
+// drawing is the package's views (ofxManifoldEditorViews.h), which only READ:
 //
-//   app          setup, update, draw -- assembling the pieces
-//   controller   mouse and keys, turned into Model operations
-//   grid tool    the snapping grid, a preference of the session
-//   MapView      grid lines, regions, the drag box, selection rings
-//   NodeGlyph    one node's shape, fill and audition halo
+//   MapView      grid, regions, halos, links, nodes, rings, listening point
+//   NodeGlyph    one node's shape, fill and halo
 //   OutputChart  the faders, drawn from editor::ChartLayout
-//   KeyPanel     the side panel and help
-//   EditorFiles  saving and opening the map and its outputs
+//   KeyPanel     the side panel: status, current output, keys
+//   Text, Style  the font, and the output colours
 //
-// Each view section only READS the model.
+// Moved out of this file in slice 2f, unchanged -- checked by recording every
+// drawing call of a scripted session before and after (tests/drawlog).
 
 #include "ofMain.h"
 #include "ofxManifold.h"
-#include "ofxManifoldEditor.h"
+#include "ofxManifoldEditorViews.h"
 
 class ofApp : public ofBaseApp {
 public:
@@ -54,53 +54,26 @@ private:
                  ofxManifold::editor::Model&)>& op);
     void undo();
     void redo();
+
+    // The keys: availability from editor::keyMap, the same rule the panel
+    // draws from. allowed() is asked before any key acts; a key that would
+    // do nothing says why on the message line instead.
+    ofxManifold::editor::KeyContext keyContext() const;
+    bool allowed(const std::string& id);
+    std::string keyId(int key) const;
     void adopt();                     // after the map is replaced wholesale
     void placeAt(glm::vec2 p);
     ofxManifold::NodeID nodeAt(glm::vec2 screen) const;
     bool auditioning() const { return auditionHeld || auditionLocked; }
 
     // ---- grid tool --------------------------------------------------------
-    enum class GridKind { Free, Square, Triangular, Polar };
     void rebuildGrid();
 
-    // ---- MapView ----------------------------------------------------------
-    void drawGrid() const;
-    void drawSegment(glm::vec2 a, glm::vec2 b) const;
-
-    // ---- links --------------------------------------------------------------
-    void drawLinks() const;
-
-    // ---- colour: one per output, shared by everything that refers to it ---
-    ofColor outputColour(ofxManifold::TargetID t) const;
-
-    // ---- NodeGlyph --------------------------------------------------------
-    void  drawNode(ofxManifold::NodeID id) const;
-    void  drawHalo(ofxManifold::NodeID id, float weight) const;
-    float nodeRadius(ofxManifold::NodeID id) const;
-
-    // ---- OutputChart ------------------------------------------------------
-    void drawChart() const;
-
-    // ---- Text: the system's monospaced font, at a size you choose -------
-    //
-    // A fixed reading size, NOT one following the window: a bigger window is
-    // for more room, not bigger letters. (2d tied it to the window's height,
-    // and on a large screen it came out far too big.) Command-plus and
-    // command-minus change it, and the choice is kept between launches. If
-    // the font cannot be loaded, the bitmap font is used, and cw and lh say
-    // so.
-    void  fitText();
-    void  setTextSize(int size);
-    void  text(const std::string& s, float x, float y) const;
-    ofTrueTypeFont font;
-    int   textSize = 12;      // what you chose
-    int   fontSize = 0;       // what is loaded
-    float cw = 8.0f;          // character width
-    float lh = 13.0f;         // line height
-    glm::vec2 mouse{-1.0f, -1.0f};
-
-    // ---- KeyPanel ---------------------------------------------------------
-    void drawPanel() const;
+    // ---- text: the size you choose, kept between launches --------------------
+    // Command-plus and command-minus. The font itself is editor::Text.
+    void setTextSize(int size);
+    ofxManifold::editor::Text text;
+    glm::vec2 mouse{-1.0f, -1.0f};      // for hover
 
     // ---- EditorFiles ------------------------------------------------------
     //
@@ -149,7 +122,7 @@ private:
     //
     // A preference of the editing session, never written into a map file.
     ofxManifold::Grid grid;
-    GridKind kind     = GridKind::Square;
+    ofxManifold::editor::GridKind kind = ofxManifold::editor::GridKind::Square;
     float    spacing  = 0.05f;
     float    rotation = 0.0f;           // radians
     int      spokes   = 8;

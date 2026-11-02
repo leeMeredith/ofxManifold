@@ -178,6 +178,12 @@ in this repository beside `src/`: copy it into your `addons/` folder next to
 ofxManifold. It is kept out of ofxManifold's own `src/` on purpose, so projects
 that want only the manifold never compile the editor.
 
+The package has two halves. `ofxManifoldEditor.h` is the editing logic -- the
+model, selection, undo, files, keys, fader layout -- with no openFrameworks, so
+it can be tested and reused anywhere. `ofxManifoldEditorViews.h` is the drawing
+-- the map, node shapes, faders, the side panel -- in `src/views/`, for any app
+that wants to show a map the way the editor does.
+
 **`example-editor`** — the first piece of the editor. Click empty space to
 place a node on the active grid, drag a box or shift-click to select, drag the
 selection to move it as one operation, press `f` to join the selection into a
@@ -252,7 +258,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-622 vectors across eleven suites, plus 142 mutation gates that introduce known
+623 vectors across eleven suites, plus 148 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform

@@ -12,7 +12,7 @@ regions BY NAME, so a removal renumbers nothing. The C++ holds numeric ids and
 must renumber on every delete. Agreement is the evidence the renumbering is
 right.
 
-CHARACTERIZATION. Round 1 of PLAN-editor.md changes no behaviour, so these pin
+CHARACTERIZATION. Round 1 of the editor work (DECISIONS.md D-023) changed no behaviour, so these pin
 what the editor does TODAY -- including things round 2 will change on purpose,
 such as a quarter-share of silence per press. When round 2 changes one, its
 vector changes in the same commit, visibly.
@@ -531,6 +531,64 @@ class Editor:
                     marks.append((l[1], n, f))
         return marks
 
+    # ---- the keys --------------------------------------------------------
+    def bind_preview(self, sel):
+        """What b would do, found by DOING it on a copy and describing the
+        difference. The C++ predicts without doing; agreement checks the
+        prediction."""
+        import copy
+        if not self.out_sel or not sel:
+            return False, "bind or unbind selected"
+        trial = copy.deepcopy(self)
+        before = {n: self.output_count(n) for n in sel}
+        res = trial.bind(sel)
+        unbind = res[2].startswith("unbound")
+        changed = [n for n in sel
+                   if sorted(self.links.get(n, [])) != sorted(trial.links.get(n, []))]
+        silenced = [n for n in sel if before[n] > 0 and trial.output_count(n) == 0]
+        t = (("unbind " if unbind else "bind ") + str(len(changed))
+             + (" from " if unbind else " to ") + ", ".join(self.out_sel))
+        if silenced:
+            who = silenced[0] if len(silenced) == 1 else f"{len(silenced)} nodes"
+            t += f" -- {who} " + ("goes silent" if len(silenced) == 1
+                                   else "go silent")
+        return True, t
+
+    def keymap(self, sel, can_undo, can_redo, drag, aud, grid):
+        """[(id, available)], in panel order, and b's action. The rules,
+        restated from the plan: while dragging only free-hand and the window
+        keys; while auditioning only the mouse editing actions dim."""
+        nodes, outs, picked = len(self.nodes), len(self.outputs), len(self.out_sel)
+        mouse = not aud and not drag
+        any_out = any(self.output_count(n) > 0 for n in sel)
+        any_bound = any(self.links.get(n) for n in sel)
+        region_sel = any(all(n in sel for n in r) for r in self.regions)
+        grid_on = grid != "free"
+        possible, preview = self.bind_preview(sel)
+        nd = not drag
+        rules = [
+            ("place", mouse), ("box", mouse and nodes > 0),
+            ("toggle", mouse and nodes > 0), ("all", nd and nodes > 0),
+            ("none", nd and bool(sel)),
+            ("move", mouse and nodes > 0), ("freehand", drag and grid_on),
+            ("join", nd and len(sel) >= 3), ("unjoin", nd and region_sel),
+            ("remove", nd and bool(sel)),
+            ("gridkind", nd), ("rotate", nd and grid_on),
+            ("spacing", nd and grid_on), ("spokes", nd and grid == "polar"),
+            ("deadzone", nd and grid_on),
+            ("newoutput", nd), ("pickoutput", nd and outs > 0),
+            ("addoutput", nd and outs >= 2), ("nextoutput", nd and outs >= 2),
+            ("bind", nd and possible), ("bindall", nd and outs > 0 and bool(sel)),
+            ("fill", nd and any_out), ("clear", nd and bool(any_bound)),
+            ("derived", nd and bool(sel)), ("trim", nd and picked > 0),
+            ("removeoutput", nd and picked == 1), ("autooutput", nd),
+            ("audition", nd), ("lock", nd),
+            ("undo", nd and can_undo), ("redo", nd and can_redo),
+            ("save", nd), ("saveas", nd), ("open", nd), ("empty", nd),
+            ("example", nd), ("fullscreen", True), ("textsize", True),
+        ]
+        return rules, preview
+
     # ---- the fader layout ----------------------------------------------
     def chart(self, x0, top, w, h, cw=8.0, lh=13.0):
         """Fader geometry, restated from the rules. Every used channel and
@@ -844,6 +902,13 @@ class Script:
         name = b.replace("\\", "/").split("/")[-1]
         self.out.append(f"PAIR {chosen} MAP {b}.json OUT {b}-outputs.json "
                         f"LEGACY {b}-mapping.json NAME {name}")
+
+    def keys(self, drag=False, aud=False, grid="lattice"):
+        rules, preview = self.ed.keymap(self.sel, bool(self.past),
+                                        bool(self.future), drag, aud, grid)
+        self.out.append(f"KEYS drag={int(drag)} aud={int(aud)} grid={grid} "
+                        "EXPECT " + " ".join(f"{i}:{int(a)}" for i, a in rules)
+                        + " BIND " + preview)
 
     def lines(self):
         ls = self.ed.link_lines(self.sel)
@@ -1164,6 +1229,37 @@ def build():
         t.do("place", p)
     t.do("pick", "n1"); t.select("n0"); t.do("bind")
     t.select("n0"); t.lines()
+    t.end()
+
+    t = Script(out, "keys_lit_when_they_act",
+               "which keys are lit: the same rule an editor asks before "
+               "acting, so a lit key acts and a dim one does not. While a "
+               "node is dragged only free-hand and the window keys; while "
+               "auditioning only the mouse editing dims. b's action is what "
+               "it WOULD do -- worked out here by doing it on a copy, in "
+               "the C++ by predicting")
+    t.keys()                                    # an empty map
+    for p in [(0.2, 0.2), (0.8, 0.2), (0.5, 0.8)]:
+        t.do("place", p)                        # current output n0
+    t.keys()
+    t.select("n0", "n1"); t.keys()              # two: join dim; b binds n1
+    t.select("n0", "n1", "n2"); t.keys()        # three: join lit
+    t.do("join"); t.keys()                      # unjoin lit
+    t.keys(drag=True)                           # dragging: almost all dim
+    t.keys(drag=True, grid="free")              # free-hand dims too
+    t.keys(grid="polar")                        # spokes lit
+    t.keys(grid="free")                         # grid keys dim
+    t.keys(aud=True)                            # mouse editing dims
+    t.do("pick", "n2"); t.select("n2"); t.keys()    # b: n2 would go silent
+    t.do("toggleout", "n1"); t.keys()           # two outputs: O dims
+    t.select("n0", "n1", "n2"); t.do("pick", "n0"); t.do("bind")
+    # n1 and n2 feeding every output, and every output picked: b would
+    # unbind them from all of them, leaving both silent.
+    t.select("n1", "n2"); t.do("bindall")
+    t.do("pick", "n0"); t.do("toggleout", "n1"); t.do("toggleout", "n2")
+    t.keys()                                    # b: 2 nodes would go silent
+    t.do("undo"); t.do("undo"); t.keys()        # redo lit
+    t.clear_sel(); t.keys()
     t.end()
 
     t = Script(out, "derived_taps",
