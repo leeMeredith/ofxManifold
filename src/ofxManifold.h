@@ -30,6 +30,7 @@
 #include "authoring/ofxManifoldRing.h"
 
 #include "mapping/ofxManifoldMapping.h"
+#include "mapping/ofxManifoldRig.h"
 
 #include "io/ofxManifoldJSON.h"
 #include "io/ofxManifoldSerialize.h"

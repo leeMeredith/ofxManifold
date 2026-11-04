@@ -368,3 +368,207 @@ RIGFILE bad_rig_version ANALYTIC bad_rig_version.json REFUSE version
 RIGFILE bad_rig_dup_channel ANALYTIC bad_rig_dup_channel.json REFUSE channel
 RIGFILE map_is_not_a_rig ANALYTIC outputs_v3.json REFUSE kind
 RIGFILE unmarked_is_not_a_rig ANALYTIC outputs_only_v3.json REFUSE kind
+
+#--------------------------------------------------------------------
+# BLENDING ANY NUMBER OF MAPS, AND THE RIG (round 3A-3)
+#
+# blendMaps() takes (map, weights, gain) for each map and
+# returns shares by output NAME, before trim; the channels
+# maps fill, by name; and the silence, blended. The rig turns
+# those into channels: trim on outputs, the after-fed derived
+# outputs computed ONCE from the blend, the filled channels as
+# blended.
+#--------------------------------------------------------------------
+MAP front
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+BIND 0 OUTPUT L 1
+BIND 1 OUTPUT R 1
+BIND 2 OUTPUT C 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP wide
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+BIND 0 OUTPUT L 1
+BIND 0 OUTPUT R 1
+BIND 1 OUTPUT C 1
+BIND 2 SILENCE 1
+DERIVED tap 8 1 linear SRC 1:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP back
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+BIND 0 OUTPUT C 1
+BIND 1 OUTPUT L 0.5
+BIND 1 SILENCE 0.5
+DERIVED tap 8 1 linear SRC 0:0.5 1:0.5
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP roomrig
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+DERIVED tap 8 1 linear SRC 
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+# ONE map at gain 1 through its own rig gives exactly that
+# map's channels and levels -- checked against the map's own
+# toChannels() and toChannelLevels() in the runner as well
+BLENDMAPS blend_one_front ANALYTIC linear front 1 0=0.5 1=0.3 2=0.2 ; RIG roomrig SHARES L=0.5 R=0.3 C=0.2 FILLED tap=0.5 SILENCE 0 CHANNELS 0 0.5 0.3 0.2 0 0 0 0 0.5 0.65 LEVELS 0 0.5 0.15 0.2 0 0 0 0 0.5 0.52
+BLENDMAPS blend_one_wide ANALYTIC linear wide 1 0=0.6 2=0.4 ; RIG roomrig SHARES L=0.3 R=0.3 FILLED NONE SILENCE 0.4 CHANNELS 0 0.3 0.3 0 0 0 0 0 0 0.45 LEVELS 0 0.3 0.15 0 0 0 0 0 0 0.36
+BLENDMAPS blend_one_back ANALYTIC linear back 1 0=0.2 1=0.8 ; RIG roomrig SHARES L=0.4 C=0.2 FILLED tap=0.5 SILENCE 0.4 CHANNELS 0 0.4 0 0.2 0 0 0 0 0.5 0.4 LEVELS 0 0.4 0 0.2 0 0 0 0 0.5 0.32
+# the 'sub' is computed ONCE from the blend, not blended:
+# front sends L 1, wide sends L 0.5 and R 0.5. Half each:
+# L 0.75 and R 0.25, R trimmed to 0.125; the sub reads 0.875
+BLENDMAPS blend_sub_once ANALYTIC linear front 0.5 0=1 ; wide 0.5 0=1 ; RIG roomrig SHARES L=0.75 R=0.25 FILLED tap=0.5 SILENCE 0 CHANNELS 0 0.75 0.25 0 0 0 0 0 0.5 0.875 LEVELS 0 0.75 0.125 0 0 0 0 0 0.5 0.7
+# three maps, gains that sum to 1, as a map of maps gives
+BLENDMAPS blend_three CROSS linear front 0.2 0=0.3 1=0.3 2=0.4 ; wide 0.5 0=0.5 1=0.25 2=0.25 ; back 0.3 0=0.6 1=0.4 ; RIG roomrig SHARES L=0.245 R=0.185 C=0.385 FILLED tap=0.335 SILENCE 0.185 CHANNELS 0 0.245 0.185 0.385 0 0 0 0 0.335 0.3375 LEVELS 0 0.245 0.0925 0.385 0 0 0 0 0.335 0.27
+# equal power: each gain through the curve -- 0.25 becomes
+# 0.5 -- so shares no longer sum to the input; they are gains
+BLENDMAPS blend_three_equalpower CROSS equalPower front 0.25 0=0.3 1=0.3 2=0.4 ; wide 0.25 0=0.5 1=0.25 2=0.25 ; back 0.5 0=0.6 1=0.4 ; RIG roomrig SHARES L=0.4164213562 R=0.275 C=0.7492640687 FILLED tap=0.6285533906 SILENCE 0.2664213562 CHANNELS 0 0.4164213562 0.275 0.7492640687 0 0 0 0 0.6285533906 0.5539213562 LEVELS 0 0.4164213562 0.1375 0.7492640687 0 0 0 0 0.6285533906 0.443137085
+# a gain outside [0, 1] clamps, as blendByName's t does
+BLENDMAPS blend_gain_clamped SPEC linear front 1.7 0=1 ; wide -0.4 1=1 ; RIG roomrig SHARES L=1 FILLED tap=1 SILENCE 0 CHANNELS 0 1 0 0 0 0 0 0 1 1 LEVELS 0 1 0 0 0 0 0 0 1 0.8
+# a map at gain 0 contributes nothing at all
+BLENDMAPS blend_gain_zero ANALYTIC linear front 0 2=1 ; back 1 0=1 ; RIG roomrig SHARES C=1 FILLED tap=0.5 SILENCE 0 CHANNELS 0 0 0 1 0 0 0 0 0.5 0 LEVELS 0 0 0 1 0 0 0 0 0.5 0
+# silence blends: wide's node 2 is wholly silent, back's node 1
+# half. At 0.5 each: 0.5 x 1 + 0.5 x 0.5 = 0.75
+BLENDMAPS blend_silence ANALYTIC linear wide 0.5 2=1 ; back 0.5 1=1 ; RIG roomrig SHARES L=0.25 FILLED tap=0.25 SILENCE 0.75 CHANNELS 0 0.25 0 0 0 0 0 0 0.25 0.25 LEVELS 0 0.25 0 0 0 0 0 0 0.25 0.2
+
+# TWO maps through blendMaps() equal blendByName() exactly --
+# the old function is the two-map case of the new one, not a
+# second implementation that could drift
+BLENDTWO blendtwo_half ANALYTIC linear 0.5 front 0=0.5 1=0.5 ; back 0=1
+BLENDTWO blendtwo_quarter ANALYTIC linear 0.25 front 2=1 ; back 0=0.4 1=0.6
+BLENDTWO blendtwo_equalpower ANALYTIC equalPower 0.3 front 0=0.2 1=0.8 ; back 1=1
+
+#--------------------------------------------------------------------
+# THE AGREEMENT CHECK (decision E). Over every pair of maps,
+# and each map against the rig: a name on two channels, two
+# names on one channel, a channel computed by the rig in one
+# and filled by the map in another -- disagreements; a
+# different trim -- a note, since the rig's trim is used; and,
+# with a rig, a channel the rig does not have.
+#--------------------------------------------------------------------
+MAP moved
+OUT L 1 1
+OUT R 4 0.5
+OUT C 3 1
+BIND 0 OUTPUT L 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP renamed
+OUT L 1 1
+OUT R 2 0.5
+OUT Ctr 3 1
+BIND 0 OUTPUT L 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP trimmed
+OUT L 1 1
+OUT R 2 0.7
+OUT C 3 1
+BIND 0 OUTPUT L 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP extra
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+OUT Top 5 1
+BIND 0 OUTPUT L 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+ENDMAP
+
+MAP subfilled
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+BIND 0 OUTPUT L 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVED sub 9 0.8 linear SRC 0:1
+ENDMAP
+
+MAP nor
+OUT L 1 1
+OUT C 3 1
+BIND 0 OUTPUT L 1
+DERIVED tap 8 1 linear SRC 0:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1
+ENDMAP
+
+# three maps for one room agree, with each other and the rig
+CHECK check_agree ANALYTIC MAPS front wide back RIG roomrig EXPECT NONE
+CHECK check_agree_no_rig ANALYTIC MAPS front wide back RIG NONE EXPECT NONE
+# R moved to channel 4: R is on two channels, AND channel 4 is
+# nobody else's -- one disagreement, not two
+CHECK check_moved ANALYTIC MAPS front moved RIG NONE EXPECT DISAGREE:channel:R
+# channel 3 is C in one map and Ctr in the other; with the rig,
+# Ctr is also missing from the room
+CHECK check_renamed ANALYTIC MAPS front renamed RIG NONE EXPECT DISAGREE:shared:3
+CHECK check_renamed_rig ANALYTIC MAPS renamed RIG roomrig EXPECT DISAGREE:missing:Ctr DISAGREE:shared:3
+# a different trim is a note, not a disagreement
+CHECK check_trimmed ANALYTIC MAPS front trimmed RIG roomrig EXPECT NOTE:trim:R
+# a speaker the rig does not have
+CHECK check_extra ANALYTIC MAPS extra RIG roomrig EXPECT DISAGREE:missing:Top
+# the sub computed by the rig in one, filled by the map in the
+# other: same name, same channel, different meaning
+CHECK check_feed ANALYTIC MAPS front subfilled RIG NONE EXPECT DISAGREE:feed:sub
+# THE PAIRS CASE: the first map has no R, so it agrees with both
+# others; the second has R on 2 and the third on 4. A check
+# that compared every map against the first alone would pass
+# this -- the first has nothing to compare R with.
+CHECK check_second_third ANALYTIC MAPS nor front moved RIG NONE EXPECT DISAGREE:channel:R
+CHECK check_many CROSS MAPS moved renamed trimmed extra RIG roomrig EXPECT DISAGREE:channel:R DISAGREE:missing:Ctr DISAGREE:missing:Top DISAGREE:shared:3 NOTE:trim:R
+
+#--------------------------------------------------------------------
+# USING A RIG (decision H's cmd-r, in the kernel). The map takes
+# the rig's outputs, channels, trims and after-fed derived
+# outputs; bindings follow by name; each channel the map fills
+# keeps the map's sources. Refused, naming them, for anything
+# of the map's the rig lacks or holds as a different kind -- no
+# binding is dropped without a word.
+#--------------------------------------------------------------------
+MAP rig2
+OUT L 1 1
+OUT Top 6 1
+OUT R 4 0.25
+OUT C 3 0.9
+DERIVEDOUT sub 9 1 power SRC L:1 R:1
+DERIVED tap 7 0.5 linear SRC 
+ENDMAP
+
+# blended THROUGH rig2: its R is on channel 4 trimmed 0.25, its
+# sub power-sums what L and R send, its tap is trimmed 0.5. The
+# maps' own channels and trims play no part: the rig decides.
+BLENDMAPS blend_through_rig2 CROSS linear front 0.5 0=0.4 1=0.6 ; back 0.5 0=0.5 1=0.5 ; RIG rig2 SHARES L=0.325 R=0.3 C=0.25 FILLED tap=0.45 SILENCE 0.125 CHANNELS 0 0.325 0 0.25 0.3 0 0 0.45 0 0.3335416016 LEVELS 0 0.325 0 0.225 0.075 0 0 0.225 0 0.3335416016
+# back takes rig2: R moves to channel 4 and its trim to 0.25,
+# Top appears, unbound; node 1 still feeds L half and silence
+# half; the tap keeps back's sources at rig2's channel 7
+USERIG userig_back ANALYTIC MAP back RIG rig2 OUTS L:1 Top:6 R:4 C:3 IN 0=0.5 1=0.5 ROUTED 0 0.25 0 0.5 0 0 0 0.5 0 0.25 SILENCE 0.25 LEVELS 0 0.25 0 0.45 0 0 0 0.25 0 0.25
+USERIG userig_front CROSS MAP front RIG rig2 OUTS L:1 Top:6 R:4 C:3 IN 0=0.3 1=0.3 2=0.4 ROUTED 0 0.3 0 0.4 0.3 0 0 0.3 0 0.3092329219 SILENCE 0 LEVELS 0 0.3 0 0.36 0.075 0 0 0.15 0 0.3092329219
+# the map's own rig changes nothing
+USERIG userig_own ANALYTIC MAP wide RIG roomrig OUTS L:1 R:2 C:3 IN 0=0.5 1=0.25 2=0.25 ROUTED 0 0.25 0.25 0.25 0 0 0 0 0.25 0.375 SILENCE 0.25 LEVELS 0 0.25 0.125 0.25 0 0 0 0 0.25 0.3
+# refused: 'renamed' has Ctr, which the rig does not have
+USERIG userig_refused_missing ANALYTIC MAP renamed RIG roomrig REFUSED Ctr
+# refused: the map fills 'sub' itself; the rig computes it
+USERIG userig_refused_feed ANALYTIC MAP subfilled RIG rig2 REFUSED sub
+# 'extra' has Top on channel 5; rig2 has Top on 6. Not refused:
+# the rig's channel wins, which is what using a rig is for
+USERIG userig_extra_ok ANALYTIC MAP extra RIG rig2 OUTS L:1 Top:6 R:4 C:3 IN 0=1 ROUTED 0 1 0 0 0 0 0 1 0 1 SILENCE 0 LEVELS 0 1 0 0 0 0 0 0.5 0 1

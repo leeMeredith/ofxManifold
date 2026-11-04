@@ -681,6 +681,8 @@ def build():
                    f"{fname} REFUSE {reason}")
     out.append("")
     build_after(out)
+    out.append("")
+    build_blend(out)
     return out
 
 
@@ -960,6 +962,393 @@ def build_after(out):
                "REFUSE kind")
 
 
+# ---------------------------------------------------------------------------
+# round 3A-3: blending any number of maps, the rig's channels, the agreement
+# check, and using a rig (PLAN-round3.md decisions B, C and E)
+#
+# Formulated per NAME: for each output name, the sum over maps of that map's
+# share times its gain. The C++ walks each map's resolved targets and merges
+# into a list. Silence is computed per map and blended directly, never as
+# whatever routing left over.
+# ---------------------------------------------------------------------------
+
+CURVES = {
+    "linear": lambda w: w,
+    "equalPower": lambda w: math.sqrt(w) if w > 0.0 else 0.0,
+}
+
+
+def kind_of(feed):
+    """From the room's side: an after-fed derived output is computed by the
+    rig; one fed by nodes, or listed in a rig as filled by the map, is a
+    channel each map fills."""
+    return "after" if feed == "outputs" else "filled"
+
+
+def blend_maps(inputs, curve):
+    """inputs: [(mapping, wv, gain)]. Returns (shares, filled, silence), the
+    first two by name, zeros dropped."""
+    fn = CURVES[curve]
+    gains = [fn(min(1.0, max(0.0, g))) for _m, _w, g in inputs]
+    names, fnames = [], []
+    for m, _w, _g in inputs:
+        for o in m.outputs:
+            if o[0] not in names:
+                names.append(o[0])
+        for d in m.derived:
+            if kind_of(d[5]) == "filled" and d[0] not in fnames:
+                fnames.append(d[0])
+    shares = {}
+    for name in names:
+        v = 0.0
+        for (m, wv, _g), gg in zip(inputs, gains):
+            if any(o[0] == name for o in m.outputs):
+                v += m.routed(wv)[name] * gg
+        if abs(v) >= 1e-9:
+            shares[name] = v
+    filled = {}
+    for name in fnames:
+        v = 0.0
+        for (m, wv, _g), gg in zip(inputs, gains):
+            vals = m.derived_values(wv)
+            for d, dv in zip(m.derived, vals):
+                if d[0] == name and kind_of(d[5]) == "filled":
+                    v += dv * gg
+        if abs(v) >= 1e-9:
+            filled[name] = v
+    silence = sum(m.silence(wv) * gg
+                  for (m, wv, _g), gg in zip(inputs, gains))
+    return shares, filled, silence
+
+
+def rig_channels(rig, shares, filled, levels):
+    """Shares by name into the rig's channel vector: trim on outputs, then the
+    after-fed derived outputs computed ONCE from what each output sends, and
+    the channels maps fill taken as blended."""
+    used = rig.channels_in_use()
+    if not used:
+        return []
+    dense = [0.0] * (max(used) + 1)
+    sent = {}
+    for name, ch, trim in rig.outputs:
+        s = shares.get(name, 0.0)
+        sent[name] = s * trim
+        dense[ch] = s * (trim if levels else 1.0)
+    for name, ch, trim, mode, sources, feed in rig.derived:
+        if feed == "outputs":
+            if mode == "linear":
+                v = sum(g * sent.get(n, 0.0) for n, g in sources)
+            else:
+                v = math.sqrt(sum((g * sent.get(n, 0.0)) ** 2
+                                  for n, g in sources))
+        else:
+            v = filled.get(name, 0.0)
+        dense[ch] = v * (trim if levels else 1.0)
+    return dense
+
+
+def entries(m):
+    """Every channel a mapping sends: (name, channel, trim, kind)."""
+    e = [(o[0], o[1], o[2], "output") for o in m.outputs]
+    e += [(d[0], d[1], d[2], kind_of(d[5])) for d in m.derived]
+    return e
+
+
+def check(maps, rig=None):
+    """Set of (severity, code, name). Compared over EVERY pair of
+    participants rather than against a first map, so a disagreement between
+    the second and third is not hidden behind agreement with the first."""
+    parts = [entries(m) for m in maps]
+    if rig is not None:
+        parts.append(entries(rig))
+    found = set()
+    for i in range(len(parts)):
+        for j in range(i + 1, len(parts)):
+            for (na, ca, ta, ka) in parts[i]:
+                for (nb, cb, tb, kb) in parts[j]:
+                    if na == nb:
+                        if ca != cb:
+                            found.add(("DISAGREE", "channel", na))
+                        elif ka != kb:
+                            found.add(("DISAGREE", "feed", na))
+                        elif abs(ta - tb) > 1e-9:
+                            found.add(("NOTE", "trim", na))
+                    elif ca == cb:
+                        found.add(("DISAGREE", "shared", str(ca)))
+    if rig is not None:
+        in_rig = {e[0] for e in entries(rig)}
+        for m in maps:
+            for (n, _c, _t, _k) in entries(m):
+                if n not in in_rig:
+                    found.add(("DISAGREE", "missing", n))
+    return found
+
+
+def use_rig(m, rig):
+    """The map with the rig's outputs, channels, trims and after-fed derived
+    outputs; bindings following by name; the map keeping the sources of each
+    channel it fills. Refused, naming them, for anything of the map's the rig
+    does not have, or has as a different kind."""
+    rig_kind = {e[0]: e[3] for e in entries(rig)}
+    refused = sorted({n for (n, _c, _t, k) in entries(m)
+                      if rig_kind.get(n) != k})
+    if refused:
+        return None, refused
+    out = Mapping()
+    out.outputs = [list(o) for o in rig.outputs]
+    out.links = {n: list(ls) for n, ls in m.links.items()}
+    mine = {d[0]: d for d in m.derived if kind_of(d[5]) == "filled"}
+    for name, ch, trim, mode, sources, feed in rig.derived:
+        if feed == "outputs":
+            out.derived.append([name, ch, trim, mode, list(sources), feed])
+        elif name in mine:
+            d = mine[name]
+            out.derived.append([name, ch, trim, d[3], list(d[4]), "nodes"])
+        else:
+            out.derived.append([name, ch, trim, mode, [], "nodes"])
+    return out, []
+
+
+def build_blend(out):
+    out.append("#" + "-" * 68)
+    out.append("# BLENDING ANY NUMBER OF MAPS, AND THE RIG (round 3A-3)")
+    out.append("#")
+    out.append("# blendMaps() takes (map, weights, gain) for each map and")
+    out.append("# returns shares by output NAME, before trim; the channels")
+    out.append("# maps fill, by name; and the silence, blended. The rig turns")
+    out.append("# those into channels: trim on outputs, the after-fed derived")
+    out.append("# outputs computed ONCE from the blend, the filled channels as")
+    out.append("# blended.")
+    out.append("#" + "-" * 68)
+
+    # Three maps for one room. Same outputs on the same channels; each binds
+    # differently; each fills 'tap' its own way.
+    def room_map(binds, tap_src):
+        m = Mapping()
+        m.add_output("L", 1, 1.0)
+        m.add_output("R", 2, 0.5)
+        m.add_output("C", 3, 1.0)
+        for node, dest, w in binds:
+            if dest == "silence":
+                m.bind_silence(node, w)
+            else:
+                m.bind(node, dest, w)
+        m.add_derived("tap", 8, 1.0, "linear", tap_src)
+        m.add_derived_after("sub", 9, 0.8, "linear", [("L", 1.0), ("R", 1.0)])
+        return m
+
+    front = room_map([(0, "L", 1.0), (1, "R", 1.0), (2, "C", 1.0)],
+                     [(0, 1.0)])
+    wide = room_map([(0, "L", 1.0), (0, "R", 1.0), (1, "C", 1.0),
+                     (2, "silence", 1.0)], [(1, 1.0)])
+    back = room_map([(0, "C", 1.0), (1, "L", 0.5), (1, "silence", 0.5)],
+                    [(0, 0.5), (1, 0.5)])
+    maps = {"front": front, "wide": wide, "back": back}
+    for k, m in maps.items():
+        emit_map(out, k, m)
+
+    def blend_rec(name, cls, items, curve, rigname, rig):
+        shares, filled, sil = blend_maps(
+            [(maps[mn], wv, g) for mn, wv, g in items], curve)
+        spec = " ".join(f"{mn} {fmt(g)} {wv_s(wv) or 'NONE'} ;"
+                        for mn, wv, g in items)
+        out.append(f"BLENDMAPS {name} {cls} {curve} {spec} "
+                   f"RIG {rigname} "
+                   f"SHARES {' '.join(f'{n}={fmt(v)}' for n, v in shares.items()) or 'NONE'} "
+                   f"FILLED {' '.join(f'{n}={fmt(v)}' for n, v in filled.items()) or 'NONE'} "
+                   f"SILENCE {fmt(sil)} "
+                   f"CHANNELS {dense_s(rig_channels(rig, shares, filled, False))} "
+                   f"LEVELS {dense_s(rig_channels(rig, shares, filled, True))}")
+
+    rig = front.rig()
+    emit_map(out, "roomrig", rig)
+    out.append("# ONE map at gain 1 through its own rig gives exactly that")
+    out.append("# map's channels and levels -- checked against the map's own")
+    out.append("# toChannels() and toChannelLevels() in the runner as well")
+    for k, wv in (("front", [(0, 0.5), (1, 0.3), (2, 0.2)]),
+                  ("wide", [(0, 0.6), (2, 0.4)]),
+                  ("back", [(0, 0.2), (1, 0.8)])):
+        blend_rec(f"blend_one_{k}", "ANALYTIC", [(k, wv, 1.0)], "linear",
+                  "roomrig", rig)
+        assert rig_channels(rig, *blend_maps([(maps[k], wv, 1.0)],
+                                             "linear")[:2], True) \
+            == maps[k].by_channel(wv, True)
+    out.append("# the 'sub' is computed ONCE from the blend, not blended:")
+    out.append("# front sends L 1, wide sends L 0.5 and R 0.5. Half each:")
+    out.append("# L 0.75 and R 0.25, R trimmed to 0.125; the sub reads 0.875")
+    blend_rec("blend_sub_once", "ANALYTIC",
+              [("front", [(0, 1.0)], 0.5), ("wide", [(0, 1.0)], 0.5)],
+              "linear", "roomrig", rig)
+    out.append("# three maps, gains that sum to 1, as a map of maps gives")
+    blend_rec("blend_three", "CROSS",
+              [("front", [(0, 0.3), (1, 0.3), (2, 0.4)], 0.2),
+               ("wide", [(0, 0.5), (1, 0.25), (2, 0.25)], 0.5),
+               ("back", [(0, 0.6), (1, 0.4)], 0.3)],
+              "linear", "roomrig", rig)
+    out.append("# equal power: each gain through the curve -- 0.25 becomes")
+    out.append("# 0.5 -- so shares no longer sum to the input; they are gains")
+    blend_rec("blend_three_equalpower", "CROSS",
+              [("front", [(0, 0.3), (1, 0.3), (2, 0.4)], 0.25),
+               ("wide", [(0, 0.5), (1, 0.25), (2, 0.25)], 0.25),
+               ("back", [(0, 0.6), (1, 0.4)], 0.5)],
+              "equalPower", "roomrig", rig)
+    out.append("# a gain outside [0, 1] clamps, as blendByName's t does")
+    blend_rec("blend_gain_clamped", "SPEC",
+              [("front", [(0, 1.0)], 1.7), ("wide", [(1, 1.0)], -0.4)],
+              "linear", "roomrig", rig)
+    out.append("# a map at gain 0 contributes nothing at all")
+    blend_rec("blend_gain_zero", "ANALYTIC",
+              [("front", [(2, 1.0)], 0.0), ("back", [(0, 1.0)], 1.0)],
+              "linear", "roomrig", rig)
+    out.append("# silence blends: wide's node 2 is wholly silent, back's node 1")
+    out.append("# half. At 0.5 each: 0.5 x 1 + 0.5 x 0.5 = 0.75")
+    blend_rec("blend_silence", "ANALYTIC",
+              [("wide", [(2, 1.0)], 0.5), ("back", [(1, 1.0)], 0.5)],
+              "linear", "roomrig", rig)
+    out.append("")
+
+    out.append("# TWO maps through blendMaps() equal blendByName() exactly --")
+    out.append("# the old function is the two-map case of the new one, not a")
+    out.append("# second implementation that could drift")
+    for nm, t, curve, wa, wb in (("half", 0.5, "linear",
+                                  [(0, 0.5), (1, 0.5)], [(0, 1.0)]),
+                                 ("quarter", 0.25, "linear",
+                                  [(2, 1.0)], [(0, 0.4), (1, 0.6)]),
+                                 ("equalpower", 0.3, "equalPower",
+                                  [(0, 0.2), (1, 0.8)], [(1, 1.0)])):
+        out.append(f"BLENDTWO blendtwo_{nm} ANALYTIC {curve} {fmt(t)} "
+                   f"front {wv_s(wa)} ; back {wv_s(wb)}")
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# THE AGREEMENT CHECK (decision E). Over every pair of maps,")
+    out.append("# and each map against the rig: a name on two channels, two")
+    out.append("# names on one channel, a channel computed by the rig in one")
+    out.append("# and filled by the map in another -- disagreements; a")
+    out.append("# different trim -- a note, since the rig's trim is used; and,")
+    out.append("# with a rig, a channel the rig does not have.")
+    out.append("#" + "-" * 68)
+
+    def variant(fn):
+        m = room_map([(0, "L", 1.0)], [(0, 1.0)])
+        fn(m)
+        return m
+
+    def move_r(m):
+        m.outputs[1][1] = 4                     # R on channel 4, not 2
+    def name_clash(m):
+        m.outputs[2][0] = "Ctr"                 # channel 3 called Ctr
+    def trim_r(m):
+        m.outputs[1][2] = 0.7
+    def extra(m):
+        m.add_output("Top", 5, 1.0)             # a speaker the rig lacks
+    def sub_filled(m):
+        d = m.derived[1]                        # sub, read from the map
+        m.derived[1] = [d[0], d[1], d[2], d[3], [(0, 1.0)], "nodes"]
+    def no_r(m):
+        m.remove_output("R")                    # this map has no R at all
+    variants = {"moved": move_r, "renamed": name_clash, "trimmed": trim_r,
+                "extra": extra, "subfilled": sub_filled, "nor": no_r}
+    vmaps = {k: variant(f) for k, f in variants.items()}
+    for k, m in vmaps.items():
+        emit_map(out, k, m)
+
+    def check_rec(name, cls, names, rigname):
+        found = check([dict(maps, **vmaps)[n] for n in names],
+                      {"roomrig": rig, "NONE": None}[rigname])
+        exp = " ".join(f"{s}:{c}:{n}" for s, c, n in sorted(found)) or "NONE"
+        out.append(f"CHECK {name} {cls} MAPS {' '.join(names)} "
+                   f"RIG {rigname} EXPECT {exp}")
+
+    out.append("# three maps for one room agree, with each other and the rig")
+    check_rec("check_agree", "ANALYTIC", ["front", "wide", "back"], "roomrig")
+    check_rec("check_agree_no_rig", "ANALYTIC", ["front", "wide", "back"],
+              "NONE")
+    out.append("# R moved to channel 4: R is on two channels, AND channel 4 is")
+    out.append("# nobody else's -- one disagreement, not two")
+    check_rec("check_moved", "ANALYTIC", ["front", "moved"], "NONE")
+    out.append("# channel 3 is C in one map and Ctr in the other; with the rig,")
+    out.append("# Ctr is also missing from the room")
+    check_rec("check_renamed", "ANALYTIC", ["front", "renamed"], "NONE")
+    check_rec("check_renamed_rig", "ANALYTIC", ["renamed"], "roomrig")
+    out.append("# a different trim is a note, not a disagreement")
+    check_rec("check_trimmed", "ANALYTIC", ["front", "trimmed"], "roomrig")
+    out.append("# a speaker the rig does not have")
+    check_rec("check_extra", "ANALYTIC", ["extra"], "roomrig")
+    out.append("# the sub computed by the rig in one, filled by the map in the")
+    out.append("# other: same name, same channel, different meaning")
+    check_rec("check_feed", "ANALYTIC", ["front", "subfilled"], "NONE")
+    out.append("# THE PAIRS CASE: the first map has no R, so it agrees with both")
+    out.append("# others; the second has R on 2 and the third on 4. A check")
+    out.append("# that compared every map against the first alone would pass")
+    out.append("# this -- the first has nothing to compare R with.")
+    check_rec("check_second_third", "ANALYTIC", ["nor", "front", "moved"],
+              "NONE")
+    check_rec("check_many", "CROSS",
+              ["moved", "renamed", "trimmed", "extra"], "roomrig")
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# USING A RIG (decision H's cmd-r, in the kernel). The map takes")
+    out.append("# the rig's outputs, channels, trims and after-fed derived")
+    out.append("# outputs; bindings follow by name; each channel the map fills")
+    out.append("# keeps the map's sources. Refused, naming them, for anything")
+    out.append("# of the map's the rig lacks or holds as a different kind -- no")
+    out.append("# binding is dropped without a word.")
+    out.append("#" + "-" * 68)
+    # a rig with R on channel 4, trimmed 0.25, and a Top speaker on 6
+    rig2 = Mapping()
+    rig2.add_output("L", 1, 1.0)
+    rig2.add_output("Top", 6, 1.0)
+    rig2.add_output("R", 4, 0.25)
+    rig2.add_output("C", 3, 0.9)
+    rig2.add_derived_after("sub", 9, 1.0, "power", [("L", 1.0), ("R", 1.0)])
+    rig2.derived.append(["tap", 7, 0.5, "linear", [], "map"])
+    emit_map(out, "rig2", rig2)
+    out.append("# blended THROUGH rig2: its R is on channel 4 trimmed 0.25, its")
+    out.append("# sub power-sums what L and R send, its tap is trimmed 0.5. The")
+    out.append("# maps' own channels and trims play no part: the rig decides.")
+    blend_rec("blend_through_rig2", "CROSS",
+              [("front", [(0, 0.4), (1, 0.6)], 0.5),
+               ("back", [(0, 0.5), (1, 0.5)], 0.5)],
+              "linear", "rig2", rig2)
+
+    def userig_rec(name, cls, mapname, m, rigname, rg, wv):
+        res, refused = use_rig(m, rg)
+        if res is None:
+            out.append(f"USERIG {name} {cls} MAP {mapname} RIG {rigname} "
+                       f"REFUSED {' '.join(refused)}")
+            return
+        assert not check([res], rg)
+        outs = " ".join(f"{o[0]}:{o[1]}" for o in res.outputs)
+        out.append(f"USERIG {name} {cls} MAP {mapname} RIG {rigname} "
+                   f"OUTS {outs} IN {wv_s(wv)} "
+                   f"ROUTED {dense_s(res.by_channel(wv, False))} "
+                   f"SILENCE {fmt(res.silence(wv))} "
+                   f"LEVELS {dense_s(res.by_channel(wv, True))}")
+
+    out.append("# back takes rig2: R moves to channel 4 and its trim to 0.25,")
+    out.append("# Top appears, unbound; node 1 still feeds L half and silence")
+    out.append("# half; the tap keeps back's sources at rig2's channel 7")
+    userig_rec("userig_back", "ANALYTIC", "back", back, "rig2", rig2,
+               [(0, 0.5), (1, 0.5)])
+    userig_rec("userig_front", "CROSS", "front", front, "rig2", rig2,
+               [(0, 0.3), (1, 0.3), (2, 0.4)])
+    out.append("# the map's own rig changes nothing")
+    userig_rec("userig_own", "ANALYTIC", "wide", wide, "roomrig", rig,
+               [(0, 0.5), (1, 0.25), (2, 0.25)])
+    out.append("# refused: 'renamed' has Ctr, which the rig does not have")
+    userig_rec("userig_refused_missing", "ANALYTIC", "renamed",
+               vmaps["renamed"], "roomrig", rig, [])
+    out.append("# refused: the map fills 'sub' itself; the rig computes it")
+    userig_rec("userig_refused_feed", "ANALYTIC", "subfilled",
+               vmaps["subfilled"], "rig2", rig2, [])
+    out.append("# 'extra' has Top on channel 5; rig2 has Top on 6. Not refused:")
+    out.append("# the rig's channel wins, which is what using a rig is for")
+    userig_rec("userig_extra_ok", "ANALYTIC", "extra", vmaps["extra"],
+               "rig2", rig2, [(0, 1.0)])
+
+
 def fade_like_rig():
     m = Mapping()
     m.add_output("A", 0, 1.0)
@@ -980,7 +1369,8 @@ def main():
         if p and p[0] in ("LEGACY", "RESOLVE", "REFUSE", "LABEL", "REMAP",
                           "MAPFILE", "MAPROUNDTRIP", "MAPVERSION",
                           "MAPPRESERVE", "CLEARED", "REMOVEOUT",
-                          "SETFILL", "RIGOF", "RIGFILE", "RIGROUNDTRIP"):
+                          "SETFILL", "RIGOF", "RIGFILE", "RIGROUNDTRIP",
+                          "BLENDMAPS", "BLENDTWO", "CHECK", "USERIG"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

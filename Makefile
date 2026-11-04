@@ -52,7 +52,8 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
             src/interpretation/ofxManifoldSmoother.h \
             src/interpretation/ofxManifoldNegative.h
 
-MAPPING  := src/mapping/ofxManifoldMapping.h
+MAPPING  := src/mapping/ofxManifoldMapping.h \
+            src/mapping/ofxManifoldRig.h
 
 # The editor package: an addon of its own, outside ofxManifold's src/ so it is
 # never compiled into projects that want only the manifold (DECISIONS.md D-024 A).

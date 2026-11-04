@@ -6,6 +6,7 @@
 // complement of routing.
 
 #include "../src/io/ofxManifoldSerialize.h"
+#include "../src/mapping/ofxManifoldRig.h"
 
 #include <cmath>
 #include <fstream>
@@ -129,6 +130,50 @@ std::string kindName(NodeKind k) {
 int savedVersion(const std::string& text) {
     const std::size_t p = text.find("\"version\": ");
     return p == std::string::npos ? -1 : std::atoi(text.c_str() + p + 11);
+}
+
+// "L=0.5 R=0.3 ..." until the next keyword, or "NONE".
+std::vector<NamedWeight> readNamed(std::istringstream& in) {
+    std::vector<NamedWeight> v;
+    std::streampos mark;
+    std::string tok;
+    while (true) {
+        mark = in.tellg();
+        if (!(in >> tok)) break;
+        if (tok == "NONE") continue;
+        const std::size_t eq = tok.find('=');
+        if (eq == std::string::npos) { in.clear(); in.seekg(mark); break; }
+        v.push_back(NamedWeight{tok.substr(0, eq), std::stof(tok.substr(eq + 1))});
+    }
+    return v;
+}
+
+// Same names, same values; order free.
+bool sameNamed(const std::vector<NamedWeight>& got,
+               const std::vector<NamedWeight>& want, const char* what,
+               std::ostringstream& d) {
+    if (got.size() != want.size()) {
+        d << what << ": " << got.size() << " names, expected " << want.size();
+        return false;
+    }
+    for (const auto& w : want) {
+        bool found = false;
+        for (const auto& g : got) {
+            if (g.target != w.target) continue;
+            found = true;
+            if (!close(g.weight, w.weight)) {
+                d << what << " " << w.target << ": expected " << w.weight
+                  << ", got " << g.weight;
+                return false;
+            }
+        }
+        if (!found) { d << what << ": no " << w.target; return false; }
+    }
+    return true;
+}
+
+curve::Fn curveNamed(const std::string& c) {
+    return c == "equalPower" ? curve::equalPower : curve::linear;
 }
 
 // Probe weight vectors over nodes 0..5, for comparing two mappings.
@@ -693,6 +738,178 @@ int main(int argc, char** argv) {
                     if (ok && io::saveRig(back) != io::saveRig(src)) {
                         ok = false; d << "rig file not byte-stable";
                     }
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "BLENDMAPS") {
+            std::string curveName; in >> curveName;
+            std::vector<MapInput> inputs;
+            std::vector<std::string> names;
+            std::string tok;
+            while (in >> tok && tok != "RIG") {
+                MapInput mi;
+                mi.mapping = &maps[tok];
+                names.push_back(tok);
+                in >> mi.gain;
+                mi.weights = readWeights(in);
+                expectKeyword(in, ";");
+                inputs.push_back(mi);
+            }
+            std::string rn; in >> rn;
+            expectKeyword(in, "SHARES");
+            const std::vector<NamedWeight> shares = readNamed(in);
+            expectKeyword(in, "FILLED");
+            const std::vector<NamedWeight> filled = readNamed(in);
+            expectKeyword(in, "SILENCE");
+            float sil; in >> sil;
+            expectKeyword(in, "CHANNELS");
+            const std::vector<float> chans = readFloats(in);
+            expectKeyword(in, "LEVELS");
+            const std::vector<float> levels = readFloats(in);
+
+            const Mapping& rig = maps[rn];
+            const Blended b = blendMaps(inputs, curveNamed(curveName));
+            bool ok = sameNamed(b.shares, shares, "shares", d)
+                   && sameNamed(b.filled, filled, "filled", d);
+            if (ok && !close(b.silence, sil)) {
+                ok = false; d << "silence " << b.silence << ", expected " << sil;
+            }
+            if (ok) ok = sameFloats(rigChannels(rig, b), chans, "channels", d);
+            if (ok) ok = sameFloats(rigLevels(rig, b), levels, "levels", d);
+            // ONE map at gain 1: the rig must give exactly what the map gives
+            // on its own -- the rig path and the map path cannot drift.
+            if (ok && inputs.size() == 1 && inputs[0].gain == 1.0f) {
+                const Mapping& m = *inputs[0].mapping;
+                ok = sameFloats(rigChannels(rigOf(m), b),
+                                m.toChannels(inputs[0].weights),
+                                "through its own rig vs toChannels", d)
+                  && sameFloats(rigLevels(rigOf(m), b),
+                                m.toChannelLevels(inputs[0].weights),
+                                "through its own rig vs toChannelLevels", d);
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "BLENDTWO") {
+            // Two maps through blendMaps() are blendByName(), exactly.
+            std::string curveName, ma, mb; float t;
+            in >> curveName >> t >> ma;
+            const WeightVector wa = readWeights(in);
+            expectKeyword(in, ";");
+            in >> mb;
+            const WeightVector wb = readWeights(in);
+            const curve::Fn fn = curveNamed(curveName);
+            const Mapping& a = maps[ma];
+            const Mapping& b2 = maps[mb];
+            const std::vector<NamedWeight> old =
+                blendByName(a.resolve(wa), a, b2.resolve(wb), b2, t, fn);
+            const Blended nw = blendMaps({MapInput{&a, wa, 1.0f - t},
+                                          MapInput{&b2, wb, t}}, fn);
+            bool ok = sameNamed(nw.shares, old, "blendMaps vs blendByName", d);
+            if (ok && old.empty()) { ok = false; d << "nothing blended"; }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "CHECK") {
+            expectKeyword(in, "MAPS");
+            std::vector<const Mapping*> ms;
+            std::string tok;
+            while (in >> tok && tok != "RIG") ms.push_back(&maps[tok]);
+            std::string rn; in >> rn;
+            expectKeyword(in, "EXPECT");
+            std::vector<std::string> want;
+            while (in >> tok) if (tok != "NONE") want.push_back(tok);
+            const Mapping* rig = rn == "NONE" ? nullptr : &maps[rn];
+            const std::vector<Disagreement> got = checkAgreement(ms, rig);
+            std::vector<std::string> have;
+            for (const auto& g : got) {
+                have.push_back(std::string(g.note ? "NOTE" : "DISAGREE") + ":"
+                               + g.code + ":" + g.name);
+                // the message must name what it is about
+                const std::string about = g.code == "shared"
+                                        ? "channel " + g.name : g.name;
+                if (g.message.find(about) == std::string::npos) {
+                    d << "message does not name " << about << ": "
+                      << g.message << "\n      ";
+                }
+            }
+            std::sort(want.begin(), want.end());
+            std::sort(have.begin(), have.end());
+            bool ok = d.str().empty() && have == want;
+            if (have != want) {
+                d << "expected";
+                for (const auto& w : want) d << " " << w;
+                d << "\n      got     ";
+                for (const auto& h : have) d << " " << h;
+            }
+            // Order of maps must not matter.
+            if (ok && ms.size() > 1) {
+                std::vector<const Mapping*> rev(ms.rbegin(), ms.rend());
+                std::vector<std::string> again;
+                for (const auto& g : checkAgreement(rev, rig)) {
+                    again.push_back(std::string(g.note ? "NOTE" : "DISAGREE")
+                                    + ":" + g.code + ":" + g.name);
+                }
+                std::sort(again.begin(), again.end());
+                if (again != have) {
+                    ok = false; d << "the answer depends on the maps' order";
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "USERIG") {
+            expectKeyword(in, "MAP");
+            std::string mn; in >> mn;
+            expectKeyword(in, "RIG");
+            std::string rn; in >> rn;
+            std::string what; in >> what;
+            const Mapping& m = maps[mn];
+            const Mapping& rig = maps[rn];
+            const RigUse u = useRig(m, rig);
+            bool ok = true;
+            if (what == "REFUSED") {
+                std::vector<std::string> want;
+                std::string tok;
+                while (in >> tok) want.push_back(tok);
+                ok = !u.ok && u.refused == want;
+                if (!ok) {
+                    d << (u.ok ? "accepted" : "refused") << ":";
+                    for (const auto& r : u.refused) d << " " << r;
+                }
+            } else {
+                // OUTS name:ch ... IN w ROUTED ... SILENCE x LEVELS ...
+                std::vector<std::string> outs;
+                std::string tok;
+                while (in >> tok && tok != "IN") outs.push_back(tok);
+                const WeightVector w = readWeights(in);
+                expectKeyword(in, "ROUTED");
+                const std::vector<float> routed = readFloats(in);
+                expectKeyword(in, "SILENCE");
+                float sil; in >> sil;
+                expectKeyword(in, "LEVELS");
+                const std::vector<float> levels = readFloats(in);
+                ok = u.ok && u.refused.empty();
+                if (!ok) d << "refused";
+                const Mapping& r = u.result;
+                if (ok && r.targetCount() != outs.size()) {
+                    ok = false; d << r.targetCount() << " outputs";
+                }
+                for (TargetID t = 0; ok && t < outs.size(); ++t) {
+                    const std::size_t c = outs[t].find(':');
+                    if (r.targetName(t) != outs[t].substr(0, c)
+                        || r.targetChannel(t) != std::stoi(outs[t].substr(c + 1))) {
+                        ok = false; d << "output " << t << " is not " << outs[t];
+                    }
+                }
+                if (ok) ok = sameFloats(r.toChannels(w), routed, "routed", d);
+                if (ok && !close(r.silenceShare(w), sil)) {
+                    ok = false; d << "silence " << r.silenceShare(w);
+                }
+                if (ok) ok = sameFloats(r.toChannelLevels(w), levels, "levels", d);
+                // On the rig, the map agrees with it completely.
+                if (ok && !checkAgreement({&r}, &rig).empty()) {
+                    ok = false;
+                    d << "after useRig it still disagrees with the rig: "
+                      << checkAgreement({&r}, &rig)[0].message;
                 }
             }
             record(cls, name, ok, d.str());

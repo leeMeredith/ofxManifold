@@ -155,8 +155,11 @@ uses the default.
 
 ### E. Blending any number of maps, and the agreement check
 
-`blendMaps` takes a list of (resolved, mapping, gain) and returns shares by
-output name, before trim.
+`blendMaps` takes a list of (mapping, weights, gain) and returns a `Blended`:
+shares by output name before trim, the values of the channels maps fill (a
+derived output fed by nodes, decided in 3A-1) by name, and the silence. In
+`src/mapping/ofxManifoldRig.h`, with `rigChannels`, `rigLevels`,
+`checkAgreement` and `useRig`.
 
 - **Gains come from the caller.** With a curve, each gain goes through it.
   The map of maps produces gains this way, and a 3D map (F) blends its two
@@ -177,7 +180,11 @@ reports:
 - the same output name on different channels (disagreement),
 - different names on the same channel (disagreement),
 - a different trim for the same output (a note, since the rig's trim is used),
-- the same value name with a different default (disagreement).
+- one name computed from outputs in one map and filled by the map in another,
+  or an output in one and a derived output in another (disagreement),
+- with a rig, a channel a map sends that the rig doesn't have (disagreement),
+- the same value name with a different default (disagreement; with values,
+  in 3A-4).
 
 Checking is separate from blending. Whatever loads maps together refuses one
 that disagrees, and names where.
@@ -376,6 +383,29 @@ byte-identical. 31 vectors (82 in the trajectory suite), 12 mutation gates.
 - **One branch is unreachable,** and has no gate: two samples at one instant
   can't bracket a time between them, so `heightAt`'s coincident-sample return
   never runs. It is kept as a guard, as `pointAt`'s is.
+
+### 3A-3: blending maps, the rig's channels, agreement, using a rig
+
+`ofxManifoldRig.h`: `blendMaps`, `Blended`, `rigChannels`, `rigLevels`,
+`checkAgreement`, `useRig`. Header-only, in the kernel. 29 vectors (130 in the
+outputs suite), 19 mutation gates.
+
+- **One map through its own rig gives exactly the map.** Every one-map blend
+  record checks the rig path against the map's own `toChannels` and
+  `toChannelLevels`, so the two paths cannot drift.
+- **Two maps are `blendByName`.** Checked against the old function itself,
+  not against numbers, so it is a special case rather than a second copy.
+- **A sub is computed once, from the blend,** not blended from each map's own
+  sub. Checked by a case where the two differ.
+- **The pairs case was first written wrong.** It was meant to show a check
+  that compares every map with the first alone missing a disagreement between
+  the second and third. But channels are transitive: if the first agrees with
+  both, they agree with each other. It only happens when the first map has no
+  such output at all. The fixture now has a first map with no R.
+- **Coverage gap closed before the gates.** The rig's power-summed sub was
+  only ever reached through a map's own methods, never through the rig, so
+  removing its square root in the rig would have passed. A blend through a
+  rig with a power-summed sub closed it.
 
 ---
 

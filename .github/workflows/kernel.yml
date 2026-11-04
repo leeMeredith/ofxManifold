@@ -1687,6 +1687,179 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
+      # ---- round 3A-3: blending maps, the rig, agreement, using a rig ----
+
+      - name: A blend gain above 1 not clamped must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
+            '        if (g > 1.0f) g = 1.0f;\n        g = fn(g);' \
+            '        g = fn(g);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: A negative blend gain not clamped must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
+            '        if (g < 0.0f) g = 0.0f;\n        if (g > 1.0f)' \
+            '        if (g > 1.0f)'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: The blend curve not applied to the gains must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '        g = fn(g);' \
+            '        (void)fn;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Channels the maps fill not blended must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '            if (ags[a].feed != Feed::Nodes) continue;' \
+            '            continue;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Silence blended without the gains must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '        b.silence += m.silenceShare(mi.weights) * g;' \
+            '        b.silence += m.silenceShare(mi.weights);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: The rig's sub reads shares, not what outputs send must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '        sent[t] = s * rig.targetTrim(t);' \
+            '        sent[t] = s;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: The rig's output levels ignore trim must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '            levels ? sent[t] : s;' \
+            '            s;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: The rig's derived outputs ignore their own trim must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '            v * (levels ? ag.trim : 1.0f);' \
+            '            v;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: The rig's power-summed sub skips the root must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '                v = (v > 0.0f) ? std::sqrt(v) : 0.0f;' \
+            '                v = v;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Agreement checked against the first map only must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
+            '    for (std::size_t i = 0; i < parts.size(); ++i) {\n        for (std::size_t j = i + 1; j < parts.size(); ++j) {' \
+            '    for (std::size_t i = 0; i < 1 && i < parts.size(); ++i) {\n        for (std::size_t j = i + 1; j < parts.size(); ++j) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: A channel the rig lacks goes unreported must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '                if (!there) {' \
+            '                if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: A different trim reported as a disagreement must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            'detail::report(found, true, "trim", a.name,' \
+            'detail::report(found, false, "trim", a.name,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: A sub computed in one map and filled in another passes must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '                        } else if (a.kind != b.kind) {' \
+            '                        } else if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Two names on one channel pass must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '                    } else if (a.channel == b.channel) {' \
+            '                    } else if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Using a rig ignores a difference in kind must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '            if (r.name == e.name && r.kind == e.kind) { match = true; break; }' \
+            '            if (r.name == e.name) { match = true; break; }'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Using a rig drops the map's own fill sources must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
+            '        if (fill) {\n            for (std::size_t i = 0; i < fill->sources.size(); ++i) {' \
+            '        if (false) {\n            for (std::size_t i = 0; i < fill->sources.size(); ++i) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Using a rig keeps the map's trim on a filled channel must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
+            '        out.addDerived(ag.name, ag.channel, ag.trim,\n                       fill ? fill->mode : ag.mode, srcs);' \
+            '        out.addDerived(ag.name, ag.channel, fill ? fill->trim : ag.trim,\n                       fill ? fill->mode : ag.mode, srcs);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Using a rig keeps the map's output trims must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
+            '        out.addOutput(rig.targetName(t), rig.targetChannel(t),\n                      rig.targetTrim(t));' \
+            '        out.addOutput(rig.targetName(t), rig.targetChannel(t), 1.0f);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
+      - name: Using a rig drops silence shares must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
+            '                out.bindSilence(n, l.weight);' \
+            '                (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldRig.h
+
       - name: Restored tree must be green
         run: |
           make clean
