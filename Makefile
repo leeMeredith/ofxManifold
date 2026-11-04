@@ -21,6 +21,7 @@ REG_RUN  := $(BUILD)/run_regions
 GRD_RUN  := $(BUILD)/run_grids
 OUT_RUN  := $(BUILD)/run_outputs
 EDI_RUN  := $(BUILD)/run_editor
+LVL_RUN  := $(BUILD)/run_levels
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -33,6 +34,7 @@ REG_VEC  := tests/vectors/regions.vec
 GRD_VEC  := tests/vectors/grids.vec
 OUT_VEC  := tests/vectors/outputs.vec
 EDI_VEC  := tests/vectors/editor.vec
+LVL_VEC  := tests/vectors/levels.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -43,7 +45,8 @@ CORE     := src/core/ofxManifoldTypes.h \
             src/core/ofxManifoldTriangle.h \
             src/core/ofxManifoldRegion.h \
             src/core/ofxManifold2D.h \
-            src/core/ofxManifoldEvaluator.h
+            src/core/ofxManifoldEvaluator.h \
+            src/core/ofxManifoldLevels.h
 
 INTERP   := src/interpretation/ofxManifoldCurves.h \
             src/interpretation/ofxManifoldSpread.h \
@@ -83,14 +86,15 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor headers workflow wrapper vectors clean
+.PHONY: all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible door headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
-      test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor
+      test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
+      test-levels
 	@echo ""
 	@echo "all suites green"
 
@@ -211,6 +215,9 @@ test-outputs: $(OUT_RUN) $(OUT_VEC)
 test-editor: $(EDI_RUN) $(EDI_VEC)
 	@./$(EDI_RUN) $(EDI_VEC)
 
+test-levels: $(LVL_RUN) $(LVL_VEC)
+	@./$(LVL_RUN) $(LVL_VEC)
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -226,6 +233,7 @@ vectors:
 	@python3 tests/ref/reference_grids.py
 	@python3 tests/ref/reference_outputs.py
 	@python3 tests/ref/reference_editor.py
+	@python3 tests/ref/reference_levels.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
@@ -262,6 +270,13 @@ $(OUT_RUN): tests/run_outputs.cpp $(CORE) $(MAPPING) $(IO)
 
 $(OUT_VEC): tests/ref/reference_outputs.py
 	@python3 tests/ref/reference_outputs.py
+
+$(LVL_RUN): tests/run_levels.cpp $(CORE)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ tests/run_levels.cpp
+
+$(LVL_VEC): tests/ref/reference_levels.py
+	@python3 tests/ref/reference_levels.py
 
 $(GRD_RUN): tests/run_grids.cpp $(CORE) $(AUTHORING)
 	@mkdir -p $(BUILD)

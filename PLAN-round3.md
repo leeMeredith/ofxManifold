@@ -162,8 +162,8 @@ derived output fed by nodes, decided in 3A-1) by name, and the silence. In
 `checkAgreement` and `useRig`.
 
 - **Gains come from the caller.** With a curve, each gain goes through it.
-  The map of maps produces gains this way, and a 3D map (F) blends its two
-  levels through the same code.
+  The map of maps produces gains this way. A 3D map (F) does not: it is
+  geometry, and gives weights, as a 2D map does.
 - **Two maps give exactly what `blendByName` gives.** Checked by vector, so
   the old function becomes a special case.
 - **The rig turns shares into channels and levels**, applying trim and then
@@ -247,6 +247,48 @@ always has one answer.
 **Floor-plan edits reach every level.** Placing, moving, joining or removing a
 node changes the floor plan, so it changes every level. A new node takes each
 level's starting height and has no bindings or values until given them.
+
+**How it's held (revised 2026-11-04: geometry first, as 2D is).** The kernel
+already separates the shape from what it drives: `Manifold2D` turns a point
+into weights over nodes, and only then does `Mapping` turn weights into
+outputs. The 3D map keeps that split. Its first half is geometry alone, with
+no outputs, gains or audio in it:
+
+- **The floor plan is today's `Manifold2D`, unchanged.**
+- **`Levels`** (`src/core/ofxManifoldLevels.h`) holds each level's starting
+  height and the heights of nodes raised or lowered from it. Nothing else.
+- **A level is made by copying one.** Every node of the floor plan is copied
+  up (or down) in z, bends included. Each copied node sits directly above its
+  original, so every column is one node at several heights. Refused, naming
+  the node, if any copy would not be strictly between the levels around it.
+- **Evaluating (x, y, z) gives 3D weights,** one per node per level: the
+  floor plan's weight for the node, times how near z is to that level. They
+  sum to one, are never negative, and are nonzero only on the two levels
+  around z.
+- **The test that proves it's a 3D map:** the weights reproduce the point.
+  Each node on each level, at (x, y, its height), times its weight, summed,
+  is exactly (x, y, z), bent levels included. That holds because the floor
+  plan's weights already reproduce (x, y), and the vertical blend is linear
+  between the two levels' heights. It's the 3D form of the property every 2D
+  vector already relies on.
+- **No hourglass, no two pyramids.** Every level has the same floor plan, so
+  every horizontal slice of the volume is the same shape: nothing can narrow
+  to a waist or a point. Levels can't cross or touch (a raise that reaches
+  the next level is refused), so no column pinches to zero thickness and no
+  cell turns inside out.
+- **Floor-plan edits follow `Mapping`'s rule.** A new node needs nothing: on
+  every level it has that level's starting height. Removing nodes is
+  `levels.remapNodes(table)` with the table `Manifold2D::removeNodes()`
+  returns.
+
+The second half comes after the geometry is proven, and changes nothing in
+it: bindings per level and node values per level, read through the 3D
+weights exactly as a 2D map's bindings and values are read through its
+weights. The outputs belong to every level at once, so two levels can't
+disagree about the room. A derived output fed by nodes reads the floor plan's
+weights, so height doesn't change it. Then files: the map file gains `values`
+and `levels`, written only when needed; a binding on a level other than the
+first carries `"level": k`, which makes the outputs file version 3.
 
 **Later, not now:**
 
@@ -407,6 +449,29 @@ outputs suite), 19 mutation gates.
   removing its square root in the rig would have passed. A blend through a
   rig with a power-summed sub closed it.
 
+### 3A-4: the 3D map's geometry
+
+`src/core/ofxManifoldLevels.h`: `Levels`, `copyLevel`, `raise`, `setHeight`,
+`removeLevel`, `remapNodes`, `evaluate`, giving `Evaluation3D` with weights
+over (node, level). Geometry only: nothing about outputs or sound. A new suite,
+`levels`: 37 vectors, 16 mutation gates.
+
+- **Every set of weights is checked to reproduce its point,** in the runner,
+  from the C++ alone: weight times (x, y, height) summed over every node on
+  every level is (x, y, z). Bent levels included. That is what makes it a 3D
+  map rather than a stack of 2D answers.
+- **A point exactly on the top level can read as above it.** Its height there
+  is a weighted sum, and in single precision (0.108, 0.124) on a level at 1.0
+  sums to 0.99999994. Found by searching the square for such a point; without
+  the small tolerance the top of the map has holes. A vector holds it.
+- **Two gaps closed before the gates.** Raising was tested all-or-nothing only
+  when every node was blocked, so moving the unblocked ones would have passed;
+  and a copied level was only ever refused by the level below it. A case for
+  each, and both mutations are caught.
+- **A runner mistake, not a kernel one,** on the first run: the continuity
+  sweep compared weights including exact zeros, which the floor plan reports
+  on the square's diagonal. The runner now drops them, as its other checks do.
+
 ---
 
 ## Answered
@@ -431,7 +496,8 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-1** | Derived outputs after the fader, end to end: kernel, removal rule, outputs file v3, rig files | outputs vectors, round trips, existing files byte-identical, gates |
 | **3A-2** | Paths with z: `Trajectory` in 3D, path file v2 | trajectory vectors, flat paths byte-identical |
 | **3A-3** | `blendMaps`, the rig turning shares into channels, the agreement check, using a rig | two-map and one-map properties, gates |
-| **3A-4** | The 3D map: levels, heights, no crossing, evaluating (x, y, z), node values, map file levels, bindings by level | prism, partition and continuity properties, gates |
+| **3A-4** | The 3D map's geometry: levels, copying a level, raising nodes, no crossing, 3D weights at (x, y, z) | partition, reproduction of the point, continuity, prisms, gates |
+| **3A-4b** | What the 3D map drives: bindings per level, node values, map file levels, bindings by level | resolution through 3D weights, round trips, existing files byte-identical, gates |
 | **3A-5** | Editor: `d` / `D`, use and save rig, chart drawing levels it's handed | editor scripts, door check, drawlog identical |
 | **3A-6** | Editor: levels (new, switch, remove), raise and lower, the 3D view | editor scripts, judged on screen |
 | **3A-7** | Editor: setting and showing node values | editor scripts, judged on screen |

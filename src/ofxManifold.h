@@ -15,6 +15,7 @@
 #include "core/ofxManifoldRegion.h"
 #include "core/ofxManifold2D.h"
 #include "core/ofxManifoldEvaluator.h"
+#include "core/ofxManifoldLevels.h"
 
 #include "interpretation/ofxManifoldCurves.h"
 #include "interpretation/ofxManifoldSpread.h"

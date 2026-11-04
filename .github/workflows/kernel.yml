@@ -74,11 +74,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor levels; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor levels; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1
@@ -1859,6 +1859,152 @@ jobs:
           make clean
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
+
+      # ---- round 3A-4: the 3D map's geometry ----
+
+      - name: A node may touch the level below must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        if (k > 0 && !(h > height(k - 1, n))) return false;' \
+            '        if (k > 0 && h < height(k - 1, n)) return false;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A node may reach the level above must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        if (k + 1 < levels_.size() && !(h < height(k + 1, n))) return false;' \
+            '        if (false) return false;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: Raising is not all or nothing must be caught
+        run: |
+          python3 tests/mutate.py --nl src/core/ofxManifoldLevels.h \
+            '        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }\n        for (NodeID n : nodes) set(k, n, height(k, n) + dz);' \
+            '        for (NodeID n : nodes) if (std::find(bad.begin(), bad.end(), n) == bad.end()) set(k, n, height(k, n) + dz);\n        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A copied level loses its bends must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            'made.heights[i] = height(from, i) + shift;' \
+            'made.heights[i] = levels_[from].base + shift;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A copied level always goes on top must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        while (at < levels_.size() && levels_[at].base < newBase) ++at;' \
+            '        at = levels_.size();'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: Two levels may start at one height must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '            if (l.base == newBase) return levels_.size();' \
+            '            (void)l;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A copy is not checked against the level below must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '            const bool overLower = (at == 0) || h > height(at - 1, i);' \
+            '            const bool overLower = true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A point above the top level is inside must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        if (z < h[0] - onLevel || z > h[n - 1] + onLevel) return out;' \
+            '        if (z < h[0] - onLevel) return out;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: The lower level weighs t, not 1 - t must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '                                                  wn.weight * (1.0f - t)});' \
+            '                                                  wn.weight * t});'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: z always placed between the bottom two levels must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        while (k + 2 < n && h[k + 1] <= z) ++k;' \
+            '        while (false) ++k;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A level's height ignores its bends must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        for (const auto& wn : w) h += wn.weight * height(k, wn.id);' \
+            '        for (const auto& wn : w) h += wn.weight * base(k);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: One level does not ignore z must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        if (n == 1) {' \
+            '        if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: Removing nodes does not renumber heights must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '                const NodeID now = table[old];' \
+            '                const NodeID now = old;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: The last level can be removed must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        if (levels_.size() <= 1 || k >= levels_.size()) return false;' \
+            '        if (k >= levels_.size()) return false;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: No tolerance for a point on the top or bottom level must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '        const float onLevel = 1e-6f;' \
+            '        const float onLevel = 0.0f;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: A copy is not checked against the level above must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '            const bool underUpper = (at == levels_.size()) || h < height(at, i);' \
+            '            const bool underUpper = true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
 
       - name: Restored tree must be green
         run: |
