@@ -214,6 +214,29 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        if (kind == "DERIVEDOUT") {
+            // Fed by OUTPUTS, named; resolved to TargetIDs here.
+            std::string nm, mode; int ch; float tr;
+            in >> nm >> ch >> tr >> mode;
+            expectKeyword(in, "SRC");
+            Mapping& mp = maps[current];
+            std::vector<std::pair<TargetID, float>> srcs;
+            std::string tok;
+            while (in >> tok) {
+                const std::size_t c = tok.find(':');
+                srcs.emplace_back(mp.findTarget(tok.substr(0, c)),
+                                  std::stof(tok.substr(c + 1)));
+            }
+            if (mp.addDerivedFromOutputs(nm, ch, tr,
+                    mode == "power" ? SumMode::PowerPreserving
+                                    : SumMode::Linear, srcs)
+                    == static_cast<std::size_t>(-1)) {
+                std::cerr << "fixture derived refused: " << nm << "\n";
+                return 2;
+            }
+            continue;
+        }
+
         std::string name, cls; in >> name >> cls;
         std::ostringstream d;
 
@@ -291,6 +314,17 @@ int main(int argc, char** argv) {
                 if (ops[i].first == "OUTPUT") {
                     made = mp.addOutput(ops[i].second.first,
                                         ops[i].second.second) != InvalidTarget;
+                } else if (ops[i].first == "DERIVEDOUT"
+                           || ops[i].first == "DERIVEDOUTBAD") {
+                    // BAD names an output that does not exist.
+                    std::vector<std::pair<TargetID, float>> srcs;
+                    if (ops[i].first == "DERIVEDOUTBAD") {
+                        srcs.emplace_back(TargetID(999), 1.0f);
+                    }
+                    made = mp.addDerivedFromOutputs(ops[i].second.first,
+                                         ops[i].second.second, 1.0f,
+                                         SumMode::Linear, srcs)
+                           != static_cast<std::size_t>(-1);
                 } else {
                     made = mp.addDerived(ops[i].second.first,
                                          ops[i].second.second, 1.0f,
@@ -534,6 +568,9 @@ int main(int argc, char** argv) {
 
         } else if (kind == "MAPROUNDTRIP") {
             std::string mf, file; in >> mf >> file;
+            // The version it must be written as: 2 unless the record says.
+            int wantVer = 2;
+            { std::string v; if (in >> v) wantVer = std::stoi(v); }
             Manifold2D m; std::string text;
             if (!loadManifoldFixture(mf, m) || !slurp(file, text)) {
                 record(cls, name, false, "missing fixture"); continue;
@@ -543,8 +580,9 @@ int main(int argc, char** argv) {
             const std::string s1 = ok ? io::saveMapping(a, m) : "";
             ok = ok && io::loadMapping(s1, m, b).ok;
             const std::string s2 = ok ? io::saveMapping(b, m) : "";
-            ok = ok && s1 == s2 && savedVersion(s1) == 2;
-            if (!ok) d << "save -> load -> save is not byte-stable, or not v2";
+            ok = ok && s1 == s2 && savedVersion(s1) == wantVer;
+            if (!ok) d << "save -> load -> save is not byte-stable, or not v"
+                       << wantVer;
             record(cls, name, ok, d.str());
 
         } else if (kind == "MAPVERSION") {
@@ -566,6 +604,132 @@ int main(int argc, char** argv) {
             const int got = savedVersion(io::saveMapping(mp, m));
             const bool ok = (got == want);
             if (!ok) d << "written as version " << got << ", expected " << want;
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "RIGOF") {
+            // rigOf keeps outputs (name, channel, trim, order), output-fed
+            // derived outputs whole, node-fed ones as channels the map fills
+            // (no sources), no bindings, and the channel vector's arity. Then
+            // the same through a rig FILE: saveRig -> loadRig unchanged.
+            expectKeyword(in, "MAP");
+            std::string mn; in >> mn;
+            expectKeyword(in, "OUTS");
+            std::vector<std::string> outs;
+            std::string tok;
+            while (in >> tok && tok != "DERIVED") outs.push_back(tok);
+            std::vector<std::string> ders;
+            while (in >> tok && tok != "ARITY") {
+                if (tok != "NONE") ders.push_back(tok);
+            }
+            std::size_t arity; in >> arity;
+
+            const Mapping& src = maps[mn];
+            const Mapping rig = rigOf(src);
+            bool ok = true;
+            auto check = [&](const Mapping& r, const char* what) {
+                if (r.targetCount() != outs.size()) {
+                    ok = false; d << what << ": " << r.targetCount()
+                                  << " outputs, expected " << outs.size();
+                    return;
+                }
+                for (TargetID t = 0; ok && t < outs.size(); ++t) {
+                    const std::string& o = outs[t];
+                    const std::size_t a = o.find(':'), b = o.find(':', a + 1);
+                    if (r.targetName(t) != o.substr(0, a)
+                        || r.targetChannel(t) != std::stoi(o.substr(a + 1, b - a - 1))
+                        || !close(r.targetTrim(t), std::stof(o.substr(b + 1)))) {
+                        ok = false; d << what << ": output " << t
+                                      << " is not " << o;
+                    }
+                }
+                if (ok && r.aggregators().size() != ders.size()) {
+                    ok = false; d << what << ": " << r.aggregators().size()
+                                  << " derived outputs, expected "
+                                  << ders.size();
+                }
+                for (std::size_t i = 0; ok && i < ders.size(); ++i) {
+                    const std::size_t c = ders[i].find(':');
+                    const std::string nm = ders[i].substr(0, c);
+                    const bool mapFed = ders[i].substr(c + 1) == "map";
+                    const Aggregator& ag = r.aggregators()[i];
+                    if (ag.name != nm
+                        || ag.feed != (mapFed ? Feed::Nodes : Feed::Outputs)
+                        || (mapFed && !ag.sources.empty())) {
+                        ok = false; d << what << ": derived " << i
+                                      << " is not " << ders[i];
+                    }
+                }
+                if (ok && !r.boundNodes().empty()) {
+                    ok = false; d << what << ": a rig kept bindings";
+                }
+                if (ok && r.toChannels({}).size() != arity) {
+                    ok = false; d << what << ": arity " << r.toChannels({}).size()
+                                  << ", expected " << arity;
+                }
+            };
+            check(rig, "rigOf");
+            // The map's own derived levels, read through the rig's derived
+            // outputs, must not have moved: same sources, same gains.
+            for (std::size_t i = 0; ok && i < rig.aggregators().size(); ++i) {
+                const Aggregator& r = rig.aggregators()[i];
+                for (const Aggregator& a : src.aggregators()) {
+                    if (a.name != r.name) continue;
+                    const bool same = a.channel == r.channel
+                        && a.trim == r.trim && a.mode == r.mode
+                        && (a.feed == Feed::Nodes
+                            || (a.outputs == r.outputs
+                                && a.weights == r.weights));
+                    if (!same) {
+                        ok = false; d << "rigOf changed derived " << r.name;
+                    }
+                }
+            }
+            if (ok) {
+                Mapping back;
+                const io::LoadResult lr = io::loadRig(io::saveRig(src), back);
+                if (!lr.ok) { ok = false; d << "rig file: " << lr.error; }
+                else {
+                    check(back, "through a rig file");
+                    if (ok && io::saveRig(back) != io::saveRig(src)) {
+                        ok = false; d << "rig file not byte-stable";
+                    }
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "RIGFILE") {
+            std::string file, verdict; in >> file >> verdict;
+            std::string text;
+            if (!slurp(file, text)) {
+                record(cls, name, false, "missing " + file); continue;
+            }
+            Mapping mp;
+            const io::LoadResult r = io::loadRig(text, mp);
+            bool ok;
+            if (verdict == "OK") {
+                ok = r.ok;
+                if (!ok) d << "expected to load: " << r.error;
+            } else {
+                std::string reason; in >> reason;
+                ok = !r.ok && r.error.find(reason) != std::string::npos;
+                if (r.ok) d << "expected refusal, it loaded";
+                else if (!ok) d << "refused for the wrong reason"
+                                << "\n      expected the error to mention: "
+                                << reason << "\n      actual: " << r.error;
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "RIGROUNDTRIP") {
+            std::string file; in >> file;
+            std::string text;
+            Mapping a, b;
+            bool ok = slurp(file, text) && io::loadRig(text, a).ok;
+            const std::string s1 = ok ? io::saveRig(a) : "";
+            ok = ok && io::loadRig(s1, b).ok;
+            ok = ok && io::saveRig(b) == s1 && savedVersion(s1) == 3
+                    && s1.find("\"kind\": \"rig\"") != std::string::npos;
+            if (!ok) d << "rig save -> load -> save is not byte-stable, "
+                          "or not a version 3 rig";
             record(cls, name, ok, d.str());
 
         } else {

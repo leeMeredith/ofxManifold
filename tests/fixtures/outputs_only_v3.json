@@ -1,0 +1,24 @@
+{
+  "version": 3,
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1,
+      "trim": 1.0
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "sub",
+      "mode": "linear",
+      "channel": 9,
+      "trim": 1.0,
+      "sources": [
+        {
+          "output": "L",
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}

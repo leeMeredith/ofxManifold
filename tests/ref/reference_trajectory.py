@@ -505,7 +505,181 @@ def build():
     out.append("REJECT reject_traj_space SPEC bad_traj_space.json "
                "unsupported")
 
+    out.append("")
+    build_height(out)
     return out
+
+
+# ---------------------------------------------------------------------------
+# round 3A-2: paths with height (PLAN-round3.md decisions F and G)
+#
+# A sample may carry a height z. Formulated here WITHOUT reusing point_at: the
+# height is found by locating the last sample at or before t by index, then
+# interpolating z alone. The C++ shares nothing with its 2D pointAt either, so
+# a fault in one cannot hide in the other.
+# ---------------------------------------------------------------------------
+
+def height_at(samples, t):
+    """samples: [(t, (x, y, z))]. Clamped at the ends, as positions are."""
+    if not samples:
+        return 0.0
+    ts = [s[0] for s in samples]
+    zs = [s[1][2] for s in samples]
+    if len(samples) == 1 or t <= ts[0]:
+        return zs[0]
+    if t >= ts[-1]:
+        return zs[-1]
+    # the last index whose time is <= t
+    i = max(k for k in range(len(ts)) if ts[k] <= t)
+    if ts[i + 1] - ts[i] <= 0.0:
+        return zs[i]
+    return zs[i] + (zs[i + 1] - zs[i]) * (t - ts[i]) / (ts[i + 1] - ts[i])
+
+
+def flat(samples):
+    return [(t, (p[0], p[1])) for t, p in samples]
+
+
+def climb_at(samples, t, window):
+    """Vertical rate, clipped at the ends exactly as velocity_at is."""
+    if len(samples) < 2 or window <= 0.0:
+        return 0.0
+    a = max(0.0, t - window)
+    b = min(1.0, t + window)
+    if b - a <= 0.0:
+        return 0.0
+    return (height_at(samples, b) - height_at(samples, a)) / (b - a)
+
+
+def tok3(t, p):
+    return f"{fmt(t)}:{fmt(p[0])},{fmt(p[1])},{fmt(p[2])}"
+
+
+def build_height(out):
+    out.append("#" + "-" * 68)
+    out.append("# PATHS WITH HEIGHT (round 3A-2)")
+    out.append("#")
+    out.append("# A sample may carry a height z, for a 3D map: a bird dropping")
+    out.append("# from a high branch to the ground. Height is interpolated with")
+    out.append("# the SAME brackets as x and y, and pointAt() -- the 2D answer")
+    out.append("# -- is unchanged by it: every AT3 record also checks that the")
+    out.append("# x and y of point3At() equal pointAt().")
+    out.append("#" + "-" * 68)
+    bird = [(0.0, (0.2, 0.8, 1.0)), (1.0, (0.5, 0.5, 0.5)),
+            (2.0, (0.8, 0.2, 0.0)), (4.0, (0.8, 0.2, 0.0))]
+    birdf = finalize(bird)
+    out.append("# dives for two units, then waits on the ground for two")
+    out.append("TRAJ3 bird " + " ".join(tok3(t, p) for t, p in birdf))
+    out.append("")
+    for nm, cls, t in (("bird_start", "ANALYTIC", 0.0),
+                       ("bird_first_landing", "ANALYTIC", 0.25),
+                       ("bird_halfway_down", "ANALYTIC", 0.125),
+                       ("bird_ground", "ANALYTIC", 0.5),
+                       ("bird_waiting", "ANALYTIC", 0.75),
+                       ("bird_end", "ANALYTIC", 1.0),
+                       ("bird_before", "SPEC", -1.0),
+                       ("bird_after", "SPEC", 2.0),
+                       ("bird_odd", "CROSS", 0.3141)):
+        x, y = point_at(flat(birdf), t)
+        out.append(f"AT3 {nm} {cls} bird {fmt(t)} {fmt(x)} {fmt(y)} "
+                   f"{fmt(height_at(birdf, t))}")
+    even = finalize([(0.0, (0.10, 0.10)), (1.0, (0.50, 0.90)),
+                     (2.0, (0.90, 0.10))])
+    ex, ey = point_at(even, 0.3)
+    out.append("# a path with no height is at z = 0 everywhere, and says so")
+    out.append(f"AT3 flat_is_ground ANALYTIC even {fmt(0.3)} {fmt(ex)} "
+               f"{fmt(ey)} 0")
+    out.append("HAS3 has_height_bird ANALYTIC bird 1")
+    out.append("HAS3 has_height_flat ANALYTIC even 0")
+    hop = [(0.0, (0.1, 0.1, 0.0)), (0.5, (0.5, 0.5, 0.25)),
+           (1.0, (0.9, 0.9, 0.0))]
+    out.append("TRAJ3 hop " + " ".join(tok3(t, p) for t, p in hop))
+    out.append("# only the middle sample leaves the ground: still a path with")
+    out.append("# height. Checking the first and last samples alone would")
+    out.append("# call it flat, and save its hop away.")
+    out.append("HAS3 has_height_hop ANALYTIC hop 1")
+    out.append(f"AT3 hop_top ANALYTIC hop {fmt(0.5)} {fmt(0.5)} {fmt(0.5)} "
+               f"{fmt(0.25)}")
+    out.append(f"AT3 hop_rising ANALYTIC hop {fmt(0.25)} {fmt(0.3)} "
+               f"{fmt(0.3)} {fmt(0.125)}")
+    jump = [(0.0, (0.2, 0.2, 0.0)), (0.5, (0.4, 0.4, 0.6)),
+            (0.5, (0.6, 0.6, 0.9)), (1.0, (0.8, 0.8, 0.3))]
+    out.append("TRAJ3 jump " + " ".join(tok3(t, p) for t, p in jump))
+    out.append("# two samples at one instant: at that instant the later one")
+    out.append("# holds, as for x and y")
+    for nm, t in (("jump_instant", 0.5), ("jump_after", 0.75)):
+        x, y = point_at(flat(jump), t)
+        out.append(f"AT3 {nm} SPEC jump {fmt(t)} {fmt(x)} {fmt(y)} "
+                   f"{fmt(height_at(jump, t))}")
+    out.append("")
+
+    out.append("# RECORDING with height: addSample(t, vec3), then finalize().")
+    out.append("# Times as before; every height kept, in order.")
+    raw = [(3.0, (0.2, 0.8, 0.9)), (4.0, (0.4, 0.6, 0.6)),
+           (4.0, (0.45, 0.55, 0.5)), (7.0, (0.8, 0.2, 0.1))]
+    fin = finalize(raw)
+    out.append("RECORD3 record_height ANALYTIC "
+               + " ".join(tok3(t, p) for t, p in raw) + " EXPECT "
+               + " ".join(f"{fmt(t)}:{fmt(p[2])}" for t, p in fin))
+    out.append("")
+
+    out.append("# real time: a dive recorded over 8 units, queried in them")
+    dive = [(0.0, (0.5, 0.5, 1.0)), (8.0, (0.5, 0.5, 0.0))]
+    for nm, secs in (("secs3_start", 0.0), ("secs3_quarter", 2.0),
+                     ("secs3_end", 8.0)):
+        out.append(f"SECONDS3 {nm} ANALYTIC "
+                   + " ".join(tok3(t, p) for t, p in dive)
+                   + f" AT {fmt(secs)} EXPECT {fmt(0.5)} {fmt(0.5)} "
+                   f"{fmt(1.0 - secs / 8.0)}")
+    out.append("")
+
+    out.append("# VELOCITY in 3D: x and y exactly as velocityAt(); the climb")
+    out.append("# (negative: falling) from the heights, clipped at the ends")
+    out.append("# and divided by the span actually used, as in 2D")
+    for nm, cls, t, w in (("vel3_diving", "ANALYTIC", 0.125, 0.05),
+                          ("vel3_waiting", "ANALYTIC", 0.75, 0.05),
+                          ("vel3_start_clipped", "ANALYTIC", 0.0, 0.05),
+                          ("vel3_landing", "CROSS", 0.49, 0.05)):
+        vx, vy = velocity_at(flat(birdf), t, w)
+        out.append(f"VEL3 {nm} {cls} bird {fmt(t)} {fmt(w)} {fmt(vx)} "
+                   f"{fmt(vy)} {fmt(climb_at(birdf, t, w))}")
+    out.append("")
+
+    out.append("# LENGTH: in 3D, a 3-4-5 step: 0.3 across and 0.4 up is 0.5")
+    out.append("# long. length() stays the 2D length, 0.3.")
+    step = [(0.0, (0.1, 0.1, 0.0)), (1.0, (0.4, 0.1, 0.4))]
+    out.append("TRAJ3 step " + " ".join(tok3(t, p) for t, p in step))
+    out.append(f"LEN3 length_345 ANALYTIC step {fmt(0.3)} {fmt(0.5)}")
+    out.append("")
+
+    out.append("# FILES. A path with height is version 2, every sample with")
+    out.append("# three numbers. A path without height is still version 1,")
+    out.append("# byte-identical: tour.json saves as version 1.")
+    write("traj_bird.json", json.dumps({
+        "version": 2, "space": "normalized", "duration": 4.0,
+        "samples": [{"t": t, "p": list(p)} for t, p in birdf],
+    }, indent=2) + "\n")
+    out.append("ROUNDTRIP3 roundtrip_bird ANALYTIC traj_bird.json 2")
+    out.append("ROUNDTRIP3 roundtrip_flat_stays_v1 ANALYTIC tour.json 1")
+    write("bad_traj_height_v1.json",
+          '{ "version": 1, "samples": [{"t":0.0,"p":[0.1,0.1,0.5]}] }\n')
+    write("bad_traj_flat_v2.json",
+          '{ "version": 2, "samples": [{"t":0.0,"p":[0.1,0.1]}] }\n')
+    # two numbers, as version 1 has: if the version check let 3 through,
+    # this would load. With three numbers it would be refused anyway, by the
+    # height rule -- masking the version check behind another refusal.
+    write("bad_traj_v3.json",
+          '{ "version": 3, "samples": [{"t":0.0,"p":[0.1,0.1]}] }\n')
+    out.append("# a height in a version 1 file: an older reader would refuse")
+    out.append("# it anyway, so it is written only as version 2")
+    out.append("REJECT reject_height_needs_v2 ANALYTIC bad_traj_height_v1.json "
+               "version")
+    out.append("# version 2 samples all carry height; a two-number sample in")
+    out.append("# one is a damaged file, not a flat point")
+    out.append("REJECT reject_v2_without_height ANALYTIC bad_traj_flat_v2.json "
+               "three-element")
+    out.append("REJECT reject_future_version ANALYTIC bad_traj_v3.json "
+               "version")
 
 
 def main():
@@ -518,7 +692,8 @@ def main():
         p = line.split()
         if p and p[0] in ("AT", "TOUR", "PORTABLE", "DIFFERS", "ROUNDTRIP",
                           "REJECT", "RECORD", "RECORDBACK", "DURATION", "FILEDURATION",
-                          "SECONDS", "VEL"):
+                          "SECONDS", "VEL", "AT3", "HAS3", "RECORD3",
+                          "SECONDS3", "VEL3", "LEN3", "ROUNDTRIP3"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

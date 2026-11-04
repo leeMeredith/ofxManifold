@@ -1,0 +1,14 @@
+{
+  "version": 3,
+  "kind": "rig",
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1
+    },
+    {
+      "name": "R",
+      "channel": 1
+    }
+  ]
+}

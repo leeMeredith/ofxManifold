@@ -48,7 +48,11 @@ class Mapping:
     def __init__(self):
         self.outputs = []        # [name, channel, trim]
         self.links = {}          # node -> [(kind, dest_name_or_None, weight)]
-        self.derived = []        # [name, channel, trim, mode, [(node, w)]]
+        # [name, channel, trim, mode, sources, feed]. feed "nodes": sources
+        # are (node, gain), read from the weight vector -- before every fader.
+        # feed "outputs": sources are (output NAME, gain), read from what each
+        # output actually sends -- its routed share times its trim.
+        self.derived = []
         self.legacy = set()      # outputs made by add_target(), the old way
 
     # A legacy output: name only, channel = its position. This is what makes
@@ -63,7 +67,8 @@ class Mapping:
         return len(self.outputs) - 1
 
     def channels_in_use(self):
-        return {o[1] for o in self.outputs} | {d[1] for d in self.derived}
+        return ({o[1] for o in self.outputs}
+                | {d[1] for d in self.derived if d[1] >= 0})
 
     # Decision A: names unique, channels unique across outputs AND derived.
     def add_output(self, name, channel, trim=1.0):
@@ -77,7 +82,21 @@ class Mapping:
     def add_derived(self, name, channel, trim, mode, sources):
         if channel < 0 or channel in self.channels_in_use():
             return None
-        self.derived.append([name, channel, trim, mode, list(sources)])
+        self.derived.append([name, channel, trim, mode, list(sources), "nodes"])
+        return len(self.derived) - 1
+
+    def add_derived_after(self, name, channel, trim, mode, sources):
+        """Sources are output NAMES. Refused for an unknown one, as for a
+        channel in use. A derived output is not an output, so it can never be
+        a source: no chains, by construction. Channel -1 is NoChannel: a value
+        for the program, outside the channel vector."""
+        if channel != -1 and (channel < 0 or channel in self.channels_in_use()):
+            return None
+        names = {o[0] for o in self.outputs}
+        if any(n not in names for n, _g in sources):
+            return None
+        self.derived.append([name, channel, trim, mode, list(sources),
+                             "outputs"])
         return len(self.derived) - 1
 
     def remove_output(self, name):
@@ -90,6 +109,11 @@ class Mapping:
                                 if not (l[0] == "output" and l[1] == name)]
             if not self.links[node]:
                 del self.links[node]
+        # A derived output reading the removed output loses that source and
+        # its gain, and stays -- the rule removing a node already follows.
+        for d in self.derived:
+            if d[5] == "outputs":
+                d[4] = [(n, g) for n, g in d[4] if n != name]
 
     def set_fraction(self, node, f):
         """Silence weight s such that out / (out + s) == f, outputs kept."""
@@ -149,10 +173,20 @@ class Mapping:
 
     def derived_values(self, wv):
         w = dict(wv)
+        # What each output actually sends: routed share times its trim.
+        r = self.routed(wv)
+        sent = {o[0]: r[o[0]] * o[2] for o in self.outputs}
         vals = []
-        for name, ch, trim, mode, sources in self.derived:
+        for name, ch, trim, mode, sources, feed in self.derived:
+            if feed == "map":
+                vals.append(0.0)       # filled by a map; a rig alone has none
+                continue
+            read = sent if feed == "outputs" else w
             if mode == "linear":
-                v = sum(sw * w.get(n, 0.0) for n, sw in sources)
+                v = sum(sw * read.get(n, 0.0) for n, sw in sources)
+            elif feed == "outputs":
+                v = math.sqrt(sum((sw * read.get(n, 0.0)) ** 2
+                                  for n, sw in sources))
             else:
                 # Source weight applied to AMPLITUDE, then powers summed. With
                 # every source weight 1 this is exactly the existing
@@ -170,8 +204,10 @@ class Mapping:
         r = self.routed(wv)
         for name, ch, trim in self.outputs:
             dense[ch] = r[name] * (trim if levels else 1.0)
-        for (name, ch, trim, mode, _s), v in zip(self.derived,
+        for (name, ch, trim, mode, _s, _f), v in zip(self.derived,
                                                   self.derived_values(wv)):
+            if ch < 0:
+                continue                 # NoChannel: not in the vector
             dense[ch] = v * (trim if levels else 1.0)
         return dense
 
@@ -205,11 +241,32 @@ class Mapping:
             nn = table[node] if node < len(table) else -1
             if nn >= 0:
                 m.links[nn] = list(links)
-        for name, ch, trim, mode, sources in self.derived:
+        for name, ch, trim, mode, sources, feed in self.derived:
+            if feed == "outputs":
+                # Reads outputs, not nodes: renumbering nodes leaves it whole.
+                m.derived.append([name, ch, trim, mode, list(sources), feed])
+                continue
             kept = [(table[n], sw) for n, sw in sources
                     if n < len(table) and table[n] >= 0]
-            m.derived.append([name, ch, trim, mode, kept])
+            m.derived.append([name, ch, trim, mode, kept, feed])
         return m
+
+    # ---- the rig ---------------------------------------------------------
+
+    def rig(self):
+        """Every channel of the room. Outputs; derived outputs fed by outputs,
+        whole; derived outputs fed by NODES as channels the map fills -- name,
+        channel and trim, no sources, since the sources are the map's. No
+        bindings. So the channel vector keeps the map's arity: nothing that
+        leaves the room is lost by passing through a rig."""
+        r = Mapping()
+        r.outputs = [list(o) for o in self.outputs]
+        for d in self.derived:
+            if d[5] == "outputs":
+                r.derived.append([d[0], d[1], d[2], d[3], list(d[4]), d[5]])
+            else:
+                r.derived.append([d[0], d[1], d[2], d[3], [], "map"])
+        return r
 
 
 # ---------------------------------------------------------------------------
@@ -240,9 +297,10 @@ def emit_map(out, name, m):
                 out.append(f"BIND {node} OUTPUT {dest} {fmt(w)}")
             else:
                 out.append(f"BIND {node} SILENCE {fmt(w)}")
-    for dname, ch, trim, mode, sources in m.derived:
+    for dname, ch, trim, mode, sources, feed in m.derived:
         src = " ".join(f"{n}:{fmt(w)}" for n, w in sources)
-        out.append(f"DERIVED {dname} {ch} {fmt(trim)} {mode} SRC {src}")
+        rec = "DERIVEDOUT" if feed == "outputs" else "DERIVED"
+        out.append(f"{rec} {dname} {ch} {fmt(trim)} {mode} SRC {src}")
     out.append("ENDMAP")
     out.append("")
 
@@ -609,8 +667,10 @@ def build():
             {"version": 2, "outputs": [{"name": "a", "channel": 0}],
              "bindings": [{"node": "n0", "kind": "silence", "target": "a",
                            "weight": 1.0}]}, "silence"),
+        # A version newer than this reader knows. It was 3 until version 3
+        # existed (round 3A); the vector is unchanged, the fixture moved on.
         "bad_out_future_version.json": (
-            {"version": 3, "bindings": []}, "version"),
+            {"version": 4, "bindings": []}, "version"),
     }
     out.append("# refused, each for its OWN reason (D-007). 'layer' is refused")
     out.append("# as a kind until layers exist -- reserved, not accepted and")
@@ -619,7 +679,294 @@ def build():
         write_fixture(fname, obj)
         out.append(f"MAPFILE {fname[:-5]} ANALYTIC outputs_manifold.json "
                    f"{fname} REFUSE {reason}")
+    out.append("")
+    build_after(out)
     return out
+
+
+# ---------------------------------------------------------------------------
+# round 3A-1: derived outputs AFTER the fader, and rig files
+# ---------------------------------------------------------------------------
+
+def build_after(out):
+    import copy as _copy
+    out.append("#" + "-" * 68)
+    out.append("# DERIVED OUTPUTS AFTER THE FADER (PLAN-round3.md decision A)")
+    out.append("#")
+    out.append("# A derived output fed by OUTPUTS reads what each one actually")
+    out.append("# sends: its routed share times its trim. One fed by NODES reads")
+    out.append("# the weight vector, ahead of every fader, exactly as before.")
+    out.append("# Here both sit on one map: 'tap' reads nodes 0 and 1, 'sub'")
+    out.append("# reads outputs L and R. R is trimmed to half.")
+    out.append("#" + "-" * 68)
+    room = Mapping()
+    room.add_output("L", 1, 1.0)
+    room.add_output("R", 2, 0.5)
+    room.add_output("C", 3, 1.0)
+    room.bind(0, "L"); room.bind(1, "R"); room.bind(2, "C")
+    room.bind(3, "L"); room.bind(3, "R")
+    room.bind(5, "L", 0.6); room.bind_silence(5, 0.4)
+    room.add_derived("tap", 8, 1.0, "linear", [(0, 1.0), (1, 1.0)])
+    assert room.add_derived_after("sub", 9, 0.8, "linear",
+                                  [("L", 1.0), ("R", 1.0)]) is not None
+    assert room.add_derived_after("subp", 10, 1.0, "power",
+                                  [("L", 1.0), ("R", 2.0)]) is not None
+    emit_map(out, "room", room)
+
+    out.append("# THE POINT OF IT: node 1 feeds R alone, and R is trimmed to")
+    out.append("# half. The tap, before the fader, reads all of node 1 (1.0).")
+    out.append("# The sub, after it, reads what R sends (0.5) -- pull a speaker")
+    out.append("# down and its sub follows. Then the sub's own trim, 0.8, gives")
+    out.append("# its level 0.4. subp: 2 x 0.5, power-summed, is 1.")
+    resolve_record(out, "after_follows_trim", "ANALYTIC", "room", room,
+                   [(1, 1.0)])
+    out.append("# L sends 0.6 and R 0.4 x 0.5 = 0.2: the sub is their sum, 0.8,")
+    out.append("# and its level 0.64. The tap still reads 1.0.")
+    resolve_record(out, "after_sums_levels", "ANALYTIC", "room", room,
+                   [(0, 0.6), (1, 0.4)])
+    out.append("# a node whose fill sends 60% to L and 40% to silence: the sub")
+    out.append("# reads only what reached L, never the silent part")
+    resolve_record(out, "after_reads_no_silence", "ANALYTIC", "room", room,
+                   [(5, 1.0)])
+    out.append("# a null node: nothing is sent, so an after-derived output")
+    out.append("# reads nothing")
+    resolve_record(out, "after_null_reads_nothing", "ANALYTIC", "room", room,
+                   [(4, 1.0)])
+    out.append("# C feeds neither derived output")
+    resolve_record(out, "after_unread_output", "ANALYTIC", "room", room,
+                   [(2, 1.0)])
+    for k, wv in enumerate([[(0, 0.25), (1, 0.25), (2, 0.25), (3, 0.25)],
+                            [(3, 0.5), (5, 0.3), (2, 0.2)],
+                            [(1, 0.7), (4, 0.3)]]):
+        resolve_record(out, f"after_mixed_{k}", "CROSS", "room", room, wv)
+    out.append("")
+
+    out.append("# REFUSED: a source that is not an output; a channel already")
+    out.append("# taken, in either direction. DERIVEDOUTBAD names output id 999.")
+    out.append("REFUSE refuse_after_unknown_source ANALYTIC "
+               "OUTPUT a 1 DERIVEDOUTBAD d 2")
+    out.append("REFUSE refuse_after_channel_taken ANALYTIC "
+               "OUTPUT a 1 DERIVEDOUT d 1")
+    out.append("REFUSE refuse_output_on_after_channel ANALYTIC "
+               "DERIVEDOUT d 4 OUTPUT a 4")
+    out.append("")
+
+    out.append("# REMOVING AN OUTPUT a derived output reads: that source goes,")
+    out.append("# with its gain; the derived output stays. Removing L, the")
+    out.append("# FIRST output, shifts every id after it -- the sub must still")
+    out.append("# read R, not whatever moved into R's old place.")
+    for nm, gone, wv in [("room_R", "R", [(0, 0.5), (1, 0.5)]),
+                         ("room_L", "L", [(0, 0.3), (1, 0.4), (2, 0.3)]),
+                         ("room_C", "C", [(1, 0.6), (2, 0.4)])]:
+        m = _copy.deepcopy(room)
+        m.remove_output(gone)
+        rest = " ".join(f"{o[0]}:{o[1]}" for o in m.outputs)
+        out.append(f"REMOVEOUT removeout_{nm} ANALYTIC MAP room "
+                   f"OUTPUT {gone} IN {wv_s(wv)} "
+                   f"ROUTED {dense_s(m.by_channel(wv, False))} "
+                   f"SILENCE {fmt(m.silence(wv))} "
+                   f"LEVELS {dense_s(m.by_channel(wv, True))} REST {rest}")
+    out.append("")
+
+    out.append("# REMOVING A NODE renumbers nodes; it must leave an")
+    out.append("# after-derived output untouched -- it reads no node. The tap,")
+    out.append("# which does, loses node 0.")
+    table = [-1, 0, 1, 2, 3, 4]
+    after = room.remap(table)
+    wv = [(0, 0.5), (2, 0.5)]
+    out.append(f"REMAP remap_room_keeps_after ANALYTIC MAP room "
+               f"TABLE {' '.join(str(t) for t in table)} "
+               f"IN {wv_s(wv)} ROUTED {dense_s(after.by_channel(wv, False))} "
+               f"SILENCE {fmt(after.silence(wv))} "
+               f"LEVELS {dense_s(after.by_channel(wv, True))}")
+    out.append("")
+
+    out.append("# FILES. An after-derived output needs version 3, which names")
+    out.append("# its sources as outputs. Everything else keeps the version it")
+    out.append("# had: the earlier MAPPRESERVE records are unchanged.")
+    out.append("MAPPRESERVE preserve_room ANALYTIC MAP room "
+               "MANIFOLD outputs_manifold.json VERSION 3")
+    out.append("# Everything else about this map is version 1: outputs made the")
+    out.append("# old way, all bound, in order, and a derived output with no")
+    out.append("# channel and no gains. Only its reading OUTPUTS needs version 3.")
+    out.append("# Without that check it was written as version 1, which cannot")
+    out.append("# name an output source, and the sub came back reading nothing.")
+    la = Mapping()
+    la.add_target("out.1"); la.add_target("out.2")
+    la.bind(0, "out.1"); la.bind(1, "out.2")
+    la.add_derived_after("s", -1, 1.0, "linear", [("out.1", 1.0),
+                                                  ("out.2", 1.0)])
+    emit_map(out, "legacyafter", la)
+    out.append("MAPPRESERVE preserve_legacy_after ANALYTIC MAP legacyafter "
+               "MANIFOLD outputs_manifold.json VERSION 3")
+    write_fixture("outputs_v3.json", {
+        "version": 3,
+        "outputs": [{"name": "L", "channel": 1, "trim": 1.0},
+                    {"name": "R", "channel": 2, "trim": 0.5},
+                    {"name": "C", "channel": 3, "trim": 1.0}],
+        "bindings": [
+            {"node": "n0", "target": "L", "weight": 1.0},
+            {"node": "n1", "target": "R", "weight": 1.0},
+            {"node": "n2", "target": "C", "weight": 1.0}],
+        "aggregators": [
+            {"name": "tap", "mode": "linear", "channel": 8, "trim": 1.0,
+             "sources": [{"node": "n0", "weight": 1.0},
+                         {"node": "n1", "weight": 1.0}]},
+            {"name": "sub", "mode": "linear", "channel": 9, "trim": 0.8,
+             "sources": [{"output": "L", "weight": 1.0},
+                         {"output": "R", "weight": 1.0}]}],
+    })
+    out.append("MAPFILE file_v3_loads ANALYTIC outputs_manifold.json "
+               "outputs_v3.json OK")
+    out.append("MAPROUNDTRIP file_v3_roundtrip ANALYTIC outputs_manifold.json "
+               "outputs_v3.json 3")
+    out.append("MAPVERSION file_after_v3 ANALYTIC outputs_manifold.json "
+               "outputs_v3.json 3")
+    bad = {
+        # an output source in a version 2 file: written by nothing, and an
+        # older reader could not know what it means
+        "bad_out_output_source_v2.json": (
+            {"version": 2, "outputs": [{"name": "L", "channel": 1}],
+             "bindings": [],
+             "aggregators": [{"name": "s", "channel": 5, "trim": 1.0,
+                              "mode": "linear",
+                              "sources": [{"output": "L", "weight": 1.0}]}]},
+            "version 3"),
+        "bad_out_mixed_sources.json": (
+            {"version": 3, "outputs": [{"name": "L", "channel": 1}],
+             "bindings": [],
+             "aggregators": [{"name": "s", "channel": 5, "trim": 1.0,
+                              "mode": "linear",
+                              "sources": [{"output": "L", "weight": 1.0},
+                                          {"node": "n0", "weight": 1.0}]}]},
+            "mixes"),
+        "bad_out_unknown_output_source.json": (
+            {"version": 3, "outputs": [{"name": "L", "channel": 1}],
+             "bindings": [],
+             "aggregators": [{"name": "s", "channel": 5, "trim": 1.0,
+                              "mode": "linear",
+                              "sources": [{"output": "Q", "weight": 1.0}]}]},
+            "unknown output"),
+        "bad_out_unknown_file_kind.json": (
+            {"version": 3, "kind": "scene", "outputs": [], "bindings": []},
+            "kind"),
+    }
+    for fname, (obj, reason) in bad.items():
+        write_fixture(fname, obj)
+        out.append(f"MAPFILE {fname[:-5]} ANALYTIC outputs_manifold.json "
+                   f"{fname} REFUSE {reason}")
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# THE RIG (decision B): every channel of the room. rigOf(room)")
+    out.append("# keeps L, R and C on their channels with their trims, keeps")
+    out.append("# sub and subp whole, and keeps the tap as a channel the MAP")
+    out.append("# fills: name, channel, trim, no sources -- those are the map's.")
+    out.append("# No bindings. Its channel vector has the room's arity, so a")
+    out.append("# receiver's argument 9 is the sub in both.")
+    out.append("#" + "-" * 68)
+    rig = room.rig()
+    outs = " ".join(f"{o[0]}:{o[1]}:{fmt(o[2])}" for o in rig.outputs)
+    ders = " ".join(f"{d[0]}:{d[5]}" for d in rig.derived)
+    arity = len(room.by_channel([], False))
+    out.append(f"RIGOF rigof_room ANALYTIC MAP room OUTS {outs} "
+               f"DERIVED {ders} ARITY {arity}")
+    out.append("# A node-fed derived output on the HIGHEST channel. Measured")
+    out.append("# before this rule: a rig that dropped it had 5 channels where")
+    out.append("# the map had 7, and channel 6 vanished on the way out.")
+    rig2 = fade_like_rig()
+    emit_map(out, "plainrig", rig2)
+    r2 = rig2.rig()
+    outs2 = " ".join(f"{o[0]}:{o[1]}:{fmt(o[2])}" for o in r2.outputs)
+    ders2 = " ".join(f"{d[0]}:{d[5]}" for d in r2.derived)
+    assert len(r2.by_channel([], False)) == len(rig2.by_channel([], False))
+    out.append(f"RIGOF rigof_plain ANALYTIC MAP plainrig OUTS {outs2} "
+               f"DERIVED {ders2} ARITY {len(rig2.by_channel([], False))}")
+
+    write_fixture("rig_room.json", {
+        "version": 3, "kind": "rig",
+        "outputs": [{"name": "L", "channel": 1, "trim": 1.0},
+                    {"name": "R", "channel": 2, "trim": 0.5},
+                    {"name": "C", "channel": 3, "trim": 1.0}],
+        "aggregators": [
+            {"name": "tap", "mode": "linear", "channel": 8, "trim": 1.0,
+             "feed": "map"},
+            {"name": "sub", "mode": "linear", "channel": 9, "trim": 0.8,
+             "sources": [{"output": "L", "weight": 1.0},
+                         {"output": "R", "weight": 1.0}]}],
+    })
+    out.append("# a rig file loads, round-trips byte-stable as a rig, and a")
+    out.append("# map's outputs file may also open it -- outputs, no bindings")
+    out.append("RIGFILE rig_loads ANALYTIC rig_room.json OK")
+    out.append("RIGROUNDTRIP rig_roundtrip ANALYTIC rig_room.json")
+    out.append("MAPFILE rig_opens_as_map ANALYTIC outputs_manifold.json "
+               "rig_room.json OK")
+    bad_rigs = {
+        "bad_rig_bindings.json": (
+            {"version": 3, "kind": "rig",
+             "outputs": [{"name": "L", "channel": 1}],
+             "bindings": [{"node": "n0", "target": "L", "weight": 1.0}]},
+            "bindings"),
+        "bad_rig_node_source.json": (
+            {"version": 3, "kind": "rig",
+             "outputs": [{"name": "L", "channel": 1}],
+             "aggregators": [{"name": "s", "channel": 5, "trim": 1.0,
+                              "mode": "linear",
+                              "sources": [{"node": "n0", "weight": 1.0}]}]},
+            "node"),
+        # a channel the map fills names no sources: they are the map's
+        "bad_rig_map_fed_sources.json": (
+            {"version": 3, "kind": "rig",
+             "outputs": [{"name": "L", "channel": 1}],
+             "aggregators": [{"name": "s", "channel": 5, "trim": 1.0,
+                              "mode": "linear", "feed": "map",
+                              "sources": [{"output": "L", "weight": 1.0}]}]},
+            "map"),
+        "bad_rig_unknown_feed.json": (
+            {"version": 3, "kind": "rig",
+             "outputs": [{"name": "L", "channel": 1}],
+             "aggregators": [{"name": "s", "channel": 5, "trim": 1.0,
+                              "mode": "linear", "feed": "air"}]},
+            "feed"),
+        "bad_rig_version.json": (
+            {"version": 2, "kind": "rig",
+             "outputs": [{"name": "L", "channel": 1}]}, "version"),
+        "bad_rig_dup_channel.json": (
+            {"version": 3, "kind": "rig",
+             "outputs": [{"name": "L", "channel": 1},
+                         {"name": "R", "channel": 1}]}, "channel"),
+    }
+    out.append("# refused, each for its own reason; and a map's outputs file")
+    out.append("# is not a rig, so loadRig refuses it rather than dropping its")
+    out.append("# bindings without a word")
+    for fname, (obj, reason) in bad_rigs.items():
+        write_fixture(fname, obj)
+        out.append(f"RIGFILE {fname[:-5]} ANALYTIC {fname} REFUSE {reason}")
+    # Refused for NOT SAYING it is a rig -- "kind", not any other reason.
+    # A map's outputs file also has bindings, which a rig refuses on their
+    # own; with only that fixture, removing the kind check was MASKED by the
+    # bindings check and the suite stayed green (mutation run, 3A-1). The
+    # second file has outputs and nothing a rig refuses: only "kind" can
+    # stop it.
+    out.append("RIGFILE map_is_not_a_rig ANALYTIC outputs_v3.json REFUSE kind")
+    write_fixture("outputs_only_v3.json", {
+        "version": 3,
+        "outputs": [{"name": "L", "channel": 1, "trim": 1.0}],
+        "aggregators": [
+            {"name": "sub", "mode": "linear", "channel": 9, "trim": 1.0,
+             "sources": [{"output": "L", "weight": 1.0}]}],
+    })
+    out.append("RIGFILE unmarked_is_not_a_rig ANALYTIC outputs_only_v3.json "
+               "REFUSE kind")
+
+
+def fade_like_rig():
+    m = Mapping()
+    m.add_output("A", 0, 1.0)
+    m.add_output("B", 4, 0.25)
+    m.bind(0, "A"); m.bind(1, "B")
+    m.add_derived("tapA", 6, 1.0, "linear", [(0, 1.0)])
+    return m
 
 
 def main():
@@ -633,7 +980,7 @@ def main():
         if p and p[0] in ("LEGACY", "RESOLVE", "REFUSE", "LABEL", "REMAP",
                           "MAPFILE", "MAPROUNDTRIP", "MAPVERSION",
                           "MAPPRESERVE", "CLEARED", "REMOVEOUT",
-                          "SETFILL"):
+                          "SETFILL", "RIGOF", "RIGFILE", "RIGROUNDTRIP"):
             counts[p[2]] = counts.get(p[2], 0) + 1
     print(f"wrote {path}")
     for k in ("ANALYTIC", "CROSS", "SPEC"):

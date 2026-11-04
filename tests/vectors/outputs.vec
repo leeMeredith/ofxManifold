@@ -239,3 +239,132 @@ MAPFILE bad_out_dup_channel ANALYTIC outputs_manifold.json bad_out_dup_channel.j
 MAPFILE bad_out_unknown_kind ANALYTIC outputs_manifold.json bad_out_unknown_kind.json REFUSE kind
 MAPFILE bad_out_silence_with_target ANALYTIC outputs_manifold.json bad_out_silence_with_target.json REFUSE silence
 MAPFILE bad_out_future_version ANALYTIC outputs_manifold.json bad_out_future_version.json REFUSE version
+
+#--------------------------------------------------------------------
+# DERIVED OUTPUTS AFTER THE FADER (PLAN-round3.md decision A)
+#
+# A derived output fed by OUTPUTS reads what each one actually
+# sends: its routed share times its trim. One fed by NODES reads
+# the weight vector, ahead of every fader, exactly as before.
+# Here both sit on one map: 'tap' reads nodes 0 and 1, 'sub'
+# reads outputs L and R. R is trimmed to half.
+#--------------------------------------------------------------------
+MAP room
+OUT L 1 1
+OUT R 2 0.5
+OUT C 3 1
+BIND 0 OUTPUT L 1
+BIND 1 OUTPUT R 1
+BIND 2 OUTPUT C 1
+BIND 3 OUTPUT L 1
+BIND 3 OUTPUT R 1
+BIND 5 OUTPUT L 0.6
+BIND 5 SILENCE 0.4
+DERIVED tap 8 1 linear SRC 0:1 1:1
+DERIVEDOUT sub 9 0.8 linear SRC L:1 R:1
+DERIVEDOUT subp 10 1 power SRC L:1 R:2
+ENDMAP
+
+# THE POINT OF IT: node 1 feeds R alone, and R is trimmed to
+# half. The tap, before the fader, reads all of node 1 (1.0).
+# The sub, after it, reads what R sends (0.5) -- pull a speaker
+# down and its sub follows. Then the sub's own trim, 0.8, gives
+# its level 0.4. subp: 2 x 0.5, power-summed, is 1.
+RESOLVE after_follows_trim ANALYTIC MAP room IN 1=1 ROUTED 0 0 1 0 0 0 0 0 1 0.5 1 SILENCE 0 LEVELS 0 0 0.5 0 0 0 0 0 1 0.4 1
+# L sends 0.6 and R 0.4 x 0.5 = 0.2: the sub is their sum, 0.8,
+# and its level 0.64. The tap still reads 1.0.
+RESOLVE after_sums_levels ANALYTIC MAP room IN 0=0.6 1=0.4 ROUTED 0 0.6 0.4 0 0 0 0 0 1 0.8 0.7211102551 SILENCE 0 LEVELS 0 0.6 0.2 0 0 0 0 0 1 0.64 0.7211102551
+# a node whose fill sends 60% to L and 40% to silence: the sub
+# reads only what reached L, never the silent part
+RESOLVE after_reads_no_silence ANALYTIC MAP room IN 5=1 ROUTED 0 0.6 0 0 0 0 0 0 0 0.6 0.6 SILENCE 0.4 LEVELS 0 0.6 0 0 0 0 0 0 0 0.48 0.6
+# a null node: nothing is sent, so an after-derived output
+# reads nothing
+RESOLVE after_null_reads_nothing ANALYTIC MAP room IN 4=1 ROUTED 0 0 0 0 0 0 0 0 0 0 0 SILENCE 1 LEVELS 0 0 0 0 0 0 0 0 0 0 0
+# C feeds neither derived output
+RESOLVE after_unread_output ANALYTIC MAP room IN 2=1 ROUTED 0 0 0 1 0 0 0 0 0 0 0 SILENCE 0 LEVELS 0 0 0 1 0 0 0 0 0 0 0
+RESOLVE after_mixed_0 CROSS MAP room IN 0=0.25 1=0.25 2=0.25 3=0.25 ROUTED 0 0.375 0.375 0.25 0 0 0 0 0.5 0.5625 0.5303300859 SILENCE 0 LEVELS 0 0.375 0.1875 0.25 0 0 0 0 0.5 0.45 0.5303300859
+RESOLVE after_mixed_1 CROSS MAP room IN 3=0.5 5=0.3 2=0.2 ROUTED 0 0.43 0.25 0.2 0 0 0 0 0 0.555 0.4973932046 SILENCE 0.12 LEVELS 0 0.43 0.125 0.2 0 0 0 0 0 0.444 0.4973932046
+RESOLVE after_mixed_2 CROSS MAP room IN 1=0.7 4=0.3 ROUTED 0 0 0.7 0 0 0 0 0 0.7 0.35 0.7 SILENCE 0.3 LEVELS 0 0 0.35 0 0 0 0 0 0.7 0.28 0.7
+
+# REFUSED: a source that is not an output; a channel already
+# taken, in either direction. DERIVEDOUTBAD names output id 999.
+REFUSE refuse_after_unknown_source ANALYTIC OUTPUT a 1 DERIVEDOUTBAD d 2
+REFUSE refuse_after_channel_taken ANALYTIC OUTPUT a 1 DERIVEDOUT d 1
+REFUSE refuse_output_on_after_channel ANALYTIC DERIVEDOUT d 4 OUTPUT a 4
+
+# REMOVING AN OUTPUT a derived output reads: that source goes,
+# with its gain; the derived output stays. Removing L, the
+# FIRST output, shifts every id after it -- the sub must still
+# read R, not whatever moved into R's old place.
+REMOVEOUT removeout_room_R ANALYTIC MAP room OUTPUT R IN 0=0.5 1=0.5 ROUTED 0 0.5 0 0 0 0 0 0 1 0.5 0.5 SILENCE 0.5 LEVELS 0 0.5 0 0 0 0 0 0 1 0.4 0.5 REST L:1 C:3
+REMOVEOUT removeout_room_L ANALYTIC MAP room OUTPUT L IN 0=0.3 1=0.4 2=0.3 ROUTED 0 0 0.4 0.3 0 0 0 0 0.7 0.2 0.4 SILENCE 0.3 LEVELS 0 0 0.2 0.3 0 0 0 0 0.7 0.16 0.4 REST R:2 C:3
+REMOVEOUT removeout_room_C ANALYTIC MAP room OUTPUT C IN 1=0.6 2=0.4 ROUTED 0 0 0.6 0 0 0 0 0 0.6 0.3 0.6 SILENCE 0.4 LEVELS 0 0 0.3 0 0 0 0 0 0.6 0.24 0.6 REST L:1 R:2
+
+# REMOVING A NODE renumbers nodes; it must leave an
+# after-derived output untouched -- it reads no node. The tap,
+# which does, loses node 0.
+REMAP remap_room_keeps_after ANALYTIC MAP room TABLE -1 0 1 2 3 4 IN 0=0.5 2=0.5 ROUTED 0 0.25 0.75 0 0 0 0 0 0.5 0.625 0.790569415 SILENCE 0 LEVELS 0 0.25 0.375 0 0 0 0 0 0.5 0.5 0.790569415
+
+# FILES. An after-derived output needs version 3, which names
+# its sources as outputs. Everything else keeps the version it
+# had: the earlier MAPPRESERVE records are unchanged.
+MAPPRESERVE preserve_room ANALYTIC MAP room MANIFOLD outputs_manifold.json VERSION 3
+# Everything else about this map is version 1: outputs made the
+# old way, all bound, in order, and a derived output with no
+# channel and no gains. Only its reading OUTPUTS needs version 3.
+# Without that check it was written as version 1, which cannot
+# name an output source, and the sub came back reading nothing.
+MAP legacyafter
+TARGET out.1
+TARGET out.2
+BIND 0 OUTPUT out.1 1
+BIND 1 OUTPUT out.2 1
+DERIVEDOUT s -1 1 linear SRC out.1:1 out.2:1
+ENDMAP
+
+MAPPRESERVE preserve_legacy_after ANALYTIC MAP legacyafter MANIFOLD outputs_manifold.json VERSION 3
+MAPFILE file_v3_loads ANALYTIC outputs_manifold.json outputs_v3.json OK
+MAPROUNDTRIP file_v3_roundtrip ANALYTIC outputs_manifold.json outputs_v3.json 3
+MAPVERSION file_after_v3 ANALYTIC outputs_manifold.json outputs_v3.json 3
+MAPFILE bad_out_output_source_v2 ANALYTIC outputs_manifold.json bad_out_output_source_v2.json REFUSE version 3
+MAPFILE bad_out_mixed_sources ANALYTIC outputs_manifold.json bad_out_mixed_sources.json REFUSE mixes
+MAPFILE bad_out_unknown_output_source ANALYTIC outputs_manifold.json bad_out_unknown_output_source.json REFUSE unknown output
+MAPFILE bad_out_unknown_file_kind ANALYTIC outputs_manifold.json bad_out_unknown_file_kind.json REFUSE kind
+
+#--------------------------------------------------------------------
+# THE RIG (decision B): every channel of the room. rigOf(room)
+# keeps L, R and C on their channels with their trims, keeps
+# sub and subp whole, and keeps the tap as a channel the MAP
+# fills: name, channel, trim, no sources -- those are the map's.
+# No bindings. Its channel vector has the room's arity, so a
+# receiver's argument 9 is the sub in both.
+#--------------------------------------------------------------------
+RIGOF rigof_room ANALYTIC MAP room OUTS L:1:1 R:2:0.5 C:3:1 DERIVED tap:map sub:outputs subp:outputs ARITY 11
+# A node-fed derived output on the HIGHEST channel. Measured
+# before this rule: a rig that dropped it had 5 channels where
+# the map had 7, and channel 6 vanished on the way out.
+MAP plainrig
+OUT A 0 1
+OUT B 4 0.25
+BIND 0 OUTPUT A 1
+BIND 1 OUTPUT B 1
+DERIVED tapA 6 1 linear SRC 0:1
+ENDMAP
+
+RIGOF rigof_plain ANALYTIC MAP plainrig OUTS A:0:1 B:4:0.25 DERIVED tapA:map ARITY 7
+# a rig file loads, round-trips byte-stable as a rig, and a
+# map's outputs file may also open it -- outputs, no bindings
+RIGFILE rig_loads ANALYTIC rig_room.json OK
+RIGROUNDTRIP rig_roundtrip ANALYTIC rig_room.json
+MAPFILE rig_opens_as_map ANALYTIC outputs_manifold.json rig_room.json OK
+# refused, each for its own reason; and a map's outputs file
+# is not a rig, so loadRig refuses it rather than dropping its
+# bindings without a word
+RIGFILE bad_rig_bindings ANALYTIC bad_rig_bindings.json REFUSE bindings
+RIGFILE bad_rig_node_source ANALYTIC bad_rig_node_source.json REFUSE node
+RIGFILE bad_rig_map_fed_sources ANALYTIC bad_rig_map_fed_sources.json REFUSE map
+RIGFILE bad_rig_unknown_feed ANALYTIC bad_rig_unknown_feed.json REFUSE feed
+RIGFILE bad_rig_version ANALYTIC bad_rig_version.json REFUSE version
+RIGFILE bad_rig_dup_channel ANALYTIC bad_rig_dup_channel.json REFUSE channel
+RIGFILE map_is_not_a_rig ANALYTIC outputs_v3.json REFUSE kind
+RIGFILE unmarked_is_not_a_rig ANALYTIC outputs_only_v3.json REFUSE kind

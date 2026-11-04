@@ -1,0 +1,17 @@
+{
+  "version": 3,
+  "kind": "rig",
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1
+    }
+  ],
+  "bindings": [
+    {
+      "node": "n0",
+      "target": "L",
+      "weight": 1.0
+    }
+  ]
+}

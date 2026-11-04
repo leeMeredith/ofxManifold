@@ -18,6 +18,7 @@
 #include "ofxManifoldPointSource.h"
 
 #include <glm/geometric.hpp>
+#include <glm/vec3.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -25,9 +26,14 @@
 
 namespace ofxManifold {
 
+// A sample may carry a height `z`, for a 3D map (PLAN-round3.md decision F):
+// a bird dropping from a high branch to the ground. Zero is the ground of a
+// map with one level, so every path made before height existed is a path at
+// z = 0, and `{t, position}` still builds one.
 struct TrajectorySample {
     float     t = 0.0f;          // normalized [0, 1] after finalize()
     glm::vec2 position{0.0f, 0.0f};
+    float     z = 0.0f;          // height; 0 for a flat path
 };
 
 // A recorded path keeps TWO time representations, and it needs both.
@@ -68,6 +74,12 @@ public:
         }
         samples_.push_back(TrajectorySample{t, position});
         finalized_ = false;
+    }
+
+    // The same, with a height. Time is handled exactly as above.
+    void addSample(float t, glm::vec3 p) {
+        addSample(t, glm::vec2(p.x, p.y));
+        samples_.back().z = p.z;
     }
 
     // Rescale recorded times to [0, 1], remembering how long the recording
@@ -152,6 +164,53 @@ public:
         return pointAt(seconds / d);
     }
 
+    // ---- height (round 3A-2) ------------------------------------------------
+    //
+    // Interpolated with the SAME brackets as x and y, so a path's height and
+    // its position can never disagree about where along the path they are.
+    // pointAt() and everything 2D are untouched: a flat path is at z = 0
+    // everywhere, and a caller that never asks for height sees nothing new.
+    //
+    // Written apart from pointAt() rather than sharing a helper with it: a
+    // fault in one cannot then pass unseen through the other, and the 2D
+    // code every existing gate guards stays exactly as it was.
+    float heightAt(float t) const {
+        const std::size_t n = samples_.size();
+        if (n == 0) return 0.0f;
+        if (n == 1 || t <= samples_[0].t) return samples_[0].z;
+        if (t >= samples_[n - 1].t) return samples_[n - 1].z;
+        // The first sample later than t; the one before it is at or before.
+        const auto hi = std::upper_bound(
+            samples_.begin(), samples_.end(), t,
+            [](float v, const TrajectorySample& s) { return v < s.t; });
+        const TrajectorySample& lo = *(hi - 1);
+        const float gap = hi->t - lo.t;
+        if (!(gap > 0.0f)) return lo.z;
+        return lo.z + (hi->z - lo.z) * ((t - lo.t) / gap);
+    }
+
+    glm::vec3 point3At(float t) const {
+        const glm::vec2 p = pointAt(t);
+        return glm::vec3(p.x, p.y, heightAt(t));
+    }
+
+    float heightAtSeconds(float seconds) const {
+        return heightAt(seconds / ((duration_ > 0.0f) ? duration_ : 1.0f));
+    }
+
+    glm::vec3 point3AtSeconds(float seconds) const {
+        const glm::vec2 p = pointAtSeconds(seconds);
+        return glm::vec3(p.x, p.y, heightAtSeconds(seconds));
+    }
+
+    // Does any sample leave the ground? Every sample is checked: a path that
+    // starts and ends at z = 0 may still hop in the middle, and judging by
+    // its ends would save it flat and lose the hop.
+    bool hasHeight() const {
+        for (const auto& s : samples_) if (s.z != 0.0f) return true;
+        return false;
+    }
+
     // ---- motion ----------------------------------------------------------
     //
     // Velocity along the path, as a central difference over a window.
@@ -196,6 +255,26 @@ public:
         return glm::length(velocityAt(t, window));
     }
 
+    // Velocity in 3D: x and y exactly velocityAt(); z the climb -- negative
+    // when falling -- over the same clipped window, divided by the span
+    // actually used, for the reason given above.
+    glm::vec3 velocity3At(float t, float window = 0.02f) const {
+        const glm::vec2 v = velocityAt(t, window);
+        float climb = 0.0f;
+        if (samples_.size() >= 2 && window > 0.0f) {
+            const float from = (t - window < 0.0f) ? 0.0f : t - window;
+            const float to   = (t + window > 1.0f) ? 1.0f : t + window;
+            if (to > from) climb = (heightAt(to) - heightAt(from)) / (to - from);
+        }
+        return glm::vec3(v.x, v.y, climb);
+    }
+
+    glm::vec3 velocity3AtSeconds(float seconds,
+                                 float windowSeconds = 0.05f) const {
+        const float span = (duration_ > 0.0f) ? duration_ : 1.0f;
+        return velocity3At(seconds / span, windowSeconds / span) / span;
+    }
+
     // ---- access ----------------------------------------------------------
 
     std::size_t sampleCount() const { return samples_.size(); }
@@ -211,6 +290,19 @@ public:
         float d = 0.0f;
         for (std::size_t i = 1; i < samples_.size(); ++i) {
             d += glm::distance(samples_[i - 1].position, samples_[i].position);
+        }
+        return d;
+    }
+
+    // The same in 3D: height counts. length() stays the 2D length.
+    float length3() const {
+        float d = 0.0f;
+        for (std::size_t i = 1; i < samples_.size(); ++i) {
+            const TrajectorySample& a = samples_[i - 1];
+            const TrajectorySample& b = samples_[i];
+            d += glm::length(glm::vec3(b.position.x - a.position.x,
+                                       b.position.y - a.position.y,
+                                       b.z - a.z));
         }
         return d;
     }

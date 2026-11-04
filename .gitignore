@@ -8,3 +8,6 @@ openFrameworks-Info.plist
 of.entitlements
 bin/
 obj/
+
+# Python bytecode from running the references
+__pycache__/

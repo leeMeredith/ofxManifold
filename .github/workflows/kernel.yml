@@ -1440,6 +1440,253 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
+      # ---- round 3A-1: derived outputs after the fader, rig files ----
+
+      - name: After-derived output ignores trim must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            'const float a = g * acc[t] * trims_[t];' \
+            'const float a = g * acc[t];'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Removed output leaves after-derived source ids unshifted must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            'o.push_back(t > id ? t - 1 : t);' \
+            'o.push_back(t);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Removed output stays an after-derived source must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '                if (t == id) continue;\n                o.push_back' \
+            '                o.push_back'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Node renumbering wipes after-derived gains must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '            if (ag.feed == Feed::Outputs) continue;\n            std::vector<NodeID> s;' \
+            '            std::vector<NodeID> s;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: After-derived output accepts an unknown source must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '            if (sw.first >= targetNames_.size()) {\n                return static_cast<std::size_t>(-1);' \
+            '            if (false) {\n                return static_cast<std::size_t>(-1);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: After-derived power sum skips the root must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
+            'v = (v > 0.0f) ? std::sqrt(v) : 0.0f;' \
+            'v = v;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Rig drops channels the map fills must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
+            '            if (ag.channel == NoChannel) continue;\n            r.addDerived(ag.name, ag.channel, ag.trim, ag.mode, {});\n            continue;' \
+            '            continue;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMapping.h
+
+      - name: Output sources written as version 1 must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            '    for (const auto& a : mp.aggregators()) {\n        if (a.feed == Feed::Outputs) return true;\n    }\n    for (TargetID t = 0;' \
+            '    for (TargetID t = 0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Output sources written as version 2 must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '(mappingNeedsV3(mp) ? 3 : 2)' \
+            '2'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Version 2 file reads an output source must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '                    if (version < 3) {' \
+            '                    if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Derived output mixing nodes and outputs accepted must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '        if (!nodeSrcs.empty() && !outSrcs.empty()) {' \
+            '        if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Rig accepts bindings must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            '    if (root.has("bindings")) {\n        res.error = "a rig holds no bindings";' \
+            '    if (false) {\n        res.error = "a rig holds no bindings";'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: A file not marked as a rig accepted as a rig must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    if (!root.has("kind") || root["kind"].asString() != "rig") {' \
+            '    if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Channel the map fills accepts sources must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            '            if (a.has("sources")) {\n                error = "aggregator " + name + " is filled by the map and "' \
+            '            if (false) {\n                error = "aggregator " + name + " is filled by the map and "'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Unknown file kind read as a map must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    if (root.has("kind") && root["kind"].asString() != "rig") {' \
+            '    if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      # ---- round 3A-2: paths with height ----
+
+      - name: Height not interpolated between samples must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            'return lo.z + (hi->z - lo.z) * ((t - lo.t) / gap);' \
+            'return lo.z;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: A path that hops in the middle reads as flat must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        for (const auto& s : samples_) if (s.z != 0.0f) return true;' \
+            '        if (!samples_.empty() && (samples_.front().z != 0.0f || samples_.back().z != 0.0f)) return true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Recording drops the height must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '        samples_.back().z = p.z;' \
+            '        (void)p;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Climb divided by the requested window at the ends must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            'if (to > from) climb = (heightAt(to) - heightAt(from)) / (to - from);' \
+            'if (to > from) climb = (heightAt(to) - heightAt(from)) / (2.0f * window);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: 3D velocity in seconds not divided by the duration must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            'return velocity3At(seconds / span, windowSeconds / span) / span;' \
+            'return velocity3At(seconds / span, windowSeconds / span);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Height in seconds ignores the duration must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            'return heightAt(seconds / ((duration_ > 0.0f) ? duration_ : 1.0f));' \
+            'return heightAt(seconds);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: 3D length ignores height must be caught
+        run: |
+          python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
+            '                                       b.z - a.z));' \
+            '                                       0.0f));'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/sources/ofxManifoldTrajectory.h
+
+      - name: Height not written must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '        if (height) o << ", " << json::number(s.z);' \
+            '        (void)height;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: A path with height written as version 1 must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '(height ? 2 : kFormatVersion)' \
+            'kFormatVersion'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Height not read must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '        if (dims == 3) samples.back().z = s["p"].asArray()[2].asFloat();' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Version 1 file accepts a height must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '        if (dims == 2 && s.isObject() && s["p"].isArray()' \
+            '        if (false && s.isObject() && s["p"].isArray()'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: A version newer than 2 accepted for paths must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    if (version != kFormatVersion && version != 2) {' \
+            '    if (version != kFormatVersion && version != 2 && version != 3) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
       - name: Restored tree must be green
         run: |
           make clean

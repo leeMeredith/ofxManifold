@@ -1,0 +1,25 @@
+{
+  "version": 3,
+  "kind": "rig",
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "s",
+      "channel": 5,
+      "trim": 1.0,
+      "mode": "linear",
+      "feed": "map",
+      "sources": [
+        {
+          "output": "L",
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}

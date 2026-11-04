@@ -1,0 +1,46 @@
+{
+  "version": 3,
+  "kind": "rig",
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1,
+      "trim": 1.0
+    },
+    {
+      "name": "R",
+      "channel": 2,
+      "trim": 0.5
+    },
+    {
+      "name": "C",
+      "channel": 3,
+      "trim": 1.0
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "tap",
+      "mode": "linear",
+      "channel": 8,
+      "trim": 1.0,
+      "feed": "map"
+    },
+    {
+      "name": "sub",
+      "mode": "linear",
+      "channel": 9,
+      "trim": 0.8,
+      "sources": [
+        {
+          "output": "L",
+          "weight": 1.0
+        },
+        {
+          "output": "R",
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}

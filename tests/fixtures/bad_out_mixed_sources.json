@@ -1,0 +1,28 @@
+{
+  "version": 3,
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1
+    }
+  ],
+  "bindings": [],
+  "aggregators": [
+    {
+      "name": "s",
+      "channel": 5,
+      "trim": 1.0,
+      "mode": "linear",
+      "sources": [
+        {
+          "output": "L",
+          "weight": 1.0
+        },
+        {
+          "node": "n0",
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}

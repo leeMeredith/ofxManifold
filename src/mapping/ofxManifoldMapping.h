@@ -87,6 +87,21 @@ enum class SumMode {
     PowerPreserving  // root of the sum of squares
 };
 
+// What a derived output reads (PLAN-round3.md decision A).
+//
+// Nodes: the weight vector, ahead of every output's fader -- it follows the
+// MAP. Outputs: what each output actually sends, its routed share times its
+// trim -- it follows the MIX, so a sub fed from L and R drops when L is pulled
+// down. Never a mix of the two: "level" would mean two things in one sum.
+//
+// The kernel has no default. addDerived() reads nodes, as it always has;
+// addDerivedFromOutputs() reads outputs. Which one an editor offers first is
+// the editor's business.
+enum class Feed {
+    Nodes,
+    Outputs
+};
+
 // A named reducer over a subset of the weight vector, evaluated AFTER the
 // manifold (architecture doc 6.2).
 //
@@ -103,13 +118,19 @@ enum class SumMode {
 // parts front to one part rear. Source weights are GAINS on the sources, not
 // shares, so they are not normalized. An aggregator made with addAggregator()
 // has every weight 1 and resolves exactly as it always did.
+//
+// Fed by OUTPUTS (Feed::Outputs), `sources` is empty and `outputs` holds the
+// TargetIDs read, with `weights` parallel to THEM. A derived output is not a
+// target, so it can never be a source: no chains, by construction.
 struct Aggregator {
-    std::string         name;
-    std::vector<NodeID> sources;
-    SumMode             mode = SumMode::Linear;
-    std::vector<float>  weights;               // parallel to sources
-    int                 channel = NoChannel;
-    float               trim    = 1.0f;
+    std::string           name;
+    std::vector<NodeID>   sources;
+    SumMode               mode = SumMode::Linear;
+    std::vector<float>    weights;     // parallel to sources, or to outputs
+    int                   channel = NoChannel;
+    float                 trim    = 1.0f;
+    Feed                  feed    = Feed::Nodes;
+    std::vector<TargetID> outputs;     // Feed::Outputs only
 };
 
 struct Resolved {
@@ -192,6 +213,22 @@ public:
             // mapping holds no trace of bindings that no longer exist.
             if (v.empty()) it = links_.erase(it);
             else ++it;
+        }
+        // A derived output reading this output loses that source, with its
+        // gain, and stays -- the rule removeNodes() follows for nodes. Ids
+        // after it shift down, so the sub that read R still reads R.
+        for (auto& ag : aggregators_) {
+            if (ag.feed != Feed::Outputs) continue;
+            std::vector<TargetID> o;
+            std::vector<float>    g;
+            for (std::size_t i = 0; i < ag.outputs.size(); ++i) {
+                const TargetID t = ag.outputs[i];
+                if (t == id) continue;
+                o.push_back(t > id ? t - 1 : t);
+                g.push_back(i < ag.weights.size() ? ag.weights[i] : 1.0f);
+            }
+            ag.outputs = std::move(o);
+            ag.weights = std::move(g);
         }
         return true;
     }
@@ -384,6 +421,35 @@ public:
         return aggregators_.size() - 1;
     }
 
+    // A derived output fed by OUTPUTS, after their faders (decision A): each
+    // source is a TargetID and a gain on what that output sends. Refused --
+    // SIZE_MAX -- for a channel refused as addDerived() refuses it, or a
+    // source that is not an existing output.
+    std::size_t addDerivedFromOutputs(
+            const std::string& name, int channel, float trim, SumMode mode,
+            const std::vector<std::pair<TargetID, float>>& srcs) {
+        if (channel != NoChannel && (channel < 0 || channelInUse(channel))) {
+            return static_cast<std::size_t>(-1);
+        }
+        for (const auto& sw : srcs) {
+            if (sw.first >= targetNames_.size()) {
+                return static_cast<std::size_t>(-1);
+            }
+        }
+        Aggregator a;
+        a.name = name;
+        a.mode = mode;
+        a.channel = channel;
+        a.trim = trim;
+        a.feed = Feed::Outputs;
+        for (const auto& sw : srcs) {
+            a.outputs.push_back(sw.first);
+            a.weights.push_back(sw.second);
+        }
+        aggregators_.push_back(std::move(a));
+        return aggregators_.size() - 1;
+    }
+
     const std::vector<Aggregator>& aggregators() const { return aggregators_; }
 
     // ---- resolution -----------------------------------------------------
@@ -433,6 +499,24 @@ public:
 
         out.aggregates.reserve(aggregators_.size());
         for (const auto& ag : aggregators_) {
+            if (ag.feed == Feed::Outputs) {
+                // What each source output SENDS: routed share times trim.
+                float v = 0.0f;
+                for (std::size_t s = 0; s < ag.outputs.size(); ++s) {
+                    const TargetID t = ag.outputs[s];
+                    if (t >= acc.size()) continue;
+                    const float g = (s < ag.weights.size()) ? ag.weights[s]
+                                                            : 1.0f;
+                    const float a = g * acc[t] * trims_[t];
+                    if (ag.mode == SumMode::Linear) v += a;
+                    else                            v += a * a;
+                }
+                if (ag.mode == SumMode::PowerPreserving) {
+                    v = (v > 0.0f) ? std::sqrt(v) : 0.0f;
+                }
+                out.aggregates.push_back(v);
+                continue;
+            }
             // Source weight applied to the AMPLITUDE, then summed or
             // power-summed. With every weight 1 this is exactly the old sum.
             float v = 0.0f;
@@ -529,6 +613,10 @@ public:
         }
         links_ = std::move(moved);
         for (auto& ag : aggregators_) {
+            // Reads outputs, not nodes: renumbering nodes leaves it whole.
+            // Without this skip its gains were rebuilt from an empty source
+            // list -- every one of them lost.
+            if (ag.feed == Feed::Outputs) continue;
             std::vector<NodeID> s;
             std::vector<float>  g;
             for (std::size_t i = 0; i < ag.sources.size(); ++i) {
@@ -581,6 +669,46 @@ private:
     std::unordered_map<NodeID, std::vector<Link>> links_;
     std::vector<Aggregator>                  aggregators_;
 };
+
+// ---- the rig (PLAN-round3.md decision B) -----------------------------------
+
+// A map's rig: the room it plays in -- every channel that leaves it.
+//
+// Its outputs, in order, with channel and trim. Its derived outputs fed by
+// outputs, whole. Its derived outputs fed by NODES as channels the map fills:
+// name, channel, trim and mode, with no sources, since the sources are the
+// map's (SpaceMap keeps a derived node's channel among the system's speakers
+// and its links in the map; this keeps both, on the two sides of the split).
+// No bindings.
+//
+// Measured before this rule: a rig that dropped a node-fed derived output on
+// the highest channel had 5 channels where its map had 7, and that channel
+// vanished on the way out. A derived output with no channel never leaves the
+// room, so it is the map's alone and is not kept.
+//
+// Not a new class. A rig is a Mapping with outputs and no bindings, so
+// anything that lays out or resolves a map's outputs does the same for a rig.
+// Order is kept, so TargetIDs and the channel vector's arity are the map's.
+inline Mapping rigOf(const Mapping& mp) {
+    Mapping r;
+    for (TargetID t = 0; t < mp.targetCount(); ++t) {
+        r.addOutput(mp.targetName(t), mp.targetChannel(t), mp.targetTrim(t));
+    }
+    for (const auto& ag : mp.aggregators()) {
+        if (ag.feed == Feed::Nodes) {
+            if (ag.channel == NoChannel) continue;
+            r.addDerived(ag.name, ag.channel, ag.trim, ag.mode, {});
+            continue;
+        }
+        std::vector<std::pair<TargetID, float>> srcs;
+        for (std::size_t i = 0; i < ag.outputs.size(); ++i) {
+            srcs.emplace_back(ag.outputs[i],
+                              i < ag.weights.size() ? ag.weights[i] : 1.0f);
+        }
+        r.addDerivedFromOutputs(ag.name, ag.channel, ag.trim, ag.mode, srcs);
+    }
+    return r;
+}
 
 // ---- blending across manifolds -------------------------------------------
 

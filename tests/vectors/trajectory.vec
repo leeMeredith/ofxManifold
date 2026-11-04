@@ -194,3 +194,76 @@ REJECT reject_no_samples ANALYTIC bad_traj_no_samples.json missing
 # normalized -- the same guard the manifold loader has, which
 # had no vector until a CI gate went looking for one
 REJECT reject_traj_space SPEC bad_traj_space.json unsupported
+
+#--------------------------------------------------------------------
+# PATHS WITH HEIGHT (round 3A-2)
+#
+# A sample may carry a height z, for a 3D map: a bird dropping
+# from a high branch to the ground. Height is interpolated with
+# the SAME brackets as x and y, and pointAt() -- the 2D answer
+# -- is unchanged by it: every AT3 record also checks that the
+# x and y of point3At() equal pointAt().
+#--------------------------------------------------------------------
+# dives for two units, then waits on the ground for two
+TRAJ3 bird 0:0.2,0.8,1 0.25:0.5,0.5,0.5 0.5:0.8,0.2,0 1:0.8,0.2,0
+
+AT3 bird_start ANALYTIC bird 0 0.2 0.8 1
+AT3 bird_first_landing ANALYTIC bird 0.25 0.5 0.5 0.5
+AT3 bird_halfway_down ANALYTIC bird 0.125 0.35 0.65 0.75
+AT3 bird_ground ANALYTIC bird 0.5 0.8 0.2 0
+AT3 bird_waiting ANALYTIC bird 0.75 0.8 0.2 0
+AT3 bird_end ANALYTIC bird 1 0.8 0.2 0
+AT3 bird_before SPEC bird -1 0.2 0.8 1
+AT3 bird_after SPEC bird 2 0.8 0.2 0
+AT3 bird_odd CROSS bird 0.3141 0.57692 0.42308 0.3718
+# a path with no height is at z = 0 everywhere, and says so
+AT3 flat_is_ground ANALYTIC even 0.3 0.34 0.58 0
+HAS3 has_height_bird ANALYTIC bird 1
+HAS3 has_height_flat ANALYTIC even 0
+TRAJ3 hop 0:0.1,0.1,0 0.5:0.5,0.5,0.25 1:0.9,0.9,0
+# only the middle sample leaves the ground: still a path with
+# height. Checking the first and last samples alone would
+# call it flat, and save its hop away.
+HAS3 has_height_hop ANALYTIC hop 1
+AT3 hop_top ANALYTIC hop 0.5 0.5 0.5 0.25
+AT3 hop_rising ANALYTIC hop 0.25 0.3 0.3 0.125
+TRAJ3 jump 0:0.2,0.2,0 0.5:0.4,0.4,0.6 0.5:0.6,0.6,0.9 1:0.8,0.8,0.3
+# two samples at one instant: at that instant the later one
+# holds, as for x and y
+AT3 jump_instant SPEC jump 0.5 0.6 0.6 0.9
+AT3 jump_after SPEC jump 0.75 0.7 0.7 0.6
+
+# RECORDING with height: addSample(t, vec3), then finalize().
+# Times as before; every height kept, in order.
+RECORD3 record_height ANALYTIC 3:0.2,0.8,0.9 4:0.4,0.6,0.6 4:0.45,0.55,0.5 7:0.8,0.2,0.1 EXPECT 0:0.9 0.25:0.6 0.25:0.5 1:0.1
+
+# real time: a dive recorded over 8 units, queried in them
+SECONDS3 secs3_start ANALYTIC 0:0.5,0.5,1 8:0.5,0.5,0 AT 0 EXPECT 0.5 0.5 1
+SECONDS3 secs3_quarter ANALYTIC 0:0.5,0.5,1 8:0.5,0.5,0 AT 2 EXPECT 0.5 0.5 0.75
+SECONDS3 secs3_end ANALYTIC 0:0.5,0.5,1 8:0.5,0.5,0 AT 8 EXPECT 0.5 0.5 0
+
+# VELOCITY in 3D: x and y exactly as velocityAt(); the climb
+# (negative: falling) from the heights, clipped at the ends
+# and divided by the span actually used, as in 2D
+VEL3 vel3_diving ANALYTIC bird 0.125 0.05 1.2 -1.2 -2
+VEL3 vel3_waiting ANALYTIC bird 0.75 0.05 0 0 0
+VEL3 vel3_start_clipped ANALYTIC bird 0 0.05 1.2 -1.2 -2
+VEL3 vel3_landing CROSS bird 0.49 0.05 0.72 -0.72 -1.2
+
+# LENGTH: in 3D, a 3-4-5 step: 0.3 across and 0.4 up is 0.5
+# long. length() stays the 2D length, 0.3.
+TRAJ3 step 0:0.1,0.1,0 1:0.4,0.1,0.4
+LEN3 length_345 ANALYTIC step 0.3 0.5
+
+# FILES. A path with height is version 2, every sample with
+# three numbers. A path without height is still version 1,
+# byte-identical: tour.json saves as version 1.
+ROUNDTRIP3 roundtrip_bird ANALYTIC traj_bird.json 2
+ROUNDTRIP3 roundtrip_flat_stays_v1 ANALYTIC tour.json 1
+# a height in a version 1 file: an older reader would refuse
+# it anyway, so it is written only as version 2
+REJECT reject_height_needs_v2 ANALYTIC bad_traj_height_v1.json version
+# version 2 samples all carry height; a two-number sample in
+# one is a damaged file, not a flat point
+REJECT reject_v2_without_height ANALYTIC bad_traj_flat_v2.json three-element
+REJECT reject_future_version ANALYTIC bad_traj_v3.json version

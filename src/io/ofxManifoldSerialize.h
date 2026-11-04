@@ -214,6 +214,9 @@ inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
 // which lists outputs explicitly, and which an older reader refuses cleanly
 // rather than loading wrongly.
 inline bool mappingNeedsV2(const Mapping& mp, const Manifold2D& m) {
+    for (const auto& a : mp.aggregators()) {
+        if (a.feed == Feed::Outputs) return true;
+    }
     for (TargetID t = 0; t < mp.targetCount(); ++t) {
         if (mp.targetChannel(t) != static_cast<int>(t)) return true;
         if (mp.targetTrim(t) != 1.0f) return true;
@@ -242,6 +245,16 @@ inline bool mappingNeedsV2(const Mapping& mp, const Manifold2D& m) {
         if (n >= m.nodeCount()) return true;
     }
     return next != mp.targetCount();                          // unbound
+}
+
+// Version 3: a derived output fed by OUTPUTS (PLAN-round3.md decision A),
+// whose sources are written by output name. Nothing else needs it, so every
+// file that could be written as version 1 or 2 still is, byte-identical.
+inline bool mappingNeedsV3(const Mapping& mp) {
+    for (const auto& a : mp.aggregators()) {
+        if (a.feed == Feed::Outputs) return true;
+    }
+    return false;
 }
 
 inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m);
@@ -290,14 +303,9 @@ inline std::string saveMapping(const Mapping& mp, const Manifold2D& m) {
     return o.str();
 }
 
-// Version 2: outputs listed explicitly, in the order they were made, with
-// channel and trim; a binding's kind written only when it is not an output;
-// aggregator sources as objects carrying their weights.
-inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m) {
-    std::ostringstream o;
-    o << "{\n";
-    o << "  \"version\": 2,\n";
+namespace detail {
 
+inline void writeOutputs(std::ostringstream& o, const Mapping& mp) {
     o << "  \"outputs\": [\n";
     for (TargetID t = 0; t < mp.targetCount(); ++t) {
         o << "    { \"name\": " << json::quote(mp.targetName(t))
@@ -306,7 +314,66 @@ inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m) {
         if (t + 1 < mp.targetCount()) o << ",";
         o << "\n";
     }
-    o << "  ],\n";
+    o << "  ]";
+}
+
+// Derived outputs. Sources fed by nodes are written by node name, those fed
+// by outputs by output name. In a RIG (`rig`), a node-fed derived output is a
+// channel the map fills: written "feed": "map", with no sources.
+inline void writeAggregators(std::ostringstream& o, const Mapping& mp,
+                             const Manifold2D* m, bool rig) {
+    const auto& ags = mp.aggregators();
+    o << "  \"aggregators\": [\n";
+    for (std::size_t a = 0; a < ags.size(); ++a) {
+        const Aggregator& ag = ags[a];
+        o << "    { \"name\": " << json::quote(ag.name)
+          << ", \"mode\": \""
+          << (ag.mode == SumMode::Linear ? "linear" : "power") << "\"";
+        if (ag.channel != NoChannel) {
+            o << ", \"channel\": " << ag.channel
+              << ", \"trim\": " << json::number(ag.trim);
+        }
+        if (rig && ag.feed == Feed::Nodes) {
+            o << ", \"feed\": \"map\" }";
+            if (a + 1 < ags.size()) o << ",";
+            o << "\n";
+            continue;
+        }
+        o << ", \"sources\": [";
+        const bool outs = ag.feed == Feed::Outputs;
+        const std::size_t n = outs ? ag.outputs.size() : ag.sources.size();
+        for (std::size_t s2 = 0; s2 < n; ++s2) {
+            const float g = s2 < ag.weights.size() ? ag.weights[s2] : 1.0f;
+            if (outs) {
+                o << "{ \"output\": "
+                  << json::quote(mp.targetName(ag.outputs[s2]));
+            } else {
+                o << "{ \"node\": "
+                  << json::quote(m->node(ag.sources[s2]).name);
+            }
+            o << ", \"weight\": " << json::number(g) << " }";
+            if (s2 + 1 < n) o << ", ";
+        }
+        o << "] }";
+        if (a + 1 < ags.size()) o << ",";
+        o << "\n";
+    }
+    o << "  ]\n";
+}
+
+} // namespace detail
+
+// Version 2: outputs listed explicitly, in the order they were made, with
+// channel and trim; a binding's kind written only when it is not an output;
+// aggregator sources as objects carrying their weights. Version 3 is the same
+// with output-fed sources; which one is written is decided here, so a file
+// that does not need 3 is still byte-identical to what version 2 wrote.
+inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m) {
+    std::ostringstream o;
+    o << "{\n";
+    o << "  \"version\": " << (mappingNeedsV3(mp) ? 3 : 2) << ",\n";
+    detail::writeOutputs(o, mp);
+    o << ",\n";
 
     o << "  \"bindings\": [\n";
     bool first = true;
@@ -328,32 +395,143 @@ inline std::string saveMappingV2(const Mapping& mp, const Manifold2D& m) {
     if (!first) o << "\n";
     o << "  ],\n";
 
-    o << "  \"aggregators\": [\n";
-    const auto& ags = mp.aggregators();
-    for (std::size_t a = 0; a < ags.size(); ++a) {
-        o << "    { \"name\": " << json::quote(ags[a].name)
-          << ", \"mode\": \""
-          << (ags[a].mode == SumMode::Linear ? "linear" : "power") << "\"";
-        if (ags[a].channel != NoChannel) {
-            o << ", \"channel\": " << ags[a].channel
-              << ", \"trim\": " << json::number(ags[a].trim);
-        }
-        o << ", \"sources\": [";
-        for (std::size_t s2 = 0; s2 < ags[a].sources.size(); ++s2) {
-            const float g = s2 < ags[a].weights.size() ? ags[a].weights[s2]
-                                                       : 1.0f;
-            o << "{ \"node\": " << json::quote(m.node(ags[a].sources[s2]).name)
-              << ", \"weight\": " << json::number(g) << " }";
-            if (s2 + 1 < ags[a].sources.size()) o << ", ";
-        }
-        o << "] }";
-        if (a + 1 < ags.size()) o << ",";
-        o << "\n";
-    }
-    o << "  ]\n";
+    detail::writeAggregators(o, mp, &m, false);
     o << "}\n";
     return o.str();
 }
+
+namespace detail {
+
+// Outputs declared up front (version 2 and later), in order, with channel and
+// trim. Shared by maps' outputs files and rig files.
+inline bool readOutputs(const json::Value& root, Mapping& built,
+                        std::string& error) {
+    if (!root.has("outputs")) return true;
+    if (!root["outputs"].isArray()) {
+        error = "outputs is not an array";
+        return false;
+    }
+    for (const json::Value& ov : root["outputs"].asArray()) {
+        if (!ov.isObject() || !ov["name"].isString() || !ov.has("channel")) {
+            error = "output needs a string name and a channel";
+            return false;
+        }
+        const std::string nm = ov["name"].asString();
+        const int ch = static_cast<int>(ov["channel"].asNumber());
+        const float tr = ov.has("trim") ? ov["trim"].asFloat() : 1.0f;
+        if (built.findTarget(nm) != InvalidTarget) {
+            error = "duplicate output name: " + nm;
+            return false;
+        }
+        if (ch < 0) {
+            error = "negative channel for output " + nm;
+            return false;
+        }
+        if (built.addOutput(nm, ch, tr) == InvalidTarget) {
+            error = "duplicate channel " + std::to_string(ch)
+                  + " for output " + nm;
+            return false;
+        }
+    }
+    return true;
+}
+
+// Derived outputs. Sources are names (version 1), {node, weight} (version 2),
+// or {output, weight} (version 3) -- all of one kind within one derived
+// output. `m` is null for a rig, which has no nodes to name.
+inline bool readAggregators(const json::Value& root, int version,
+                            const Manifold2D* m, Mapping& built,
+                            std::string& error) {
+    if (!root.has("aggregators")) return true;
+    for (const json::Value& a : root["aggregators"].asArray()) {
+        if (!a.isObject() || !a["name"].isString()) {
+            error = "aggregator needs a string name";
+            return false;
+        }
+        const std::string name = a["name"].asString();
+        const std::string mode =
+            a.has("mode") ? a["mode"].asString() : "linear";
+        if (mode != "linear" && mode != "power") {
+            error = "unknown aggregator mode: " + mode;
+            return false;
+        }
+        // "feed": "map" -- a rig's channel that a map fills. It names no
+        // sources: they are the map's. Read as a node-fed derived output with
+        // none, which is what it is until a map supplies them.
+        if (a.has("feed")) {
+            const std::string feed = a["feed"].asString();
+            if (version < 3 || feed != "map") {
+                error = "aggregator " + name + ": unknown feed " + feed;
+                return false;
+            }
+            if (a.has("sources")) {
+                error = "aggregator " + name + " is filled by the map and "
+                        "names no sources";
+                return false;
+            }
+        }
+        std::vector<std::pair<NodeID, float>>   nodeSrcs;
+        std::vector<std::pair<TargetID, float>> outSrcs;
+        if (a.has("sources")) {
+            for (const json::Value& s : a["sources"].asArray()) {
+                const float g = (s.isObject() && s.has("weight"))
+                              ? s["weight"].asFloat() : 1.0f;
+                if (s.isObject() && s.has("output")) {
+                    if (version < 3) {
+                        error = "aggregator " + name + " reads an output, "
+                                "which needs version 3";
+                        return false;
+                    }
+                    const std::string on = s["output"].asString();
+                    const TargetID t = built.findTarget(on);
+                    if (t == InvalidTarget) {
+                        error = "aggregator " + name
+                              + " references unknown output: " + on;
+                        return false;
+                    }
+                    outSrcs.emplace_back(t, g);
+                    continue;
+                }
+                const std::string nm =
+                    s.isObject() ? s["node"].asString() : s.asString();
+                if (!m) {
+                    error = "aggregator " + name + " reads node " + nm
+                          + ": a rig holds no nodes";
+                    return false;
+                }
+                const NodeID id = m->findNode(nm);
+                if (id == InvalidNode) {
+                    error = "aggregator references unknown node: " + nm;
+                    return false;
+                }
+                nodeSrcs.emplace_back(id, g);
+            }
+        }
+        // Summing a share before the faders with a level after them would
+        // give a number that means neither.
+        if (!nodeSrcs.empty() && !outSrcs.empty()) {
+            error = "aggregator " + name + " mixes node and output sources";
+            return false;
+        }
+        const int ch = a.has("channel")
+                     ? static_cast<int>(a["channel"].asNumber())
+                     : NoChannel;
+        const float tr = a.has("trim") ? a["trim"].asFloat() : 1.0f;
+        const SumMode sm = mode == "power" ? SumMode::PowerPreserving
+                                           : SumMode::Linear;
+        const std::size_t made = outSrcs.empty()
+            ? built.addDerived(name, ch, tr, sm, nodeSrcs)
+            : built.addDerivedFromOutputs(name, ch, tr, sm, outSrcs);
+        if (made == static_cast<std::size_t>(-1)) {
+            error = "aggregator " + name + ": channel " + std::to_string(ch)
+                  + " is negative or already used";
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace detail
 
 inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
                               Mapping& out) {
@@ -371,43 +549,24 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
         return res;
     }
     const int version = static_cast<int>(root["version"].asNumber());
-    if (version != 1 && version != 2) {
+    if (version < 1 || version > 3) {
         res.error = "missing or unsupported version "
                   + std::to_string(version);
+        return res;
+    }
+    // A file may say what it is. The only kind so far is a rig, which opens
+    // here as a map with outputs and no bindings. Anything else is a file
+    // this reader does not understand, refused rather than half-read.
+    if (root.has("kind") && root["kind"].asString() != "rig") {
+        res.error = "unknown file kind: " + root["kind"].asString();
         return res;
     }
 
     Mapping built;
 
-    // Version 2 declares outputs up front, in order, with channel and trim.
-    if (version == 2 && root.has("outputs")) {
-        if (!root["outputs"].isArray()) {
-            res.error = "outputs is not an array";
-            return res;
-        }
-        for (const json::Value& ov : root["outputs"].asArray()) {
-            if (!ov.isObject() || !ov["name"].isString()
-                || !ov.has("channel")) {
-                res.error = "output needs a string name and a channel";
-                return res;
-            }
-            const std::string nm = ov["name"].asString();
-            const int ch = static_cast<int>(ov["channel"].asNumber());
-            const float tr = ov.has("trim") ? ov["trim"].asFloat() : 1.0f;
-            if (built.findTarget(nm) != InvalidTarget) {
-                res.error = "duplicate output name: " + nm;
-                return res;
-            }
-            if (ch < 0) {
-                res.error = "negative channel for output " + nm;
-                return res;
-            }
-            if (built.addOutput(nm, ch, tr) == InvalidTarget) {
-                res.error = "duplicate channel " + std::to_string(ch)
-                          + " for output " + nm;
-                return res;
-            }
-        }
+    // Version 2 and later declare outputs up front, in order.
+    if (version >= 2 && !detail::readOutputs(root, built, res.error)) {
+        return res;
     }
     if (root.has("bindings")) {
         if (!root["bindings"].isArray()) {
@@ -453,51 +612,67 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
         }
     }
 
-    if (root.has("aggregators")) {
-        for (const json::Value& a : root["aggregators"].asArray()) {
-            if (!a.isObject() || !a["name"].isString()) {
-                res.error = "aggregator needs a string name";
-                return res;
-            }
-            const std::string mode =
-                a.has("mode") ? a["mode"].asString() : "linear";
-            if (mode != "linear" && mode != "power") {
-                res.error = "unknown aggregator mode: " + mode;
-                return res;
-            }
-            // Sources: names (version 1) or {node, weight} (version 2).
-            std::vector<std::pair<NodeID, float>> srcs;
-            if (a.has("sources")) {
-                for (const json::Value& s : a["sources"].asArray()) {
-                    const std::string nm =
-                        s.isObject() ? s["node"].asString() : s.asString();
-                    const float g = (s.isObject() && s.has("weight"))
-                                  ? s["weight"].asFloat() : 1.0f;
-                    const NodeID id = m.findNode(nm);
-                    if (id == InvalidNode) {
-                        res.error = "aggregator references unknown node: "
-                                  + nm;
-                        return res;
-                    }
-                    srcs.emplace_back(id, g);
-                }
-            }
-            const int ch = a.has("channel")
-                         ? static_cast<int>(a["channel"].asNumber())
-                         : NoChannel;
-            const float tr = a.has("trim") ? a["trim"].asFloat() : 1.0f;
-            if (built.addDerived(a["name"].asString(), ch, tr,
-                                 mode == "power" ? SumMode::PowerPreserving
-                                                 : SumMode::Linear, srcs)
-                    == static_cast<std::size_t>(-1)) {
-                res.error = "aggregator " + a["name"].asString()
-                          + ": channel " + std::to_string(ch)
-                          + " is negative or already used";
-                return res;
-            }
-        }
+    if (!detail::readAggregators(root, version, &m, built, res.error)) {
+        return res;
     }
 
+    out = std::move(built);
+    res.ok = true;
+    return res;
+}
+
+// ---- rig (PLAN-round3.md decision B) --------------------------------------
+//
+// The room: outputs with channel and trim, and derived outputs fed by outputs.
+// Always version 3, and marked "kind": "rig", so a rig is never mistaken for
+// a map's outputs file, nor one for a rig. Written from rigOf(), so whatever
+// a map holds that belongs to the map -- bindings, a derived output that
+// reads nodes -- is never written into a rig.
+inline std::string saveRig(const Mapping& mp) {
+    const Mapping rig = rigOf(mp);
+    std::ostringstream o;
+    o << "{\n";
+    o << "  \"version\": 3,\n";
+    o << "  \"kind\": \"rig\",\n";
+    detail::writeOutputs(o, rig);
+    o << ",\n";
+    detail::writeAggregators(o, rig, nullptr, true);
+    o << "}\n";
+    return o.str();
+}
+
+// Refuses anything a rig cannot hold, by name: bindings, a derived output
+// reading a node, a file that is not a rig. A map's outputs file handed here
+// is refused rather than having its bindings dropped without a word.
+inline LoadResult loadRig(const std::string& text, Mapping& out) {
+    LoadResult res;
+    const json::ParseResult pr = json::parse(text);
+    if (!pr.ok) {
+        res.error = "json: " + pr.error + " at byte "
+                  + std::to_string(pr.offset);
+        return res;
+    }
+    const json::Value& root = pr.value;
+    if (!root.isObject()) { res.error = "root is not an object"; return res; }
+    if (!root.has("kind") || root["kind"].asString() != "rig") {
+        res.error = "not a rig: no \"kind\": \"rig\"";
+        return res;
+    }
+    const int version = root.has("version")
+                      ? static_cast<int>(root["version"].asNumber()) : 0;
+    if (version != 3) {
+        res.error = "unsupported rig version " + std::to_string(version);
+        return res;
+    }
+    if (root.has("bindings")) {
+        res.error = "a rig holds no bindings";
+        return res;
+    }
+    Mapping built;
+    if (!detail::readOutputs(root, built, res.error)) return res;
+    if (!detail::readAggregators(root, version, nullptr, built, res.error)) {
+        return res;
+    }
     out = std::move(built);
     res.ok = true;
     return res;
@@ -515,10 +690,15 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
 // pauses -- and it needs no decision about which curve family is right. A
 // curve representation can be added later as a second format; going the other
 // way, from a fitted curve back to what actually happened, cannot.
+//
+// Version 2 (round 3A-2): a path with height writes every sample's `p` with
+// three numbers. Written only when some sample leaves the ground, so every
+// flat path is still version 1, byte-identical.
 inline std::string saveTrajectory(const Trajectory& tr) {
+    const bool height = tr.hasHeight();
     std::ostringstream o;
     o << "{\n";
-    o << "  \"version\": " << kFormatVersion << ",\n";
+    o << "  \"version\": " << (height ? 2 : kFormatVersion) << ",\n";
     o << "  \"space\": \"normalized\",\n";
     // Optional. Absent means the original timing is unknown, which is what a
     // path assembled programmatically has. A reader from before this field
@@ -531,7 +711,9 @@ inline std::string saveTrajectory(const Trajectory& tr) {
         const TrajectorySample& s = tr.sample(i);
         o << "    { \"t\": " << json::number(s.t)
           << ", \"p\": [" << json::number(s.position.x) << ", "
-          << json::number(s.position.y) << "] }";
+          << json::number(s.position.y);
+        if (height) o << ", " << json::number(s.z);
+        o << "] }";
         if (i + 1 < tr.sampleCount()) o << ",";
         o << "\n";
     }
@@ -550,11 +732,17 @@ inline LoadResult loadTrajectory(const std::string& text, Trajectory& out) {
     }
     const json::Value& root = pr.value;
     if (!root.isObject()) { res.error = "root is not an object"; return res; }
-    if (!root.has("version")
-        || static_cast<int>(root["version"].asNumber()) != kFormatVersion) {
+    if (!root.has("version")) {
         res.error = "missing or unsupported version";
         return res;
     }
+    // 1: flat, two numbers per sample. 2: with height, three.
+    const int version = static_cast<int>(root["version"].asNumber());
+    if (version != kFormatVersion && version != 2) {
+        res.error = "missing or unsupported version";
+        return res;
+    }
+    const std::size_t dims = (version == 2) ? 3 : 2;
     if (root.has("space") && root["space"].asString() != "normalized") {
         res.error = "unsupported space: " + root["space"].asString();
         return res;
@@ -567,9 +755,15 @@ inline LoadResult loadTrajectory(const std::string& text, Trajectory& out) {
     std::vector<TrajectorySample> samples;
     float last = -1.0f;
     for (const json::Value& s : root["samples"].asArray()) {
+        if (dims == 2 && s.isObject() && s["p"].isArray()
+            && s["p"].asArray().size() == 3) {
+            res.error = "a sample with height needs version 2";
+            return res;
+        }
         if (!s.isObject() || !s["p"].isArray()
-            || s["p"].asArray().size() != 2) {
-            res.error = "sample needs a two-element p";
+            || s["p"].asArray().size() != dims) {
+            res.error = dims == 2 ? "sample needs a two-element p"
+                                  : "version 2 sample needs a three-element p";
             return res;
         }
         const float t = s["t"].asFloat();
@@ -584,6 +778,7 @@ inline LoadResult loadTrajectory(const std::string& text, Trajectory& out) {
         samples.push_back(TrajectorySample{
             t, glm::vec2(s["p"].asArray()[0].asFloat(),
                          s["p"].asArray()[1].asFloat())});
+        if (dims == 3) samples.back().z = s["p"].asArray()[2].asFloat();
     }
 
     const float dur = root.has("duration") ? root["duration"].asFloat() : 0.0f;

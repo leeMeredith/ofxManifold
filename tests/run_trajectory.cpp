@@ -66,6 +66,24 @@ TrajectorySample parseSample(const std::string& tok) {
     return s;
 }
 
+// "0.25:0.3,0.5,0.8" -> one sample with height
+TrajectorySample parseSample3(const std::string& tok) {
+    const std::size_t colon = tok.find(':');
+    const std::size_t c1 = tok.find(',', colon);
+    const std::size_t c2 = tok.find(',', c1 + 1);
+    TrajectorySample s;
+    s.t = std::stof(tok.substr(0, colon));
+    s.position = glm::vec2(std::stof(tok.substr(colon + 1, c1 - colon - 1)),
+                           std::stof(tok.substr(c1 + 1, c2 - c1 - 1)));
+    s.z = std::stof(tok.substr(c2 + 1));
+    return s;
+}
+
+int savedVersion(const std::string& text) {
+    const std::size_t p = text.find("\"version\": ");
+    return p == std::string::npos ? -1 : std::atoi(text.c_str() + p + 11);
+}
+
 std::string showWeights(const Manifold2D& m, const Evaluation& e) {
     std::ostringstream os;
     os << std::fixed << std::setprecision(4);
@@ -99,6 +117,17 @@ int main(int argc, char** argv) {
             std::vector<TrajectorySample> ss;
             std::string tok;
             while (in >> tok) ss.push_back(parseSample(tok));
+            Trajectory tr;
+            tr.setSamples(std::move(ss));
+            trajectories[name] = tr;
+            continue;
+        }
+
+        if (kind == "TRAJ3") {
+            std::string name; in >> name;
+            std::vector<TrajectorySample> ss;
+            std::string tok;
+            while (in >> tok) ss.push_back(parseSample3(tok));
             Trajectory tr;
             tr.setSamples(std::move(ss));
             trajectories[name] = tr;
@@ -379,6 +408,148 @@ int main(int argc, char** argv) {
             else if (!ok) d << "expected duration " << std::fixed
                             << std::setprecision(6) << want << ", got "
                             << tr.duration();
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "AT3") {
+            // Height, and the 2D answer UNCHANGED by it: point3At's x and y
+            // must be exactly pointAt's.
+            std::string traj; float t, ex, ey, ez;
+            in >> traj >> t >> ex >> ey >> ez;
+            const Trajectory& tr = trajectories[traj];
+            const glm::vec3 p = tr.point3At(t);
+            const glm::vec2 q = tr.pointAt(t);
+            bool ok = close(p.x, ex) && close(p.y, ey) && close(p.z, ez)
+                   && close(tr.heightAt(t), ez);
+            if (!ok) d << "expected (" << std::fixed << std::setprecision(6)
+                       << ex << ", " << ey << ", " << ez << "), got ("
+                       << p.x << ", " << p.y << ", " << p.z << ")";
+            if (ok && (p.x != q.x || p.y != q.y)) {
+                ok = false; d << "point3At's x, y differ from pointAt's";
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "HAS3") {
+            std::string traj; int want; in >> traj >> want;
+            const bool got = trajectories[traj].hasHeight();
+            const bool ok = got == (want != 0);
+            if (!ok) d << "hasHeight() is " << got;
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "RECORD3") {
+            // addSample(t, vec3) then finalize(): times, and every height.
+            Trajectory tr;
+            std::vector<std::pair<float, float>> want;
+            std::string tok;
+            bool inExpect = false;
+            while (in >> tok) {
+                if (tok == "EXPECT") { inExpect = true; continue; }
+                if (inExpect) {
+                    const std::size_t c = tok.find(':');
+                    want.emplace_back(std::stof(tok.substr(0, c)),
+                                      std::stof(tok.substr(c + 1)));
+                    continue;
+                }
+                const TrajectorySample s3 = parseSample3(tok);
+                tr.addSample(s3.t, glm::vec3(s3.position.x, s3.position.y,
+                                             s3.z));
+            }
+            tr.finalize();
+            bool ok = tr.sampleCount() == want.size();
+            if (!ok) d << "expected " << want.size() << " samples, got "
+                       << tr.sampleCount();
+            for (std::size_t i = 0; ok && i < want.size(); ++i) {
+                if (!close(tr.sample(i).t, want[i].first)
+                    || !close(tr.sample(i).z, want[i].second)) {
+                    ok = false;
+                    d << "sample " << i << ": t " << tr.sample(i).t << " z "
+                      << tr.sample(i).z << ", expected " << want[i].first
+                      << " " << want[i].second;
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "SECONDS3") {
+            Trajectory tr;
+            std::string tok;
+            while (in >> tok && tok != "AT") {
+                const TrajectorySample s3 = parseSample3(tok);
+                tr.addSample(s3.t, glm::vec3(s3.position.x, s3.position.y,
+                                             s3.z));
+            }
+            tr.finalize();
+            float secs; in >> secs;
+            std::string kw; in >> kw;          // EXPECT
+            float ex, ey, ez; in >> ex >> ey >> ez;
+            const glm::vec3 p = tr.point3AtSeconds(secs);
+            const bool ok = close(p.x, ex) && close(p.y, ey) && close(p.z, ez)
+                         && close(tr.heightAtSeconds(secs), ez);
+            if (!ok) d << "got (" << p.x << ", " << p.y << ", " << p.z << ")";
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "VEL3") {
+            std::string traj; float t, w, ex, ey, ez;
+            in >> traj >> t >> w >> ex >> ey >> ez;
+            const Trajectory& tr = trajectories[traj];
+            const glm::vec3 v = tr.velocity3At(t, w);
+            const glm::vec2 v2 = tr.velocityAt(t, w);
+            bool ok = close(v.x, ex) && close(v.y, ey) && close(v.z, ez);
+            if (!ok) d << "expected (" << ex << ", " << ey << ", " << ez
+                       << "), got (" << v.x << ", " << v.y << ", " << v.z
+                       << ")";
+            if (ok && (v.x != v2.x || v.y != v2.y)) {
+                ok = false; d << "velocity3At's x, y differ from velocityAt's";
+            }
+            // In seconds, over a known duration, it is the same vector
+            // divided by that duration.
+            if (ok) {
+                Trajectory timed = tr;
+                timed.setDuration(4.0f);
+                const glm::vec3 vs =
+                    timed.velocity3AtSeconds(t * 4.0f, w * 4.0f);
+                if (!close(vs.x, ex / 4.0f) || !close(vs.y, ey / 4.0f)
+                    || !close(vs.z, ez / 4.0f)) {
+                    ok = false;
+                    d << "velocity3AtSeconds is not velocity3At / duration";
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "LEN3") {
+            std::string traj; float l2, l3; in >> traj >> l2 >> l3;
+            const Trajectory& tr = trajectories[traj];
+            const bool ok = close(tr.length(), l2) && close(tr.length3(), l3);
+            if (!ok) d << "length " << tr.length() << ", length3 "
+                       << tr.length3();
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "ROUNDTRIP3") {
+            // Byte-stable, written as the version given, and every height
+            // and position surviving -- a writer and reader that agreed on
+            // dropping z would pass a bytes-only check.
+            std::string file; int wantVer; in >> file >> wantVer;
+            std::string text;
+            Trajectory t1, t2;
+            if (!slurp(file, text) || !io::loadTrajectory(text, t1).ok) {
+                record(cls, name, false, "cannot load " + file); continue;
+            }
+            const std::string s1 = io::saveTrajectory(t1);
+            bool ok = io::loadTrajectory(s1, t2).ok
+                   && io::saveTrajectory(t2) == s1;
+            if (!ok) d << "save -> load -> save is not byte stable";
+            if (ok && savedVersion(s1) != wantVer) {
+                ok = false;
+                d << "written as version " << savedVersion(s1)
+                  << ", expected " << wantVer;
+            }
+            for (int i = 0; ok && i <= 40; ++i) {
+                const float t = static_cast<float>(i) / 40.0f;
+                if (t1.point3At(t) != t2.point3At(t)) {
+                    ok = false; d << "reloaded path differs at t=" << t;
+                }
+            }
+            if (ok && t1.hasHeight() != (wantVer == 2)) {
+                ok = false; d << "file's height does not match its version";
+            }
             record(cls, name, ok, d.str());
 
         } else if (kind == "REJECT") {
