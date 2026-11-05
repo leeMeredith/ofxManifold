@@ -404,7 +404,8 @@ def build():
     st2.remap(table)
     out.append(f"REMAP3 remap_follows_bend ANALYTIC bent TABLE "
                + " ".join(map(str, table)) + f" {heights_s(st2)}")
-    build_map3d(out, sq, tris)
+    maps = build_map3d(out, sq, tris)
+    build_files3(out, sq, tris, maps)
     return out
 
 
@@ -481,6 +482,9 @@ class Map3:
                 return "REFUSED"
             self.defs.append([w[1], float(w[2]), float(w[3]), float(w[4])])
             return str(len(self.defs) - 1)
+        elif v == "SETH":
+            ok = self.stack.set(int(w[1]), int(w[2]), float(w[3]))
+            return "OK" if ok else "REFUSED"
         elif v == "SETV":
             self.vals[int(w[1])][(w[3], int(w[2]))] = float(w[4])
         elif v == "REMOVEOUT":
@@ -711,6 +715,210 @@ def build_map3d(out, sq, tris):
                 " ".join(f"{n}@{k}={fmt(w)}" for (n, k), w in sorted(w3.items())))
         out.append(f"VAL3 {name} {cls} {mname} W {wtxt} VALUE {vname} "
                    f"EXPECT {fmt(m.value_at(vname, w3))}")
+    return maps
+
+
+# ---------------------------------------------------------------------------
+# round 3A-4c: files for the 3D map (PLAN-round3.md decision G)
+#
+# The fixtures are written here from the reference's own model, in its own
+# words -- json.dumps, not the C++ writer -- so loading them proves the C++
+# reads the format, and saving then reloading proves it writes it.
+# ---------------------------------------------------------------------------
+
+import json as _json
+
+from reference_outputs import write_fixture  # noqa: E402
+
+
+def files_of(m3, sq, tris):
+    """The pair of files for a Map3 model, as plain JSON."""
+    names = [f"n{i}" for i in range(len(sq))]
+    mp = {
+        "version": 3, "space": "normalized",
+        "nodes": [{"id": names[i], "position": [sq[i][0], sq[i][1]],
+                   "weight": 1.0} for i in sorted(sq)],
+        "regions": [[names[a], names[b], names[c]] for a, b, c in tris],
+        "values": [{"name": d[0], "fallback": d[1], "lo": d[2], "hi": d[3]}
+                   for d in m3.defs],
+        "levels": [],
+    }
+    for k, base in enumerate(m3.stack.bases):
+        lv = {"base": base, "heights": [], "values": []}
+        for i in range(m3.stack.n):
+            if m3.stack.H[k][i] != base:
+                lv["heights"].append({"node": names[i],
+                                      "height": m3.stack.H[k][i]})
+        for d in m3.defs:
+            for i in range(m3.stack.n):
+                x = m3.value(k, i, d[0])
+                if x != d[1]:
+                    lv["values"].append({"value": d[0], "node": names[i],
+                                         "x": x})
+        mp["levels"].append(lv)
+
+    room = m3.maps[0]
+    outs = {
+        "version": 3,
+        "outputs": [{"name": o[0], "channel": o[1], "trim": o[2]}
+                    for o in room.outputs],
+        "bindings": [],
+        "aggregators": [],
+    }
+    for k, m in enumerate(m3.maps):
+        for node in sorted(m.links):
+            for kind, dest, w in m.links[node]:
+                b = {"node": names[node]}
+                if k > 0:
+                    b["level"] = k
+                if kind == "silence":
+                    b["kind"] = "silence"
+                else:
+                    b["target"] = dest
+                b["weight"] = w
+                outs["bindings"].append(b)
+    for name, ch, tr, mode, sources, feed in room.derived:
+        a = {"name": name, "mode": mode, "channel": ch, "trim": tr}
+        if feed == "outputs":
+            a["sources"] = [{"output": s, "weight": g} for s, g in sources]
+        else:
+            a["sources"] = [{"node": names[s], "weight": g}
+                            for s, g in sources]
+        outs["aggregators"].append(a)
+    return mp, outs
+
+
+def build_files3(out, sq, tris, maps):
+    out.append("")
+    out.append("#" + "-" * 68)
+    out.append("# FILES FOR THE 3D MAP (round 3A-4c). The usual pair: the map")
+    out.append("# file gains 'values' and 'levels' (version 3), the outputs file")
+    out.append("# a 'level' on bindings above the first (version 3).")
+    out.append("#")
+    out.append("# FILE3 loads a pair written HERE, by json.dumps, and checks it")
+    out.append("# against the map built by operations: every height, every")
+    out.append("# value, the channels on and between every level. Then saves")
+    out.append("# it and checks save -> load -> save is byte-stable.")
+    out.append("#" + "-" * 68)
+    # (not forest_remap: its floor plan has three nodes, the square four)
+    for name in ("forest", "forest_trim", "forest_nomid"):
+        mp, outs = files_of(maps[name], sq, tris)
+        write_fixture(f"map3_{name}.json", mp)
+        write_fixture(f"map3_{name}-outputs.json", outs)
+        out.append(f"FILE3 file3_{name} ANALYTIC map3_{name}.json "
+                   f"map3_{name}-outputs.json AS {name}")
+    out.append("")
+
+    out.append("# SAVE3: the map built by operations, saved by the C++, with the")
+    out.append("# versions it must be written as, reloaded and compared. One")
+    out.append("# flat level and no values -- every map before 3D -- must save")
+    out.append("# BYTE-IDENTICAL to saveManifold and saveMapping (PLAIN).")
+    out.append("SAVE3 save3_forest ANALYTIC forest MAPV 3 OUTV 3")
+    out.append("SAVE3 save3_nomid ANALYTIC forest_nomid MAPV 3 OUTV 3")
+    out.append("# one level, but with values: version 3 for the map file, and")
+    out.append("# the outputs file exactly as a 2D map's -- version 3 here only")
+    out.append("# because its sub is fed after the fader (3A-1)")
+    out.append("SAVE3 save3_single_values ANALYTIC single MAPV 3 OUTV 3")
+    m = Map3(4)
+    for o in ("OUT L 1 1", "OUT R 2 0.5", "AFTER sub 9 0.8 linear L:1,R:1",
+              "BIND 0 0 L 1", "BIND 0 1 R 1", "BIND 0 2 L 0.5",
+              "SILENCE 0 2 0.5"):
+        m.op(o.split())
+    maps["plain"] = m
+    out.append("MAP3 plain NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; "
+               "AFTER sub 9 0.8 linear L:1,R:1 ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; "
+               "BIND 0 2 L 0.5 ; SILENCE 0 2 0.5")
+    out.append("SAVE3 save3_plain ANALYTIC plain MAPV PLAIN OUTV PLAIN")
+    out.append("# a single level bent at one node: only version 3 can say so")
+    m2 = Map3(4)
+    for o in ("OUT L 1 1", "BIND 0 0 L 1", "SETH 0 1 -0.25"):
+        m2.op(o.split())
+    maps["groundbent"] = m2
+    out.append("MAP3 groundbent NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; "
+               "SETH 0 1 -0.25 =OK")
+    out.append("SAVE3 save3_ground_bent ANALYTIC groundbent MAPV 3 OUTV 2")
+    out.append("# two flat levels and no values: the levels alone need version 3")
+    m3 = Map3(4)
+    for o in ("OUT L 1 1", "BIND 0 0 L 1", "COPY 0 1"):
+        m3.op(o.split())
+    maps["twoflat"] = m3
+    out.append("MAP3 twoflat NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; "
+               "COPY 0 1 =1")
+    out.append("SAVE3 save3_two_flat ANALYTIC twoflat MAPV 3 OUTV 3")
+    out.append("# one flat level that does not start at 0: copied below the")
+    out.append("# ground, then the ground removed. Only version 3 can say where")
+    out.append("# it starts.")
+    m4 = Map3(4)
+    for o in ("OUT L 1 1", "BIND 0 0 L 1", "COPY 0 -0.5", "REMOVELEVEL 1"):
+        m4.op(o.split())
+    maps["lowered"] = m4
+    out.append("MAP3 lowered NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; "
+               "COPY 0 -0.5 =0 ; REMOVELEVEL 1 =OK")
+    out.append("SAVE3 save3_lowered ANALYTIC lowered MAPV 3 OUTV 2")
+    out.append("")
+
+    out.append("# REFUSED, each for its own reason, leaving nothing half-read")
+    base_map, base_out = files_of(maps["forest"], sq, tris)
+
+    def bad(fname_map, mp_obj, fname_out, out_obj, reason, note):
+        if mp_obj is not None:
+            write_fixture(fname_map, mp_obj)
+        if out_obj is not None:
+            write_fixture(fname_out, out_obj)
+        out.append("# " + note)
+        out.append(f"REFUSE3 {fname_map[:-5]}__{fname_out[:-5]} ANALYTIC "
+                   f"{fname_map} {fname_out} {reason}")
+
+    o2 = _json.loads(_json.dumps(base_out))
+    o2["bindings"].append({"node": "n0", "level": 3, "target": "L",
+                           "weight": 1.0})
+    bad("map3_forest.json", None, "bad3_level_too_high-outputs.json", o2,
+        "level 3", "a binding on level 3 of a three-level map")
+    m3_ = _json.loads(_json.dumps(base_map))
+    m3_["levels"][1]["heights"] = [{"node": "n2", "height": 1.2}]
+    bad("bad3_cross.json", m3_, "map3_forest-outputs.json", None, "cross",
+        "the middle level's node 2 above the canopy")
+    m4 = _json.loads(_json.dumps(base_map))
+    m4["levels"][1]["base"] = 1.5
+    bad("bad3_bases.json", m4, "map3_forest-outputs.json", None,
+        "increasing", "starting heights out of order")
+    m5 = _json.loads(_json.dumps(base_map))
+    m5["levels"][0]["values"].append({"value": "wet", "node": "n0", "x": 1})
+    bad("bad3_undeclared.json", m5, "map3_forest-outputs.json", None,
+        "never declared", "a value set that was never declared")
+    m6 = _json.loads(_json.dumps(base_map))
+    m6["values"].append({"name": "bright", "fallback": 0, "lo": 0, "hi": 1})
+    bad("bad3_twice.json", m6, "map3_forest-outputs.json", None, "twice",
+        "a value declared twice")
+    m7 = _json.loads(_json.dumps(base_map))
+    m7["levels"][2]["heights"] = [{"node": "n9", "height": 1.1}]
+    bad("bad3_unknown_node.json", m7, "map3_forest-outputs.json", None,
+        "unknown node", "a height for a node the floor plan does not have")
+    m8 = _json.loads(_json.dumps(base_map))
+    m8["version"] = 2
+    del m8["regions"]
+    m8["regions"] = base_map["regions"]
+    bad("bad3_levels_v2.json", m8, "map3_forest-outputs.json", None,
+        "version 3", "levels in a version 2 map file")
+    o3 = _json.loads(_json.dumps(base_out))
+    o3["bindings"].append({"node": "n0", "level": 1, "target": "Nowhere",
+                           "weight": 1.0})
+    bad("map3_forest.json", None, "bad3_undeclared_output-outputs.json", o3,
+        "undeclared", "a binding to an output the file never declared")
+    o4 = _json.loads(_json.dumps(base_out))
+    o4["version"] = 2
+    o4["aggregators"] = [a for a in o4["aggregators"]
+                         if a["sources"] and "node" in a["sources"][0]]
+    bad("map3_forest.json", None, "bad3_level_v2-outputs.json", o4,
+        "version 3", "a binding with a level in a version 2 outputs file")
+    out.append("")
+    out.append("# The 2D readers refuse a 3D map's files rather than drop its")
+    out.append("# levels: the map file by version, the outputs file by its")
+    out.append("# first binding with a level")
+    out.append("REFUSE2D refuse2d_mapfile ANALYTIC MAP map3_forest.json "
+               "loadMap3D")
+    out.append("REFUSE2D refuse2d_outputs ANALYTIC OUTPUTS "
+               "map3_forest-outputs.json loadMap3D")
 
 
 def main():
@@ -723,7 +931,9 @@ def main():
         parts = line.split()
         if len(parts) > 2 and parts[0] in ("HEIGHTS", "EVAL3", "EVALXYZ",
                                             "CONT", "NEWNODE", "REMAP3",
-                                            "CH3", "CH3XYZ", "VAL3"):
+                                            "CH3", "CH3XYZ", "VAL3",
+                                            "FILE3", "SAVE3", "REFUSE3",
+                                            "REFUSE2D"):
             counts[parts[2]] = counts.get(parts[2], 0) + 1
     print(f"wrote {OUT}")
     for k in sorted(counts):

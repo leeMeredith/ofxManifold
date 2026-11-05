@@ -36,5 +36,6 @@
 
 #include "io/ofxManifoldJSON.h"
 #include "io/ofxManifoldSerialize.h"
+#include "io/ofxManifoldSerialize3D.h"
 
 #include "ofx/ofxManifoldRenderer.h"

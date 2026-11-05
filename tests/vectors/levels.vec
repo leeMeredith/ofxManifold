@@ -208,3 +208,67 @@ VAL3 dist_copied_up ANALYTIC forest W 1@1=1 VALUE dist EXPECT 0.3
 VAL3 bright_outside ANALYTIC forest W OUTSIDE VALUE bright EXPECT 0.5
 VAL3 bright_remap CROSS forest_remap W 0@0=0.2 0@1=0.2 1@0=0.2 1@1=0.2 2@0=0.1 2@1=0.1 VALUE bright EXPECT 0.32
 VAL3 bright_nomid CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 VALUE bright EXPECT 0.66
+
+#--------------------------------------------------------------------
+# FILES FOR THE 3D MAP (round 3A-4c). The usual pair: the map
+# file gains 'values' and 'levels' (version 3), the outputs file
+# a 'level' on bindings above the first (version 3).
+#
+# FILE3 loads a pair written HERE, by json.dumps, and checks it
+# against the map built by operations: every height, every
+# value, the channels on and between every level. Then saves
+# it and checks save -> load -> save is byte-stable.
+#--------------------------------------------------------------------
+FILE3 file3_forest ANALYTIC map3_forest.json map3_forest-outputs.json AS forest
+FILE3 file3_forest_trim ANALYTIC map3_forest_trim.json map3_forest_trim-outputs.json AS forest_trim
+FILE3 file3_forest_nomid ANALYTIC map3_forest_nomid.json map3_forest_nomid-outputs.json AS forest_nomid
+
+# SAVE3: the map built by operations, saved by the C++, with the
+# versions it must be written as, reloaded and compared. One
+# flat level and no values -- every map before 3D -- must save
+# BYTE-IDENTICAL to saveManifold and saveMapping (PLAIN).
+SAVE3 save3_forest ANALYTIC forest MAPV 3 OUTV 3
+SAVE3 save3_nomid ANALYTIC forest_nomid MAPV 3 OUTV 3
+# one level, but with values: version 3 for the map file, and
+# the outputs file exactly as a 2D map's -- version 3 here only
+# because its sub is fed after the fader (3A-1)
+SAVE3 save3_single_values ANALYTIC single MAPV 3 OUTV 3
+MAP3 plain NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; AFTER sub 9 0.8 linear L:1,R:1 ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 0.5 ; SILENCE 0 2 0.5
+SAVE3 save3_plain ANALYTIC plain MAPV PLAIN OUTV PLAIN
+# a single level bent at one node: only version 3 can say so
+MAP3 groundbent NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; SETH 0 1 -0.25 =OK
+SAVE3 save3_ground_bent ANALYTIC groundbent MAPV 3 OUTV 2
+# two flat levels and no values: the levels alone need version 3
+MAP3 twoflat NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 1 =1
+SAVE3 save3_two_flat ANALYTIC twoflat MAPV 3 OUTV 3
+# one flat level that does not start at 0: copied below the
+# ground, then the ground removed. Only version 3 can say where
+# it starts.
+MAP3 lowered NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 -0.5 =0 ; REMOVELEVEL 1 =OK
+SAVE3 save3_lowered ANALYTIC lowered MAPV 3 OUTV 2
+
+# REFUSED, each for its own reason, leaving nothing half-read
+# a binding on level 3 of a three-level map
+REFUSE3 map3_forest__bad3_level_too_high-outputs ANALYTIC map3_forest.json bad3_level_too_high-outputs.json level 3
+# the middle level's node 2 above the canopy
+REFUSE3 bad3_cross__map3_forest-outputs ANALYTIC bad3_cross.json map3_forest-outputs.json cross
+# starting heights out of order
+REFUSE3 bad3_bases__map3_forest-outputs ANALYTIC bad3_bases.json map3_forest-outputs.json increasing
+# a value set that was never declared
+REFUSE3 bad3_undeclared__map3_forest-outputs ANALYTIC bad3_undeclared.json map3_forest-outputs.json never declared
+# a value declared twice
+REFUSE3 bad3_twice__map3_forest-outputs ANALYTIC bad3_twice.json map3_forest-outputs.json twice
+# a height for a node the floor plan does not have
+REFUSE3 bad3_unknown_node__map3_forest-outputs ANALYTIC bad3_unknown_node.json map3_forest-outputs.json unknown node
+# levels in a version 2 map file
+REFUSE3 bad3_levels_v2__map3_forest-outputs ANALYTIC bad3_levels_v2.json map3_forest-outputs.json version 3
+# a binding to an output the file never declared
+REFUSE3 map3_forest__bad3_undeclared_output-outputs ANALYTIC map3_forest.json bad3_undeclared_output-outputs.json undeclared
+# a binding with a level in a version 2 outputs file
+REFUSE3 map3_forest__bad3_level_v2-outputs ANALYTIC map3_forest.json bad3_level_v2-outputs.json version 3
+
+# The 2D readers refuse a 3D map's files rather than drop its
+# levels: the map file by version, the outputs file by its
+# first binding with a level
+REFUSE2D refuse2d_mapfile ANALYTIC MAP map3_forest.json loadMap3D
+REFUSE2D refuse2d_outputs ANALYTIC OUTPUTS map3_forest-outputs.json loadMap3D

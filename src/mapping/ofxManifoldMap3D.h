@@ -129,6 +129,33 @@ public:
         }
     }
 
+    // Take levels and per-level routing built elsewhere -- by a file loader.
+    // Checked at the door: one Mapping per level, and every level agreeing
+    // about the room (checkAgreement, notes included). Refused, changing
+    // nothing, otherwise. Values are cleared; declare and set them after.
+    bool adopt(Levels geometry, std::vector<Mapping> routing,
+               std::string* why = nullptr) {
+        if (routing.size() != geometry.count()) {
+            if (why) {
+                *why = std::to_string(routing.size()) + " bindings tables for "
+                     + std::to_string(geometry.count()) + " levels";
+            }
+            return false;
+        }
+        std::vector<const Mapping*> all;
+        for (const Mapping& m : routing) all.push_back(&m);
+        const auto dis = checkAgreement(all);
+        if (!dis.empty()) {
+            if (why) *why = "levels disagree about the room: " + dis[0].message;
+            return false;
+        }
+        levels_ = std::move(geometry);
+        routing_ = std::move(routing);
+        defs_.clear();
+        values_.assign(routing_.size(), {});
+        return true;
+    }
+
     // ---- outputs: every level at once --------------------------------------
 
     TargetID addOutput(const std::string& name, int channel, float trim = 1.0f) {

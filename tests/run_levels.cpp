@@ -11,6 +11,7 @@
 #include "../src/core/ofxManifold2D.h"
 #include "../src/core/ofxManifoldLevels.h"
 #include "../src/mapping/ofxManifoldMap3D.h"
+#include "../src/io/ofxManifoldSerialize3D.h"
 
 #include <glm/vec3.hpp>
 
@@ -163,6 +164,95 @@ Manifold2D buildFloor(const Plan& plan) {
 
 std::map<std::string, Manifold2D> floors;
 std::map<std::string, Map3D> maps3;
+
+bool slurp(const std::string& file, std::string& out) {
+    std::ifstream f("tests/fixtures/" + file);
+    if (!f) return false;
+    std::stringstream ss; ss << f.rdbuf();
+    out = ss.str();
+    return true;
+}
+
+int fileVersion(const std::string& text) {
+    const std::size_t p = text.find("\"version\": ");
+    return p == std::string::npos ? -1 : std::atoi(text.c_str() + p + 11);
+}
+
+bool sameDense(const std::vector<float>& got, const std::vector<float>& want,
+               const char* what, std::ostringstream& d);
+
+// Two 3D maps hold the same thing: levels, every height, the value set, every
+// value, and the same channels on every level and halfway between each pair.
+bool sameMap3(const Map3D& a, const Map3D& b, std::size_t nodes,
+              std::ostringstream& d) {
+    if (a.count() != b.count()) {
+        d << a.count() << " levels, expected " << b.count();
+        return false;
+    }
+    for (LevelID k = 0; k < a.count(); ++k) {
+        if (!close(a.levels().base(k), b.levels().base(k))) {
+            d << "level " << k << " starts at " << a.levels().base(k);
+            return false;
+        }
+        for (NodeID n = 0; n < nodes; ++n) {
+            if (!close(a.levels().height(k, n), b.levels().height(k, n))) {
+                d << "node " << n << " on level " << k << " at "
+                  << a.levels().height(k, n) << ", expected "
+                  << b.levels().height(k, n);
+                return false;
+            }
+        }
+    }
+    if (a.valueSet().size() != b.valueSet().size()) {
+        d << a.valueSet().size() << " values declared, expected "
+          << b.valueSet().size();
+        return false;
+    }
+    for (std::size_t v = 0; v < a.valueSet().size(); ++v) {
+        const ValueDef& x = a.valueSet()[v];
+        const ValueDef& y = b.valueSet()[v];
+        if (x.name != y.name || !close(x.fallback, y.fallback)
+            || !close(x.lo, y.lo) || !close(x.hi, y.hi)) {
+            d << "value " << v << " is " << x.name << ", expected " << y.name;
+            return false;
+        }
+        for (LevelID k = 0; k < a.count(); ++k) {
+            for (NodeID n = 0; n < nodes; ++n) {
+                if (!close(a.value(k, n, v), b.value(k, n, v))) {
+                    d << x.name << " of node " << n << " on level " << k
+                      << " is " << a.value(k, n, v) << ", expected "
+                      << b.value(k, n, v);
+                    return false;
+                }
+            }
+        }
+    }
+    auto probe = [&](LevelID k, float t) {
+        Evaluation3D e;
+        e.inside = true;
+        for (NodeID n = 0; n < nodes; ++n) {
+            const float w = 1.0f / static_cast<float>(nodes);
+            if (t < 1.0f) e.weights.push_back(LevelWeight{n, k, w * (1.0f - t)});
+            if (t > 0.0f) e.weights.push_back(LevelWeight{n, k + 1, w * t});
+        }
+        return e;
+    };
+    for (LevelID k = 0; k < a.count(); ++k) {
+        for (float t : {0.0f, 0.5f}) {
+            if (t > 0.0f && k + 1 >= a.count()) continue;
+            const Evaluation3D e = probe(k, t);
+            std::ostringstream dd;
+            if (!sameDense(a.toChannelLevels(e), b.toChannelLevels(e),
+                           "levels", dd)
+                || !close(a.silenceShare(e), b.silenceShare(e))) {
+                d << "on level " << k << (t > 0 ? " and above" : "") << ": "
+                  << dd.str();
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 std::vector<float> readFloatsUntil(std::istringstream& in, const char* stop) {
     std::vector<float> v;
@@ -415,6 +505,9 @@ int main(int argc, char** argv) {
                                                      std::stof(w[4]));
                     got = i == static_cast<std::size_t>(-1)
                         ? "=REFUSED" : "=" + std::to_string(i);
+                } else if (v == "SETH") {
+                    got = m.setHeight(std::stoul(w[1]), std::stoul(w[2]),
+                                      std::stof(w[3])) ? "=OK" : "=REFUSED";
                 } else if (v == "SETV") {
                     m.setValue(std::stoul(w[1]), std::stoul(w[2]),
                                m.findValue(w[3]), std::stof(w[4]));
@@ -652,6 +745,105 @@ int main(int argc, char** argv) {
                               << ", expected " << sil;
             }
             if (ok) ok = map3Properties(m, e, d);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "FILE3") {
+            // A pair written by the reference loads, equals the map built by
+            // operations, and save -> load -> save is byte-stable.
+            std::string mf, of, as, mn;
+            in >> mf >> of >> as >> mn;
+            std::string mt, ot;
+            bool ok = slurp(mf, mt) && slurp(of, ot);
+            if (!ok) d << "missing " << mf << " or " << of;
+            Manifold2D fl;
+            Map3D got;
+            if (ok) {
+                const io::LoadResult r = io::loadMap3D(mt, ot, fl, got);
+                ok = r.ok;
+                if (!ok) d << "refused: " << r.error;
+            }
+            if (ok) ok = sameMap3(got, maps3[mn], fl.nodeCount(), d);
+            if (ok) {
+                const std::string s1 = io::saveManifold3D(fl, got);
+                const std::string s2 = io::saveMapping3D(got, fl);
+                Manifold2D fl2; Map3D again;
+                const io::LoadResult r2 = io::loadMap3D(s1, s2, fl2, again);
+                ok = r2.ok && io::saveManifold3D(fl2, again) == s1
+                          && io::saveMapping3D(again, fl2) == s2;
+                if (!ok) d << "save -> load -> save is not byte-stable"
+                           << (r2.ok ? "" : ": " + r2.error);
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "SAVE3") {
+            // The map built by operations, saved by the C++ as the versions
+            // given, reloaded equal. PLAIN: byte-identical to the 2D savers.
+            std::string mn, mv, ov;
+            in >> mn;
+            expectKeyword(in, "MAPV");
+            in >> mv;
+            expectKeyword(in, "OUTV");
+            in >> ov;
+            const Map3D& m = maps3[mn];
+            const Manifold2D& fl = floors["square"];
+            const std::string s1 = io::saveManifold3D(fl, m);
+            const std::string s2 = io::saveMapping3D(m, fl);
+            bool ok = true;
+            if (mv == "PLAIN") {
+                ok = s1 == io::saveManifold(fl) && s2 == io::saveMapping(m.level(0), fl);
+                if (!ok) d << "a flat map with no values does not save as a 2D map";
+            } else if (fileVersion(s1) != std::stoi(mv)
+                       || fileVersion(s2) != std::stoi(ov)) {
+                ok = false;
+                d << "saved as versions " << fileVersion(s1) << " and "
+                  << fileVersion(s2) << ", expected " << mv << " and " << ov;
+            }
+            Manifold2D fl2; Map3D back;
+            if (ok) {
+                const io::LoadResult r = io::loadMap3D(s1, s2, fl2, back);
+                ok = r.ok;
+                if (!ok) d << "its own files refused: " << r.error;
+            }
+            if (ok) ok = sameMap3(back, m, fl.nodeCount(), d);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "REFUSE3") {
+            std::string mf, of; in >> mf >> of;
+            std::string reason, tok;
+            while (in >> tok) reason += (reason.empty() ? "" : " ") + tok;
+            std::string mt, ot;
+            bool ok = slurp(mf, mt) && slurp(of, ot);
+            if (!ok) d << "missing " << mf << " or " << of;
+            Manifold2D fl = floors["square"];
+            Map3D got;
+            got.addOutput("untouched", 42, 1.0f);
+            if (ok) {
+                const io::LoadResult r = io::loadMap3D(mt, ot, fl, got);
+                ok = !r.ok && r.error.find(reason) != std::string::npos;
+                if (r.ok) d << "loaded";
+                else if (!ok) d << "refused for the wrong reason: " << r.error;
+                // and nothing was half-written into the caller's objects
+                if (ok && (got.level(0).findTarget("untouched") == InvalidTarget
+                           || fl.nodeCount() != plans["square"].pos.size())) {
+                    ok = false; d << "a refused load changed its outputs";
+                }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "REFUSE2D") {
+            std::string which, file, reason; in >> which >> file >> reason;
+            std::string text;
+            bool ok = slurp(file, text);
+            if (ok) {
+                io::LoadResult r;
+                if (which == "MAP") {
+                    Manifold2D fl; r = io::loadManifold(text, fl);
+                } else {
+                    Mapping mp; r = io::loadMapping(text, floors["square"], mp);
+                }
+                ok = !r.ok && r.error.find(reason) != std::string::npos;
+                if (!ok) d << (r.ok ? "loaded" : "wrong reason: " + r.error);
+            }
             record(cls, name, ok, d.str());
 
         } else if (kind == "VAL3") {

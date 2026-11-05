@@ -44,6 +44,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace ofxManifold {
@@ -178,6 +180,66 @@ public:
             return false;
         }
         set(k, n, h);
+        return true;
+    }
+
+    // ---- rebuilding, as a file does -------------------------------------------
+
+    // Replace every level at once: flat levels starting at `bases`, then the
+    // `bends` -- per level, (node, height) pairs. Checked WHOLE, after all of
+    // it is in place: set one by one, a valid file could be refused part way
+    // (a node raised on the ground before the level above it is raised too).
+    // Refused, changing nothing, if the bases are not strictly increasing, or
+    // any node -- of `nodeCount`, or any bent one -- would not be strictly
+    // between its levels. `why` says which.
+    bool rebuild(const std::vector<float>& bases,
+                 const std::vector<std::vector<std::pair<NodeID, float>>>& bends,
+                 std::size_t nodeCount, std::string* why = nullptr) {
+        auto fail = [&](const std::string& w) {
+            if (why) *why = w;
+            return false;
+        };
+        if (bases.empty()) return fail("a map has at least one level");
+        for (std::size_t k = 1; k < bases.size(); ++k) {
+            if (!(bases[k] > bases[k - 1])) {
+                return fail("level starting heights are not strictly "
+                            "increasing at level " + std::to_string(k));
+            }
+        }
+        std::vector<Level> made;
+        for (float b : bases) made.push_back(Level{b, {}});
+        std::size_t n = nodeCount;
+        for (std::size_t k = 0; k < bends.size() && k < made.size(); ++k) {
+            for (const auto& nh : bends[k]) {
+                if (nh.first == InvalidNode) return fail("bend on an unknown node");
+                Level& l = made[k];
+                if (l.heights.size() <= nh.first) {
+                    l.heights.resize(nh.first + 1, l.base);
+                }
+                l.heights[nh.first] = nh.second;
+                n = std::max(n, static_cast<std::size_t>(nh.first) + 1);
+            }
+        }
+        if (bends.size() > made.size()) {
+            return fail("bends for " + std::to_string(bends.size())
+                        + " levels, but there are "
+                        + std::to_string(made.size()));
+        }
+        auto at = [&](std::size_t k, NodeID i) {
+            const Level& l = made[k];
+            return i < l.heights.size() ? l.heights[i] : l.base;
+        };
+        for (std::size_t k = 1; k < made.size(); ++k) {
+            for (NodeID i = 0; i < n; ++i) {
+                if (!(at(k, i) > at(k - 1, i))) {
+                    return fail("levels cross or touch at node "
+                                + std::to_string(i) + " between levels "
+                                + std::to_string(k - 1) + " and "
+                                + std::to_string(k));
+                }
+            }
+        }
+        levels_ = std::move(made);
         return true;
     }
 

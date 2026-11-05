@@ -504,6 +504,34 @@ mutation gates.
   out of bounds on every evaluation. The first gap above would have reached
   it.
 
+### 3A-4c: files for the 3D map
+
+`src/io/ofxManifoldSerialize3D.h`: `saveManifold3D`, `saveMapping3D`,
+`loadMap3D`. The map file gains `values` and `levels` (version 3); bindings
+above the first level carry `"level"` (outputs file version 3). A map with
+one flat level at 0 and no values saves byte-identical to `saveManifold` and
+`saveMapping`. `loadManifold` refuses a version 3 map file and `loadMapping` a
+binding with a level, each naming `loadMap3D`, rather than dropping the
+levels. `Levels::rebuild` checks a whole file's heights at once, and
+`Map3D::adopt` checks that every level agrees about the room. 21 vectors (84
+in the levels suite), 17 mutation gates.
+
+- **The fixtures are written by the reference, with `json.dumps`,** not by
+  the C++ writer, so loading them proves the reader and saving then
+  reloading proves the writer.
+- **Heights from a file are checked whole, not one at a time.** Set one by
+  one, a valid file could be refused part way: a node raised on the ground
+  before the same node on the level above.
+- **A missing build dependency hid every serializer mutation locally.** The
+  levels runner wasn't rebuilt when the serializer changed, so all fifteen
+  file mutations first came back "missed". CI was never affected, since every
+  gate starts from `make clean`, but a local `make test` after editing a
+  serializer would have tested the old one. Fixed in the Makefile; all
+  seventeen are caught.
+- **One expectation of mine was wrong:** a one-level map with values saves
+  its outputs file as version 3, not 2, because its sub reads outputs (3A-1).
+  The C++ was right.
+
 ---
 
 ## Answered

@@ -38,26 +38,13 @@ struct LoadResult {
 
 // ---- manifold ------------------------------------------------------------
 
-inline std::string saveManifold(const Manifold2D& m) {
-    // A map made only of triangles is written EXACTLY as before: version 1,
-    // a "triangles" key. Every file v1.0.0 could read, it still can.
-    //
-    // A map containing any region of four or more nodes is written as
-    // version 2 under "regions". The version bump is what makes an older
-    // reader FAIL CLEANLY -- "unsupported version 2" -- instead of finding no
-    // "triangles" key and silently loading a map with no regions at all.
-    bool allTriangles = true;
-    for (std::size_t r = 0; r < m.regionCount(); ++r) {
-        if (m.region(static_cast<RegionID>(r)).size() != 3) {
-            allTriangles = false;
-            break;
-        }
-    }
-    const int version = allTriangles ? 1 : 2;
+namespace detail {
 
-    std::ostringstream o;
-    o << "{\n";
-    o << "  \"version\": " << version << ",\n";
+// Nodes and regions, as every map file writes them, up to the open regions
+// list's closing bracket. "triangles" for a map of triangles alone (version
+// 1), "regions" otherwise.
+inline void writeFloor(std::ostringstream& o, const Manifold2D& m,
+                       bool regionsKey) {
     // Recorded so a future non-normalized variant is DETECTABLE rather than
     // silently misread as normalized. A loader that finds an unknown space
     // refuses rather than guessing.
@@ -79,7 +66,7 @@ inline std::string saveManifold(const Manifold2D& m) {
     // previous writer emitted exactly three names per region, so a quad
     // saved as a triangle, dropped its fourth node, and reloaded without
     // error as a different shape. See DECISIONS.md D-017.
-    o << "  \"" << (allTriangles ? "triangles" : "regions") << "\": [\n";
+    o << "  \"" << (regionsKey ? "regions" : "triangles") << "\": [\n";
     for (std::size_t r = 0; r < m.regionCount(); ++r) {
         const auto& ids = m.region(static_cast<RegionID>(r)).ids();
         o << "    [";
@@ -91,12 +78,43 @@ inline std::string saveManifold(const Manifold2D& m) {
         if (r + 1 < m.regionCount()) o << ",";
         o << "\n";
     }
+}
+
+} // namespace detail
+
+inline std::string saveManifold(const Manifold2D& m) {
+    // A map made only of triangles is written EXACTLY as before: version 1,
+    // a "triangles" key. Every file v1.0.0 could read, it still can.
+    //
+    // A map containing any region of four or more nodes is written as
+    // version 2 under "regions". The version bump is what makes an older
+    // reader FAIL CLEANLY -- "unsupported version 2" -- instead of finding no
+    // "triangles" key and silently loading a map with no regions at all.
+    bool allTriangles = true;
+    for (std::size_t r = 0; r < m.regionCount(); ++r) {
+        if (m.region(static_cast<RegionID>(r)).size() != 3) {
+            allTriangles = false;
+            break;
+        }
+    }
+    const int version = allTriangles ? 1 : 2;
+
+    std::ostringstream o;
+    o << "{\n";
+    o << "  \"version\": " << version << ",\n";
+    detail::writeFloor(o, m, !allTriangles);
     o << "  ]\n";
     o << "}\n";
     return o.str();
 }
 
-inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
+namespace detail {
+
+// The floor plan, from a map file of any version up to `maxVersion`. Version
+// 3 is a 3D map: its nodes and regions are read here, its levels and values
+// by loadMap3D (ofxManifoldSerialize3D.h).
+inline LoadResult loadFloor(const std::string& text, Manifold2D& out,
+                            int maxVersion) {
     LoadResult res;
     const json::ParseResult pr = json::parse(text);
     if (!pr.ok) {
@@ -112,8 +130,11 @@ inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
         return res;
     }
     const int v = static_cast<int>(root["version"].asNumber());
-    if (v != 1 && v != 2) {
-        res.error = "unsupported version " + std::to_string(v);
+    if (v < 1 || v > maxVersion) {
+        // Version 3 is a 3D map. Read as a flat one, its levels, bends and
+        // values would be dropped without a word, so it is refused here.
+        res.error = "unsupported version " + std::to_string(v)
+                  + (v == 3 ? ": a 3D map, opened with loadMap3D" : "");
         return res;
     }
     if (root.has("space") && root["space"].asString() != "normalized") {
@@ -195,6 +216,12 @@ inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
     out = std::move(built);
     res.ok = true;
     return res;
+}
+
+} // namespace detail
+
+inline LoadResult loadManifold(const std::string& text, Manifold2D& out) {
+    return detail::loadFloor(text, out, 2);
 }
 
 // ---- mapping -------------------------------------------------------------
@@ -533,6 +560,130 @@ inline bool readAggregators(const json::Value& root, int version,
 
 } // namespace detail
 
+namespace detail {
+
+// The body of an outputs file, into one Mapping per level. `levels` comes in
+// sized: one for a 2D map, the 3D map's level count otherwise. Outputs and
+// derived outputs go to every level; each binding to its own.
+//
+// For a 2D map (`threeD` false) a binding carrying "level" is refused rather
+// than silently put on the only level there is: that file belongs to a 3D map.
+inline bool readMappingLevels(const json::Value& root, int version,
+                              const Manifold2D& m, std::vector<Mapping>& levels,
+                              bool threeD, std::string& error) {
+    // Version 2 and later declare outputs up front, in order.
+    if (version >= 2 && !readOutputs(root, levels[0], error)) return false;
+    for (std::size_t k = 1; k < levels.size(); ++k) levels[k] = levels[0];
+
+    if (root.has("bindings")) {
+        if (!root["bindings"].isArray()) {
+            error = "bindings is not an array";
+            return false;
+        }
+        for (const json::Value& b : root["bindings"].asArray()) {
+            if (!b.isObject() || !b["node"].isString()) {
+                error = "binding needs a string node";
+                return false;
+            }
+            // Kind: absent means output, which is every version 1 binding.
+            // "layer" is reserved and REFUSED until layers exist -- accepting
+            // and ignoring it would silently drop a binding.
+            const std::string kind =
+                b.has("kind") ? b["kind"].asString() : "output";
+            if (kind != "output" && kind != "silence") {
+                error = "unknown binding kind: " + kind;
+                return false;
+            }
+            if (kind == "silence" && b.has("target")) {
+                error = "a silence binding must not name a target";
+                return false;
+            }
+            if (kind == "output" && !b["target"].isString()) {
+                error = "binding needs string node and target";
+                return false;
+            }
+            const std::string nn = b["node"].asString();
+            const NodeID id = m.findNode(nn);
+            if (id == InvalidNode) {
+                // A mapping is only meaningful against a manifold, so a
+                // dangling reference is a load error rather than a warning.
+                error = "binding references unknown node: " + nn;
+                return false;
+            }
+            // Which level (round 3A-4c). Absent means the first.
+            std::size_t level = 0;
+            if (b.has("level")) {
+                const int lv = static_cast<int>(b["level"].asNumber());
+                if (!threeD) {
+                    error = "binding on level " + std::to_string(lv)
+                          + ": this is a 3D map's outputs file, opened with "
+                            "loadMap3D";
+                    return false;
+                }
+                if (version < 3) {
+                    error = "a binding with a level needs version 3";
+                    return false;
+                }
+                if (lv < 0 || static_cast<std::size_t>(lv) >= levels.size()) {
+                    error = "binding on level " + std::to_string(lv)
+                          + ", but the map has "
+                          + std::to_string(levels.size()) + " levels";
+                    return false;
+                }
+                level = static_cast<std::size_t>(lv);
+            }
+            Mapping& built = levels[level];
+            const float w = b.has("weight") ? b["weight"].asFloat() : 1.0f;
+            if (kind == "silence") {
+                built.bindSilence(id, w);
+            } else if (threeD) {
+                // Every level must hold the same outputs, so a binding may
+                // only name one the file declared; making it here would put
+                // it on one level alone.
+                const TargetID t = built.findTarget(b["target"].asString());
+                if (t == InvalidTarget) {
+                    error = "binding to undeclared output: "
+                          + b["target"].asString();
+                    return false;
+                }
+                built.bind(id, t, w);
+            } else {
+                built.bind(id, built.addTarget(b["target"].asString()), w);
+            }
+        }
+    }
+
+    for (Mapping& built : levels) {
+        if (!readAggregators(root, version, &m, built, error)) return false;
+    }
+    return true;
+}
+
+// Version and kind, as every outputs file is checked.
+inline bool readMappingHeader(const json::Value& root, int& version,
+                              std::string& error) {
+    if (!root.isObject()) { error = "root is not an object"; return false; }
+    if (!root.has("version")) {
+        error = "missing or unsupported version";
+        return false;
+    }
+    version = static_cast<int>(root["version"].asNumber());
+    if (version < 1 || version > 3) {
+        error = "missing or unsupported version " + std::to_string(version);
+        return false;
+    }
+    // A file may say what it is. The only kind so far is a rig, which opens
+    // here as a map with outputs and no bindings. Anything else is a file
+    // this reader does not understand, refused rather than half-read.
+    if (root.has("kind") && root["kind"].asString() != "rig") {
+        error = "unknown file kind: " + root["kind"].asString();
+        return false;
+    }
+    return true;
+}
+
+} // namespace detail
+
 inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
                               Mapping& out) {
     LoadResult res;
@@ -542,81 +693,14 @@ inline LoadResult loadMapping(const std::string& text, const Manifold2D& m,
                   + std::to_string(pr.offset);
         return res;
     }
-    const json::Value& root = pr.value;
-    if (!root.isObject()) { res.error = "root is not an object"; return res; }
-    if (!root.has("version")) {
-        res.error = "missing or unsupported version";
+    int version = 0;
+    if (!detail::readMappingHeader(pr.value, version, res.error)) return res;
+    std::vector<Mapping> one(1);
+    if (!detail::readMappingLevels(pr.value, version, m, one, false,
+                                   res.error)) {
         return res;
     }
-    const int version = static_cast<int>(root["version"].asNumber());
-    if (version < 1 || version > 3) {
-        res.error = "missing or unsupported version "
-                  + std::to_string(version);
-        return res;
-    }
-    // A file may say what it is. The only kind so far is a rig, which opens
-    // here as a map with outputs and no bindings. Anything else is a file
-    // this reader does not understand, refused rather than half-read.
-    if (root.has("kind") && root["kind"].asString() != "rig") {
-        res.error = "unknown file kind: " + root["kind"].asString();
-        return res;
-    }
-
-    Mapping built;
-
-    // Version 2 and later declare outputs up front, in order.
-    if (version >= 2 && !detail::readOutputs(root, built, res.error)) {
-        return res;
-    }
-    if (root.has("bindings")) {
-        if (!root["bindings"].isArray()) {
-            res.error = "bindings is not an array";
-            return res;
-        }
-        for (const json::Value& b : root["bindings"].asArray()) {
-            if (!b.isObject() || !b["node"].isString()) {
-                res.error = "binding needs a string node";
-                return res;
-            }
-            // Kind: absent means output, which is every version 1 binding.
-            // "layer" is reserved and REFUSED until layers exist -- accepting
-            // and ignoring it would silently drop a binding.
-            const std::string kind =
-                b.has("kind") ? b["kind"].asString() : "output";
-            if (kind != "output" && kind != "silence") {
-                res.error = "unknown binding kind: " + kind;
-                return res;
-            }
-            if (kind == "silence" && b.has("target")) {
-                res.error = "a silence binding must not name a target";
-                return res;
-            }
-            if (kind == "output" && !b["target"].isString()) {
-                res.error = "binding needs string node and target";
-                return res;
-            }
-            const std::string nn = b["node"].asString();
-            const NodeID id = m.findNode(nn);
-            if (id == InvalidNode) {
-                // A mapping is only meaningful against a manifold, so a
-                // dangling reference is a load error rather than a warning.
-                res.error = "binding references unknown node: " + nn;
-                return res;
-            }
-            const float w = b.has("weight") ? b["weight"].asFloat() : 1.0f;
-            if (kind == "silence") {
-                built.bindSilence(id, w);
-            } else {
-                built.bind(id, built.addTarget(b["target"].asString()), w);
-            }
-        }
-    }
-
-    if (!detail::readAggregators(root, version, &m, built, res.error)) {
-        return res;
-    }
-
-    out = std::move(built);
+    out = std::move(one[0]);
     res.ok = true;
     return res;
 }

@@ -83,7 +83,8 @@ SOURCES  := src/sources/ofxManifoldPointSource.h \
             src/sources/ofxManifoldTrajectory.h
 
 IO       := src/io/ofxManifoldJSON.h \
-            src/io/ofxManifoldSerialize.h
+            src/io/ofxManifoldSerialize.h \
+            src/io/ofxManifoldSerialize3D.h
 
 BENCH    := $(BUILD)/bench
 
@@ -272,7 +273,7 @@ $(OUT_RUN): tests/run_outputs.cpp $(CORE) $(MAPPING) $(IO)
 $(OUT_VEC): tests/ref/reference_outputs.py
 	@python3 tests/ref/reference_outputs.py
 
-$(LVL_RUN): tests/run_levels.cpp $(CORE) $(MAPPING)
+$(LVL_RUN): tests/run_levels.cpp $(CORE) $(MAPPING) $(IO)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ tests/run_levels.cpp
 

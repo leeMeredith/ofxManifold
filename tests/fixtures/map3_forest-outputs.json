@@ -1,0 +1,146 @@
+{
+  "version": 3,
+  "outputs": [
+    {
+      "name": "L",
+      "channel": 1,
+      "trim": 1.0
+    },
+    {
+      "name": "R",
+      "channel": 2,
+      "trim": 0.5
+    },
+    {
+      "name": "Top",
+      "channel": 3,
+      "trim": 1.0
+    }
+  ],
+  "bindings": [
+    {
+      "node": "n0",
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n1",
+      "target": "R",
+      "weight": 1.0
+    },
+    {
+      "node": "n2",
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n2",
+      "target": "R",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "kind": "silence",
+      "weight": 1.0
+    },
+    {
+      "node": "n0",
+      "level": 1,
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n1",
+      "level": 1,
+      "target": "R",
+      "weight": 1.0
+    },
+    {
+      "node": "n2",
+      "level": 1,
+      "target": "Top",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "level": 1,
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "level": 1,
+      "kind": "silence",
+      "weight": 1.0
+    },
+    {
+      "node": "n0",
+      "level": 2,
+      "target": "Top",
+      "weight": 1.0
+    },
+    {
+      "node": "n1",
+      "level": 2,
+      "target": "Top",
+      "weight": 1.0
+    },
+    {
+      "node": "n2",
+      "level": 2,
+      "target": "Top",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "level": 2,
+      "target": "L",
+      "weight": 1.0
+    },
+    {
+      "node": "n3",
+      "level": 2,
+      "kind": "silence",
+      "weight": 3.0
+    }
+  ],
+  "aggregators": [
+    {
+      "name": "sub",
+      "mode": "linear",
+      "channel": 9,
+      "trim": 0.8,
+      "sources": [
+        {
+          "output": "L",
+          "weight": 1.0
+        },
+        {
+          "output": "R",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "name": "tap",
+      "mode": "linear",
+      "channel": 8,
+      "trim": 1.0,
+      "sources": [
+        {
+          "node": "n0",
+          "weight": 1.0
+        },
+        {
+          "node": "n2",
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}

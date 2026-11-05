@@ -2134,6 +2134,161 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
+      # ---- round 3A-4c: files for the 3D map ----
+
+      - name: Several levels saved as a flat map must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '    if (lv.count() > 1 || !map.valueSet().empty()) return true;' \
+            '    if (!map.valueSet().empty()) return true;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A bent ground saved as a flat map must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '        if (lv.bent(0, n)) return true;' \
+            '        (void)n;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A level not starting at 0 saved as a flat map must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '    if (lv.base(0) != 0.0f) return true;' \
+            '    (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: Bindings saved without their level must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '                if (k > 0) o << ", \"level\": " << k;' \
+            '                (void)k;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: Bent nodes not saved must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '            if (!lv.bent(k, n)) continue;' \
+            '            continue;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: Node values not saved must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '                if (x == defs[v].fallback) continue;' \
+            '                continue;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A one-level map not saved as a 2D outputs file must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '    if (map.count() == 1) return saveMapping(map.level(0), m);' \
+            '    (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A flat map not saved as a 2D map file must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '    if (!detail::needs3D(map, m.nodeCount())) return saveManifold(m);' \
+            '    (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A value declared twice accepted must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize3D.h \
+            '                == static_cast<std::size_t>(-1)) {\n                res.error = "value declared twice: " + name;\n                return res;' \
+            '                == static_cast<std::size_t>(-2)) {\n                res.error = "value declared twice: " + name;\n                return res;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A value never declared accepted must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize3D.h \
+            '        if (v == static_cast<std::size_t>(-1)) {\n            res.error = "value set but never declared: " + sv.name;' \
+            '        if (false) {\n            res.error = "value set but never declared: " + sv.name;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: Levels accepted in a version 2 map file must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
+            '        && static_cast<int>(root["version"].asNumber()) < 3) {' \
+            '        && false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize3D.h
+
+      - name: A binding with a level accepted in a version 2 outputs file must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            '                if (version < 3) {\n                    error = "a binding with a level needs version 3";' \
+            '                if (false) {\n                    error = "a binding with a level needs version 3";'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: The 2D outputs reader accepts a binding with a level must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '                if (!threeD) {' \
+            '                if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: The 2D map reader accepts a 3D map file must be caught
+        run: |
+          python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
+            '    return detail::loadFloor(text, out, 2);' \
+            '    return detail::loadFloor(text, out, 3);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: A binding to an undeclared output accepted must be caught
+        run: |
+          python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
+            '                if (t == InvalidTarget) {\n                    error = "binding to undeclared output: "' \
+            '                if (false) {\n                    error = "binding to undeclared output: "'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/io/ofxManifoldSerialize.h
+
+      - name: Levels that cross accepted from a file must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '                if (!(at(k, i) > at(k - 1, i))) {' \
+            '                if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
+      - name: Level starting heights out of order accepted must be caught
+        run: |
+          python3 tests/mutate.py src/core/ofxManifoldLevels.h \
+            '            if (!(bases[k] > bases[k - 1])) {' \
+            '            if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/core/ofxManifoldLevels.h
+
       - name: Restored tree must be green
         run: |
           make clean
