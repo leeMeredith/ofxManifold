@@ -1572,8 +1572,10 @@ def build_round3(out):
     t.do("saverig", "room-rig.json")
     t.do("empty")
     t.do("place", (0.5, 0.8)); t.do("place", (0.2, 0.2))
-    t.do("pick", "n0"); t.do("trim", -3.0); t.do("pick", "n1")
-    t.do("toggleout", "n0")
+    # n1 picked LAST, so it is current but not first among the picked:
+    # settling would make the first current, which is how a rig that lost
+    # the current output once passed unseen (CI gate run, 3A-5)
+    t.do("pick", "n0"); t.do("trim", -3.0); t.do("toggleout", "n1")
     out.append("# the rig brings n2 and the sum, n0's trim back to 0 dB, and")
     out.append("# n1's -6 dB; the bindings here stay as they are, and n1 --")
     out.append("# not the rig's first output -- stays the current one, with")

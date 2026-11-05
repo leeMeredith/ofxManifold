@@ -113,8 +113,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldTriangle.h \
             'const float sB = signedArea2(p, c, a);' \
             'const float sB = signedArea2(p, a, c);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldTriangle.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldTriangle.h
 
       - name: Unrenormalized bias must be caught
@@ -122,8 +121,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldTriangle.h \
             'r.w[i] = scaled[i] * inv;' \
             'r.w[i] = scaled[i];'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldTriangle.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldTriangle.h
 
       - name: Epsilon below the float noise floor must be caught
@@ -131,8 +129,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldTypes.h \
             'kAreaEpsilon = 1e-6f' \
             'kAreaEpsilon = 1e-9f'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldTypes.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldTypes.h
 
       - name: Epsilon large enough to eat valid topology must be caught
@@ -140,8 +137,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldTypes.h \
             'kAreaEpsilon = 1e-6f' \
             'kAreaEpsilon = 1e-3f'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldTypes.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldTypes.h
 
       - name: T-junction detection disabled must be caught
@@ -149,8 +145,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             'rep.tJunctions.push_back(TJunction{n, r, ia, ib});' \
             '(void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Orphan detection disabled must be caught
@@ -158,8 +153,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             'if (!used[n]) rep.orphans.push_back(n);' \
             '(void)used;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Node identity rotated in the result must be caught
@@ -167,8 +161,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             'e.weights.push_back(WeightedNode{ids[i], rr.w[i]});' \
             'e.weights.push_back(WeightedNode{ids[(i+1)%ids.size()], rr.w[i]});'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: positionOf skips the un-bias must be caught
@@ -176,8 +169,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             'out.position += (raw[i] / rawTotal) * nodes_[w[i].id].position;' \
             'out.position += w[i].weight * nodes_[w[i].id].position;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: sharesRegion check dropped must be caught
@@ -185,8 +177,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '&& sharesRegion(w);' \
             '&& true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: setNodePosition ignores sign flip must be caught
@@ -194,8 +185,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '|| sign != regions_[r].constructionSign()' \
             '|| false'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Evaluator ignores its hint must be caught
@@ -203,8 +193,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldEvaluator.h \
             'manifold_->evaluate(p, lastRegion_)' \
             'manifold_->evaluate(p, InvalidRegion)'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldEvaluator.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldEvaluator.h
 
       - name: Evaluator keeps a stale hint must be caught
@@ -212,8 +201,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldEvaluator.h \
             'lastRegion_ = e.inside ? e.regionID : InvalidRegion;' \
             'if (e.inside) lastRegion_ = e.regionID;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldEvaluator.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldEvaluator.h
 
       - name: Curve renormalizes must be caught
@@ -221,8 +209,7 @@ jobs:
           python3 tests/mutate.py --nl src/interpretation/ofxManifoldCurves.h \
             '    }\n    return out;\n}\n\n} // namespace curve' \
             '    }\n    return normalize(out);\n}\n\n} // namespace curve'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldCurves.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldCurves.h
 
       - name: Curve loses node identity must be caught
@@ -230,8 +217,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldCurves.h \
             'out.push_back(WeightedNode{wn.id, fn(wn.weight)});' \
             'out.push_back(WeightedNode{static_cast<NodeID>(out.size()), fn(wn.weight)});'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldCurves.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldCurves.h
 
       - name: Wrong equal-power curve must be caught
@@ -239,8 +225,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldCurves.h \
             'return (w <= 0.0f) ? 0.0f : std::sqrt(w);' \
             'return w * 0.5f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldCurves.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldCurves.h
 
       - name: Wrong cosine quadrant must be caught
@@ -248,8 +233,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldCurves.h \
             'return std::sin(w * 1.57079632679489661923f);' \
             'return std::cos(w * 1.57079632679489661923f);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldCurves.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldCurves.h
 
       - name: Spread ignores its amount must be caught
@@ -257,8 +241,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldSpread.h \
             'out[wn.id].weight += (1.0f - amount) * wn.weight;' \
             'out[wn.id].weight += wn.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSpread.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSpread.h
 
       - name: Spread does not clamp must be caught
@@ -266,8 +249,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldSpread.h \
             'if (amount > 1.0f) amount = 1.0f;' \
             '// mutant: no clamp'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSpread.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSpread.h
 
       - name: Blend gains not curved must be caught
@@ -275,8 +257,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldBlend.h \
             'const float ga = fn(1.0f - t);' \
             'const float ga = 1.0f - t;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldBlend.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldBlend.h
 
       - name: Blend overwrites shared nodes must be caught
@@ -284,8 +265,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldBlend.h \
             'it->weight += wn.weight * gb;' \
             'it->weight = wn.weight * gb;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldBlend.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldBlend.h
 
       - name: Mapping links not normalized within the node must be caught
@@ -293,8 +273,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             'acc[l.id] += wn.weight * (l.weight / linkTotal);' \
             'acc[l.id] += wn.weight * l.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Duplicate bind replaces instead of accumulating must be caught
@@ -302,8 +281,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             'l.id == target) {\n                l.weight += weight;' \
             'l.id == target) {\n                l.weight = weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Dense arity follows contributions not targets must be caught
@@ -311,8 +289,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             'std::vector<float> dense(targetNames_.size(), 0.0f);' \
             'std::vector<float> dense(resolve(w).targets.size(), 0.0f);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Power aggregator skips the root must be caught
@@ -320,8 +297,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             'v = (v <= 0.0f) ? 0.0f : std::sqrt(v);' \
             'v = v;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Null node redistributes instead of discarding must be caught
@@ -329,8 +305,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '                continue;                   // null node: weight discarded' \
             '                for (auto& a : acc) a += wn.weight / acc.size(); continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: JSON exponents not parsed must be caught
@@ -338,8 +313,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldJSON.h \
             'if (i < s.size() && (s[i] == '\''e'\'' || s[i] == '\''E'\'')) {' \
             'if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldJSON.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldJSON.h
 
       - name: JSON duplicate keys last-wins must be caught
@@ -347,8 +321,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldJSON.h \
             'if (o.find(key) != o.end()) return fail("duplicate key: " + key);' \
             '(void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldJSON.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldJSON.h
 
       - name: JSON write precision below float round-trip must be caught
@@ -356,8 +329,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldJSON.h \
             '"%.9g"' \
             '"%.7g"'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldJSON.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldJSON.h
 
       - name: Loader accepts an unknown space must be caught
@@ -365,8 +337,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             'res.error = "unsupported space: " + root["space"].asString();\n        return res;\n    }\n    if (!root.has("nodes")' \
             'res.error = "unsupported space";\n    }\n    if (!root.has("nodes")'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Loader accepts a dangling region reference must be caught
@@ -374,8 +345,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             'res.error = "region references unknown node: " + nm;\n                    return res;' \
             'continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Mapping written by NodeID instead of name must be caught
@@ -383,8 +353,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             'json::quote(m.node(id).name)\n              << ", \"target\": "' \
             'json::quote(std::to_string(id))\n              << ", \"target\": "'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Mapping target written by id instead of name must be caught
@@ -392,8 +361,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             '<< ", \"target\": " << json::quote(mp.targetName(l.id))\n              << ", \"weight\"' \
             '<< ", \"target\": " << json::quote(std::to_string(l.id))\n              << ", \"weight\"'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Interpolate ignores node identity must be caught
@@ -401,8 +369,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldInterpolate.h \
             'acc = acc + values[wn.id] * wn.weight;' \
             'acc = acc + values[&wn - &w[0]] * wn.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldInterpolate.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldInterpolate.h
 
       - name: Interpolate drops the weight must be caught
@@ -410,8 +377,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldInterpolate.h \
             'acc = acc + values[wn.id] * wn.weight;' \
             'acc = acc + values[wn.id];'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldInterpolate.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldInterpolate.h
 
       - name: Coverage counts out-of-range nodes must be caught
@@ -419,8 +385,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldInterpolate.h \
             '        if (wn.id < valueCount) total += wn.weight;' \
             '        total += wn.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldInterpolate.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldInterpolate.h
 
       - name: Solve using unsigned areas must be caught
@@ -428,8 +393,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldTriangle.h \
             '    const float sA = signedArea2(p, b, c);' \
             '    const float sA = std::fabs(signedArea2(p, b, c));'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldTriangle.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldTriangle.h
 
       - name: Finalize must preserve sample spacing must be caught
@@ -437,8 +401,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '            for (auto& s : samples_) s.t = (s.t - t0) / span;' \
             '            for (std::size_t i = 0; i < samples_.size(); ++i) samples_[i].t = float(i)/float(samples_.size()-1);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Finalize must start the path at zero must be caught
@@ -446,8 +409,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        const float t0 = samples_.front().t;' \
             '        const float t0 = 0.0f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: addSample must clamp backwards time must be caught
@@ -455,8 +417,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '            t = samples_.back().t;      // never allow time to run backwards' \
             '            (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: pointAt must interpolate, not snap must be caught
@@ -464,8 +425,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        return a.position + (b.position - a.position) * u;' \
             '        return (u < 0.5f) ? a.position : b.position;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: pointAt must clamp outside the path must be caught
@@ -473,8 +433,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        if (t <= samples_.front().t) return samples_.front().position;' \
             '        if (t < -1e9f) return samples_.front().position;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Trajectory loader must refuse backwards time must be caught
@@ -482,8 +441,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '            res.error = "samples are not in non-decreasing time order";' \
             '            res.error = "";'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Trajectory loader accepts an unknown space must be caught
@@ -491,8 +449,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             'res.error = "unsupported space: " + root["space"].asString();\n        return res;\n    }\n    if (!root.has("samples")' \
             'res.error = "unsupported space";\n    }\n    if (!root.has("samples")'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Velocity must divide by the span actually used must be caught
@@ -500,8 +457,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        return (pointAt(b) - pointAt(a)) / span;   // units per unit of t' \
             '        return (pointAt(b) - pointAt(a)) / (2.0f * window);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Velocity must be a central difference must be caught
@@ -509,8 +465,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        const float b = std::min(1.0f, t + window);' \
             '        const float b = t;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Finalize must record the duration must be caught
@@ -518,8 +473,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        duration_ = (span > 0.0f) ? span : 0.0f;' \
             '        duration_ = 0.0f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: pointAtSeconds must divide by the duration must be caught
@@ -527,8 +481,7 @@ jobs:
           python3 tests/mutate.py --nl src/sources/ofxManifoldTrajectory.h \
             '        const float d = (duration_ > 0.0f) ? duration_ : 1.0f;\n        return pointAt(seconds / d);' \
             '        return pointAt(seconds);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Duration must survive a save must be caught
@@ -536,8 +489,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '        o << "  \"duration\": " << json::number(tr.duration()) << ",\n";' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Duration must survive a load must be caught
@@ -545,8 +497,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    const float dur = root.has("duration") ? root["duration"].asFloat() : 0.0f;' \
             '    const float dur = 0.0f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: blendByName merges by TargetID not name must be caught
@@ -554,8 +505,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '        const std::string& name = mb.targetName(wt.id);\n        auto it = std::find_if(out.begin(), out.end(),' \
             '        const std::string& name = mb.targetName(wt.id);\n        auto it = std::find_if(out.end(), out.end(),'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: blendByName gains not curved must be caught
@@ -563,8 +513,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '    const float ga = fn(1.0f - t);\n    const float gb = fn(t);' \
             '    const float ga = 1.0f - t;\n    const float gb = t;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: blendByName overwrites shared targets must be caught
@@ -572,8 +521,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '        if (it != out.end()) it->weight += wt.weight * gb;' \
             '        if (it != out.end()) it->weight = wt.weight * gb;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: blendByName does not clamp t must be caught
@@ -581,8 +529,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '    if (t < 0.0f) t = 0.0f;\n    if (t > 1.0f) t = 1.0f;\n\n    const float ga = fn(1.0f - t);' \
             '    const float ga = fn(1.0f - t);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Smoother must honour the half-life must be caught
@@ -590,8 +537,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldSmoother.h \
             '                          ? 1.0f - std::pow(0.5f, dt / halfLife_)' \
             '                          ? 0.2f'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSmoother.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSmoother.h
 
       - name: Smoother must decay departing nodes must be caught
@@ -599,8 +545,7 @@ jobs:
           python3 tests/mutate.py --nl src/interpretation/ofxManifoldSmoother.h \
             '        for (const auto& cur : state_) {\n            float want = 0.0f;' \
             '        for (const auto& cur : state_) {\n            float want = 0.0f; if (true) continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSmoother.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSmoother.h
 
       - name: Smoother must clamp to the slew rate must be caught
@@ -608,8 +553,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldSmoother.h \
             '            if (d >  maxStep) v = from + maxStep;' \
             '            if (d >  maxStep) v = v;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSmoother.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSmoother.h
 
       - name: Smoother must keep held tiny weights must be caught
@@ -617,8 +561,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldSmoother.h \
             '                           return !std::any_of(target.begin(), target.end(),' \
             '                           return true; return !std::any_of(target.begin(), target.end(),'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSmoother.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSmoother.h
 
       - name: Disabled smoother must pass through must be caught
@@ -626,8 +569,7 @@ jobs:
           python3 tests/mutate.py --nl src/interpretation/ofxManifoldSmoother.h \
             '        if (halfLife_ <= 0.0f && maxRate_ <= 0.0f) {\n            state_ = target;\n            return state_;\n        }' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldSmoother.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldSmoother.h
 
       - name: Ring edge special case removed must be caught
@@ -635,8 +577,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        if (std::fabs(A[i]) < kRingEpsilon && D[i] < 0.0f) {' \
             '        if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Ring vertex special case removed must be caught
@@ -644,8 +585,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        if (r[i] < kRingEpsilon) {' \
             '        if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Region self-intersection check dropped must be caught
@@ -653,8 +593,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        if (ringSelfIntersects(p)) return "self-intersecting";' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Non-convex regions refused must be caught
@@ -662,8 +601,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        if (ringSelfIntersects(p)) return "self-intersecting";' \
             '        if (ringSelfIntersects(p) || !ringIsConvex(p)) return "self-intersecting";'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Bias ignored for polygon regions must be caught
@@ -671,8 +609,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '            out.w[i] *= bias[i];' \
             '            (void)bias;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Serializer truncates regions to three nodes must be caught
@@ -680,8 +617,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '        for (std::size_t k = 0; k < ids.size(); ++k) {' \
             '        for (std::size_t k = 0; k < 3 && k < ids.size(); ++k) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Polygon maps written as version 1 must be caught
@@ -689,8 +625,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    const int version = allTriangles ? 1 : 2;' \
             '    const int version = 1;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Containment reverts to weight sign must be caught
@@ -698,8 +633,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        return ringContains(p, v, eps);' \
             '        const RingResult r = solveRing(p, v); if (!r.valid) return false; for (float x : r.w) if (x < -eps) return false; return true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Containment always inside must be caught
@@ -707,8 +641,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        return ringContains(p, v, eps);' \
             '        (void)v; return true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: Boundary not counted as inside must be caught
@@ -716,8 +649,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldRegion.h \
             '        if (dx * dx + dy * dy <= eps * eps) return true;' \
             '        (void)dx; (void)dy;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldRegion.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldRegion.h
 
       - name: clampNegative does not renormalize must be caught
@@ -725,8 +657,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldNegative.h \
             '            out.push_back(WeightedNode{wn.id, wn.weight * inv});' \
             '            out.push_back(WeightedNode{wn.id, wn.weight});'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldNegative.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldNegative.h
 
       - name: anyNegative fires on edge noise must be caught
@@ -734,8 +665,7 @@ jobs:
           python3 tests/mutate.py src/interpretation/ofxManifoldNegative.h \
             '        if (wn.weight < -eps) return true;' \
             '        if (wn.weight < 0.0f) return true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/interpretation/ofxManifoldNegative.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/interpretation/ofxManifoldNegative.h
 
       - name: Snap without neighbour search must be caught
@@ -743,8 +673,7 @@ jobs:
           python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
             '        for (long d0 = -1; d0 <= 1; ++d0) {' \
             '        for (long d0 = 0; d0 <= 0; ++d0) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/authoring/ofxManifoldGrid.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/authoring/ofxManifoldGrid.h
 
       - name: Lattice basis not reduced must be caught
@@ -752,8 +681,7 @@ jobs:
           python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
             '        for (int guard = 0; guard < 64; ++guard) {' \
             '        for (int guard = 0; guard < 0; ++guard) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/authoring/ofxManifoldGrid.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/authoring/ofxManifoldGrid.h
 
       - name: Tie broken by highest address must be caught
@@ -761,8 +689,7 @@ jobs:
           python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
             '            if (a != bestA) return a < bestA;' \
             '            if (a != bestA) return a > bestA;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/authoring/ofxManifoldGrid.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/authoring/ofxManifoldGrid.h
 
       - name: Polar searches too few rings must be caught
@@ -770,8 +697,7 @@ jobs:
           python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
             '        for (int ring = 1; ring <= top; ++ring) {' \
             '        for (int ring = (int(r / dr_) > 1 ? int(r / dr_) - 1 : 1); ring <= int(r / dr_) + 1; ++ring) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/authoring/ofxManifoldGrid.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/authoring/ofxManifoldGrid.h
 
       - name: Free mode snaps must be caught
@@ -779,8 +705,7 @@ jobs:
           python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
             '        r.point = p;               // free: the identity, exactly' \
             '        r.point = {std::floor(p.x * 10.0f) / 10.0f, p.y};'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/authoring/ofxManifoldGrid.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/authoring/ofxManifoldGrid.h
 
       - name: Hysteresis removed must be caught
@@ -788,8 +713,7 @@ jobs:
           python3 tests/mutate.py src/authoring/ofxManifoldGrid.h \
             '        if (dc <= ds + double(dead) * spacing()) {' \
             '        if (false) { (void)dc; (void)ds;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/authoring/ofxManifoldGrid.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/authoring/ofxManifoldGrid.h
 
       - name: Move allows a self-intersecting region must be caught
@@ -797,8 +721,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '                || (ids.size() > 3 && ringSelfIntersects(ring));' \
             '                ;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Refused batch applied partially must be caught
@@ -806,8 +729,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '                    nodes_[it->first].position = it->second;' \
             '                    (void)it;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Removal shrinks a region instead of removing it must be caught
@@ -815,8 +737,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '                if (gone[n]) { keep = false; break; }' \
             '                if (gone[n]) continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Removal accepts an out-of-range id must be caught
@@ -824,8 +745,7 @@ jobs:
           python3 tests/mutate.py --nl src/core/ofxManifold2D.h \
             '            if (id >= nodes_.size()) return false;\n        }\n        std::vector<bool> gone(nodes_.size(), false);' \
             '        }\n        std::vector<bool> gone(nodes_.size(), false);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Duplicate node name accepted must be caught
@@ -833,8 +753,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '        if (byName_.count(name) != 0) return InvalidNode;' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Removal remap not reported must be caught
@@ -842,8 +761,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '        if (remap) *remap = std::move(map);' \
             '        if (remap) remap->assign(map.size(), 0);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Unjoin removes the wrong regions must be caught
@@ -851,8 +769,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifold2D.h \
             '            if (!gone[r]) built.addRegion(regions_[r].ids());' \
             '            if (gone[r]) built.addRegion(regions_[r].ids());'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifold2D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifold2D.h
 
       - name: Silence left out of normalization must be caught
@@ -860,8 +777,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '            for (const auto& l : it->second) linkTotal += l.weight;' \
             '            for (const auto& l : it->second) if (l.kind == DestKind::Output) linkTotal += l.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Trim applied to routed share must be caught
@@ -869,8 +785,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '                t.weight * (levels ? trims_[t.id] : 1.0f);' \
             '                t.weight * trims_[t.id];'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Derived output missing from channels must be caught
@@ -878,8 +793,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '            if (ch < 0) continue;\n            out[static_cast<std::size_t>(ch)] =' \
             '            if (true) continue;\n            out[static_cast<std::size_t>(ch)] ='
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Mapping ignores node renumbering must be caught
@@ -887,8 +801,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '            moved[to] = std::move(kv.second);' \
             '            moved[kv.first] = std::move(kv.second);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Duplicate channel accepted must be caught
@@ -896,8 +809,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '        if (channel < 0 || channelInUse(channel)) return InvalidTarget;' \
             '        if (channel < 0) return InvalidTarget;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Derived source weights ignored must be caught
@@ -905,8 +817,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '                const float a = g * wn.weight;' \
             '                const float a = wn.weight; (void)g;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Silence forgets null nodes must be caught
@@ -914,8 +825,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '            if (it == links_.end() || it->second.empty()) {\n                s += wn.weight;' \
             '            if (it == links_.end() || it->second.empty()) {\n                (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Version 1 written after reordering must be caught
@@ -923,8 +833,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '            if (l.id != next) return true;                    // reordered' \
             '            (void)next;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Version 1 written with an unbound output must be caught
@@ -932,8 +841,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    return next != mp.targetCount();                          // unbound' \
             '    return false;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Unknown binding kind accepted must be caught
@@ -941,8 +849,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '            if (kind != "output" && kind != "silence") {' \
             '            if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Clearing bindings does nothing must be caught
@@ -950,8 +857,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '    void clearBindings(NodeID node) { links_.erase(node); }' \
             '    void clearBindings(NodeID node) { (void)node; }'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Removed output leaves binding ids unshifted must be caught
@@ -959,8 +865,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '                if (l.kind == DestKind::Output && l.id > id) --l.id;' \
             '                (void)l;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Removed output leaves name lookup unshifted must be caught
@@ -968,8 +873,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '            if (kv.second > id) --kv.second;' \
             '            (void)kv;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Removed output keeps its bindings must be caught
@@ -977,8 +881,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             '                            return l.kind == DestKind::Output && l.id == id;' \
             '                            return false && l.id == id;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Editor delete leaves bindings unrenumbered must be caught
@@ -986,8 +889,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    mapping_.remapNodes(remap);' \
             '    (void)remap;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Editor removes an output others still feed must be caught
@@ -995,8 +897,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (t != InvalidTarget && !outputInUse(t)) {' \
             '        if (t != InvalidTarget) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Editor names ignore outputs must be caught
@@ -1004,8 +905,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (manifold_.findNode(nm) == InvalidNode\n            && mapping_.findTarget(nm) == InvalidTarget) {' \
             '        if (manifold_.findNode(nm) == InvalidNode) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Editor box join ignores angle order must be caught
@@ -1013,8 +913,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    if (!sel.ordered()) {\n        std::vector<glm::vec2> pts;' \
             '    if (false) {\n        std::vector<glm::vec2> pts;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Editor allows a duplicate region must be caught
@@ -1022,8 +921,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '            return refusal("those nodes already form a region", 2.0f);' \
             '            (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Editor current output stranded by removal must be caught
@@ -1031,8 +929,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {\n        --currentOutput_;' \
             '    } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {\n        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Box selection keeps click order must be caught
@@ -1040,8 +937,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
             '    nodes_.push_back(id);\n    ordered_ = false;' \
             '    nodes_.push_back(id);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp
 
       - name: Faders not narrowed as outputs are added must be caught
@@ -1049,8 +945,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    bw = std::min(46.0f, std::max(2.0f, bw));' \
             '    bw = std::max(46.0f, std::max(2.0f, bw));'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Silence fader loses its extra gap must be caught
@@ -1058,8 +953,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    const float silenceX = x + gap;' \
             '    const float silenceX = x;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Fader click ignores height must be caught
@@ -1067,8 +961,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    if (empty || y < top || y > top + height) return kNothing;' \
             '    if (empty) return kNothing;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Picking an output does nothing must be caught
@@ -1076,8 +969,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    selectOnlyOutput(t);\n    Result r;' \
             '    Result r;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Setting a fill stacks silence shares must be caught
@@ -1085,8 +977,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '        v.erase(std::remove_if(v.begin(), v.end(),\n                    [](const Link& l) { return l.kind == DestKind::Silence; }),\n                v.end());' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: A full fill leaves a zero silence binding must be caught
@@ -1094,8 +985,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '        if (f < 1.0f) {\n            v.push_back(Link{DestKind::Silence, InvalidTarget,' \
             '        if (true) {\n            v.push_back(Link{DestKind::Silence, InvalidTarget,'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Fill steps ignore round numbers must be caught
@@ -1103,8 +993,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '                         : (direction > 0 ? std::ceil(k) : std::floor(k));' \
             '                         : k + float(direction);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Fill steps skip values through float noise must be caught
@@ -1112,8 +1001,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (std::fabs(k - kr) < 1e-3f) k = kr;' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Fine fill steps are coarse must be caught
@@ -1121,8 +1009,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    const float unit = fine ? 0.01f : 0.05f;' \
             '    const float unit = 0.05f; (void)fine;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Bind to every output doubles an existing binding must be caught
@@ -1130,8 +1017,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        mapping_.clearBindings(id);\n        for (TargetID t = 0;' \
             '        for (TargetID t = 0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Refusals become undo steps must be caught
@@ -1139,8 +1025,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.h \
             '        if (r.changed) record(std::move(before), label);' \
             '        record(std::move(before), label);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.h
 
       - name: A new action keeps stale redo steps must be caught
@@ -1148,8 +1033,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
             '    future_.clear();\n}' \
             '}'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
 
       - name: History limit drops the newest step must be caught
@@ -1157,8 +1041,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
             '    if (limit_ > 0 && past_.size() > limit_) past_.erase(past_.begin());' \
             '    if (limit_ > 0 && past_.size() > limit_) past_.pop_back();'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
 
       - name: Binding twice feeds an output double must be caught
@@ -1166,8 +1049,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '            if (all == !feeds(id, t)) continue;   // already as wanted' \
             '            (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Unbinding changes a node's fill must be caught
@@ -1175,8 +1057,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        } else if (fill < 1.0f) {\n            mapping_.setOutputFraction(id, fill);\n        }' \
             '        }'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Unbinding the last output leaves stray silence must be caught
@@ -1184,8 +1065,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (outputCount(id) == 0) {\n            // Its last output gone' \
             '        if (false) {\n            // Its last output gone'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Opening the outputs file looks for the wrong map must be caught
@@ -1193,8 +1073,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
             '    for (const char* tail : {"-outputs.json", "-mapping.json", ".json"}) {' \
             '    for (const char* tail : {".json", "-outputs.json", "-mapping.json"}) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
 
       - name: Earlier editors' saves lose their outputs must be caught
@@ -1202,8 +1081,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
             '    if (readFile(p.outputs, otext) || readFile(p.legacy, otext)) {' \
             '    if (readFile(p.outputs, otext)) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
 
       - name: A refused outputs file goes unflagged must be caught
@@ -1211,8 +1089,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
             '            note = " -- outputs file refused: " + mr.error;\n            r.refused = true;' \
             '            note = " -- outputs file refused: " + mr.error;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
 
       - name: Fader line drawn for silence must be caught
@@ -1220,8 +1097,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '            if (l.kind == DestKind::Output) marks.push_back({l.id, id, fill});' \
             '            marks.push_back({l.id, id, fill});'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Placing a node moves the current output must be caught
@@ -1229,8 +1105,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '            if (currentOutput_ == InvalidTarget) selectOnlyOutput(t);' \
             '            selectOnlyOutput(t);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: An unbind silences a node without saying so must be caught
@@ -1238,8 +1113,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    if (!silenced.empty()) {\n        r.message += " -- "' \
             '    if (false) {\n        r.message += " -- "'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Selected outputs not shifted on removal must be caught
@@ -1247,8 +1121,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        kept.push_back(s > t ? s - 1 : s);' \
             '        kept.push_back(s);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: b ignores the other selected outputs must be caught
@@ -1256,8 +1129,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        for (TargetID t : outputSel_) {\n            if (all == !feeds(id, t)) continue;   // already as wanted' \
             '        for (TargetID t : {currentOutput_}) {\n            if (all == !feeds(id, t)) continue;   // already as wanted'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Removing outputs with several selected must be caught
@@ -1265,8 +1137,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    if (outputSel_.size() > 1) {\n        return refusal("select one output' \
             '    if (false) {\n        return refusal("select one output'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Incoming link lines drawn heavy must be caught
@@ -1274,8 +1145,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '            ln.heavy = out;' \
             '            ln.heavy = true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Mutual link lines drawn on top of each other must be caught
@@ -1283,8 +1153,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '                a.lane = (a.from < a.to) ? +1 : -1;' \
             '                a.lane = 0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Fader contribution ignores silence must be caught
@@ -1292,8 +1161,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '                out[std::size_t(ch)] += wn.weight * l.weight / total;' \
             '                out[std::size_t(ch)] += wn.weight * l.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Link arc bends toward the nearest node must be caught
@@ -1301,8 +1169,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        l.bend = (clearance[1] > clearance[0] + 1e-4f) ? -1 : +1;' \
             '        l.bend = (clearance[1] > clearance[0] + 1e-4f) ? +1 : -1;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Mutual link arcs bend to the same side must be caught
@@ -1310,8 +1177,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (l.lane != 0) { l.bend = l.lane; continue; }' \
             '        if (l.lane != 0) { l.bend = +1; continue; }'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Link labels measured from the receiver must be caught
@@ -1319,8 +1185,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    return arcPoint(p, c, q, line.from < line.to ? t : 1.0f - t);' \
             '    return arcPoint(p, c, q, t);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Faders take the total's column must be caught
@@ -1328,8 +1193,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    const float room = width - 16.0f * text.charWidth;   // the total'\''s column' \
             '    const float room = width;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Unused channels drawn full width must be caught
@@ -1337,8 +1201,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '        b.w = (b.kind == ChartBar::Kind::Unused) ? std::min(sliver, bw) : bw;' \
             '        b.w = bw;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Fader labels ignore the text size must be caught
@@ -1346,8 +1209,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '        if (!fits(b.name)) allNames = false;' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Fader hit area excludes the gap must be caught
@@ -1355,8 +1217,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    const float half = gap * 0.5f;' \
             '    const float half = 0.0f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Fader numbers decided bar by bar must be caught
@@ -1364,8 +1225,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '        if (!fits(std::to_string(b.channel))) allNumbers = false;' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Fader ruler room ignores the next mark must be caught
@@ -1373,8 +1233,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '                const float end = j < L.bars.size() ? L.bars[j].x : silenceX;' \
             '                const float end = silenceX;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Channel line shown when numbers do not fit must be caught
@@ -1382,8 +1241,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '                if (allNumbers) b.sub = ch;' \
             '                b.sub = ch;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Keys act in the middle of a drag must be caught
@@ -1391,8 +1249,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
             '        entry("remove", "delete", "remove nodes", !drag && !sel.empty(),' \
             '        entry("remove", "delete", "remove nodes", !sel.empty(),'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 
       - name: Audition leaves mouse editing lit must be caught
@@ -1400,8 +1257,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
             '    const bool mouse = !ctx.auditioning && !drag;   // mouse editing allowed' \
             '    const bool mouse = !drag;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 
       - name: Remove output lit with several picked must be caught
@@ -1409,8 +1265,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
             '              !drag && picked == 1,' \
             '              !drag && picked >= 1,'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 
       - name: Undo lit with nothing to undo must be caught
@@ -1418,8 +1273,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
             '        entry("undo", "cmd-z", "undo", !drag && ctx.canUndo,' \
             '        entry("undo", "cmd-z", "undo", !drag,'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 
       - name: b preview never predicts silence must be caught
@@ -1427,8 +1281,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '            if (!survives) p.silenced.push_back(manifold_.node(id).name);' \
             '            (void)survives;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: b preview counts nodes already as wanted must be caught
@@ -1436,8 +1289,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (!changes) continue;\n        ++p.count;' \
             '        ++p.count;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       # ---- round 3A-1: derived outputs after the fader, rig files ----
@@ -1447,8 +1299,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             'const float a = g * acc[t] * trims_[t];' \
             'const float a = g * acc[t];'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Removed output leaves after-derived source ids unshifted must be caught
@@ -1456,8 +1307,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             'o.push_back(t > id ? t - 1 : t);' \
             'o.push_back(t);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Removed output stays an after-derived source must be caught
@@ -1465,8 +1315,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '                if (t == id) continue;\n                o.push_back' \
             '                o.push_back'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Node renumbering wipes after-derived gains must be caught
@@ -1474,8 +1323,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '            if (ag.feed == Feed::Outputs) continue;\n            std::vector<NodeID> s;' \
             '            std::vector<NodeID> s;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: After-derived output accepts an unknown source must be caught
@@ -1483,8 +1331,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '            if (sw.first >= targetNames_.size()) {\n                return static_cast<std::size_t>(-1);' \
             '            if (false) {\n                return static_cast<std::size_t>(-1);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: After-derived power sum skips the root must be caught
@@ -1492,8 +1339,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMapping.h \
             'v = (v > 0.0f) ? std::sqrt(v) : 0.0f;' \
             'v = v;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Rig drops channels the map fills must be caught
@@ -1501,8 +1347,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMapping.h \
             '            if (ag.channel == NoChannel) continue;\n            r.addDerived(ag.name, ag.channel, ag.trim, ag.mode, {});\n            continue;' \
             '            continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMapping.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMapping.h
 
       - name: Output sources written as version 1 must be caught
@@ -1510,8 +1355,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             '    for (const auto& a : mp.aggregators()) {\n        if (a.feed == Feed::Outputs) return true;\n    }\n    for (TargetID t = 0;' \
             '    for (TargetID t = 0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Output sources written as version 2 must be caught
@@ -1519,8 +1363,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '(mappingNeedsV3(mp) ? 3 : 2)' \
             '2'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Version 2 file reads an output source must be caught
@@ -1528,8 +1371,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '                    if (version < 3) {' \
             '                    if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Derived output mixing nodes and outputs accepted must be caught
@@ -1537,8 +1379,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '        if (!nodeSrcs.empty() && !outSrcs.empty()) {' \
             '        if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Rig accepts bindings must be caught
@@ -1546,8 +1387,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             '    if (root.has("bindings")) {\n        res.error = "a rig holds no bindings";' \
             '    if (false) {\n        res.error = "a rig holds no bindings";'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: A file not marked as a rig accepted as a rig must be caught
@@ -1555,8 +1395,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    if (!root.has("kind") || root["kind"].asString() != "rig") {' \
             '    if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Channel the map fills accepts sources must be caught
@@ -1564,8 +1403,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             '            if (a.has("sources")) {\n                error = "aggregator " + name + " is filled by the map and "' \
             '            if (false) {\n                error = "aggregator " + name + " is filled by the map and "'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Unknown file kind read as a map must be caught
@@ -1573,8 +1411,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    if (root.has("kind") && root["kind"].asString() != "rig") {' \
             '    if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       # ---- round 3A-2: paths with height ----
@@ -1584,8 +1421,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             'return lo.z + (hi->z - lo.z) * ((t - lo.t) / gap);' \
             'return lo.z;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: A path that hops in the middle reads as flat must be caught
@@ -1593,8 +1429,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        for (const auto& s : samples_) if (s.z != 0.0f) return true;' \
             '        if (!samples_.empty() && (samples_.front().z != 0.0f || samples_.back().z != 0.0f)) return true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Recording drops the height must be caught
@@ -1602,8 +1437,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '        samples_.back().z = p.z;' \
             '        (void)p;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Climb divided by the requested window at the ends must be caught
@@ -1611,8 +1445,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             'if (to > from) climb = (heightAt(to) - heightAt(from)) / (to - from);' \
             'if (to > from) climb = (heightAt(to) - heightAt(from)) / (2.0f * window);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: 3D velocity in seconds not divided by the duration must be caught
@@ -1620,8 +1453,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             'return velocity3At(seconds / span, windowSeconds / span) / span;' \
             'return velocity3At(seconds / span, windowSeconds / span);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Height in seconds ignores the duration must be caught
@@ -1629,8 +1461,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             'return heightAt(seconds / ((duration_ > 0.0f) ? duration_ : 1.0f));' \
             'return heightAt(seconds);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: 3D length ignores height must be caught
@@ -1638,8 +1469,7 @@ jobs:
           python3 tests/mutate.py src/sources/ofxManifoldTrajectory.h \
             '                                       b.z - a.z));' \
             '                                       0.0f));'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/sources/ofxManifoldTrajectory.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/sources/ofxManifoldTrajectory.h
 
       - name: Height not written must be caught
@@ -1647,8 +1477,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '        if (height) o << ", " << json::number(s.z);' \
             '        (void)height;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: A path with height written as version 1 must be caught
@@ -1656,8 +1485,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '(height ? 2 : kFormatVersion)' \
             'kFormatVersion'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Height not read must be caught
@@ -1665,8 +1493,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '        if (dims == 3) samples.back().z = s["p"].asArray()[2].asFloat();' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Version 1 file accepts a height must be caught
@@ -1674,8 +1501,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '        if (dims == 2 && s.isObject() && s["p"].isArray()' \
             '        if (false && s.isObject() && s["p"].isArray()'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: A version newer than 2 accepted for paths must be caught
@@ -1683,8 +1509,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    if (version != kFormatVersion && version != 2) {' \
             '    if (version != kFormatVersion && version != 2 && version != 3) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       # ---- round 3A-3: blending maps, the rig, agreement, using a rig ----
@@ -1694,8 +1519,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
             '        if (g > 1.0f) g = 1.0f;\n        g = fn(g);' \
             '        g = fn(g);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: A negative blend gain not clamped must be caught
@@ -1703,8 +1527,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
             '        if (g < 0.0f) g = 0.0f;\n        if (g > 1.0f)' \
             '        if (g > 1.0f)'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: The blend curve not applied to the gains must be caught
@@ -1712,8 +1535,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '        g = fn(g);' \
             '        (void)fn;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Channels the maps fill not blended must be caught
@@ -1721,8 +1543,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '            if (ags[a].feed != Feed::Nodes) continue;' \
             '            continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Silence blended without the gains must be caught
@@ -1730,8 +1551,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '        b.silence += m.silenceShare(mi.weights) * g;' \
             '        b.silence += m.silenceShare(mi.weights);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: The rig's sub reads shares, not what outputs send must be caught
@@ -1739,8 +1559,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '        sent[t] = s * rig.targetTrim(t);' \
             '        sent[t] = s;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: The rig's output levels ignore trim must be caught
@@ -1748,8 +1567,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '            levels ? sent[t] : s;' \
             '            s;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: The rig's derived outputs ignore their own trim must be caught
@@ -1757,8 +1575,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '            v * (levels ? ag.trim : 1.0f);' \
             '            v;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: The rig's power-summed sub skips the root must be caught
@@ -1766,8 +1583,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '                v = (v > 0.0f) ? std::sqrt(v) : 0.0f;' \
             '                v = v;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Agreement checked against the first map only must be caught
@@ -1775,8 +1591,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
             '    for (std::size_t i = 0; i < parts.size(); ++i) {\n        for (std::size_t j = i + 1; j < parts.size(); ++j) {' \
             '    for (std::size_t i = 0; i < 1 && i < parts.size(); ++i) {\n        for (std::size_t j = i + 1; j < parts.size(); ++j) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: A channel the rig lacks goes unreported must be caught
@@ -1784,8 +1599,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '                if (!there) {' \
             '                if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: A different trim reported as a disagreement must be caught
@@ -1793,8 +1607,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             'detail::report(found, true, "trim", a.name,' \
             'detail::report(found, false, "trim", a.name,'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: A sub computed in one map and filled in another passes must be caught
@@ -1802,8 +1615,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '                        } else if (a.kind != b.kind) {' \
             '                        } else if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Two names on one channel pass must be caught
@@ -1811,8 +1623,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '                    } else if (a.channel == b.channel) {' \
             '                    } else if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Using a rig ignores a difference in kind must be caught
@@ -1820,8 +1631,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '            if (r.name == e.name && r.kind == e.kind) { match = true; break; }' \
             '            if (r.name == e.name) { match = true; break; }'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Using a rig drops the map's own fill sources must be caught
@@ -1829,8 +1639,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
             '        if (fill) {\n            for (std::size_t i = 0; i < fill->sources.size(); ++i) {' \
             '        if (false) {\n            for (std::size_t i = 0; i < fill->sources.size(); ++i) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Using a rig keeps the map's trim on a filled channel must be caught
@@ -1838,8 +1647,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
             '        out.addDerived(ag.name, ag.channel, ag.trim,\n                       fill ? fill->mode : ag.mode, srcs);' \
             '        out.addDerived(ag.name, ag.channel, fill ? fill->trim : ag.trim,\n                       fill ? fill->mode : ag.mode, srcs);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Using a rig keeps the map's output trims must be caught
@@ -1847,8 +1655,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldRig.h \
             '        out.addOutput(rig.targetName(t), rig.targetChannel(t),\n                      rig.targetTrim(t));' \
             '        out.addOutput(rig.targetName(t), rig.targetChannel(t), 1.0f);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       - name: Using a rig drops silence shares must be caught
@@ -1856,8 +1663,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldRig.h \
             '                out.bindSilence(n, l.weight);' \
             '                (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldRig.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldRig.h
 
       # ---- round 3A-4: the 3D map's geometry ----
@@ -1867,8 +1673,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        if (k > 0 && !(h > height(k - 1, n))) return false;' \
             '        if (k > 0 && h < height(k - 1, n)) return false;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A node may reach the level above must be caught
@@ -1876,8 +1681,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        if (k + 1 < levels_.size() && !(h < height(k + 1, n))) return false;' \
             '        if (false) return false;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: Raising is not all or nothing must be caught
@@ -1885,8 +1689,7 @@ jobs:
           python3 tests/mutate.py --nl src/core/ofxManifoldLevels.h \
             '        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }\n        for (NodeID n : nodes) set(k, n, height(k, n) + dz);' \
             '        for (NodeID n : nodes) if (std::find(bad.begin(), bad.end(), n) == bad.end()) set(k, n, height(k, n) + dz);\n        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A copied level loses its bends must be caught
@@ -1894,8 +1697,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             'made.heights[i] = height(from, i) + shift;' \
             'made.heights[i] = levels_[from].base + shift;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A copied level always goes on top must be caught
@@ -1903,8 +1705,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        while (at < levels_.size() && levels_[at].base < newBase) ++at;' \
             '        at = levels_.size();'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: Two levels may start at one height must be caught
@@ -1912,8 +1713,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '            if (l.base == newBase) return levels_.size();' \
             '            (void)l;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A copy is not checked against the level below must be caught
@@ -1921,8 +1721,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '            const bool overLower = (at == 0) || h > height(at - 1, i);' \
             '            const bool overLower = true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A point above the top level is inside must be caught
@@ -1930,8 +1729,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        if (z < h[0] - onLevel || z > h[n - 1] + onLevel) return out;' \
             '        if (z < h[0] - onLevel) return out;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: The lower level weighs t, not 1 - t must be caught
@@ -1939,8 +1737,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '                                                  wn.weight * (1.0f - t)});' \
             '                                                  wn.weight * t});'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: z always placed between the bottom two levels must be caught
@@ -1948,8 +1745,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        while (k + 2 < n && h[k + 1] <= z) ++k;' \
             '        while (false) ++k;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A level's height ignores its bends must be caught
@@ -1957,8 +1753,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        for (const auto& wn : w) h += wn.weight * height(k, wn.id);' \
             '        for (const auto& wn : w) h += wn.weight * base(k);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: One level does not ignore z must be caught
@@ -1966,8 +1761,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        if (n == 1) {' \
             '        if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: Removing nodes does not renumber heights must be caught
@@ -1975,8 +1769,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '                const NodeID now = table[old];' \
             '                const NodeID now = old;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: The last level can be removed must be caught
@@ -1984,8 +1777,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        if (levels_.size() <= 1 || k >= levels_.size()) return false;' \
             '        if (k >= levels_.size()) return false;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: No tolerance for a point on the top or bottom level must be caught
@@ -1993,8 +1785,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '        const float onLevel = 1e-6f;' \
             '        const float onLevel = 0.0f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: A copy is not checked against the level above must be caught
@@ -2002,8 +1793,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '            const bool underUpper = (at == levels_.size()) || h < height(at, i);' \
             '            const bool underUpper = true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       # ---- round 3A-4b: what the 3D map drives ----
@@ -2013,8 +1803,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        for (Mapping& m : routing_) id = m.addOutput(name, channel, trim);' \
             '        id = routing_[0].addOutput(name, channel, trim);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: An output removed from the first level only must be caught
@@ -2022,8 +1811,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        for (Mapping& m : routing_) ok = m.removeOutput(id) && ok;' \
             '        ok = routing_[0].removeOutput(id);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A trim set on the first level only must be caught
@@ -2031,8 +1819,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        for (Mapping& m : routing_) m.setTargetTrim(id, trim);' \
             '        routing_[0].setTargetTrim(id, trim);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A copied level loses its values must be caught
@@ -2040,8 +1827,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        values_.insert(values_.begin() + static_cast<std::ptrdiff_t>(at), vals);' \
             '        values_.insert(values_.begin() + static_cast<std::ptrdiff_t>(at), std::vector<std::vector<float>>());'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A removed level leaves its values behind must be caught
@@ -2049,8 +1835,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        values_.erase(values_.begin() + static_cast<std::ptrdiff_t>(k));' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: Values do not follow removed nodes must be caught
@@ -2058,8 +1843,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '                    const NodeID now = table[old];' \
             '                    const NodeID now = old;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: Bindings do not follow removed nodes must be caught
@@ -2067,8 +1851,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        for (Mapping& m : routing_) m.remapNodes(table);' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A node-fed derived output reads only the first level must be caught
@@ -2076,8 +1859,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        const Resolved onFloor = room.resolve(floor);' \
             '        const Resolved onFloor = room.resolve(per[0]);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: Silence from one level only must be caught
@@ -2085,8 +1867,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '            b.silence += routing_[k].silenceShare(per[k]);' \
             '            b.silence = routing_[k].silenceShare(per[k]);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A value outside the map is zero, not its fallback must be caught
@@ -2094,8 +1875,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '        if (!e.inside) return defs_[v].fallback;' \
             '        if (!e.inside) return 0.0f;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: Two values may share a name must be caught
@@ -2103,8 +1883,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMap3D.h \
             '        if (findValue(name) != static_cast<std::size_t>(-1)) {\n            return static_cast<std::size_t>(-1);\n        }' \
             '        (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A binding lands on the first level must be caught
@@ -2112,8 +1891,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '            routing_[k].bind(n, t, w);' \
             '            routing_[0].bind(n, t, w);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: A node with no value of its own reads zero must be caught
@@ -2121,8 +1899,7 @@ jobs:
           python3 tests/mutate.py --nl src/mapping/ofxManifoldMap3D.h \
             '            return defs_[v].fallback;\n        }\n        return values_[k][v][n];' \
             '            return 0.0f;\n        }\n        return values_[k][v][n];'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       - name: Shares from one level only must be caught
@@ -2130,8 +1907,7 @@ jobs:
           python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
             '                if (wt.id < acc.size()) acc[wt.id] += wt.weight;' \
             '                if (wt.id < acc.size()) acc[wt.id] = wt.weight;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/mapping/ofxManifoldMap3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/mapping/ofxManifoldMap3D.h
 
       # ---- round 3A-4c: files for the 3D map ----
@@ -2141,8 +1917,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '    if (lv.count() > 1 || !map.valueSet().empty()) return true;' \
             '    if (!map.valueSet().empty()) return true;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A bent ground saved as a flat map must be caught
@@ -2150,8 +1925,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '        if (lv.bent(0, n)) return true;' \
             '        (void)n;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A level not starting at 0 saved as a flat map must be caught
@@ -2159,8 +1933,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '    if (lv.base(0) != 0.0f) return true;' \
             '    (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: Bindings saved without their level must be caught
@@ -2168,8 +1941,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '                if (k > 0) o << ", \"level\": " << k;' \
             '                (void)k;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: Bent nodes not saved must be caught
@@ -2177,8 +1949,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '            if (!lv.bent(k, n)) continue;' \
             '            continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: Node values not saved must be caught
@@ -2186,8 +1957,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '                if (x == defs[v].fallback) continue;' \
             '                continue;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A one-level map not saved as a 2D outputs file must be caught
@@ -2195,8 +1965,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '    if (map.count() == 1) return saveMapping(map.level(0), m);' \
             '    (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A flat map not saved as a 2D map file must be caught
@@ -2204,8 +1973,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '    if (!detail::needs3D(map, m.nodeCount())) return saveManifold(m);' \
             '    (void)0;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A value declared twice accepted must be caught
@@ -2213,8 +1981,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize3D.h \
             '                == static_cast<std::size_t>(-1)) {\n                res.error = "value declared twice: " + name;\n                return res;' \
             '                == static_cast<std::size_t>(-2)) {\n                res.error = "value declared twice: " + name;\n                return res;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A value never declared accepted must be caught
@@ -2222,8 +1989,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize3D.h \
             '        if (v == static_cast<std::size_t>(-1)) {\n            res.error = "value set but never declared: " + sv.name;' \
             '        if (false) {\n            res.error = "value set but never declared: " + sv.name;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: Levels accepted in a version 2 map file must be caught
@@ -2231,8 +1997,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize3D.h \
             '        && static_cast<int>(root["version"].asNumber()) < 3) {' \
             '        && false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize3D.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize3D.h
 
       - name: A binding with a level accepted in a version 2 outputs file must be caught
@@ -2240,8 +2005,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             '                if (version < 3) {\n                    error = "a binding with a level needs version 3";' \
             '                if (false) {\n                    error = "a binding with a level needs version 3";'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: The 2D outputs reader accepts a binding with a level must be caught
@@ -2249,8 +2013,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '                if (!threeD) {' \
             '                if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: The 2D map reader accepts a 3D map file must be caught
@@ -2258,8 +2021,7 @@ jobs:
           python3 tests/mutate.py src/io/ofxManifoldSerialize.h \
             '    return detail::loadFloor(text, out, 2);' \
             '    return detail::loadFloor(text, out, 3);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: A binding to an undeclared output accepted must be caught
@@ -2267,8 +2029,7 @@ jobs:
           python3 tests/mutate.py --nl src/io/ofxManifoldSerialize.h \
             '                if (t == InvalidTarget) {\n                    error = "binding to undeclared output: "' \
             '                if (false) {\n                    error = "binding to undeclared output: "'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/io/ofxManifoldSerialize.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/io/ofxManifoldSerialize.h
 
       - name: Levels that cross accepted from a file must be caught
@@ -2276,8 +2037,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '                if (!(at(k, i) > at(k - 1, i))) {' \
             '                if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       - name: Level starting heights out of order accepted must be caught
@@ -2285,8 +2045,7 @@ jobs:
           python3 tests/mutate.py src/core/ofxManifoldLevels.h \
             '            if (!(bases[k] > bases[k - 1])) {' \
             '            if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py src/core/ofxManifoldLevels.h; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
       # ---- round 3A-5: the editor, after the fader, rigs, the chart handed its levels ----
@@ -2296,8 +2055,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);\n    mapping_.addDerivedFromOutputs(' \
             '    srcs.emplace_back(outputSel_.front(), 1.0f);\n    mapping_.addDerivedFromOutputs('
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: d with no output is not refused must be caught
@@ -2305,8 +2063,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    if (outputSel_.empty()) {\n        return refusal("no output yet -- press o to make one", 2.5f);\n    }\n    const int ch' \
             '    if (false) {\n        return refusal("no output yet -- press o to make one", 2.5f);\n    }\n    const int ch'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Using a rig loses the current output must be caught
@@ -2314,8 +2071,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    currentOutput_ = current.empty() ? InvalidTarget\n                                     : mapping_.findTarget(current);' \
             '    currentOutput_ = InvalidTarget;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: A rig that does not fit is used anyway must be caught
@@ -2323,8 +2079,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '    if (!u.ok) {' \
             '    if (false) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: Using a rig drops the picked outputs must be caught
@@ -2332,8 +2087,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
             '        if (t != InvalidTarget) outputSel_.push_back(t);' \
             '        (void)t;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 
       - name: A rig file chosen by its full name gets the wrong path must be caught
@@ -2341,8 +2095,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
             '    for (const char* tail : {"-rig.json", ".json"}) {' \
             '    for (const char* tail : {".json"}) {'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
 
       - name: d lit with no output must be caught
@@ -2350,8 +2103,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
             '        entry("derivedafter", "d", "derived output after the picked faders",\n              !drag && picked > 0,' \
             '        entry("derivedafter", "d", "derived output after the picked faders",\n              !drag,'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 
       - name: Saving a rig lit with no outputs must be caught
@@ -2359,8 +2111,7 @@ jobs:
           python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
             '        entry("saverig", "shift-cmd-r", "save the outputs as a rig",\n              !drag && outputs > 0,' \
             '        entry("saverig", "shift-cmd-r", "save the outputs as a rig",\n              !drag,'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 
       - name: The chart is handed no selection share must be caught
@@ -2368,8 +2119,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    if (!sel.empty()) lv.fromSelection = contributions(model, sel, wv);' \
             '    (void)sel;'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: The chart is handed silence outside the map must be caught
@@ -2377,8 +2127,7 @@ jobs:
           python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
             '    lv.silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;' \
             '    lv.silence = mapping.silenceShare(evaluation.weights);'
-          make clean
-          if make test; then echo "::error::not caught"; exit 1; fi
+          if python3 tests/gate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp; then echo "::error::not caught"; exit 1; fi
           git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 
       - name: Restored tree must be green

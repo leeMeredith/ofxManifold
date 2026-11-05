@@ -558,6 +558,28 @@ in the levels suite), 17 mutation gates.
   empty weight vector, which hid a chart that ignored the inside flag; the
   check now leaves weights in an outside evaluation.
 
+### Between 3A-5 and 3A-6: CI gates run only what they reach
+
+`tests/gate.py FILE` asks the compiler (`-MM`) which suites compile the
+mutated file, deletes those suites' binaries, and builds and runs only them,
+plus the door check for an editor file. Every gate calls it instead of
+`make clean` and all of `make test`. It fails safe: a file no suite reaches
+runs everything, and a suite the Makefile runs but the script doesn't know
+stops it with an error. The final "restored tree" step is still a clean full
+run.
+
+- **Measured here:** a clean full `make test` is 112 s; a gate is 10 to 52 s,
+  about 13 s on average over all 251. The CI run should fall from about an
+  hour to a fraction of that.
+- **Every gate was run the new way before it was handed over,** and all 251
+  are caught.
+- **That run found a gate that had gone quiet.** In 3A-5, a second fader was
+  toggled into the rig script to catch "using a rig drops the picked
+  outputs". Toggling a fader makes it current, so the current output became
+  the first one, and "using a rig loses the current output" -- which falls
+  back to the first -- could no longer fail. The script now picks n0 first
+  and toggles n1, so n1 is current but not first. Both gates are caught.
+
 ---
 
 ## Answered

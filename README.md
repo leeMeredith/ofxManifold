@@ -260,7 +260,9 @@ Vectors are classed by where their authority comes from:
 
 809 vectors across twelve suites, plus 251 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
-is an assertion rather than a check. CI runs on Linux x86_64 and macOS arm64,
+is an assertion rather than a check. Each gate runs only the suites that compile
+the file it mutates, found by asking the compiler (`tests/gate.py`): a suite
+that cannot see a file cannot catch a fault in it. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform
 alone.
 

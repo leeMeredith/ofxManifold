@@ -96,6 +96,8 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make test` | rebuild and run all vectors |
 | `make vectors` | regenerate `tests/vectors/triangle.vec` from the Python reference |
 | `make clean` | remove `build/` |
+| `make fma` | all suites as an arm64 Mac builds them (fused multiply-add), on x86 Linux with clang |
+| `python3 tests/gate.py FILE` | run only the suites that compile FILE; what each CI mutation gate runs |
 | `make headers` | assert every header compiles standalone |
 | `make workflow` | assert the CI workflow is still valid |
 | `make door` | nothing outside `editor::Model` can change a map; snippets that must fail to compile |
