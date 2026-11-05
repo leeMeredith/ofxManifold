@@ -2289,6 +2289,98 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
+      # ---- round 3A-5: the editor, after the fader, rigs, the chart handed its levels ----
+
+      - name: d follows only the current fader must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);\n    mapping_.addDerivedFromOutputs(' \
+            '    srcs.emplace_back(outputSel_.front(), 1.0f);\n    mapping_.addDerivedFromOutputs('
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: d with no output is not refused must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    if (outputSel_.empty()) {\n        return refusal("no output yet -- press o to make one", 2.5f);\n    }\n    const int ch' \
+            '    if (false) {\n        return refusal("no output yet -- press o to make one", 2.5f);\n    }\n    const int ch'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Using a rig loses the current output must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    currentOutput_ = current.empty() ? InvalidTarget\n                                     : mapping_.findTarget(current);' \
+            '    currentOutput_ = InvalidTarget;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: A rig that does not fit is used anyway must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '    if (!u.ok) {' \
+            '    if (false) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: Using a rig drops the picked outputs must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
+            '        if (t != InvalidTarget) outputSel_.push_back(t);' \
+            '        (void)t;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+
+      - name: A rig file chosen by its full name gets the wrong path must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
+            '    for (const char* tail : {"-rig.json", ".json"}) {' \
+            '    for (const char* tail : {".json"}) {'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+
+      - name: d lit with no output must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+            '        entry("derivedafter", "d", "derived output after the picked faders",\n              !drag && picked > 0,' \
+            '        entry("derivedafter", "d", "derived output after the picked faders",\n              !drag,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+
+      - name: Saving a rig lit with no outputs must be caught
+        run: |
+          python3 tests/mutate.py --nl ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+            '        entry("saverig", "shift-cmd-r", "save the outputs as a rig",\n              !drag && outputs > 0,' \
+            '        entry("saverig", "shift-cmd-r", "save the outputs as a rig",\n              !drag,'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+
+      - name: The chart is handed no selection share must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '    if (!sel.empty()) lv.fromSelection = contributions(model, sel, wv);' \
+            '    (void)sel;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
+      - name: The chart is handed silence outside the map must be caught
+        run: |
+          python3 tests/mutate.py ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
+            '    lv.silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;' \
+            '    lv.silence = mapping.silenceShare(evaluation.weights);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+
       - name: Restored tree must be green
         run: |
           make clean

@@ -10,19 +10,19 @@ namespace editor {
 // heard. Derived outputs in their own colour. A silence bar at the end, so
 // outputs plus silence always total exactly 1. Trim as a tick: the bar is the
 // routed share, the tick is the level that actually leaves.
-void drawChart(const Scene& s, const ChartLayout& chart) {
+void drawChart(const Scene& s, const ChartLayout& chart,
+               const ChartLevels& lv) {
     const Model&      model     = *s.model;
     const Selection&  selection = *s.selection;
     const Manifold2D& manifold  = model.manifold();
     const Mapping&    mapping   = model.mapping();
-    const Evaluation& evaluation = *s.evaluation;
     const ofxManifoldRenderer* renderer = s.renderer;
     const float cw = s.text->charWidth(), lh = s.text->lineHeight();
     auto text = [&](const std::string& t, float x, float y) {
         s.text->draw(t, x, y);
     };
     (void)model; (void)selection; (void)manifold; (void)mapping;
-    (void)evaluation; (void)renderer; (void)cw; (void)lh; (void)text;
+    (void)renderer; (void)cw; (void)lh; (void)text;
 
     ofPushStyle();
     ofSetColor(40, 43, 52);
@@ -37,14 +37,12 @@ void drawChart(const Scene& s, const ChartLayout& chart) {
         return;
     }
 
-    const WeightVector none;
-    const WeightVector& wv = evaluation.inside ? evaluation.weights : none;
-    const std::vector<float> routed = mapping.toChannels(wv);
-    const std::vector<float> levels = mapping.toChannelLevels(wv);
-    const float silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
+    // Handed in, not computed: see chartLevels().
+    const std::vector<float>& routed = lv.routed;
+    const std::vector<float>& levels = lv.levels;
+    const float silence = lv.silence;
     // How much of each output's level comes from the selected nodes.
-    const std::vector<float> fromSel = selection.empty()
-        ? std::vector<float>() : contributions(model, selection, wv);
+    const std::vector<float>& fromSel = lv.fromSelection;
     const std::vector<std::size_t> taps = tapsOf(model, selection);
     const float rise = chart.barArea - 6.0f;
     const float row1 = chart.base + lh + 1.0f;      // label rows under bars
@@ -161,7 +159,7 @@ void drawChart(const Scene& s, const ChartLayout& chart) {
     // runs past the window however many outputs there are.
     ofSetColor(235, 238, 245);
     const float tx = chart.totalX;
-    if (evaluation.inside) {
+    if (lv.inside) {
         text("outputs " + ofToString(outputsTotal, 3), tx, chart.top + lh + 6.0f);
         text("silence " + ofToString(silence, 3), tx, chart.top + 2.0f * lh + 6.0f);
         text("total   " + ofToString(outputsTotal + silence, 3), tx,

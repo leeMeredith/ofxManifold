@@ -126,7 +126,7 @@ void ofApp::draw() {
     st.warning = refusedFlash > 0.0f;
 
     drawMap(sc, look, over);
-    drawChart(sc, chart);
+    drawChart(sc, chart, chartLevels(model, selection, evaluation));
     drawPanel(sc, look, st, keyContext());
 }
 
@@ -376,6 +376,9 @@ std::string ofApp::keyId(int key) const {
         if (key == 's' || key == 'S' || key == 19) {
             return (key == 'S' || shift) ? "saveas" : "save";
         }
+        if (key == 'r' || key == 'R' || key == 18) {
+            return (key == 'R' || shift) ? "saverig" : "userig";
+        }
         if (key == 'o' || key == 'O' || key == 15) return "open";
         return "";
     }
@@ -393,7 +396,8 @@ std::string ofApp::keyId(int key) const {
     case 'u':                                       return "unjoin";
     case 'f':                                       return "join";
     case 'o':                                       return "newoutput";
-    case 'd':                                       return "derived";
+    case 'd':                                       return "derivedafter";
+    case 'D':                                       return "derived";
     case 'b':                                       return "bind";
     case 'B':                                       return "bindall";
     case 'q': case 'Q': case 'w': case 'W':         return "fill";
@@ -447,6 +451,8 @@ void ofApp::keyPressed(int key) {
     if (id == "save")   { save(); return; }
     if (id == "saveas") { saveAs(); return; }
     if (id == "open")   { open(); return; }
+    if (id == "userig") { useRig(); return; }
+    if (id == "saverig") { saveRig(); return; }
     if (id == "empty") {
         currentPath.clear();
         act("new map", [](Model& m) {
@@ -508,6 +514,10 @@ void ofApp::keyPressed(int key) {
     if (id == "newoutput") { act("new output", [](Model& m) { return m.newOutput(); }); return; }
     if (id == "derived") {
         act("derived output", [&](Model& m) { return m.newDerived(selection); });
+        return;
+    }
+    if (id == "derivedafter") {
+        act("derived output", [](Model& m) { return m.newDerivedAfter(); });
         return;
     }
     if (id == "bind") { act("binding", [&](Model& m) { return m.bind(selection); }); return; }
@@ -634,6 +644,24 @@ void ofApp::open() {
     ofFileDialogResult d =
         ofSystemLoadDialog("Open a map -- either file of a pair");
     if (d.bSuccess) openAt(d.getPath());
+}
+
+// Using a rig is one undo step, like any edit. The rig file stays as it was.
+void ofApp::useRig() {
+    ofFileDialogResult d =
+        ofSystemLoadDialog("Use a rig -- its outputs replace this map's");
+    if (!d.bSuccess) return;
+    const std::string path = d.getPath();
+    act("use rig", [path](Model& m) { return useRigFile(m, path); });
+}
+
+void ofApp::saveRig() {
+    const std::string suggested = currentPath.empty()
+        ? std::string("room") : pairFor(currentPath).name;
+    ofFileDialogResult d =
+        ofSystemSaveDialog(suggested + "-rig.json", "Save the outputs as a rig");
+    if (!d.bSuccess) return;
+    show(saveRigFile(model, d.getPath()));
 }
 
 // Opening is one undo step, like any edit: history.apply records it only if

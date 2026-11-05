@@ -75,6 +75,56 @@ Result savePair(const Model& model, const std::string& chosen) {
     return r;
 }
 
+RigFile rigFor(const std::string& chosen) {
+    std::string b = chosen;
+    for (const char* tail : {"-rig.json", ".json"}) {
+        if (endsWith(b, tail)) {
+            b.resize(b.size() - std::string(tail).size());
+            break;
+        }
+    }
+    RigFile f;
+    f.path = b + "-rig.json";
+    const std::size_t slash = b.find_last_of("/\\");
+    f.name = (slash == std::string::npos) ? b : b.substr(slash + 1);
+    return f;
+}
+
+Result saveRigFile(const Model& model, const std::string& chosen) {
+    const RigFile f = rigFor(chosen);
+    Result r;
+    r.seconds = 3.0f;
+    if (!writeFile(f.path, io::saveRig(model.mapping()))) {
+        r.refused = true;
+        r.message = "cannot write " + f.name + "-rig.json";
+        return r;
+    }
+    r.message = "saved rig " + f.name + "-rig.json";
+    return r;
+}
+
+Result useRigFile(Model& model, const std::string& chosen) {
+    const RigFile f = rigFor(chosen);
+    std::string text;
+    if (!readFile(f.path, text)) {
+        Result r;
+        r.refused = true;
+        r.seconds = 3.0f;
+        r.message = "cannot open " + f.name + "-rig.json";
+        return r;
+    }
+    Mapping rig;
+    const io::LoadResult lr = io::loadRig(text, rig);
+    if (!lr.ok) {
+        Result r;
+        r.refused = true;
+        r.seconds = 5.0f;
+        r.message = "rig refused: " + lr.error;
+        return r;
+    }
+    return model.useRig(rig, f.name);
+}
+
 Result openPair(Model& model, const std::string& chosen) {
     const FilePair p = pairFor(chosen);
     Result r;

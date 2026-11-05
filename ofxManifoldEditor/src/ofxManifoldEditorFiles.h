@@ -47,5 +47,22 @@ Result savePair(const Model& model, const std::string& chosen);
 // is refused opens the map, says why, and flags the result as refused.
 Result openPair(Model& model, const std::string& chosen);
 
+// ---- rigs (PLAN-round3.md decision B) ----------------------------------------
+//
+// A rig is one file, the room: "stage-rig.json". Choosing "stage",
+// "stage.json" or "stage-rig.json" all name it.
+struct RigFile {
+    std::string path;      // base + "-rig.json"
+    std::string name;      // base without its directories, for messages
+};
+RigFile rigFor(const std::string& chosen);
+
+// Write the map's outputs as a rig. The model is only read.
+Result saveRigFile(const Model& model, const std::string& chosen);
+
+// Read a rig and move the map onto it, through Model::useRig. A rig that
+// cannot be read, or that the map does not fit, changes nothing.
+Result useRigFile(Model& model, const std::string& chosen);
+
 } // namespace editor
 } // namespace ofxManifold

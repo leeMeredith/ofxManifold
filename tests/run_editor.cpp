@@ -84,6 +84,11 @@ std::string dump(const Model& md) {
         for (std::size_t k = 0; k < a.sources.size(); ++k) {
             o << (k ? "," : "") << m.node(a.sources[k]).name;
         }
+        // Fed by outputs (round 3A-5): output names, marked so they can
+        // never be read as nodes.
+        for (std::size_t k = 0; k < a.outputs.size(); ++k) {
+            o << (k ? "," : "") << ">" << mp.targetName(a.outputs[k]);
+        }
     }
     o << " | C " << (md.currentOutput() == InvalidTarget
                      ? std::string("-") : mp.targetName(md.currentOutput()));
@@ -170,6 +175,7 @@ std::string label(const std::string& op) {
         {"place", "place"}, {"join", "join"}, {"unjoin", "unjoin"},
         {"remove", "delete"}, {"newoutput", "new output"},
         {"derived", "derived output"}, {"bind", "binding"},
+        {"derivedafter", "derived output"}, {"userig", "use rig"},
         {"bindall", "bind to every output"}, {"fill", "fill"},
         {"clear", "clear bindings"}, {"trim", "trim"},
         {"removeoutput", "remove output"}, {"example", "example map"},
@@ -249,6 +255,15 @@ int main(int argc, char** argv) {
             else if (lastOp == "remove")  op = [&](Model& m) { return m.remove(sel); };
             else if (lastOp == "newoutput") op = [&](Model& m) { return m.newOutput(); };
             else if (lastOp == "derived") op = [&](Model& m) { return m.newDerived(sel); };
+            else if (lastOp == "derivedafter") op = [&](Model& m) { return m.newDerivedAfter(); };
+            else if (lastOp == "saverig") {
+                std::string nm; in >> nm;
+                op = [nm](Model& m) { return saveRigFile(m, kScratch + nm); };
+            }
+            else if (lastOp == "userig") {
+                std::string nm; in >> nm;
+                op = [nm](Model& m) { return useRigFile(m, kScratch + nm); };
+            }
             else if (lastOp == "bind")    op = [&](Model& m) { return m.bind(sel); };
             else if (lastOp == "bindall") op = [&](Model& m) { return m.bindAll(sel); };
             else if (lastOp == "fill") {
@@ -449,6 +464,38 @@ int main(int argc, char** argv) {
                 ok = false;
                 why << "contributions after step " << step << ": want "
                     << want << ", got " << got;
+            }
+            // What the chart is handed (round 3A-5) must be exactly what it
+            // used to compute for itself: the map's channels, levels and
+            // silence at these weights, and the selection's part. Inside,
+            // and outside -- where there is no silence and no selection
+            // share to show.
+            if (ok) {
+                Evaluation ev;
+                ev.inside = true;
+                ev.weights = w;
+                const ChartLevels lv = chartLevels(md, sel, ev);
+                const Mapping& mp = md.mapping();
+                const std::vector<float> want2 = sel.empty()
+                    ? std::vector<float>() : contributions(md, sel, w);
+                if (!lv.inside || lv.routed != mp.toChannels(w)
+                    || lv.levels != mp.toChannelLevels(w)
+                    || lv.silence != mp.silenceShare(w)
+                    || lv.fromSelection != want2) {
+                    ok = false;
+                    why << "chartLevels differs from the map's own reading "
+                           "after step " << step;
+                }
+                // Outside, with weights left in it: the chart must still show
+                // nothing, as it did when it computed its own levels.
+                Evaluation off;
+                off.weights = w;
+                const ChartLevels lo = chartLevels(md, sel, off);
+                if (ok && (lo.inside || lo.silence != 0.0f
+                           || lo.routed != mp.toChannels({}))) {
+                    ok = false;
+                    why << "chartLevels outside the map is not empty";
+                }
             }
         } else if (kind == "TAPS") {
             std::string want, tok;

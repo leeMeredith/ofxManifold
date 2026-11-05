@@ -114,5 +114,22 @@ std::vector<float> contributions(const Model& model, const Selection& sel,
 // node loses nothing to -- by aggregator index.
 std::vector<std::size_t> tapsOf(const Model& model, const Selection& sel);
 
+// What the faders show, computed by whoever holds the levels and HANDED to
+// the chart (round 3A-5). The editor computes them from its one map; a player
+// blending several maps computes them from the blend and hands those over
+// instead -- the chart draws either without knowing which.
+struct ChartLevels {
+    bool               inside = false;   // false: the point is off the map
+    std::vector<float> routed;           // by channel, before trim
+    std::vector<float> levels;           // by channel, after trim
+    float              silence = 0.0f;
+    std::vector<float> fromSelection;    // by channel; empty with no selection
+};
+
+// The editor's levels: its map at the listening point, and the selection's
+// part of each. Exactly what the chart used to compute for itself.
+ChartLevels chartLevels(const Model& model, const Selection& sel,
+                        const Evaluation& evaluation);
+
 } // namespace editor
 } // namespace ofxManifold

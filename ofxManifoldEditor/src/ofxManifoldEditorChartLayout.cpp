@@ -201,5 +201,19 @@ TargetID ChartLayout::outputAt(float x, float y) const {
     return b.kind == ChartBar::Kind::Output ? b.output : InvalidTarget;
 }
 
+ChartLevels chartLevels(const Model& model, const Selection& sel,
+                        const Evaluation& evaluation) {
+    ChartLevels lv;
+    const Mapping& mapping = model.mapping();
+    const WeightVector none;
+    const WeightVector& wv = evaluation.inside ? evaluation.weights : none;
+    lv.inside = evaluation.inside;
+    lv.routed = mapping.toChannels(wv);
+    lv.levels = mapping.toChannelLevels(wv);
+    lv.silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
+    if (!sel.empty()) lv.fromSelection = contributions(model, sel, wv);
+    return lv;
+}
+
 } // namespace editor
 } // namespace ofxManifold

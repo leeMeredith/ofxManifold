@@ -1,6 +1,7 @@
 #include "ofxManifoldEditorModel.h"
 
 #include "authoring/ofxManifoldRing.h"
+#include "mapping/ofxManifoldRig.h"
 
 #include <glm/geometric.hpp>
 
@@ -397,6 +398,48 @@ Result Model::newDerived(const Selection& sel) {
     mapping_.addDerived(nm, ch, 1.0f, SumMode::Linear, srcs);
     return changed("derived " + nm + " on channel " + std::to_string(ch)
                    + ", sum of " + std::to_string(srcs.size()), 3.0f);
+}
+
+Result Model::newDerivedAfter() {
+    if (outputSel_.empty()) {
+        return refusal("no output yet -- press o to make one", 2.5f);
+    }
+    const int ch = nextFreeChannel();
+    const std::string nm = "sum" + std::to_string(ch);
+    std::vector<std::pair<TargetID, float>> srcs;
+    for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);
+    mapping_.addDerivedFromOutputs(nm, ch, 1.0f, SumMode::Linear, srcs);
+    return changed("derived " + nm + " on channel " + std::to_string(ch)
+                   + ", after " + selectedOutputNames(), 3.0f);
+}
+
+Result Model::useRig(const Mapping& rig, const std::string& name) {
+    const RigUse u = ofxManifold::useRig(mapping_, rig);
+    if (!u.ok) {
+        std::string list;
+        for (std::size_t i = 0; i < u.refused.size(); ++i) {
+            list += (i ? ", " : "") + u.refused[i];
+        }
+        return refusal("cannot use rig " + name + " -- not in it, or not "
+                       "the same kind: " + list, 4.0f);
+    }
+    // Outputs may come back in another order: carry the current and picked
+    // outputs across by name.
+    const std::string current = currentOutput_ == InvalidTarget
+        ? std::string() : mapping_.targetName(currentOutput_);
+    std::vector<std::string> picked;
+    for (TargetID t : outputSel_) picked.push_back(mapping_.targetName(t));
+    mapping_ = u.result;
+    currentOutput_ = current.empty() ? InvalidTarget
+                                     : mapping_.findTarget(current);
+    outputSel_.clear();
+    for (const std::string& nm : picked) {
+        const TargetID t = mapping_.findTarget(nm);
+        if (t != InvalidTarget) outputSel_.push_back(t);
+    }
+    settleCurrentOutput();
+    return changed("using rig " + name + ": "
+                   + std::to_string(mapping_.targetCount()) + " outputs", 3.0f);
 }
 
 BindPlan Model::planBind(const Selection& sel) const {

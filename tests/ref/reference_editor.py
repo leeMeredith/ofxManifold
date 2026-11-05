@@ -113,6 +113,9 @@ class Editor:
 
     def remove_output(self, name):
         self.outputs = [o for o in self.outputs if o[0] != name]
+        # an after-fed derived output loses the source, and stays (3A-1)
+        self.derived = [[d[0], d[1], [x for x in d[2] if x != ">" + name]]
+                        + d[3:] for d in self.derived]
         for n in list(self.links):
             self.links[n] = [l for l in self.links[n]
                              if not (l[0] == "out" and l[1] == name)]
@@ -200,7 +203,7 @@ class Editor:
         for n in gone:
             self.links.pop(n, None)
         self.derived = [[d[0], d[1], [s for s in d[2] if s not in gone]]
-                        for d in self.derived]
+                        + d[3:] for d in self.derived]
         og = 0
         for nm in sel:
             if nm in self.out_names() and not self.in_use(nm):
@@ -234,6 +237,55 @@ class Editor:
         nm = f"sum{ch}"
         self.derived.append([nm, ch, list(sel)])
         return (1, 0, f"derived {nm} on channel {ch}, sum of {len(sel)}")
+
+    # ---- round 3A-5: after the fader, and rigs -----------------------------
+    #
+    # A derived output fed by outputs is [name, channel, [">L", ">R"],
+    # "after"]: its sources are output names, marked so they never match a
+    # node's. One fed by nodes keeps its three fields, as before.
+
+    @staticmethod
+    def kind(d):
+        return d[3] if len(d) > 3 else "filled"
+
+    def new_derived_after(self):
+        if not self.out_sel:
+            return (0, 1, "no output yet -- press o to make one")
+        ch = self.next_channel()
+        nm = f"sum{ch}"
+        self.derived.append([nm, ch, [">" + o for o in self.out_sel], "after"])
+        return (1, 0, f"derived {nm} on channel {ch}, after "
+                + ", ".join(self.out_sel))
+
+    def rig(self):
+        """The room: outputs, after-fed derived outputs, and the channels the
+        map fills -- listed, with no sources."""
+        return ([list(o) for o in self.outputs],
+                [[d[0], d[1], list(d[2]) if self.kind(d) == "after" else [],
+                  self.kind(d)] for d in self.derived])
+
+    def use_rig(self, rig, name):
+        routs, rder = rig
+        rk = {o[0]: "output" for o in routs}
+        rk.update({d[0]: d[3] for d in rder})
+        mine = [(o[0], "output") for o in self.outputs] + \
+               [(d[0], self.kind(d)) for d in self.derived]
+        refused = sorted({n for n, k in mine if rk.get(n) != k})
+        if refused:
+            return (0, 1, f"cannot use rig {name} -- not in it, or not the "
+                    f"same kind: {', '.join(refused)}")
+        fills = {d[0]: d for d in self.derived if self.kind(d) == "filled"}
+        self.outputs = [list(o) for o in routs]
+        new = []
+        for d in rder:
+            if d[3] == "after":
+                new.append([d[0], d[1], list(d[2]), "after"])
+            else:
+                new.append([d[0], d[1],
+                            list(fills[d[0]][2]) if d[0] in fills else []])
+        self.derived = new
+        self.settle()
+        return (1, 0, f"using rig {name}: {len(self.outputs)} outputs")
 
     def feeds(self, node, out):
         return any(l[0] == "out" and l[1] == out
@@ -580,11 +632,13 @@ class Editor:
             ("addoutput", nd and outs >= 2), ("nextoutput", nd and outs >= 2),
             ("bind", nd and possible), ("bindall", nd and outs > 0 and bool(sel)),
             ("fill", nd and any_out), ("clear", nd and bool(any_bound)),
+            ("derivedafter", nd and picked > 0),
             ("derived", nd and bool(sel)), ("trim", nd and picked > 0),
             ("removeoutput", nd and picked == 1), ("autooutput", nd),
             ("audition", nd), ("lock", nd),
             ("undo", nd and can_undo), ("redo", nd and can_redo),
-            ("save", nd), ("saveas", nd), ("open", nd), ("empty", nd),
+            ("save", nd), ("saveas", nd), ("open", nd),
+            ("userig", nd), ("saverig", nd and outs > 0), ("empty", nd),
             ("example", nd), ("fullscreen", True), ("textsize", True),
         ]
         return rules, preview
@@ -710,7 +764,8 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "bindall": "bind to every output", "fill": "fill",
           "clear": "clear bindings", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
-          "empty": "new map", "move": "move", "openpair": "open"}
+          "empty": "new map", "move": "move", "openpair": "open",
+          "derivedafter": "derived output", "userig": "use rig"}
 
 
 class Script:
@@ -718,6 +773,7 @@ class Script:
         self.out, self.ed = out, Editor()
         self.past, self.future, self.limit = [], [], limit
         self.disk = {}           # base name -> (snapshot, outputs state)
+        self.rigs = {}           # base name -> rig
         self.grid = grid or G.Free()
         self.sel, self.ordered = [], True
         out.append(f"# {note}")
@@ -764,6 +820,9 @@ class Script:
             "unjoin":   lambda: e.unjoin(s),
             "remove":   lambda: e.remove(s),
             "newoutput": e.new_output, "derived": lambda: e.new_derived(s),
+            "derivedafter": e.new_derived_after,
+            "saverig":  lambda: self.save_rig(args[0]),
+            "userig":   lambda: self.use_rig(args[0]),
             "bind":     lambda: e.bind(s),
             "bindall":  lambda: e.bind_all(s),
             "fill":     lambda: e.step_fill(s, args[0], args[1]),
@@ -791,7 +850,7 @@ class Script:
         elif op == "fill":
             argtxt = f" {args[0]} {1 if args[1] else 0}"
         elif op in ("savepair", "openpair", "legacypair", "maponly",
-                    "badoutputs"):
+                    "badoutputs", "saverig", "userig"):
             argtxt = f" {args[0]}"
         elif op == "move":
             argtxt = f" {args[0]} {fmt(args[1][0])} {fmt(args[1][1])}"
@@ -865,6 +924,27 @@ class Script:
             if chosen.endswith(tail):
                 return chosen[:-len(tail)]
         return chosen
+
+    @staticmethod
+    def rig_base(chosen):
+        for tail in ("-rig.json", ".json"):
+            if chosen.endswith(tail):
+                return chosen[:-len(tail)]
+        return chosen
+
+    def save_rig(self, chosen):
+        import copy
+        b = self.rig_base(chosen)
+        self.rigs[b] = copy.deepcopy(self.ed.rig())
+        name = b.replace("\\", "/").split("/")[-1]
+        return (0, 0, f"saved rig {name}-rig.json")
+
+    def use_rig(self, chosen):
+        b = self.rig_base(chosen)
+        name = b.replace("\\", "/").split("/")[-1]
+        if b not in self.rigs:
+            return (0, 1, f"cannot open {name}-rig.json")
+        return self.ed.use_rig(self.rigs[b], name)
 
     def save_pair(self, chosen):
         b = self.base(chosen)
@@ -1444,7 +1524,89 @@ def build():
             probes=[("mid", 0), ("mid", 5), ("edge", 5), ("mid", 9),
                     ("silence",)])
     t.end()
+    build_round3(out)
     return out
+
+
+def build_round3(out):
+    t = Script(out, "derived_after_and_before",
+               "d makes a derived output from the PICKED FADERS, after their "
+               "faders; D one from the selected NODES, before them, as d "
+               "did. Three nodes, each its own output; pick n0 and shift-"
+               "pick n1, press d; select n2, press D")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("place", (0.5, 0.8))
+    t.keys()
+    t.do("pick", "n0"); t.do("toggleout", "n1")
+    t.do("derivedafter")
+    t.select("n2"); t.do("derived")
+    t.keys()
+    t.taps()
+    t.contrib([("n0", 0.5), ("n2", 0.5)])
+    out.append("# n1 removed with its node: the after-fed sum loses that")
+    out.append("# source and stays, reading n0 alone")
+    t.select("n1"); t.do("remove")
+    t.do("undo"); t.do("undo")
+    t.end()
+
+    t = Script(out, "derived_after_needs_an_output",
+               "an empty map has no faders to follow: d is refused and says "
+               "why; D with nothing selected likewise")
+    t.do("empty")
+    t.keys()
+    t.do("derivedafter")
+    t.do("derived")
+    t.end()
+
+    t = Script(out, "rig_save_and_use",
+               "save the outputs as a rig; make a second map with two of the "
+               "speakers, placed differently, n0 trimmed differently; use the rig "
+               "on it. Outputs, channels and trims come from the rig, in its "
+               "order; bindings follow by name; the after-fed sum comes with "
+               "the rig. One undo step")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("place", (0.5, 0.8))
+    t.do("pick", "n0"); t.do("toggleout", "n1"); t.do("derivedafter")
+    t.do("pick", "n1"); t.do("trim", -6.0)
+    t.do("saverig", "room")
+    t.do("saverig", "room-rig.json")
+    t.do("empty")
+    t.do("place", (0.5, 0.8)); t.do("place", (0.2, 0.2))
+    t.do("pick", "n0"); t.do("trim", -3.0); t.do("pick", "n1")
+    t.do("toggleout", "n0")
+    out.append("# the rig brings n2 and the sum, n0's trim back to 0 dB, and")
+    out.append("# n1's -6 dB; the bindings here stay as they are, and n1 --")
+    out.append("# not the rig's first output -- stays the current one, with")
+    out.append("# n0 still picked beside it")
+    t.do("userig", "room")
+    t.keys()
+    t.do("undo")
+    t.do("redo")
+    t.end()
+
+    t = Script(out, "rig_refused",
+               "a rig that lacks an output of this map is refused, naming "
+               "it, and nothing changes; so is a rig file that is not there")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("saverig", "pair")
+    t.do("place", (0.5, 0.8))
+    t.do("userig", "pair")
+    t.do("userig", "nowhere")
+    t.do("undo")
+    t.end()
+
+    t = Script(out, "rig_kind_mismatch",
+               "the rig computes sum2 from outputs; this map fills sum2 from "
+               "its nodes. Same name, same channel, different meaning: "
+               "refused rather than quietly replaced")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("pick", "n0"); t.do("derivedafter")
+    t.do("saverig", "kinds")
+    t.do("empty")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.select("n0"); t.do("derived")
+    t.do("userig", "kinds")
+    t.end()
 
 
 def main():

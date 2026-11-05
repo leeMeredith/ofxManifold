@@ -106,7 +106,20 @@ public:
     // ---- outputs -----------------------------------------------------------
 
     Result newOutput();
+    // A derived output summing the selected NODES -- before every fader,
+    // following the map (D).
     Result newDerived(const Selection& sel);
+    // A derived output summing what the selected OUTPUTS send -- after their
+    // faders, following the mix (d; PLAN-round3.md decision A). Refused with
+    // no output picked.
+    Result newDerivedAfter();
+
+    // Move the map onto a rig (cmd-r): the rig's outputs, channels, trims and
+    // after-fed derived outputs; bindings following by name. Refused, naming
+    // what the rig lacks or holds as a different kind, changing nothing. The
+    // current output stays current if the rig has it; the picked outputs
+    // keep those it has.
+    Result useRig(const Mapping& rig, const std::string& name);
     // Toggle the selected nodes' binding to the CURRENT output.
     //
     //   if every selected node already feeds it  -> unbind them all from it

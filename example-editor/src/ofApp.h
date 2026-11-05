@@ -83,6 +83,8 @@ private:
     void save();                        // command-S: to the open pair
     void saveAs();                      // shift-command-S: choose a name
     void open();                        // command-O
+    void useRig();                      // command-R: move onto a rig
+    void saveRig();                     // shift-command-R: save one
     void openAt(const std::string& path);
     void remember() const;              // the pair to reopen next launch
     void markChanged(const ofxManifold::editor::Result& r);

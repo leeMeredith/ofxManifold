@@ -532,6 +532,32 @@ in the levels suite), 17 mutation gates.
   its outputs file as version 3, not 2, because its sub reads outputs (3A-1).
   The C++ was right.
 
+### 3A-5: the editor -- after the fader, rigs, the chart handed its levels
+
+- **`d`** makes a derived output from the picked faders, after their faders
+  (`Model::newDerivedAfter`). **`D`** makes one from the selected nodes, as
+  `d` did. **cmd-r** uses a rig (`useRigFile`, `Model::useRig`), one undo
+  step; **shift-cmd-r** saves the outputs as `name-rig.json`
+  (`saveRigFile`). The current output and the picked outputs carry across a
+  rig by name.
+- **The chart draws levels it is handed.** `chartLevels()` computes what
+  `drawChart` used to compute for itself; `drawChart` takes a `ChartLevels`,
+  so the player can hand it a blend. A pure move: the recorded drawing of the
+  30-frame session, built with only this change, is identical, 29,461 calls.
+  The runner also checks `chartLevels` against the map's own reading at every
+  CONTRIB record, inside and outside.
+- 5 editor scripts (36), 50 checked steps (478), 10 mutation gates.
+
+- **An understood change to old vectors.** The 15 KEYS records list every
+  key, so each gains `derivedafter`, `userig` and `saverig`. Nothing else in
+  the old editor vectors changed. This is the key panel growing, not the
+  simple path changing.
+- **Two gaps found by the gates.** Using a rig with only the current output
+  picked could not show picked outputs being dropped, since settling puts the
+  current one back; the script now picks two. And "outside" was tested with an
+  empty weight vector, which hid a chart that ignored the inside flag; the
+  check now leaves weights in an outside evaluation.
+
 ---
 
 ## Answered
