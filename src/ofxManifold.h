@@ -32,6 +32,7 @@
 
 #include "mapping/ofxManifoldMapping.h"
 #include "mapping/ofxManifoldRig.h"
+#include "mapping/ofxManifoldMap3D.h"
 
 #include "io/ofxManifoldJSON.h"
 #include "io/ofxManifoldSerialize.h"

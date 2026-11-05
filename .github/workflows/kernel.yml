@@ -2006,6 +2006,134 @@ jobs:
           if make test; then echo "::error::not caught"; exit 1; fi
           git checkout -- src/core/ofxManifoldLevels.h
 
+      # ---- round 3A-4b: what the 3D map drives ----
+
+      - name: An output added to the first level only must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        for (Mapping& m : routing_) id = m.addOutput(name, channel, trim);' \
+            '        id = routing_[0].addOutput(name, channel, trim);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: An output removed from the first level only must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        for (Mapping& m : routing_) ok = m.removeOutput(id) && ok;' \
+            '        ok = routing_[0].removeOutput(id);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A trim set on the first level only must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        for (Mapping& m : routing_) m.setTargetTrim(id, trim);' \
+            '        routing_[0].setTargetTrim(id, trim);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A copied level loses its values must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        values_.insert(values_.begin() + static_cast<std::ptrdiff_t>(at), vals);' \
+            '        values_.insert(values_.begin() + static_cast<std::ptrdiff_t>(at), std::vector<std::vector<float>>());'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A removed level leaves its values behind must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        values_.erase(values_.begin() + static_cast<std::ptrdiff_t>(k));' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: Values do not follow removed nodes must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '                    const NodeID now = table[old];' \
+            '                    const NodeID now = old;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: Bindings do not follow removed nodes must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        for (Mapping& m : routing_) m.remapNodes(table);' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A node-fed derived output reads only the first level must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        const Resolved onFloor = room.resolve(floor);' \
+            '        const Resolved onFloor = room.resolve(per[0]);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: Silence from one level only must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '            b.silence += routing_[k].silenceShare(per[k]);' \
+            '            b.silence = routing_[k].silenceShare(per[k]);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A value outside the map is zero, not its fallback must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '        if (!e.inside) return defs_[v].fallback;' \
+            '        if (!e.inside) return 0.0f;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: Two values may share a name must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMap3D.h \
+            '        if (findValue(name) != static_cast<std::size_t>(-1)) {\n            return static_cast<std::size_t>(-1);\n        }' \
+            '        (void)0;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A binding lands on the first level must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '            routing_[k].bind(n, t, w);' \
+            '            routing_[0].bind(n, t, w);'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: A node with no value of its own reads zero must be caught
+        run: |
+          python3 tests/mutate.py --nl src/mapping/ofxManifoldMap3D.h \
+            '            return defs_[v].fallback;\n        }\n        return values_[k][v][n];' \
+            '            return 0.0f;\n        }\n        return values_[k][v][n];'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
+      - name: Shares from one level only must be caught
+        run: |
+          python3 tests/mutate.py src/mapping/ofxManifoldMap3D.h \
+            '                if (wt.id < acc.size()) acc[wt.id] += wt.weight;' \
+            '                if (wt.id < acc.size()) acc[wt.id] = wt.weight;'
+          make clean
+          if make test; then echo "::error::not caught"; exit 1; fi
+          git checkout -- src/mapping/ofxManifoldMap3D.h
+
       - name: Restored tree must be green
         run: |
           make clean

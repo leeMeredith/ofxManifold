@@ -10,6 +10,7 @@
 
 #include "../src/core/ofxManifold2D.h"
 #include "../src/core/ofxManifoldLevels.h"
+#include "../src/mapping/ofxManifoldMap3D.h"
 
 #include <glm/vec3.hpp>
 
@@ -161,6 +162,73 @@ Manifold2D buildFloor(const Plan& plan) {
 }
 
 std::map<std::string, Manifold2D> floors;
+std::map<std::string, Map3D> maps3;
+
+std::vector<float> readFloatsUntil(std::istringstream& in, const char* stop) {
+    std::vector<float> v;
+    std::string tok;
+    while (in >> tok && tok != stop) v.push_back(std::stof(tok));
+    return v;
+}
+
+// "n@l=w ..." until the given keyword; "OUTSIDE" gives an outside evaluation.
+Evaluation3D readW3(std::istringstream& in, const char* stop) {
+    Evaluation3D e;
+    e.inside = true;
+    std::string tok;
+    while (in >> tok && tok != stop) {
+        if (tok == "OUTSIDE") { e.inside = false; continue; }
+        const std::size_t at = tok.find('@'), eq = tok.find('=');
+        e.weights.push_back(LevelWeight{
+            static_cast<NodeID>(std::stoul(tok.substr(0, at))),
+            static_cast<LevelID>(std::stoul(tok.substr(at + 1, eq - at - 1))),
+            std::stof(tok.substr(eq + 1))});
+    }
+    return e;
+}
+
+bool sameDense(const std::vector<float>& got, const std::vector<float>& want,
+               const char* what, std::ostringstream& d) {
+    if (got.size() != want.size()) {
+        d << what << ": " << got.size() << " channels, expected " << want.size();
+        return false;
+    }
+    for (std::size_t i = 0; i < want.size(); ++i) {
+        if (!close(got[i], want[i])) {
+            d << what << " channel " << i << ": expected " << want[i]
+              << ", got " << got[i];
+            return false;
+        }
+    }
+    return true;
+}
+
+// The two things every reading of a Map3D is checked for, beyond matching:
+// every level agrees about the room, and weights on ONE level read exactly
+// as that level's own Mapping reads them.
+bool map3Properties(const Map3D& m, const Evaluation3D& e,
+                    std::ostringstream& d) {
+    std::vector<const Mapping*> all;
+    for (LevelID k = 0; k < m.count(); ++k) all.push_back(&m.level(k));
+    const auto dis = checkAgreement(all);
+    if (!dis.empty()) {
+        d << "levels disagree about the room: " << dis[0].message;
+        return false;
+    }
+    if (!e.inside || e.weights.empty()) return true;
+    const LevelID k = e.weights[0].level;
+    WeightVector w;
+    for (const auto& lw : e.weights) {
+        if (lw.level != k) return true;
+        w.push_back(WeightedNode{lw.node, lw.weight});
+    }
+    return sameDense(m.toChannels(e), m.level(k).toChannels(w),
+                     "one level vs its own Mapping", d)
+        && sameDense(m.toChannelLevels(e), m.level(k).toChannelLevels(w),
+                     "one level vs its own Mapping, levels", d)
+        && (close(m.silenceShare(e), m.level(k).silenceShare(w))
+            || (d << "silence differs from the level's own", false));
+}
 
 } // namespace
 
@@ -253,6 +321,128 @@ int main(int argc, char** argv) {
                 }
             }
             stacks[name] = st;
+            continue;
+        }
+
+        if (kind == "MAP3") {
+            // Built by operations, each that can refuse giving the result
+            // written after it.
+            std::string name, pn; in >> name;
+            expectKeyword(in, "NODES");
+            in >> pn;
+            expectKeyword(in, "OPS");
+            std::string rest; std::getline(in, rest);
+            Map3D m;
+            const std::size_t nodes = plans[pn].pos.size();
+            auto target = [&](const std::string& nm) {
+                return m.level(0).findTarget(nm);
+            };
+            for (const std::string& op : splitOn(rest, ';')) {
+                std::istringstream o(op);
+                std::vector<std::string> w;
+                std::string tok;
+                while (o >> tok) w.push_back(tok);
+                if (w.empty()) continue;
+                std::string want, got;
+                if (w.back()[0] == '=') { want = w.back(); w.pop_back(); }
+                const std::string& v = w[0];
+                if (v == "OUT") {
+                    m.addOutput(w[1], std::stoi(w[2]), std::stof(w[3]));
+                } else if (v == "AFTER" || v == "TAP") {
+                    const SumMode mode = w[4] == "power" ? SumMode::PowerPreserving
+                                                         : SumMode::Linear;
+                    if (v == "AFTER") {
+                        std::vector<std::pair<TargetID, float>> srcs;
+                        for (const auto& sv : splitOn(w[5], ',')) {
+                            const auto kv = splitOn(sv, ':');
+                            srcs.emplace_back(target(kv[0]), std::stof(kv[1]));
+                        }
+                        m.addDerivedFromOutputs(w[1], std::stoi(w[2]),
+                                                std::stof(w[3]), mode, srcs);
+                    } else {
+                        std::vector<std::pair<NodeID, float>> srcs;
+                        for (const auto& sv : splitOn(w[5], ',')) {
+                            const auto kv = splitOn(sv, ':');
+                            srcs.emplace_back(
+                                static_cast<NodeID>(std::stoul(kv[0])),
+                                std::stof(kv[1]));
+                        }
+                        m.addDerived(w[1], std::stoi(w[2]), std::stof(w[3]),
+                                     mode, srcs);
+                    }
+                } else if (v == "COPY") {
+                    std::vector<NodeID> blocked;
+                    const LevelID at = m.copyLevel(
+                        std::stoul(w[1]), std::stof(w[2]), nodes, &blocked);
+                    if (at < m.count()) got = "=" + std::to_string(at);
+                    else {
+                        got = "=REFUSED:";
+                        if (blocked.empty()) got += "-";
+                        for (std::size_t i = 0; i < blocked.size(); ++i) {
+                            got += (i ? "," : "") + std::to_string(blocked[i]);
+                        }
+                    }
+                } else if (v == "RAISE") {
+                    std::vector<NodeID> ids;
+                    for (const auto& sv : splitOn(w[3], ',')) {
+                        ids.push_back(static_cast<NodeID>(std::stoul(sv)));
+                    }
+                    std::vector<NodeID> blocked;
+                    if (m.raise(std::stoul(w[1]), ids, std::stof(w[2]),
+                                &blocked)) {
+                        got = "=OK";
+                    } else {
+                        got = "=REFUSED:";
+                        for (std::size_t i = 0; i < blocked.size(); ++i) {
+                            got += (i ? "," : "") + std::to_string(blocked[i]);
+                        }
+                    }
+                } else if (v == "BIND") {
+                    m.bind(std::stoul(w[1]), std::stoul(w[2]), target(w[3]),
+                           std::stof(w[4]));
+                } else if (v == "SILENCE") {
+                    m.bindSilence(std::stoul(w[1]), std::stoul(w[2]),
+                                  std::stof(w[3]));
+                } else if (v == "CLEAR") {
+                    m.clearBindings(std::stoul(w[1]), std::stoul(w[2]));
+                } else if (v == "FRACTION") {
+                    got = m.setOutputFraction(std::stoul(w[1]), std::stoul(w[2]),
+                                              std::stof(w[3]))
+                        ? "=OK" : "=REFUSED";
+                } else if (v == "VALUE") {
+                    const std::size_t i = m.addValue(w[1], std::stof(w[2]),
+                                                     std::stof(w[3]),
+                                                     std::stof(w[4]));
+                    got = i == static_cast<std::size_t>(-1)
+                        ? "=REFUSED" : "=" + std::to_string(i);
+                } else if (v == "SETV") {
+                    m.setValue(std::stoul(w[1]), std::stoul(w[2]),
+                               m.findValue(w[3]), std::stof(w[4]));
+                } else if (v == "REMOVEOUT") {
+                    m.removeOutput(target(w[1]));
+                } else if (v == "TRIM") {
+                    m.setTrim(target(w[1]), std::stof(w[2]));
+                } else if (v == "REMOVELEVEL") {
+                    got = m.removeLevel(std::stoul(w[1])) ? "=OK" : "=REFUSED";
+                } else if (v == "REMAP") {
+                    std::vector<NodeID> table;
+                    for (const auto& sv : splitOn(w[1], ',')) {
+                        const long x = std::stol(sv);
+                        table.push_back(x < 0 ? InvalidNode
+                                              : static_cast<NodeID>(x));
+                    }
+                    m.remapNodes(table);
+                } else {
+                    std::cerr << "unknown op " << v << "\n";
+                    return 2;
+                }
+                if (got != want) {
+                    record("ANALYTIC", "map3_" + name + "_" + v, false,
+                           "'" + op + "' gave '" + got + "', expected '"
+                           + want + "'");
+                }
+            }
+            maps3[name] = m;
             continue;
         }
 
@@ -433,6 +623,48 @@ int main(int argc, char** argv) {
                     }
                 }
             }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "CH3" || kind == "CH3XYZ") {
+            std::string mn; in >> mn;
+            const Map3D& m = maps3[mn];
+            Evaluation3D e;
+            if (kind == "CH3") {
+                expectKeyword(in, "W");
+                e = readW3(in, "ROUTED");
+            } else {
+                std::string fp; in >> fp;
+                expectKeyword(in, "P");
+                float x, y, z; in >> x >> y >> z;
+                expectKeyword(in, "ROUTED");
+                e = m.levels().evaluate(floors["square"].evaluate({x, y}), z);
+            }
+            const std::vector<float> routed = readFloatsUntil(in, "SILENCE");
+            float sil; in >> sil;
+            expectKeyword(in, "LEVELS");
+            std::vector<float> levels;
+            std::string tok;
+            while (in >> tok) levels.push_back(std::stof(tok));
+            bool ok = sameDense(m.toChannels(e), routed, "routed", d)
+                   && sameDense(m.toChannelLevels(e), levels, "levels", d);
+            if (ok && !close(m.silenceShare(e), sil)) {
+                ok = false; d << "silence " << m.silenceShare(e)
+                              << ", expected " << sil;
+            }
+            if (ok) ok = map3Properties(m, e, d);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "VAL3") {
+            std::string mn; in >> mn;
+            expectKeyword(in, "W");
+            const Evaluation3D e = readW3(in, "VALUE");
+            std::string vn; in >> vn;
+            expectKeyword(in, "EXPECT");
+            float want; in >> want;
+            const Map3D& m = maps3[mn];
+            const float got = m.valueAt(m.findValue(vn), e);
+            const bool ok = close(got, want);
+            if (!ok) d << vn << " = " << got << ", expected " << want;
             record(cls, name, ok, d.str());
 
         } else {

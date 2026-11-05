@@ -56,7 +56,8 @@ INTERP   := src/interpretation/ofxManifoldCurves.h \
             src/interpretation/ofxManifoldNegative.h
 
 MAPPING  := src/mapping/ofxManifoldMapping.h \
-            src/mapping/ofxManifoldRig.h
+            src/mapping/ofxManifoldRig.h \
+            src/mapping/ofxManifoldMap3D.h
 
 # The editor package: an addon of its own, outside ofxManifold's src/ so it is
 # never compiled into projects that want only the manifold (DECISIONS.md D-024 A).
@@ -271,7 +272,7 @@ $(OUT_RUN): tests/run_outputs.cpp $(CORE) $(MAPPING) $(IO)
 $(OUT_VEC): tests/ref/reference_outputs.py
 	@python3 tests/ref/reference_outputs.py
 
-$(LVL_RUN): tests/run_levels.cpp $(CORE)
+$(LVL_RUN): tests/run_levels.cpp $(CORE) $(MAPPING)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -o $@ tests/run_levels.cpp
 

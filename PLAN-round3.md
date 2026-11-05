@@ -479,6 +479,31 @@ over (node, level). Geometry only: nothing about outputs or sound. A new suite,
   `make fma` reproduces an arm64 build on x86 Linux with clang; every round 3
   mutation was re-run under it, and all are still caught.
 
+### 3A-4b: what the 3D map drives
+
+`src/mapping/ofxManifoldMap3D.h`: `Map3D` holds the levels, one `Mapping` per
+level and the node values, and is the only way to change them, so they stay
+in step. Outputs go to every level at once; bindings and values to one.
+Reading resolves each level with its own share of the weights and sums; a
+derived output fed by outputs is computed once from that sum, one fed by nodes
+from the floor plan's weights. 26 vectors (63 in the levels suite), 14
+mutation gates.
+
+- **Two properties checked on every reading,** from the C++ alone: every
+  level agrees about the room (`checkAgreement` over all levels, notes
+  included); and weights on one level read exactly as that level's own
+  `Mapping` reads them. A Map3D with one level is today's map.
+- **Two gaps found by the gates, both in the fixtures.** Every output was
+  added while there was one level, then copied up, so adding an output to the
+  first level only passed. And the node-removal case weighed the two
+  renumbered nodes equally, so values left at their OLD ids summed to the
+  same answer. An output added after the levels, and unequal weights, closed
+  them.
+- **A binding to an output that doesn't exist is now ignored.**
+  `Mapping::bind` doesn't check the id, and a link past the end would be read
+  out of bounds on every evaluation. The first gap above would have reached
+  it.
+
 ---
 
 ## Answered
@@ -504,7 +529,8 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-2** | Paths with z: `Trajectory` in 3D, path file v2 | trajectory vectors, flat paths byte-identical |
 | **3A-3** | `blendMaps`, the rig turning shares into channels, the agreement check, using a rig | two-map and one-map properties, gates |
 | **3A-4** | The 3D map's geometry: levels, copying a level, raising nodes, no crossing, 3D weights at (x, y, z) | partition, reproduction of the point, continuity, prisms, gates |
-| **3A-4b** | What the 3D map drives: bindings per level, node values, map file levels, bindings by level | resolution through 3D weights, round trips, existing files byte-identical, gates |
+| **3A-4b** | What the 3D map drives: bindings per level, node values per level, read through the 3D weights | one level equals its own Mapping, levels agree about the room, gates |
+| **3A-4c** | Files for the 3D map: map file `values` and `levels`, bindings by level | round trips, existing files byte-identical, refusals, gates |
 | **3A-5** | Editor: `d` / `D`, use and save rig, chart drawing levels it's handed | editor scripts, door check, drawlog identical |
 | **3A-6** | Editor: levels (new, switch, remove), raise and lower, the 3D view | editor scripts, judged on screen |
 | **3A-7** | Editor: setting and showing node values | editor scripts, judged on screen |

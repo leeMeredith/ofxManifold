@@ -15,7 +15,7 @@ serialization the standard library's own JSON parser against a hand-written one.
 |---|---|---|
 | `core` | 31 + 48 | triangle solve, bias, degeneracy, affine invariance, containment, topology, inverse evaluation, node movement, evaluator hint |
 | `core` (regions) | 113 | polygons of N ≥ 3 by mean-value coordinates, non-convex regions, batch moves, removal |
-| `core` (levels) | 37 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point |
+| `core` (levels) | 63 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point; what it drives: bindings and node values per level |
 | `interpretation` | 69 | curves, spread, blend, interpolate, coverage, smoothing, negative weights |
 | `mapping` | 35 + 130 | bindings, aggregators, dense output, blending by name; outputs with channel and trim, silence, fill, derived outputs before or after the fader, rigs, blending any number of maps, the agreement check |
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
@@ -23,7 +23,7 @@ serialization the standard library's own JSON parser against a hand-written one.
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
 | `ofxManifoldEditor` (logic) | 31 scripts, 428 steps | editing operations, selection, undo, files, fader layout, link lines, keys |
 
-**757 vectors, 210 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**783 vectors, 224 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 

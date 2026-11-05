@@ -130,3 +130,81 @@ CONT sweep_under_bend CROSS bent SQUARE FROM 0.2 0.2 0.45 TO 0.85 0.85 0.45 STEP
 #--------------------------------------------------------------------
 NEWNODE newnode_bases ANALYTIC bent NODE 4 HEIGHTS 0,0.5,1
 REMAP3 remap_follows_bend ANALYTIC bent TABLE 0 -1 1 2 L0 0,0,0 L1 0.5,0.8,0.5 L2 1,1,1
+
+#--------------------------------------------------------------------
+# WHAT THE 3D MAP DRIVES (round 3A-4b): bindings and node
+# values per level, read through the 3D weights. Outputs
+# belong to every level at once. Every record is also checked
+# for: every level agreeing about the room; and, where the
+# weights sit on one level, equalling that level's own Mapping.
+#--------------------------------------------------------------------
+# the forest: ground binds to L and R, the middle level moves
+# node 2 to Top, the canopy sends nearly everything to Top. A
+# second 'bright' is refused; the copies carry bindings and
+# values up with them
+MAP3 forest NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK
+# one level: today's map, a Map3D with nothing above the ground
+MAP3 single NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3
+# R removed: from every level at once, and from the sub
+MAP3 forest_noR NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; REMOVEOUT R
+# an output added AFTER the levels exist reaches every level --
+# every earlier output was added to the ground and copied up,
+# which a first-level-only add would also pass. The canopy binds
+# node 3 to it.
+MAP3 forest_late NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; OUT Floor 4 1 ; BIND 2 3 Floor 1
+# Top trimmed to a quarter: on every level at once
+MAP3 forest_trim NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; TRIM Top 0.25
+# the middle level removed: ground and canopy keep their own
+# bindings and values
+MAP3 forest_nomid NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; REMOVELEVEL 1 =OK
+# node 1 removed from the floor plan: on every level its
+# bindings and values go, and those of nodes 2 and 3 follow them
+# to their new ids
+MAP3 forest_remap NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; REMAP 0,-1,1,2
+# on the ground alone: exactly level 0's own Mapping
+CH3 ground_only ANALYTIC forest W 0@0=0.25 1@0=0.25 2@0=0.25 3@0=0.25 ROUTED 0 0.5 0.375 0 0 0 0 0 0.5 0.6875 SILENCE 0.125 LEVELS 0 0.5 0.1875 0 0 0 0 0 0.5 0.55
+# on the canopy alone: node 3 sends a quarter of itself to L
+# and the rest to silence; the others go to Top
+CH3 canopy_only ANALYTIC forest W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 ROUTED 0 0.0625 0 0.75 0 0 0 0 0.5 0.0625 SILENCE 0.1875 LEVELS 0 0.0625 0 0.75 0 0 0 0 0.5 0.05
+# halfway between ground and middle: node 2's share splits
+# between L and R below and Top above
+CH3 ground_mid_half ANALYTIC forest W 0@0=0.125 0@1=0.125 1@0=0.125 1@1=0.125 2@0=0.125 2@1=0.125 3@0=0.125 3@1=0.125 ROUTED 0 0.4375 0.3125 0.125 0 0 0 0 0.5 0.59375 SILENCE 0.125 LEVELS 0 0.4375 0.15625 0.125 0 0 0 0 0.5 0.475
+# the sub is computed ONCE from what L and R send in total --
+# not one sub per level, summed
+CH3 sub_from_total ANALYTIC forest W 0@0=0.375 0@1=0.125 1@0=0.375 1@1=0.125 ROUTED 0 0.5 0.5 0 0 0 0 0 0.5 0.75 SILENCE 0 LEVELS 0 0.5 0.25 0 0 0 0 0 0.5 0.6
+# the tap reads the floor plan's weights for nodes 0 and 2:
+# the same at every height
+CH3 tap_ignores_height_low ANALYTIC forest W 0@0=0.48 0@1=0.12 2@0=0.32 2@1=0.08 ROUTED 0 0.76 0.16 0.08 0 0 0 0 1 0.84 SILENCE 0 LEVELS 0 0.76 0.08 0.08 0 0 0 0 1 0.672
+CH3 tap_ignores_height_high ANALYTIC forest W 0@1=0.06 0@2=0.54 2@1=0.04 2@2=0.36 ROUTED 0 0.06 0 0.94 0 0 0 0 1 0.06 SILENCE 0 LEVELS 0 0.06 0 0.94 0 0 0 0 1 0.048
+CH3 mixed_upper CROSS forest W 0@1=0.04 0@2=0.06 1@1=0.08 1@2=0.12 2@1=0.12 2@2=0.18 3@1=0.16 3@2=0.24 ROUTED 0 0.18 0.08 0.48 0 0 0 0 0.4 0.22 SILENCE 0.26 LEVELS 0 0.18 0.04 0.48 0 0 0 0 0.4 0.176
+# outside: nothing reaches the room, and nothing is silent
+CH3 outside ANALYTIC forest W OUTSIDE ROUTED 0 0 0 0 0 0 0 0 0 0 SILENCE 0 LEVELS 0 0 0 0 0 0 0 0 0 0
+# one level: the Map3D is today's Mapping exactly
+CH3 single_is_mapping ANALYTIC single W 0@0=0.3 1@0=0.3 2@0=0.2 3@0=0.2 ROUTED 0 0.5 0.4 0 0 0 0 0 0.5 0.7 SILENCE 0.1 LEVELS 0 0.5 0.2 0 0 0 0 0 0.5 0.56
+# after removals
+CH3 noR_between CROSS forest_noR W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 ROUTED 0 0.5 0 0.1 0 0 0 0 0.5 0.5 SILENCE 0.4 LEVELS 0 0.5 0 0.1 0 0 0 0 0.5 0.4
+CH3 trim_canopy ANALYTIC forest_trim W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 ROUTED 0 0.0625 0 0.75 0 0 0 0 0.5 0.0625 SILENCE 0.1875 LEVELS 0 0.0625 0 0.1875 0 0 0 0 0.5 0.05
+CH3 late_output_canopy ANALYTIC forest_late W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 ROUTED 0 0.05 0 0.75 0.05 0 0 0 0.5 0.05 SILENCE 0.15 LEVELS 0 0.05 0 0.75 0.05 0 0 0 0.5 0.04
+CH3 nomid_between CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 ROUTED 0 0.275 0.2 0.4 0 0 0 0 0.5 0.375 SILENCE 0.125 LEVELS 0 0.275 0.1 0.4 0 0 0 0 0.5 0.3
+# node 1 removed: old node 2 is now node 1, old 3 is node 2
+CH3 remap_between CROSS forest_remap W 0@0=0.2 0@1=0.2 1@0=0.15 1@1=0.15 2@0=0.15 2@1=0.15 ROUTED 0 0.625 0.075 0.15 0 0 0 0 0.7 0.6625 SILENCE 0.15 LEVELS 0 0.625 0.0375 0.15 0 0 0 0 0.7 0.53
+
+# THE WHOLE PATH: a point (x, y, z), the floor plan's own
+# evaluation, the bent levels, then the bindings
+CH3XYZ xyz_low CROSS forest SQUARE P 0.6 0.3 0.2 ROUTED 0 0.4565217391 0.4565217391 0.08695652174 0 0 0 0 0.625 0.6847826087 SILENCE 0 LEVELS 0 0.4565217391 0.2282608696 0.08695652174 0 0 0 0 0.625 0.547826087
+CH3XYZ xyz_under_bend CROSS forest SQUARE P 0.8 0.75 0.6 ROUTED 0 0.2035189076 0.1410189076 0.6554621849 0 0 0 0 0.9375 0.2740283613 SILENCE 0 LEVELS 0 0.2035189076 0.07050945378 0.6554621849 0 0 0 0 0.9375 0.2192226891
+CH3XYZ xyz_canopy CROSS forest SQUARE P 0.3 0.7 0.95 ROUTED 0 0.1691176471 0 0.4705882353 0 0 0 0 0.5 0.1691176471 SILENCE 0.3602941176 LEVELS 0 0.1691176471 0 0.4705882353 0 0 0 0 0.5 0.1352941176
+CH3XYZ xyz_above CROSS forest SQUARE P 0.3 0.7 1.1 ROUTED 0 0 0 0 0 0 0 0 0 0 SILENCE 0 LEVELS 0 0 0 0 0 0 0 0 0 0
+
+# VALUES: each level's node values by the 3D weights, always
+# linearly. Node 1 was never given 'bright' on the ground:
+# it carries the fallback, 0.5. A null node carries values too
+# (node 3 on the ground is half silent; still counted).
+VAL3 bright_ground ANALYTIC forest W 0@0=0.25 1@0=0.25 2@0=0.25 3@0=0.25 VALUE bright EXPECT 0.325
+VAL3 bright_canopy ANALYTIC forest W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 VALUE bright EXPECT 1
+VAL3 bright_between ANALYTIC forest W 0@0=0.125 0@1=0.125 1@0=0.125 1@1=0.125 2@0=0.125 2@1=0.125 3@0=0.125 3@1=0.125 VALUE bright EXPECT 0.3875
+VAL3 dist_ground_node1 ANALYTIC forest W 1@0=1 VALUE dist EXPECT 0.3
+VAL3 dist_copied_up ANALYTIC forest W 1@1=1 VALUE dist EXPECT 0.3
+VAL3 bright_outside ANALYTIC forest W OUTSIDE VALUE bright EXPECT 0.5
+VAL3 bright_remap CROSS forest_remap W 0@0=0.2 0@1=0.2 1@0=0.2 1@1=0.2 2@0=0.1 2@1=0.1 VALUE bright EXPECT 0.32
+VAL3 bright_nomid CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 VALUE bright EXPECT 0.66
