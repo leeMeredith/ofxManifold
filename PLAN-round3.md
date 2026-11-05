@@ -471,6 +471,13 @@ over (node, level). Geometry only: nothing about outputs or sound. A new suite,
 - **A runner mistake, not a kernel one,** on the first run: the continuity
   sweep compared weights including exact zeros, which the floor plan reports
   on the square's diagonal. The runner now drops them, as its other checks do.
+- **CI on macOS arm64 failed where Linux passed.** An arm64 compiler fuses
+  multiply-adds, so a weight that is exactly zero on a region's edge comes
+  out as +-1e-10, and the runner counted it as a weight, or as a negative
+  one. The kernel was right: it passes the floor plan's weights through.
+  The runner now treats anything within its tolerance of zero as zero.
+  `make fma` reproduces an arm64 build on x86 Linux with clang; every round 3
+  mutation was re-run under it, and all are still caught.
 
 ---
 

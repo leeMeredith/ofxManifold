@@ -104,14 +104,22 @@ bool check(const Evaluation3D& e, bool wantInside,
         if (!e.weights.empty()) { d << "outside but weights given"; return false; }
         return true;
     }
+    // A weight within the tolerance of zero IS zero. On a region's edge the
+    // floor plan's weight for the node across it is zero in exact arithmetic,
+    // but with fused multiply-add -- every arm64 Mac -- it comes out as
+    // +-1e-10. Levels passes it through, multiplied; it is neither a weight
+    // that matters nor a negative one. Found by CI on macOS arm64, then
+    // reproduced here with -ffp-contract=fast.
     std::map<std::pair<NodeID, LevelID>, float> got;
     for (const auto& lw : e.weights) {
-        if (lw.weight < 0.0f) {
+        if (lw.weight < -tolerance) {
             d << "negative weight " << lw.weight << " on " << lw.node << "@"
               << lw.level;
             return false;
         }
-        if (lw.weight != 0.0f) got[{lw.node, lw.level}] += lw.weight;
+        if (std::fabs(lw.weight) > tolerance) {
+            got[{lw.node, lw.level}] += lw.weight;
+        }
     }
     if (got.size() != want.size()) {
         d << got.size() << " weights, expected " << want.size();
@@ -345,10 +353,14 @@ int main(int argc, char** argv) {
                 const Evaluation3D e = st.levels.evaluate(
                     floors[plan].evaluate(glm::vec2(x, y)), z);
                 std::map<std::pair<NodeID, LevelID>, float> now;
-                // Exact zeros are dropped, as check() drops them: on the
-                // square's diagonal the floor plan reports a node at weight 0.
+                // Weights within the tolerance of zero are dropped, as
+                // check() drops them: on the square's diagonal the floor plan
+                // reports the node across the edge at 0, or +-1e-10 with
+                // fused multiply-add.
                 for (const auto& lw : e.weights) {
-                    if (lw.weight != 0.0f) now[{lw.node, lw.level}] += lw.weight;
+                    if (std::fabs(lw.weight) > tolerance) {
+                        now[{lw.node, lw.level}] += lw.weight;
+                    }
                 }
                 std::ostringstream dd;
                 if (!check(e, true, now, st.levels, plans[plan], x, y, z,

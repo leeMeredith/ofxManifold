@@ -86,7 +86,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
+.PHONY: fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
 
 all: test
 
@@ -352,6 +352,17 @@ reproducible:
 
 # The editor's one door (DECISIONS.md D-024 D): snippets that must FAIL to
 # compile, and a control that must compile. See tests/check_door.py.
+# The suites as an arm64 Mac's compiler builds them: multiply-adds fused into
+# one rounding. Values that are exactly zero in exact arithmetic -- a weight on
+# a region's edge -- come out as +-1e-10 instead. CI on macOS arm64 found the
+# levels runner treating those as real (round 3A-4); this reproduces it on an
+# x86 Linux machine with clang. Not part of `make test`.
+fma:
+	@$(MAKE) --no-print-directory clean
+	@$(MAKE) --no-print-directory test CXX=clang++ \
+	  CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wpedantic -Ilibs -mfma -ffp-contract=fast"
+	@$(MAKE) --no-print-directory clean
+
 door:
 	@CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" python3 tests/check_door.py
 
