@@ -425,9 +425,12 @@ import copy as _copy
 import math as _math
 
 from reference_outputs import Mapping as OutMap  # noqa: E402
+from reference_outputs import use_rig as _use_rig  # noqa: E402
 
 
 class Map3:
+    registry = {}                      # name -> Map3, for USERIG
+
     def __init__(self, n):
         self.stack = Stack(n)
         self.maps = [OutMap()]
@@ -500,6 +503,25 @@ class Map3:
                 return "REFUSED"
             del self.maps[int(w[1])]
             del self.vals[int(w[1])]
+            return "OK"
+        elif v == "USERIG":
+            # The rig is another map's room, as rigOf() makes it: outputs,
+            # after-fed derived outputs, and the channels it fills, listed
+            # with no sources. Every level moves onto it, or none does.
+            src = Map3.registry[w[1]].maps[0]
+            rig = OutMap()
+            rig.outputs = [list(o) for o in src.outputs]
+            rig.derived = [[d[0], d[1], d[2], d[3],
+                            list(d[4]) if d[5] == "outputs" else [], d[5]]
+                           for d in src.derived]
+            moved, bad = [], set()
+            for m in self.maps:
+                r, refused = _use_rig(m, rig)
+                bad |= set(refused)
+                moved.append(r)
+            if bad:
+                return "REFUSED:" + ",".join(sorted(bad))
+            self.maps = moved
             return "OK"
         elif v == "REMAP":
             table = [int(x) for x in w[1].split(",")]
@@ -591,6 +613,7 @@ def build_map3d(out, sq, tris):
             out.append("# " + line)
         out.append(f"MAP3 {name} NODES square OPS " + " ; ".join(shown))
         maps[name] = m
+        Map3.registry[name] = m
         return m
 
     map_rec("forest", base_ops,
@@ -612,6 +635,25 @@ def build_map3d(out, sq, tris):
     map_rec("forest_nomid", base_ops + ["REMOVELEVEL 1"],
             ["the middle level removed: ground and canopy keep their own",
              "bindings and values"])
+    # Round 3A-6: a rig used on every level at once. "wider" has the forest's
+    # outputs in another order, on other channels, plus one more; "narrow"
+    # lacks Top.
+    map_rec("wider", ["OUT Top 5 1", "OUT R 2 0.25", "OUT L 1 1",
+                      "OUT Floor 4 1", "AFTER sub 9 0.8 linear L:1,R:1",
+                      "TAP tap 8 1 linear 1:1"],
+            ["a room for the forest to move onto: its outputs reordered,",
+             "Top on channel 5, R trimmed to a quarter, and Floor besides"])
+    map_rec("narrow", ["OUT L 1 1", "OUT R 2 0.5",
+                       "AFTER sub 9 0.8 linear L:1,R:1",
+                       "TAP tap 8 1 linear 1:1"],
+            ["a room without Top"])
+    map_rec("forest_onrig", base_ops + ["USERIG wider"],
+            ["the forest on the wider rig: every level moves at once, each",
+             "keeping its own bindings by name; the tap keeps the forest's",
+             "own sources; heights and values are untouched"])
+    map_rec("forest_badrig", base_ops + ["USERIG narrow"],
+            ["the narrow rig is refused, naming Top, and nothing changes:",
+             "not even the levels that bind nothing to Top"])
     map_rec("forest_remap", base_ops + ["REMAP 0,-1,1,2"],
             ["node 1 removed from the floor plan: on every level its",
              "bindings and values go, and those of nodes 2 and 3 follow them",
@@ -669,6 +711,14 @@ def build_map3d(out, sq, tris):
     w3_rec("CH3", "late_output_canopy", "ANALYTIC", "forest_late", on(2, mid))
     w3_rec("CH3", "nomid_between", "CROSS", "forest_nomid",
            on(0, {0: 0.3, 1: 0.3, 2: 0.2, 3: 0.2}, 0.5))
+    out.append("# on the wider rig: Top reads on channel 5, R at its new trim,")
+    out.append("# Floor silent, the tap from the forest's own nodes")
+    w3_rec("CH3", "onrig_canopy", "ANALYTIC", "forest_onrig", on(2, mid))
+    w3_rec("CH3", "onrig_between", "CROSS", "forest_onrig",
+           on(1, {0: 0.1, 1: 0.2, 2: 0.3, 3: 0.4}, 0.6))
+    out.append("# refused: exactly the forest's own reading")
+    w3_rec("CH3", "badrig_unchanged", "CROSS", "forest_badrig",
+           on(1, {0: 0.1, 1: 0.2, 2: 0.3, 3: 0.4}, 0.6))
     out.append("# node 1 removed: old node 2 is now node 1, old 3 is node 2")
     w3_rec("CH3", "remap_between", "CROSS", "forest_remap",
            on(0, {0: 0.4, 1: 0.3, 2: 0.3}, 0.5))
@@ -703,6 +753,8 @@ def build_map3d(out, sq, tris):
             ("dist_ground_node1", "ANALYTIC", "forest", on(0, {1: 1.0}), "dist"),
             ("dist_copied_up", "ANALYTIC", "forest", on(1, {1: 1.0}), "dist"),
             ("bright_outside", "ANALYTIC", "forest", None, "bright"),
+            ("bright_onrig", "ANALYTIC", "forest_onrig", on(1, mid, 0.5),
+             "bright"),
             # unequal weights on the renumbered nodes 1 and 2: with equal
             # ones, values left at their OLD ids sum to the same answer, and
             # a remap that moved nothing passed
@@ -805,6 +857,32 @@ def build_files3(out, sq, tris, maps):
         mp, outs = files_of(maps[name], sq, tris)
         write_fixture(f"map3_{name}.json", mp)
         write_fixture(f"map3_{name}-outputs.json", outs)
+        out.append(f"FILE3 file3_{name} ANALYTIC map3_{name}.json "
+                   f"map3_{name}-outputs.json AS {name}")
+    out.append("# An outputs file from before outputs were declared (version 1):")
+    out.append("# each output is made by the first binding naming it, at the next")
+    out.append("# channel. Opened as a 3D map, the output is made on EVERY level,")
+    out.append("# so the levels agree about the room; the binding is on the first.")
+    out.append("# (Found by the editor opening an old pair, round 3A-6.)")
+    for name, ops, binds in (
+            ("legacy_one", ["OUT L 0 1", "OUT R 1 1", "BIND 0 0 L 1",
+                            "BIND 0 1 R 1", "BIND 0 2 L 1"],
+             [("n0", "L"), ("n1", "R"), ("n2", "L")]),
+            ("legacy_two", ["OUT L 0 1", "COPY 0 1", "BIND 0 0 L 1"],
+             [("n0", "L")])):
+        m = Map3(4)
+        shown = []
+        for o in ops:
+            r = m.op(o.split())
+            shown.append(o + (f" ={r}" if r is not None else ""))
+        maps[name] = m
+        out.append(f"MAP3 {name} NODES square OPS " + " ; ".join(shown))
+        mp, _outs = files_of(m, sq, tris)
+        v1 = {"version": 1,
+              "bindings": [{"node": n, "target": t, "weight": 1.0}
+                           for n, t in binds]}
+        write_fixture(f"map3_{name}.json", mp)
+        write_fixture(f"map3_{name}-outputs.json", v1)
         out.append(f"FILE3 file3_{name} ANALYTIC map3_{name}.json "
                    f"map3_{name}-outputs.json AS {name}")
     out.append("")

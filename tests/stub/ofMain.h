@@ -105,6 +105,24 @@ public:
 inline ofFileDialogResult ofSystemSaveDialog(const std::string&, const std::string&){ return {}; }
 inline ofFileDialogResult ofSystemLoadDialog(const std::string& = "", bool = false, const std::string& = ""){ return {}; }
 inline bool ofBufferToFile(const std::string&,ofBuffer&){return true;}
+// The arrows and the 3D view (round 3A-6), as openFrameworks 0.12 declares
+// them: the key codes, the frame time, 3D lines and spheres, and the camera.
+#define OF_KEY_LEFT 356
+#define OF_KEY_UP 357
+#define OF_KEY_RIGHT 358
+#define OF_KEY_DOWN 359
+inline double ofGetLastFrameTime(){return 1.0/60.0;}
+inline void ofDrawLine(const glm::vec3&,const glm::vec3&){}
+inline void ofDrawSphere(const glm::vec3&,float){}
+inline void ofSetSphereResolution(int){}
+class ofEasyCam {
+public:
+    void begin(const ofRectangle&){} void end(){}
+    void setTarget(const glm::vec3&){} void setDistance(float){}
+    void setControlArea(const ofRectangle&){}
+    void enableMouseInput(){} void disableMouseInput(){}
+    void setPosition(float,float,float){} void lookAt(const glm::vec3&){}
+};
 struct ofLogNotice { template<typename T> ofLogNotice& operator<<(const T&){return *this;} };
 struct ofLogError { template<typename T> ofLogError& operator<<(const T&){return *this;} };
 struct ofBaseApp {

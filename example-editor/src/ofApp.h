@@ -98,11 +98,15 @@ private:
     // are CONST: drawing and hit-testing read through them, and nothing here
     // can change the map, its outputs, or the current output except through a
     // Model operation. Declared after the model, so they bind to it.
+    //
+    // The current level's bindings are NOT held here: they live in the 3D
+    // map's list of levels, which a new level or an undo can move, so a
+    // reference would dangle (found by the drawing log, 3A-6). They are read
+    // fresh from model.mapping() each time.
     ofxManifold::editor::Model     model;
     ofxManifold::editor::Selection selection;
     ofxManifold::editor::History   history;
     const ofxManifold::Manifold2D& manifold      = model.manifold();
-    const ofxManifold::Mapping&    mapping       = model.mapping();
     const ofxManifold::TargetID&   currentOutput = model.currentOutput();
     const bool&                    autoOutput    = model.autoOutput();
 
@@ -113,8 +117,24 @@ private:
     ofxManifold::editor::ChartLayout        chart;
     float chartTop = 0.0f;
 
+    // ---- state: the 3D view and the column of dots (round 3A-6) -----------
+    // The view is for looking only; its camera is dragged within its own
+    // area, and a press there never reaches the map.
+    ofEasyCam   cam;
+    bool        show3D   = false;
+    bool        aimed    = false;     // the camera pointed, the first time
+    ofRectangle view3D;
+    bool        pressIn3D = false;
+    float       panelLeft = 0.0f;     // pushed right by the dots and the view
+
     // Audition: dragging moves the listening point and can NEVER move a node.
     glm::vec2 auditionPoint{0.5f, 0.5f};
+    // Its height (round 3A-6): the current level's under the point, until
+    // up or down, held while auditioning, glides it (zFree); back on the
+    // current level when audition ends.
+    float     auditionZ = 0.0f;
+    bool      zFree     = false;
+    int       glideDir  = 0;            // +1 up, -1 down, 0 not held
     bool      auditionHeld   = false;
     bool      auditionLocked = false;
     bool      pressAudition  = false;   // this press began in audition

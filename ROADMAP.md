@@ -15,15 +15,15 @@ serialization the standard library's own JSON parser against a hand-written one.
 |---|---|---|
 | `core` | 31 + 48 | triangle solve, bias, degeneracy, affine invariance, containment, topology, inverse evaluation, node movement, evaluator hint |
 | `core` (regions) | 113 | polygons of N ≥ 3 by mean-value coordinates, non-convex regions, batch moves, removal |
-| `core` (levels) | 84 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point; what it drives: bindings and node values per level; its files |
+| `core` (levels) | 90 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point; what it drives: bindings and node values per level, a rig used on every level; its files, version 1 outputs files included |
 | `interpretation` | 69 | curves, spread, blend, interpolate, coverage, smoothing, negative weights |
 | `mapping` | 35 + 130 | bindings, aggregators, dense output, blending by name; outputs with channel and trim, silence, fill, derived outputs before or after the fader, rigs, blending any number of maps, the agreement check |
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
 | `sources` | 82 | trajectories, real-time replay, velocity, the touring case, paths with height |
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
-| `ofxManifoldEditor` (logic) | 36 scripts, 478 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs |
+| `ofxManifoldEditor` (logic) | 46 scripts, 603 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots |
 
-**809 vectors, 251 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**825 vectors, 275 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 
@@ -54,7 +54,9 @@ It is checked for typos against a stub and judged by eye.
 - **`example-editor`** and the **`ofxManifoldEditor`** views — place, select,
   move, join; outputs, bindings, fill and trim; a permanent listening point
   with live faders; link lines; undo; named saves as a pair of files; keys lit
-  when they act. Built over two rounds in use (DECISIONS.md D-023, D-024)
+  when they act. Built over two rounds in use (DECISIONS.md D-023, D-024).
+  Round 3A added levels for a 3D map, heights, listening in 3D, a column of
+  dots and a 3D view
 
 ---
 

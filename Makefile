@@ -67,13 +67,15 @@ EDITOR_H   := ofxManifoldEditor/src/ofxManifoldEditor.h \
               ofxManifoldEditor/src/ofxManifoldEditorChartLayout.h \
               ofxManifoldEditor/src/ofxManifoldEditorHistory.h \
               ofxManifoldEditor/src/ofxManifoldEditorFiles.h \
-              ofxManifoldEditor/src/ofxManifoldEditorKeys.h
+              ofxManifoldEditor/src/ofxManifoldEditorKeys.h \
+              ofxManifoldEditor/src/ofxManifoldEditorListening.h
 EDITOR_CPP := ofxManifoldEditor/src/ofxManifoldEditorModel.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp \
               ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp \
-              ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+              ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp \
+              ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
 EDITOR_INC := -Isrc -IofxManifoldEditor/src
 
 AUTHORING := src/authoring/ofxManifoldGrid.h \

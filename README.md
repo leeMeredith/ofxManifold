@@ -205,6 +205,17 @@ all rotatable; hold alt for a free-hand drag. Drag a corner of the quad
 across its opposite edge and the move is refused, because the ring would cross
 itself.
 
+A map can have **levels**: the same floor plan at several heights, for a 3D
+map. `n` copies the current level to a new one above, `N` below; ↑ and ↓ move
+between them; `y` and `h` raise and lower the selected nodes on the current
+level (shift for fine steps), refused if a node would reach the next level;
+⌘⌫ removes a level. A column of dots beside the map shows the levels and
+which one you are on, and a raised node shows its offset. Binding, fill and
+clear act on the current level; outputs belong to every level. While
+auditioning, ↑ and ↓ move the listening point up and down through the levels
+and past them, so you hear one level crossfade into the next. ⌘3 opens a 3D
+view beside the map, for looking only: drag in it to turn it.
+
 **`example-regions`** — a triangle, a hexagon, an L-shape and a star in one
 map. Regions of three nodes use the barycentric solve; more use mean-value
 coordinates. Drag into the L-shape's inner corner and a red line pulls
@@ -258,7 +269,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-809 vectors across twelve suites, plus 251 mutation gates that introduce known
+825 vectors across twelve suites, plus 275 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

@@ -1,8 +1,11 @@
 #include "ofxManifoldEditorMapView.h"
 
+#include "ofxManifoldEditorListening.h"
 #include "ofxManifoldEditorNodeGlyph.h"
 #include "ofxManifoldEditorStyle.h"
 #include "ofxManifoldEditorText.h"
+
+#include <cstdio>
 
 namespace ofxManifold {
 namespace editor {
@@ -191,6 +194,65 @@ void drawLinks(const Scene& s) {
     ofPopStyle();
 }
 
+void drawOffsets(const Scene& s) {
+    const Model& model = *s.model;
+    const Manifold2D& manifold = model.manifold();
+    const Levels& lv = model.map3d().levels();
+    const LevelID k = model.currentLevel();
+    const float lh = s.text->lineHeight();
+    bool any = false;
+    for (NodeID i = 0; i < manifold.nodeCount(); ++i) {
+        if (!lv.bent(k, i)) continue;
+        if (!any) { ofPushStyle(); any = true; }
+        char b[16];
+        std::snprintf(b, sizeof b, "%+.2f", double(lv.height(k, i) - lv.base(k)));
+        const glm::vec2 p = s.renderer->toScreen(manifold.node(i).position);
+        ofSetColor(150, 190, 235);
+        s.text->draw(b, p.x + 12.0f, p.y + lh + 4.0f);
+    }
+    if (any) ofPopStyle();
+}
+
+void drawLevelColumn(const Scene& s) {
+    const Model& model = *s.model;
+    const ofRectangle vp = s.renderer->viewport();
+    const float inset = vp.getHeight() * 0.15f;
+    const DotColumn c = dotColumn(model, vp.getY() + inset,
+                                  vp.getBottom() - inset, true,
+                                  *s.evaluation, s.listeningZ);
+    if (!c.shown) return;
+    const float x = vp.getRight() + 15.0f;
+    ofPushStyle();
+    // the spine, faint, then a dot per level
+    ofSetLineWidth(1.0f);
+    ofSetColor(70, 76, 92);
+    ofDrawLine(x, c.dots.front(), x, c.dots.back());
+    for (std::size_t k = 0; k < c.dots.size(); ++k) {
+        if (k == c.current) {
+            ofFill();
+            ofSetColor(235, 238, 245);
+        } else {
+            ofNoFill();
+            ofSetColor(150, 156, 170);
+        }
+        ofDrawCircle(x, c.dots[k], 4.0f);
+    }
+    // the current level's starting height, beside its dot
+    char b[16];
+    std::snprintf(b, sizeof b, "%g",
+                  double(model.map3d().levels().base(c.current)));
+    ofSetColor(235, 238, 245);
+    s.text->draw(b, x + 9.0f, c.dots[c.current] + s.text->lineHeight() * 0.35f);
+    // the listening mark: green among the levels, grey outside them
+    if (c.marked) {
+        ofSetLineWidth(2.0f);
+        if (c.outside) ofSetColor(110, 115, 125);
+        else           ofSetColor(120, 200, 160);
+        ofDrawLine(x - 8.0f, c.mark, x + 8.0f, c.mark);
+    }
+    ofPopStyle();
+}
+
 void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
     const Model&      model     = *s.model;
     const Selection&  selection = *s.selection;
@@ -217,6 +279,7 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
     for (std::size_t i = 0; i < manifold.nodeCount(); ++i) {
         drawNode(s, NodeID(i));
     }
+    drawOffsets(s);
 
     // Nodes feeding the CURRENT output: a green ring, outside the selection
     // ring so both can show at once. With the fader marks below, this is how
@@ -276,6 +339,8 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
         ofDrawLine(lp.x, lp.y + 4.0f, lp.x, lp.y + 11.0f);
         ofPopStyle();
     }
+
+    drawLevelColumn(s);
 }
 
 } // namespace editor

@@ -30,6 +30,7 @@
 #include "ofxManifoldMapping.h"
 #include "ofxManifoldRig.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -192,6 +193,33 @@ public:
             made = m.addDerivedFromOutputs(name, channel, trim, mode, srcs);
         }
         return made;
+    }
+
+    // Move every level onto a rig at once (the editor's cmd-r, round 3A-6):
+    // each level as useRig() moves one map, its bindings following by name.
+    // All or nothing: refused, changing nothing, if any level sends what the
+    // rig lacks or has as another kind; `refused` receives those names,
+    // sorted. The levels and the node values are not touched.
+    bool useRig(const Mapping& rig, std::vector<std::string>* refused = nullptr) {
+        if (refused) refused->clear();
+        std::vector<Mapping> moved;
+        std::vector<std::string> bad;
+        for (const Mapping& m : routing_) {
+            RigUse u = ofxManifold::useRig(m, rig);
+            if (!u.ok) {
+                bad.insert(bad.end(), u.refused.begin(), u.refused.end());
+                continue;
+            }
+            moved.push_back(std::move(u.result));
+        }
+        if (!bad.empty()) {
+            std::sort(bad.begin(), bad.end());
+            bad.erase(std::unique(bad.begin(), bad.end()), bad.end());
+            if (refused) *refused = bad;
+            return false;
+        }
+        routing_ = std::move(moved);
+        return true;
     }
 
     // ---- bindings: one level -----------------------------------------------

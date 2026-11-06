@@ -636,6 +636,15 @@ inline bool readMappingLevels(const json::Value& root, int version,
             const float w = b.has("weight") ? b["weight"].asFloat() : 1.0f;
             if (kind == "silence") {
                 built.bindSilence(id, w);
+            } else if (threeD && version < 2) {
+                // Version 1 declares nothing: an output is made by the first
+                // binding that names it. Made on EVERY level, so the levels
+                // still agree about the room; the binding itself is on the
+                // first, the only level a version 1 file can bind on. (Found
+                // by the editor opening an old pair as a 3D map, 3A-6.)
+                TargetID t = InvalidTarget;
+                for (Mapping& l : levels) t = l.addTarget(b["target"].asString());
+                built.bind(id, t, w);
             } else if (threeD) {
                 // Every level must hold the same outputs, so a binding may
                 // only name one the file declared; making it here would put

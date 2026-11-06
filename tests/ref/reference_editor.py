@@ -43,10 +43,51 @@ class Editor:
         self.nodes = []          # [name, (x, y)] in id order
         self.regions = []        # [tuple of names] in id order, ring order
         self.outputs = []        # [name, channel, trim] in id order
-        self.links = {}          # node name -> [(kind, output name|None, w)]
+        # Levels (round 3A-6), bottom first. Each has its starting height,
+        # the heights of its bent nodes BY NAME (absolute, and only where they
+        # differ from the base), and its own bindings. `links` is the current
+        # level's: every operation written before levels reads and writes
+        # exactly what it did.
+        self.levels = [dict(base=0.0, heights={}, links={})]
+        self.cur = 0
         self.derived = []        # [name, channel, [source names]]
         self.current = None
-        self.out_sel = []        # selected outputs        # selected outputs, by name; current among them
+        self.out_sel = []        # selected outputs, by name; current among them
+
+    # node name -> [(kind, output name|None, w)], on the current level
+    @property
+    def links(self):
+        return self.levels[self.cur]["links"]
+
+    @links.setter
+    def links(self, value):
+        self.levels[self.cur]["links"] = value
+
+    def all_links(self):
+        return [lv["links"] for lv in self.levels]
+
+    def height(self, k, name):
+        lv = self.levels[k]
+        return lv["heights"].get(name, lv["base"])
+
+    def set_height(self, k, name, h):
+        lv = self.levels[k]
+        if h == lv["base"]:
+            lv["heights"].pop(name, None)
+        else:
+            lv["heights"][name] = h
+
+    def fits(self, k, name, h):
+        if k > 0 and not h > self.height(k - 1, name):
+            return False
+        if k + 1 < len(self.levels) and not h < self.height(k + 1, name):
+            return False
+        return True
+
+    def three_d(self):
+        """Anything only a 3D map has: what the dump shows past 'A'."""
+        lv = self.levels
+        return len(lv) > 1 or lv[0]["base"] != 0.0 or bool(lv[0]["heights"])
 
     # ---- helpers -------------------------------------------------------
     def names(self):
@@ -77,8 +118,11 @@ class Editor:
         return sum(1 for l in self.links.get(node, []) if l[0] == "out")
 
     def in_use(self, out):
+        # on ANY level: deleting a node must not take an output another
+        # level's nodes still feed
         return any(l[0] == "out" and l[1] == out
-                   for ls in self.links.values() for l in ls)
+                   for links in self.all_links()
+                   for ls in links.values() for l in ls)
 
     def settle(self):
         if self.current not in self.out_names():
@@ -116,11 +160,12 @@ class Editor:
         # an after-fed derived output loses the source, and stays (3A-1)
         self.derived = [[d[0], d[1], [x for x in d[2] if x != ">" + name]]
                         + d[3:] for d in self.derived]
-        for n in list(self.links):
-            self.links[n] = [l for l in self.links[n]
-                             if not (l[0] == "out" and l[1] == name)]
-            if not self.links[n]:
-                del self.links[n]
+        for links in self.all_links():
+            for n in list(links):
+                links[n] = [l for l in links[n]
+                            if not (l[0] == "out" and l[1] == name)]
+                if not links[n]:
+                    del links[n]
         self.out_sel = [o for o in self.out_sel if o != name]
         if self.current == name:
             self.current = self.out_sel[0] if self.out_sel else None
@@ -147,7 +192,12 @@ class Editor:
         self.nodes.append([nm, (q[0], q[1])])
         if self.auto and nm not in self.out_names():
             self.outputs.append([nm, self.next_channel(), 1.0])
-            self.bind_one(nm, nm)
+            # on every level: a speaker is a speaker at every height
+            keep = self.cur
+            for k in range(len(self.levels)):
+                self.cur = k
+                self.bind_one(nm, nm)
+            self.cur = keep
             if self.current is None:        # only if there was none
                 self.select_only(nm)
         return (1, 0, "")
@@ -201,7 +251,9 @@ class Editor:
                         if not any(n in gone for n in r)]
         rg = before - len(self.regions)
         for n in gone:
-            self.links.pop(n, None)
+            for lv in self.levels:
+                lv["links"].pop(n, None)
+                lv["heights"].pop(n, None)
         self.derived = [[d[0], d[1], [s for s in d[2] if s not in gone]]
                         + d[3:] for d in self.derived]
         og = 0
@@ -444,14 +496,191 @@ class Editor:
             return (0, 1, "select one output to remove -- "
                     f"{len(self.out_sel)} are selected")
         nm = self.current
-        feeders = sum(1 for ls in self.links.values()
-                      if any(l[0] == "out" and l[1] == nm for l in ls))
+        feeders = len({n for links in self.all_links()
+                       for n, ls in links.items()
+                       if any(l[0] == "out" and l[1] == nm for l in ls)})
         self.remove_output(nm)
         msg = f"removed output {nm}"
         if feeders:
             msg += f" -- {feeders} node" + ("" if feeders == 1 else "s") \
                 + " no longer reach it"
         return (1, 1 if feeders else 0, msg)
+
+    # ---- round 3A-6: levels ----------------------------------------------
+    #
+    # Restated from the plan, by name. New levels are placed halfway to the
+    # neighbour, or a quarter of the map beyond the end, so starting heights
+    # stay sums of halves and quarters -- exact in float and in double alike.
+
+    def switch_level(self, d):
+        n = len(self.levels)
+        if n == 1:
+            return (0, 0, "one level -- n makes another")
+        k = self.cur + d
+        if k < 0:
+            return (0, 0, "already the bottom level")
+        if k >= n:
+            return (0, 0, "already the top level")
+        self.cur = k
+        return (0, 0, f"level {k + 1} of {n}, at "
+                f"{fmt(self.levels[k]['base'])}")
+
+    def new_level(self, above):
+        import copy
+        n, k = len(self.levels), self.cur
+        b = self.levels[k]["base"]
+        if above:
+            base = b + 0.25 if k == n - 1 else (b + self.levels[k + 1]["base"]) * 0.5
+            at = k + 1
+        else:
+            base = b - 0.25 if k == 0 else (self.levels[k - 1]["base"] + b) * 0.5
+            at = k
+        where = "above" if above else "below"
+        shift = base - b
+        made = {nm: self.height(k, nm) + shift for nm in self.names()}
+        blocked = [nm for nm in self.names()
+                   if not ((at == 0 or made[nm] > self.height(at - 1, nm))
+                           and (at == n or made[nm] < self.height(at, nm)))]
+        if blocked or any(lv["base"] == base for lv in self.levels):
+            return (0, 1, f"no room for a new level {where} -- "
+                    + (", ".join(blocked) or "a level starts there")
+                    + " would reach the level next to it")
+        level = dict(base=base, heights={}, links=copy.deepcopy(self.links))
+        for nm, h in made.items():
+            if h != base:
+                level["heights"][nm] = h
+        self.levels.insert(at, level)
+        self.cur = at
+        return (1, 0, f"new level {at + 1} of {n + 1}, at {fmt(base)}")
+
+    def raise_nodes(self, sel, direction, fine):
+        """Each node's offset from the level's start steps to the next
+        multiple of the step, as fill does. All or nothing."""
+        if not sel:
+            return (0, 0, "")
+        unit = 0.01 if fine else 0.05
+        k = self.cur
+        base = self.levels[k]["base"]
+        new = {}
+        for nm in sel:
+            q = (self.height(k, nm) - base) / unit
+            qr = round(q)
+            if abs(q - qr) < 1e-3:
+                nxt = qr + direction
+            else:
+                nxt = math.ceil(q) if direction > 0 else math.floor(q)
+            new[nm] = base + nxt * unit
+        blocked = [nm for nm in sel if not self.fits(k, nm, new[nm])]
+        if blocked:
+            return (0, 1, ", ".join(blocked) + " would reach the level "
+                    + ("above" if direction > 0 else "below"))
+        for nm in sel:
+            self.set_height(k, nm, new[nm])
+        offs = [new[nm] - base for nm in sel]
+        lo, hi = f"{min(offs):+.3g}", f"{max(offs):+.3g}"
+        return (1, 0, f"height {lo}" + ("" if lo == hi else f" to {hi}"))
+
+    def remove_level(self):
+        n = len(self.levels)
+        if n == 1:
+            return (0, 1, "a map has at least one level")
+        gone = self.cur
+        del self.levels[gone]
+        self.cur = max(0, gone - 1)
+        return (1, 0, f"removed level {gone + 1}; now on level "
+                f"{self.cur + 1} of {n - 1}")
+
+    # ---- round 3A-6: listening in three dimensions ------------------------
+    #
+    # Given the floor plan's weights at a point, as the CONTRIB records give
+    # them, and a height z. Restated from the plan, not from Levels.
+
+    def heights_at(self, weights):
+        return [sum(w * self.height(k, n) for n, w in weights)
+                for k in range(len(self.levels))]
+
+    def where(self, weights, z):
+        """(inside, below, t), as Levels::evaluate decides them."""
+        n = len(self.levels)
+        if n == 1:
+            return True, 0, 0.0
+        h = self.heights_at(weights)
+        if z < h[0] - 1e-6 or z > h[-1] + 1e-6:
+            return False, 0, 0.0
+        k = 0
+        while k + 2 < n and h[k + 1] <= z:
+            k += 1
+        t = min(1.0, max(0.0, (z - h[k]) / (h[k + 1] - h[k])))
+        return True, k, t
+
+    def level_share(self, weights, z):
+        """[(level, node, weight)], the 3D weights."""
+        inside, k, t = self.where(weights, z)
+        if not inside:
+            return None
+        if len(self.levels) == 1:
+            return [(0, nm, w) for nm, w in weights]
+        out = []
+        for nm, w in weights:
+            if t < 1.0:
+                out.append((k, nm, w * (1 - t)))
+            if t > 0.0:
+                out.append((k + 1, nm, w * t))
+        return out
+
+    def hear(self, sel, weights, z):
+        """What the chart is handed at (weights, z): routed by channel
+        before trim, silence, and the selection's part by channel."""
+        used = [o[1] for o in self.outputs] + [d[1] for d in self.derived]
+        size = (max(used) + 1) if used else 0
+        routed, mine = [0.0] * size, [0.0] * size
+        share = self.level_share(weights, z)
+        if share is None:
+            return False, routed, 0.0, (mine if sel else None)
+        chan = {o[0]: o[1] for o in self.outputs}
+        trim = {o[0]: o[2] for o in self.outputs}
+        to_out = {o[0]: 0.0 for o in self.outputs}
+        silence = 0.0
+        for k, nm, w in share:
+            ls = self.levels[k]["links"].get(nm, [])
+            total = sum(l[2] for l in ls)
+            if total <= 0:
+                silence += w          # a null node is silent whole
+                continue
+            for l in ls:
+                part = w * l[2] / total
+                if l[0] == "out":
+                    to_out[l[1]] += part
+                    if nm in sel:
+                        mine[chan[l[1]]] += part
+                else:
+                    silence += part
+        for o, v in to_out.items():
+            routed[chan[o]] = v
+        floor = dict(weights)
+        for d in self.derived:
+            if self.kind(d) == "after":
+                routed[d[1]] = sum(to_out[s[1:]] * trim[s[1:]] for s in d[2])
+            else:
+                routed[d[1]] = sum(floor.get(s, 0.0) for s in d[2])
+        return True, routed, silence, (mine if sel else None)
+
+    def dots(self, weights, z, top, bottom, listening):
+        """The column of dots: one per level, top level at the top, evenly
+        spaced; and the listening mark, between the dots it lies between,
+        or half a space past an end dot when outside."""
+        n = len(self.levels)
+        if n == 1:
+            return None
+        gap = (bottom - top) / (n - 1)
+        ys = [bottom - k * gap for k in range(n)]
+        if not listening:
+            return ys, None, False
+        inside, k, t = self.where(weights, z)
+        if inside:
+            return ys, ys[k] + t * (ys[k + 1] - ys[k]), False
+        above = z > self.heights_at(weights)[-1]
+        return ys, (ys[-1] - gap / 2) if above else (ys[0] + gap / 2), True
 
     def toggle_auto(self):
         self.auto = not self.auto
@@ -488,19 +717,27 @@ class Editor:
     # A pair on "disk" is a snapshot of the map and, depending on the case, of
     # its outputs. The kernel's own suites pin the file FORMATS; this only has
     # to know what a correct round trip must restore.
-    def snapshot(self):
+    def snapshot(self, flat=False):
+        """flat: as a file written the 2D way -- the floor plan, and the
+        current level's bindings -- by an earlier editor or a test."""
         import copy
+        levels = self.levels
+        if flat:
+            levels = [dict(base=0.0, heights={}, links=self.links)]
         return copy.deepcopy((self.nodes, self.regions, self.outputs,
-                              self.links, self.derived))
+                              levels, self.derived))
 
     def restore(self, snap, with_outputs):
         import copy
-        n, r, o, l, d = copy.deepcopy(snap)
+        n, r, o, lv, d = copy.deepcopy(snap)
         self.nodes, self.regions = n, r
+        self.levels, self.cur = lv, 0
         if with_outputs:
-            self.outputs, self.links, self.derived = o, l, d
+            self.outputs, self.derived = o, d
         else:
-            self.outputs, self.links, self.derived = [], {}, []
+            self.outputs, self.derived = [], []
+            for level in self.levels:
+                level["links"] = {}
         self.select_only(None)
         self.settle()
 
@@ -635,6 +872,11 @@ class Editor:
             ("derivedafter", nd and picked > 0),
             ("derived", nd and bool(sel)), ("trim", nd and picked > 0),
             ("removeoutput", nd and picked == 1), ("autooutput", nd),
+            # round 3A-6: while auditioning, up and down move the listening
+            # point, so they work with one level too
+            ("levelswitch", nd and (aud or len(self.levels) > 1)),
+            ("newlevel", nd), ("raise", nd and bool(sel)),
+            ("removelevel", nd and len(self.levels) > 1), ("view3d", True),
             ("audition", nd), ("lock", nd),
             ("undo", nd and can_undo), ("redo", nd and can_redo),
             ("save", nd), ("saveas", nd), ("open", nd),
@@ -748,6 +990,18 @@ class Editor:
                  "C " + (self.current or "-"),
                  "S " + (",".join(self.out_sel) or "-"),
                  "A " + ("1" if self.auto else "0")]
+        if self.three_d():
+            # Round 3A-6: the current level, then every level bottom first:
+            # its starting height, its bent nodes' heights, its bindings.
+            parts.append(f"V {self.cur}")
+            for k, lv in enumerate(self.levels):
+                parts.append(
+                    f"Z{k} {fmt(lv['base'])}"
+                    + "".join(f" {n}={fmt(lv['heights'][n])}"
+                              for n in self.names() if n in lv["heights"])
+                    + " K" + "".join(
+                        f" {n}>{l[1] if l[0] == 'out' else '~'}:{fmt(l[2])}"
+                        for n in self.names() for l in lv["links"].get(n, [])))
         return " | ".join(parts)
 
 
@@ -765,7 +1019,9 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "clear": "clear bindings", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
           "empty": "new map", "move": "move", "openpair": "open",
-          "derivedafter": "derived output", "userig": "use rig"}
+          "derivedafter": "derived output", "userig": "use rig",
+          "newlevel": "new level", "raise": "height",
+          "removelevel": "remove level"}
 
 
 class Script:
@@ -837,6 +1093,11 @@ class Script:
             "pick":     lambda: e.pick(args[0]),
             "toggleout": lambda: e.toggle_output(args[0]),
             "removeoutput": e.remove_current, "auto": e.toggle_auto,
+            "levelup":  lambda: e.switch_level(+1),
+            "leveldown": lambda: e.switch_level(-1),
+            "newlevel": lambda: e.new_level(args[0] > 0),
+            "raise":    lambda: e.raise_nodes(s, args[0], args[1]),
+            "removelevel": e.remove_level,
             "example":  lambda: (e.example(), (1, 0, ""))[1],
             "empty":    lambda: (e.new_empty(), (1, 0, ""))[1],
         }[op]()
@@ -847,8 +1108,10 @@ class Script:
             argtxt = f" {fmt(args[0])}"
         elif op in ("pick", "toggleout"):
             argtxt = f" {args[0]}"
-        elif op == "fill":
+        elif op in ("fill", "raise"):
             argtxt = f" {args[0]} {1 if args[1] else 0}"
+        elif op == "newlevel":
+            argtxt = f" {args[0]}"
         elif op in ("savepair", "openpair", "legacypair", "maponly",
                     "badoutputs", "saverig", "userig"):
             argtxt = f" {args[0]}"
@@ -955,7 +1218,7 @@ class Script:
         """A file written some other way: by an earlier editor ("legacy"),
         with no outputs file (None), or with an outputs file that is
         refused ("bad")."""
-        self.disk[self.base(chosen)] = (self.ed.snapshot(), outputs)
+        self.disk[self.base(chosen)] = (self.ed.snapshot(flat=True), outputs)
         return (0, 0, "")
 
     def open_pair(self, chosen):
@@ -969,7 +1232,8 @@ class Script:
         pl = lambda k, one, many: f"{k} {one if k == 1 else many}"
         msg = (f"opened {b}: {pl(len(e.nodes), 'node', 'nodes')}, "
                f"{pl(len(e.regions), 'region', 'regions')}, "
-               f"{pl(len(e.outputs), 'output', 'outputs')}")
+               f"{pl(len(e.outputs), 'output', 'outputs')}"
+               + (f", {len(e.levels)} levels" if len(e.levels) > 1 else ""))
         if outs is None:
             return (1, 0, msg + " (no outputs file)")
         if outs == "bad":
@@ -1004,6 +1268,44 @@ class Script:
         self.out.append("CONTRIB " + " ".join(f"{n}={fmt(w)}"
                                               for n, w in weights)
                         + " EXPECT " + (" ".join(fmt(x) for x in c) or "NONE"))
+
+    def hear(self, weights, z, top=0.0, bottom=90.0, listening=True):
+        """Round 3A-6: what the chart is handed at the floor weights and
+        height z, and where the column of dots puts each level and the
+        listening mark."""
+        e = self.ed
+        inside, routed, sil, mine = e.hear(self.sel, weights, z)
+        col = e.dots(weights, z, top, bottom, listening)
+        if col is None:
+            dots = "NONE"
+        else:
+            ys, mark, outside = col
+            dots = (" ".join(fmt(y) for y in ys) + f" CUR {e.cur} MARK "
+                    + ("-" if mark is None else
+                       f"{fmt(mark)} {1 if outside else 0}"))
+        self.out.append(
+            "HEAR " + " ".join(f"{n}={fmt(w)}" for n, w in weights)
+            + f" Z {fmt(z)} COL {fmt(top)} {fmt(bottom)} {int(listening)}"
+            + f" EXPECT {int(inside)} ROUTED "
+            + (" ".join(fmt(x) for x in routed) or "-")
+            + f" SILENCE {fmt(sil)} SEL "
+            + ("-" if mine is None else (" ".join(fmt(x) for x in mine) or "-"))
+            + f" DOTS {dots}")
+
+    def start_z(self, weights):
+        """Where audition starts: the current level, under the point."""
+        z = self.ed.heights_at(weights)[self.ed.cur]
+        self.out.append("STARTZ " + " ".join(f"{n}={fmt(w)}" for n, w in weights)
+                        + f" EXPECT {fmt(z)}")
+        return z
+
+    def glide(self, z, direction, fine, seconds):
+        """Holding up or down while auditioning: 0.25 a second, or 0.05
+        with shift. Passing a level is nothing special."""
+        z2 = z + direction * (0.05 if fine else 0.25) * seconds
+        self.out.append(f"GLIDE {fmt(z)} {direction} {int(fine)} {fmt(seconds)}"
+                        f" EXPECT {fmt(z2)}")
+        return z2
 
     def taps(self):
         self.out.append("TAPS " + (" ".join(self.ed.taps(self.sel)) or "NONE"))
@@ -1525,6 +1827,7 @@ def build():
                     ("silence",)])
     t.end()
     build_round3(out)
+    build_levels(out)
     return out
 
 
@@ -1608,6 +1911,232 @@ def build_round3(out):
     t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
     t.select("n0"); t.do("derived")
     t.do("userig", "kinds")
+    t.end()
+
+
+
+def build_levels(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-6: LEVELS IN THE EDITOR")
+    out.append("#")
+    out.append("# The model holds a 3D map and a current level. Output keys act")
+    out.append("# on every level; binding keys on the current one. Every state")
+    out.append("# past the first level also lists each level: its starting")
+    out.append("# height, its bent nodes, its bindings (Z0, Z1, ...).")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "levels_new_and_switch",
+               "the example map: n copies the level above, halfway to the "
+               "next or a quarter beyond the top; N below. The new level "
+               "becomes current. Up and down move between levels and stop "
+               "at the ends; they are not undo steps, new levels are")
+    t.do("example")
+    t.do("levelup")
+    t.keys()
+    t.do("newlevel", 1)
+    t.keys()
+    t.do("newlevel", 1)
+    t.do("levelup")
+    t.do("leveldown")
+    out.append("# N from the middle level: halfway down to the ground")
+    t.do("newlevel", 0)
+    t.do("leveldown")
+    out.append("# N from the ground: a quarter below it")
+    t.do("newlevel", 0)
+    t.do("leveldown")
+    t.do("undo"); t.do("undo"); t.do("redo")
+    t.end()
+
+    t = Script(out, "levels_bind_one_level",
+               "three levels of the example map: binding, fill and clear on "
+               "the middle level leave the others alone, and the link lines "
+               "are the current level's")
+    t.do("example")
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.do("leveldown")
+    t.select("N")
+    t.do("pick", "rear"); t.do("bind")
+    t.lines()
+    t.do("fill", -1, False)
+    t.marks()
+    t.do("levelup")
+    t.lines()
+    t.marks()
+    t.do("leveldown"); t.do("leveldown")
+    t.select("O"); t.do("clear")
+    t.keys()
+    t.do("bindall")
+    t.end()
+
+    t = Script(out, "levels_raise",
+               "y and h raise and lower the selected nodes on the current "
+               "level, 0.05 a step or 0.01 fine, each landing on the next "
+               "multiple of its step as fill does. Refused, all or nothing, "
+               "naming the nodes, at the level above or below")
+    t.do("example")
+    t.select("O")
+    t.keys()
+    t.do("raise", 1, False)
+    out.append("# one level: nothing to reach, so a raise is allowed")
+    t.do("raise", -1, False)
+    t.do("newlevel", 1)
+    t.do("leveldown")
+    t.do("raise", 1, True); t.do("raise", 1, False)
+    t.do("raise", 1, False); t.do("raise", 1, False); t.do("raise", 1, False)
+    out.append("# O now at 0.2, and the next coarse step would touch 0.25")
+    t.do("raise", 1, False)
+    t.do("raise", 1, True); t.do("raise", 1, True); t.do("raise", 1, True)
+    t.do("raise", 1, True)
+    t.select("O", "N", "E")
+    out.append("# O at 0.24, N and E at the start: O refuses, nobody moves")
+    t.do("raise", 1, True)
+    t.do("raise", -1, False)
+    t.do("levelup")
+    t.do("raise", -1, False)
+    t.select("W"); t.do("raise", -1, False)
+    t.do("undo")
+    t.end()
+
+    t = Script(out, "levels_new_level_blocked",
+               "a new level is a copy of the current one, bends and all; one "
+               "that would reach a level next to it is refused, naming the "
+               "nodes")
+    t.do("example")
+    t.do("newlevel", 1)
+    t.do("leveldown")
+    t.select("O")
+    for _ in range(4):
+        t.do("raise", 1, False)
+    out.append("# O at 0.2 on the ground; a copy at 0.125 puts it at 0.325,")
+    out.append("# past the level at 0.25")
+    t.do("newlevel", 1)
+    t.do("newlevel", 0)
+    t.do("levelup")
+    t.do("newlevel", 1)
+    t.end()
+
+    t = Script(out, "levels_remove",
+               "cmd-delete removes the current level; the one below becomes "
+               "current. The only level cannot be removed")
+    t.do("example")
+    t.do("removelevel")
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.select("N"); t.do("pick", "rear"); t.do("bind")
+    t.do("leveldown")
+    t.do("removelevel")
+    t.keys()
+    t.do("leveldown")
+    t.do("removelevel")
+    t.keys()
+    t.do("undo"); t.do("undo")
+    t.end()
+
+    t = Script(out, "levels_nodes",
+               "placing a node on a map with levels: its output is bound on "
+               "every level, and it starts at each level's own height. "
+               "Removing nodes takes their heights and bindings from every "
+               "level; a node's own output stays while ANY level still feeds "
+               "it")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.do("place", (0.5, 0.8))
+    t.select("n2"); t.do("raise", -1, False)
+    t.do("leveldown")
+    t.select("n0"); t.do("pick", "n1"); t.do("bind")
+    t.do("leveldown")
+    t.select("n1"); t.do("remove")
+    out.append("# n1's own output stays: n0 still feeds it on the middle level")
+    t.select("n2"); t.do("remove")
+    t.do("undo")
+    t.end()
+
+    t = Script(out, "levels_outputs",
+               "outputs belong to every level: a new output, a trim, a "
+               "derived output and a removal reach all of them; the removal "
+               "counts each node that fed it on any level once")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("newlevel", 1)
+    t.do("newoutput")
+    t.select("n0"); t.do("bind")
+    t.do("leveldown")
+    t.select("n0", "n1"); t.do("bind")
+    t.do("trim", -6.0)
+    t.do("derivedafter")
+    out.append("# removed from the upper level, where only n0 feeds it: n1 feeds")
+    out.append("# it on the ground, so two nodes no longer reach it")
+    t.do("levelup")
+    t.do("removeoutput")
+    t.end()
+
+    t = Script(out, "levels_files",
+               "a map with three levels, one bent, saved and opened again: "
+               "every level, its heights and its bindings come back; the "
+               "first level is current")
+    t.do("example")
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.select("O"); t.do("raise", 1, False)
+    t.select("N"); t.do("pick", "rear"); t.do("bind")
+    t.do("savepair", "forest")
+    t.do("empty")
+    t.do("openpair", "forest.json")
+    t.end()
+
+    t = Script(out, "levels_rig",
+               "a rig used on a map with levels moves every level onto it: "
+               "each keeps its own bindings, by name")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.do("place", (0.5, 0.8))
+    t.do("pick", "n0"); t.do("trim", -6.0)
+    t.do("saverig", "room")
+    t.do("empty")
+    t.do("place", (0.8, 0.2)); t.do("place", (0.2, 0.2))
+    t.do("newlevel", 1)
+    t.select("n0"); t.do("pick", "n1"); t.do("bind")
+    t.do("userig", "room")
+    t.do("undo")
+    t.end()
+
+    t = Script(out, "levels_listening",
+               "audition in three dimensions: it starts on the current "
+               "level under the point; up and down glide it through the "
+               "levels and past them. The chart is handed what reaches the "
+               "room there, and the column of dots places the listening "
+               "mark between the levels it lies between, or past the ends, "
+               "greyed, outside")
+    t.do("example")
+    w = [("O", 0.5), ("N", 0.25), ("E", 0.25)]
+    out.append("# one level: z changes nothing, and there are no dots")
+    t.hear(w, 0.0); t.hear(w, 3.0)
+    t.keys(aud=True)
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.do("leveldown")
+    t.select("N"); t.do("pick", "rear"); t.do("bind")
+    t.do("levelup")
+    t.select("O"); t.do("raise", -1, False)
+    t.do("leveldown")
+    t.clear_sel()
+    z = t.start_z(w)
+    t.hear(w, z)
+    for _ in range(6):
+        z = t.glide(z, +1, False, 0.25)
+        t.hear(w, z)
+    out.append("# past the top level: outside, silent, the mark greyed above")
+    z = t.glide(z, +1, False, 1.0)
+    t.hear(w, z)
+    t.hear(w, -0.1)
+    t.hear(w, 0.3, listening=False)
+    out.append("# the selection's part, from every level it is heard on")
+    t.select("N", "O")
+    t.hear(w, 0.3)
+    t.hear([("A", 0.25), ("B", 0.25), ("C", 0.25), ("D", 0.25)], 0.4,
+           top=10.0, bottom=130.0)
+    t.keys(aud=True)
+    t.keys(aud=False)
+    z = t.glide(0.6, -1, True, 2.0)
+    out.append("# on the top level O is lowered: audition starts under the point,")
+    out.append("# on the level as bent, not at its starting height")
+    t.do("levelup")
+    t.start_z(w)
     t.end()
 
 

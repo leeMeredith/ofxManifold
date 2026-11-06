@@ -12,6 +12,7 @@
 #include "ofxManifoldEditorHistory.h"
 #include "ofxManifoldEditorFiles.h"
 #include "ofxManifoldEditorKeys.h"
+#include "ofxManifoldEditorListening.h"
 #include "io/ofxManifoldSerialize.h"
 
 #include <filesystem>
@@ -98,7 +99,59 @@ std::string dump(const Model& md) {
         o << (k ? "," : "") << mp.targetName(md.selectedOutputs()[k]);
     }
     o << " | A " << (md.autoOutput() ? "1" : "0");
+
+    // Round 3A-6: anything only a 3D map has -- more than one level, a level
+    // not starting at 0, a bent node -- and then every level, bottom first:
+    // its starting height, its bent nodes, its bindings.
+    const Map3D& map = md.map3d();
+    const Levels& lv = map.levels();
+    bool threeD = map.count() > 1 || lv.base(0) != 0.0f;
+    for (NodeID i = 0; i < m.nodeCount(); ++i) {
+        if (lv.bent(0, i)) threeD = true;
+    }
+    if (!threeD) return o.str();
+    o << " | V " << md.currentLevel();
+    for (LevelID k = 0; k < map.count(); ++k) {
+        const Mapping& l = map.level(k);
+        o << " | Z" << k << " " << num(lv.base(k));
+        for (NodeID i = 0; i < m.nodeCount(); ++i) {
+            if (lv.bent(k, i)) {
+                o << " " << m.node(i).name << "=" << num(lv.height(k, i));
+            }
+        }
+        o << " K";
+        for (NodeID i = 0; i < m.nodeCount(); ++i) {
+            for (std::size_t j = 0; j < l.linkCount(i); ++j) {
+                const Link& ln = l.link(i, j);
+                o << " " << m.node(i).name << ">"
+                  << (ln.kind == DestKind::Output ? l.targetName(ln.id)
+                                                  : std::string("~"))
+                  << ":" << num(ln.weight);
+            }
+        }
+    }
     return o.str();
+}
+
+// "n=0.5 m=0.25 ... Z" -> the floor plan's evaluation, inside.
+Evaluation readWeights(std::istringstream& in, const Model& md,
+                       const std::string& stop) {
+    Evaluation ev;
+    ev.inside = true;
+    std::string tok;
+    while (in >> tok && tok != stop) {
+        const std::size_t eq = tok.find('=');
+        ev.weights.push_back(WeightedNode{
+            md.manifold().findNode(tok.substr(0, eq)),
+            std::stof(tok.substr(eq + 1))});
+    }
+    return ev;
+}
+
+std::string joinNums(const std::vector<float>& v) {
+    std::string s;
+    for (float x : v) s += (s.empty() ? "" : " ") + num(x);
+    return s.empty() ? "-" : s;
 }
 
 // Split into number runs and everything else, so numbers compare within
@@ -179,7 +232,9 @@ std::string label(const std::string& op) {
         {"bindall", "bind to every output"}, {"fill", "fill"},
         {"clear", "clear bindings"}, {"trim", "trim"},
         {"removeoutput", "remove output"}, {"example", "example map"},
-        {"empty", "new map"}, {"move", "move"}, {"openpair", "open"}};
+        {"empty", "new map"}, {"move", "move"}, {"openpair", "open"},
+        {"newlevel", "new level"}, {"raise", "height"},
+        {"removelevel", "remove level"}};
     auto it = L.find(op);
     return it == L.end() ? op : it->second;
 }
@@ -318,6 +373,18 @@ int main(int argc, char** argv) {
                 }
                 op = [](Model&) { return Result{}; };
             }
+            else if (lastOp == "levelup")   op = [](Model& m) { return m.switchLevel(+1); };
+            else if (lastOp == "leveldown") op = [](Model& m) { return m.switchLevel(-1); };
+            else if (lastOp == "newlevel") {
+                int above; in >> above;
+                op = [above](Model& m) { return m.newLevel(above > 0); };
+            }
+            else if (lastOp == "raise") {
+                int dir, fine; in >> dir >> fine;
+                op = [&, dir, fine](Model& m) {
+                    return m.raise(sel, dir, fine != 0); };
+            }
+            else if (lastOp == "removelevel") op = [](Model& m) { return m.removeLevel(); };
             else if (lastOp == "example") op = [&](Model& m) {
                 m.loadExample(); Result r; r.changed = true; return r; };
             else if (lastOp == "empty")   op = [&](Model& m) {
@@ -496,6 +563,62 @@ int main(int argc, char** argv) {
                     ok = false;
                     why << "chartLevels outside the map is not empty";
                 }
+            }
+        } else if (kind == "HEAR") {
+            // Round 3A-6: the listening point at the floor weights and a
+            // height; what the chart is handed there, and the column of dots.
+            const Evaluation floor = readWeights(in, md, "Z");
+            float z, top, bottom; int listening;
+            std::string kw;
+            in >> z >> kw >> top >> bottom >> listening >> kw;   // COL, EXPECT
+            std::string want, tok;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            const ChartLevels lv = chartLevels3D(md, sel, floor, z);
+            std::string got = std::string(lv.inside ? "1" : "0")
+                + " ROUTED " + joinNums(lv.routed)
+                + " SILENCE " + num(lv.silence) + " SEL "
+                + (sel.empty() ? std::string("-") : joinNums(lv.fromSelection));
+            const DotColumn c = dotColumn(md, top, bottom, listening != 0,
+                                          floor, z);
+            got += " DOTS ";
+            if (!c.shown) {
+                got += "NONE";
+            } else {
+                got += joinNums(c.dots) + " CUR " + std::to_string(c.current)
+                     + " MARK " + (c.marked ? num(c.mark) + " "
+                                              + (c.outside ? "1" : "0")
+                                            : std::string("-"));
+            }
+            if (ok && !sameState(want, got)) {
+                ok = false;
+                why << "listening after step " << step << ":\n      want "
+                    << want << "\n      got  " << got;
+            }
+            // One level: exactly what the 2D chart was handed.
+            if (ok && md.map3d().count() == 1) {
+                const ChartLevels flat = chartLevels(md, sel, floor);
+                if (flat.routed != lv.routed || flat.silence != lv.silence
+                    || flat.fromSelection != lv.fromSelection) {
+                    ok = false;
+                    why << "one level, but the 3D chart differs from the 2D";
+                }
+            }
+        } else if (kind == "STARTZ") {
+            const Evaluation floor = readWeights(in, md, "EXPECT");
+            float want; in >> want;
+            const float got = listenStart(md, floor);
+            if (ok && std::fabs(got - want) > tolerance) {
+                ok = false;
+                why << "audition starts at " << got << ", expected " << want;
+            }
+        } else if (kind == "GLIDE") {
+            float z, secs, want; int dir, fine; std::string kw;
+            in >> z >> dir >> fine >> secs >> kw >> want;
+            const float got = glide(z, dir, fine != 0, secs);
+            if (ok && std::fabs(got - want) > tolerance) {
+                ok = false;
+                why << "glide from " << z << " gave " << got << ", expected "
+                    << want;
             }
         } else if (kind == "TAPS") {
             std::string want, tok;

@@ -1,6 +1,7 @@
 #include "ofxManifoldEditorFiles.h"
 
 #include "io/ofxManifoldSerialize.h"
+#include "io/ofxManifoldSerialize3D.h"
 
 #include <fstream>
 #include <sstream>
@@ -59,13 +60,16 @@ Result savePair(const Model& model, const std::string& chosen) {
     const FilePair p = pairFor(chosen);
     Result r;
     r.seconds = 3.0f;
-    if (!writeFile(p.map, io::saveManifold(model.manifold()))) {
+    // A map with one flat level and no values writes exactly what the 2D
+    // writers do (D-022, checked by vector); anything more is version 3.
+    if (!writeFile(p.map, io::saveManifold3D(model.manifold(),
+                                             model.map3d()))) {
         r.refused = true;
         r.message = "cannot write " + p.name + ".json";
         return r;
     }
     if (!writeFile(p.outputs,
-                   io::saveMapping(model.mapping(), model.manifold()))) {
+                   io::saveMapping3D(model.map3d(), model.manifold()))) {
         r.refused = true;
         r.message = "saved " + p.name + ".json, but cannot write "
                   + p.name + "-outputs.json";
@@ -136,23 +140,33 @@ Result openPair(Model& model, const std::string& chosen) {
         r.message = "cannot open " + p.name + ".json";
         return r;
     }
+    // The map file alone first, with no outputs: its floor plan and levels.
+    // A refusal here is the map file's own.
+    const std::string noOutputs = io::saveMapping(Mapping(), Manifold2D());
     Manifold2D m;
-    const io::LoadResult lr = io::loadManifold(text, m);
-    if (!lr.ok) {
-        r.refused = true;
-        r.message = "open failed: " + lr.error;
-        return r;
+    Map3D map;
+    {
+        const io::LoadResult lr = io::loadMap3D(text, noOutputs, m, map);
+        if (!lr.ok) {
+            r.refused = true;
+            r.message = "open failed: " + lr.error;
+            return r;
+        }
     }
 
     // The outputs refer to nodes by NAME, so they are read against the map
     // just loaded. The current name first, then the one earlier editors used.
-    Mapping mp;
+    // Refused, the map is kept with no outputs, and the reason is shown.
     std::string note;
     std::string otext;
     if (readFile(p.outputs, otext) || readFile(p.legacy, otext)) {
-        const io::LoadResult mr = io::loadMapping(otext, m, mp);
-        if (!mr.ok) {
-            mp = Mapping();
+        Manifold2D m2;
+        Map3D withOutputs;
+        const io::LoadResult mr = io::loadMap3D(text, otext, m2, withOutputs);
+        if (mr.ok) {
+            m = std::move(m2);
+            map = std::move(withOutputs);
+        } else {
             note = " -- outputs file refused: " + mr.error;
             r.refused = true;
             r.seconds = 6.0f;
@@ -163,12 +177,16 @@ Result openPair(Model& model, const std::string& chosen) {
 
     const std::size_t nodes = m.nodeCount();
     const std::size_t regions = m.regionCount();
-    const std::size_t outs = mp.targetCount();
-    model.adopt(std::move(m), std::move(mp));
+    const std::size_t outs = map.level(0).targetCount();
+    const std::size_t levels = map.count();
+    model.adopt(std::move(m), std::move(map));
     r.changed = true;
     r.message = "opened " + p.name + ": " + plural(nodes, " node", " nodes")
               + ", " + plural(regions, " region", " regions") + ", "
-              + plural(outs, " output", " outputs") + note;
+              + plural(outs, " output", " outputs")
+              + (levels > 1 ? ", " + std::to_string(levels) + " levels"
+                            : std::string())
+              + note;
     return r;
 }
 

@@ -30,5 +30,14 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o);
 void drawGrid(const Scene& s, const GridLook& look);
 void drawLinks(const Scene& s);
 
+// Round 3A-6. Each bent node's offset from its level's start, beside it, on
+// the current level. And the column of dots just right of the map, one per
+// level, the current one filled with its starting height beside it, and the
+// listening mark: where the listening point is among the levels, greyed when
+// it is outside them. Both draw nothing for a map with one flat level, so a
+// 2D map looks exactly as it did. drawMap() draws both.
+void drawOffsets(const Scene& s);
+void drawLevelColumn(const Scene& s);
+
 } // namespace editor
 } // namespace ofxManifold

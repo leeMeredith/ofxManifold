@@ -157,6 +157,18 @@ MAP3 forest_trim NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER 
 # the middle level removed: ground and canopy keep their own
 # bindings and values
 MAP3 forest_nomid NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; REMOVELEVEL 1 =OK
+# a room for the forest to move onto: its outputs reordered,
+# Top on channel 5, R trimmed to a quarter, and Floor besides
+MAP3 wider NODES square OPS OUT Top 5 1 ; OUT R 2 0.25 ; OUT L 1 1 ; OUT Floor 4 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 1:1
+# a room without Top
+MAP3 narrow NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 1:1
+# the forest on the wider rig: every level moves at once, each
+# keeping its own bindings by name; the tap keeps the forest's
+# own sources; heights and values are untouched
+MAP3 forest_onrig NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; USERIG wider =OK
+# the narrow rig is refused, naming Top, and nothing changes:
+# not even the levels that bind nothing to Top
+MAP3 forest_badrig NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; USERIG narrow =REFUSED:Top
 # node 1 removed from the floor plan: on every level its
 # bindings and values go, and those of nodes 2 and 3 follow them
 # to their new ids
@@ -186,6 +198,12 @@ CH3 noR_between CROSS forest_noR W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2
 CH3 trim_canopy ANALYTIC forest_trim W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 ROUTED 0 0.0625 0 0.75 0 0 0 0 0.5 0.0625 SILENCE 0.1875 LEVELS 0 0.0625 0 0.1875 0 0 0 0 0.5 0.05
 CH3 late_output_canopy ANALYTIC forest_late W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 ROUTED 0 0.05 0 0.75 0.05 0 0 0 0.5 0.05 SILENCE 0.15 LEVELS 0 0.05 0 0.75 0.05 0 0 0 0.5 0.04
 CH3 nomid_between CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 ROUTED 0 0.275 0.2 0.4 0 0 0 0 0.5 0.375 SILENCE 0.125 LEVELS 0 0.275 0.1 0.4 0 0 0 0 0.5 0.3
+# on the wider rig: Top reads on channel 5, R at its new trim,
+# Floor silent, the tap from the forest's own nodes
+CH3 onrig_canopy ANALYTIC forest_onrig W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 ROUTED 0 0.0625 0 0 0 0.75 0 0 0.5 0.0625 SILENCE 0.1875 LEVELS 0 0.0625 0 0 0 0.75 0 0 0.5 0.05
+CH3 onrig_between CROSS forest_onrig W 0@1=0.04 0@2=0.06 1@1=0.08 1@2=0.12 2@1=0.12 2@2=0.18 3@1=0.16 3@2=0.24 ROUTED 0 0.18 0.08 0 0 0.48 0 0 0.4 0.2 SILENCE 0.26 LEVELS 0 0.18 0.02 0 0 0.48 0 0 0.4 0.16
+# refused: exactly the forest's own reading
+CH3 badrig_unchanged CROSS forest_badrig W 0@1=0.04 0@2=0.06 1@1=0.08 1@2=0.12 2@1=0.12 2@2=0.18 3@1=0.16 3@2=0.24 ROUTED 0 0.18 0.08 0.48 0 0 0 0 0.4 0.22 SILENCE 0.26 LEVELS 0 0.18 0.04 0.48 0 0 0 0 0.4 0.176
 # node 1 removed: old node 2 is now node 1, old 3 is node 2
 CH3 remap_between CROSS forest_remap W 0@0=0.2 0@1=0.2 1@0=0.15 1@1=0.15 2@0=0.15 2@1=0.15 ROUTED 0 0.625 0.075 0.15 0 0 0 0 0.7 0.6625 SILENCE 0.15 LEVELS 0 0.625 0.0375 0.15 0 0 0 0 0.7 0.53
 
@@ -206,6 +224,7 @@ VAL3 bright_between ANALYTIC forest W 0@0=0.125 0@1=0.125 1@0=0.125 1@1=0.125 2@
 VAL3 dist_ground_node1 ANALYTIC forest W 1@0=1 VALUE dist EXPECT 0.3
 VAL3 dist_copied_up ANALYTIC forest W 1@1=1 VALUE dist EXPECT 0.3
 VAL3 bright_outside ANALYTIC forest W OUTSIDE VALUE bright EXPECT 0.5
+VAL3 bright_onrig ANALYTIC forest_onrig W 0@1=0.125 0@2=0.125 1@1=0.125 1@2=0.125 2@1=0.125 2@2=0.125 3@1=0.125 3@2=0.125 VALUE bright EXPECT 0.725
 VAL3 bright_remap CROSS forest_remap W 0@0=0.2 0@1=0.2 1@0=0.2 1@1=0.2 2@0=0.1 2@1=0.1 VALUE bright EXPECT 0.32
 VAL3 bright_nomid CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 VALUE bright EXPECT 0.66
 
@@ -222,6 +241,15 @@ VAL3 bright_nomid CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0
 FILE3 file3_forest ANALYTIC map3_forest.json map3_forest-outputs.json AS forest
 FILE3 file3_forest_trim ANALYTIC map3_forest_trim.json map3_forest_trim-outputs.json AS forest_trim
 FILE3 file3_forest_nomid ANALYTIC map3_forest_nomid.json map3_forest_nomid-outputs.json AS forest_nomid
+# An outputs file from before outputs were declared (version 1):
+# each output is made by the first binding naming it, at the next
+# channel. Opened as a 3D map, the output is made on EVERY level,
+# so the levels agree about the room; the binding is on the first.
+# (Found by the editor opening an old pair, round 3A-6.)
+MAP3 legacy_one NODES square OPS OUT L 0 1 ; OUT R 1 1 ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1
+FILE3 file3_legacy_one ANALYTIC map3_legacy_one.json map3_legacy_one-outputs.json AS legacy_one
+MAP3 legacy_two NODES square OPS OUT L 0 1 ; COPY 0 1 =1 ; BIND 0 0 L 1
+FILE3 file3_legacy_two ANALYTIC map3_legacy_two.json map3_legacy_two-outputs.json AS legacy_two
 
 # SAVE3: the map built by operations, saved by the C++, with the
 # versions it must be written as, reloaded and compared. One

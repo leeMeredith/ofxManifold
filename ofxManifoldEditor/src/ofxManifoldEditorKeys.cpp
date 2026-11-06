@@ -9,6 +9,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
     const std::size_t nodes = m.manifold().nodeCount();
     const std::size_t outputs = m.mapping().targetCount();
     const std::size_t picked = m.selectedOutputs().size();
+    const std::size_t levels = m.map3d().count();
     const bool drag = ctx.dragging;
     const bool mouse = !ctx.auditioning && !drag;   // mouse editing allowed
 
@@ -128,6 +129,22 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("autooutput", "p",
               std::string("auto-output ") + (m.autoOutput() ? "on" : "off"),
               !drag, dragging),
+    }});
+
+    // Round 3A-6. While auditioning, up and down move the listening point
+    // through the levels and past them -- so they work with one level too.
+    g.push_back({"levels", {
+        entry("levelswitch", "up down",
+              ctx.auditioning ? "listen higher / lower" : "level up / down",
+              !drag && (ctx.auditioning || levels > 1),
+              unlessDrag("one level -- n makes another")),
+        entry("newlevel", "n N", "new level above / below", !drag, dragging),
+        entry("raise", "y h", "raise / lower 0.05 (shift 0.01)",
+              !drag && !sel.empty(),
+              unlessDrag("select the nodes to raise or lower")),
+        entry("removelevel", "cmd-delete", "remove the level",
+              !drag && levels > 1, unlessDrag("the only level")),
+        entry("view3d", "cmd-3", "3D view on or off", true, ""),
     }});
 
     g.push_back({"listen", {

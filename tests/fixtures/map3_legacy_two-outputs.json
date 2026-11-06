@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "bindings": [
+    {
+      "node": "n0",
+      "target": "L",
+      "weight": 1.0
+    }
+  ]
+}

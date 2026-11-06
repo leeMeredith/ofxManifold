@@ -135,6 +135,37 @@ int main() {
     key(OF_KEY_DEL);
     frame("delete");
 
+    // Round 3A-6: levels. Appended, so every frame above is as it was.
+    key('e');
+    key('n');
+    key('n');
+    key(OF_KEY_DOWN);
+    frame("three levels, on the middle one: the column of dots");
+    click(sx(0.30f), sy(0.50f));                   // O
+    key('y');
+    key('Y');
+    frame("O raised on the middle level: its offset shown");
+    a.keyPressed(' ');
+    a.keyPressed(OF_KEY_UP);
+    for (int i = 0; i < 30; ++i) a.update();       // half a second held
+    frame("auditioning, glided up between the middle and top levels");
+    a.keyReleased(OF_KEY_UP);
+    for (int i = 0; i < 60; ++i) a.update();
+    a.keyPressed(OF_KEY_UP);
+    for (int i = 0; i < 60; ++i) a.update();
+    frame("glided past the top level: outside, the mark greyed");
+    a.keyReleased(OF_KEY_UP);
+    a.keyReleased(' ');
+    frame("audition released: back on the middle level");
+    hold(OF_KEY_COMMAND);
+    key('3');
+    release(OF_KEY_COMMAND);
+    frame("the 3D view");
+    hold(OF_KEY_COMMAND);
+    key(OF_KEY_DEL);
+    release(OF_KEY_COMMAND);
+    frame("the middle level removed");
+
     std::fputs(drawlog().c_str(), stdout);
     return 0;
 }

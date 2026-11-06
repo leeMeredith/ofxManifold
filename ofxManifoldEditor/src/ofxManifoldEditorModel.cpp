@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <set>
 
 namespace ofxManifold {
 namespace editor {
@@ -31,6 +33,20 @@ Result changed(const std::string& msg, float seconds) {
 
 std::string plural(std::size_t n, const char* one, const char* many) {
     return std::to_string(n) + (n == 1 ? one : many);
+}
+
+// A height in a message: six significant digits, as the vectors write them.
+std::string height(float h) {
+    char b[32];
+    std::snprintf(b, sizeof b, "%g", double(h));
+    return b;
+}
+
+// An offset from a level's start, always signed: "+0.05", "-0.1", "+0".
+std::string offset(float d) {
+    char b[32];
+    std::snprintf(b, sizeof b, "%+.3g", double(d));
+    return b;
 }
 
 } // namespace
@@ -71,23 +87,24 @@ void Model::loadExample() {
     //   D         rear, and a quarter silent     circle, three-quarters filled
     //
     // plus a derived "sub" fed by N and O, at its own channel.
-    mapping_ = Mapping();
-    const TargetID front = mapping_.addOutput("front", 0);
-    const TargetID left  = mapping_.addOutput("left", 1);
-    const TargetID right = mapping_.addOutput("right", 2);
-    const TargetID rear  = mapping_.addOutput("rear", 3);
-    mapping_.bind(N, front);
-    mapping_.bind(W, left);
-    mapping_.bind(E, right);
-    mapping_.bind(S, rear);
-    for (TargetID t : {front, left, right, rear}) mapping_.bind(O, t);
-    mapping_.bind(B, right);
-    mapping_.bindSilence(B, 1.0f);
-    mapping_.bind(C, left);
-    mapping_.bind(C, right);
-    mapping_.bind(D, rear);
-    mapping_.bindSilence(D, 1.0f / 3.0f);
-    mapping_.addDerived("sub", 4, 1.0f, SumMode::Linear, {{N, 1.0f}, {O, 1.0f}});
+    map_ = Map3D();
+    level_ = 0;
+    const TargetID front = map_.addOutput("front", 0);
+    const TargetID left  = map_.addOutput("left", 1);
+    const TargetID right = map_.addOutput("right", 2);
+    const TargetID rear  = map_.addOutput("rear", 3);
+    map_.bind(0, N, front);
+    map_.bind(0, W, left);
+    map_.bind(0, E, right);
+    map_.bind(0, S, rear);
+    for (TargetID t : {front, left, right, rear}) map_.bind(0, O, t);
+    map_.bind(0, B, right);
+    map_.bindSilence(0, B, 1.0f);
+    map_.bind(0, C, left);
+    map_.bind(0, C, right);
+    map_.bind(0, D, rear);
+    map_.bindSilence(0, D, 1.0f / 3.0f);
+    map_.addDerived("sub", 4, 1.0f, SumMode::Linear, {{N, 1.0f}, {O, 1.0f}});
     (void)A;
 
     selectOnlyOutput(front);
@@ -97,15 +114,25 @@ void Model::loadExample() {
 
 void Model::newEmpty() {
     manifold_ = Manifold2D();
-    mapping_ = Mapping();
+    map_ = Map3D();
+    level_ = 0;
     selectOnlyOutput(InvalidTarget);
     settleCurrentOutput();
     refreshTopology();
 }
 
 void Model::adopt(Manifold2D m, Mapping mp) {
+    Map3D one;
+    std::vector<Mapping> routing;
+    routing.push_back(std::move(mp));
+    one.adopt(Levels(), std::move(routing));   // one level always agrees
+    adopt(std::move(m), std::move(one));
+}
+
+void Model::adopt(Manifold2D m, Map3D map) {
     manifold_ = std::move(m);
-    mapping_ = std::move(mp);
+    map_ = std::move(map);
+    level_ = 0;
     selectOnlyOutput(InvalidTarget);
     settleCurrentOutput();
     refreshTopology();
@@ -115,17 +142,17 @@ void Model::adopt(Manifold2D m, Mapping mp) {
 // and none current, the first becomes current.
 void Model::settleCurrentOutput() {
     if (currentOutput_ != InvalidTarget
-        && currentOutput_ >= mapping_.targetCount()) {
+        && currentOutput_ >= mapping().targetCount()) {
         currentOutput_ = InvalidTarget;
     }
-    if (currentOutput_ == InvalidTarget && mapping_.targetCount() > 0) {
+    if (currentOutput_ == InvalidTarget && mapping().targetCount() > 0) {
         currentOutput_ = 0;
     }
     // The selected outputs follow: none that no longer exist, and the
     // current output always among them.
     std::vector<TargetID> kept;
     for (TargetID t : outputSel_) {
-        if (t < mapping_.targetCount()) kept.push_back(t);
+        if (t < mapping().targetCount()) kept.push_back(t);
     }
     outputSel_ = kept;
     if (currentOutput_ == InvalidTarget) outputSel_.clear();
@@ -146,7 +173,7 @@ bool Model::outputSelected(TargetID t) const {
 std::string Model::selectedOutputNames() const {
     std::string names;
     for (TargetID t : outputSel_) {
-        names += (names.empty() ? "" : ", ") + mapping_.targetName(t);
+        names += (names.empty() ? "" : ", ") + mapping().targetName(t);
     }
     return names;
 }
@@ -163,7 +190,7 @@ std::string Model::freshName() const {
     for (std::size_t k = manifold_.nodeCount(); ; ++k) {
         const std::string nm = "n" + std::to_string(k);
         if (manifold_.findNode(nm) == InvalidNode
-            && mapping_.findTarget(nm) == InvalidTarget) {
+            && mapping().findTarget(nm) == InvalidTarget) {
             return nm;
         }
     }
@@ -171,31 +198,36 @@ std::string Model::freshName() const {
 
 int Model::nextFreeChannel() const {
     int ch = 0;
-    while (mapping_.channelInUse(ch)) ++ch;
+    while (mapping().channelInUse(ch)) ++ch;
     return ch;
 }
 
 std::size_t Model::outputCount(NodeID id) const {
     std::size_t n = 0;
-    for (std::size_t k = 0; k < mapping_.linkCount(id); ++k) {
-        if (mapping_.link(id, k).kind == DestKind::Output) ++n;
+    for (std::size_t k = 0; k < mapping().linkCount(id); ++k) {
+        if (mapping().link(id, k).kind == DestKind::Output) ++n;
     }
     return n;
 }
 
 bool Model::feeds(NodeID node, TargetID output) const {
-    for (std::size_t k = 0; k < mapping_.linkCount(node); ++k) {
-        const Link& l = mapping_.link(node, k);
+    for (std::size_t k = 0; k < mapping().linkCount(node); ++k) {
+        const Link& l = mapping().link(node, k);
         if (l.kind == DestKind::Output && l.id == output) return true;
     }
     return false;
 }
 
+// On ANY level: deleting a node must not take away an output another level's
+// nodes still feed.
 bool Model::outputInUse(TargetID t) const {
-    for (NodeID n : mapping_.boundNodes()) {
-        for (std::size_t k = 0; k < mapping_.linkCount(n); ++k) {
-            const Link& l = mapping_.link(n, k);
-            if (l.kind == DestKind::Output && l.id == t) return true;
+    for (LevelID k = 0; k < map_.count(); ++k) {
+        const Mapping& mp = map_.level(k);
+        for (NodeID n : mp.boundNodes()) {
+            for (std::size_t i = 0; i < mp.linkCount(n); ++i) {
+                const Link& l = mp.link(n, i);
+                if (l.kind == DestKind::Output && l.id == t) return true;
+            }
         }
     }
     return false;
@@ -237,12 +269,14 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
     // The output takes the NODE'S NAME. That is what pairs them, and it
     // survives save and reload with no extra bookkeeping -- which is how
     // deleting the node later finds its own fader.
-    if (autoOutput_ && mapping_.findTarget(manifold_.node(id).name)
+    if (autoOutput_ && mapping().findTarget(manifold_.node(id).name)
                           == InvalidTarget) {
-        const TargetID t = mapping_.addOutput(manifold_.node(id).name,
-                                             nextFreeChannel());
+        const TargetID t = map_.addOutput(manifold_.node(id).name,
+                                          nextFreeChannel());
         if (t != InvalidTarget) {
-            mapping_.bind(id, t);
+            // On every level: a speaker is a speaker at every height
+            // (PLAN-round3.md, 3A-6).
+            for (LevelID k = 0; k < map_.count(); ++k) map_.bind(k, id, t);
             // The current output changes only if there was none. It used to
             // follow every new node, so the output `b` acted on was usually
             // the one the newest node already fed -- and b, a toggle, then
@@ -343,7 +377,7 @@ Result Model::remove(const Selection& sel) {
     for (NodeID id : sel.nodes()) names.push_back(manifold_.node(id).name);
     std::vector<NodeID> remap;
     manifold_.removeNodes(sel.nodes(), &remap, &regionsGone);
-    mapping_.remapNodes(remap);
+    map_.remapNodes(remap);   // every level's heights, bindings and values
 
     // A node's own output -- the one named after it -- goes with it, but ONLY
     // if nothing else is bound to it. Otherwise deleting a speaker's node
@@ -351,9 +385,9 @@ Result Model::remove(const Selection& sel) {
     // by hand never share a node's name, so they are never removed this way.
     std::size_t outsGone = 0;
     for (const std::string& nm : names) {
-        const TargetID t = mapping_.findTarget(nm);
+        const TargetID t = mapping().findTarget(nm);
         if (t != InvalidTarget && !outputInUse(t)) {
-            mapping_.removeOutput(t);
+            map_.removeOutput(t);
             afterOutputRemoved(t);
             ++outsGone;
         }
@@ -377,10 +411,10 @@ Result Model::remove(const Selection& sel) {
 Result Model::newOutput() {
     const int ch = nextFreeChannel();
     std::string nm = "out" + std::to_string(ch);
-    for (int k = 2; mapping_.findTarget(nm) != InvalidTarget; ++k) {
+    for (int k = 2; mapping().findTarget(nm) != InvalidTarget; ++k) {
         nm = "out" + std::to_string(ch) + "_" + std::to_string(k);
     }
-    selectOnlyOutput(mapping_.addOutput(nm, ch));
+    selectOnlyOutput(map_.addOutput(nm, ch));
     return changed("new output " + nm + " on channel " + std::to_string(ch)
                    + " -- select nodes and press b", 3.0f);
 }
@@ -395,7 +429,7 @@ Result Model::newDerived(const Selection& sel) {
     const std::string nm = "sum" + std::to_string(ch);
     std::vector<std::pair<NodeID, float>> srcs;
     for (NodeID id : sel.nodes()) srcs.emplace_back(id, 1.0f);
-    mapping_.addDerived(nm, ch, 1.0f, SumMode::Linear, srcs);
+    map_.addDerived(nm, ch, 1.0f, SumMode::Linear, srcs);
     return changed("derived " + nm + " on channel " + std::to_string(ch)
                    + ", sum of " + std::to_string(srcs.size()), 3.0f);
 }
@@ -408,38 +442,39 @@ Result Model::newDerivedAfter() {
     const std::string nm = "sum" + std::to_string(ch);
     std::vector<std::pair<TargetID, float>> srcs;
     for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);
-    mapping_.addDerivedFromOutputs(nm, ch, 1.0f, SumMode::Linear, srcs);
+    map_.addDerivedFromOutputs(nm, ch, 1.0f, SumMode::Linear, srcs);
     return changed("derived " + nm + " on channel " + std::to_string(ch)
                    + ", after " + selectedOutputNames(), 3.0f);
 }
 
 Result Model::useRig(const Mapping& rig, const std::string& name) {
-    const RigUse u = ofxManifold::useRig(mapping_, rig);
-    if (!u.ok) {
+    // Outputs may come back in another order: carry the current and picked
+    // outputs across by name.
+    const std::string current = currentOutput_ == InvalidTarget
+        ? std::string() : mapping().targetName(currentOutput_);
+    std::vector<std::string> picked;
+    for (TargetID t : outputSel_) picked.push_back(mapping().targetName(t));
+
+    // Every level at once, or none (Map3D::useRig).
+    std::vector<std::string> refused;
+    if (!map_.useRig(rig, &refused)) {
         std::string list;
-        for (std::size_t i = 0; i < u.refused.size(); ++i) {
-            list += (i ? ", " : "") + u.refused[i];
+        for (std::size_t i = 0; i < refused.size(); ++i) {
+            list += (i ? ", " : "") + refused[i];
         }
         return refusal("cannot use rig " + name + " -- not in it, or not "
                        "the same kind: " + list, 4.0f);
     }
-    // Outputs may come back in another order: carry the current and picked
-    // outputs across by name.
-    const std::string current = currentOutput_ == InvalidTarget
-        ? std::string() : mapping_.targetName(currentOutput_);
-    std::vector<std::string> picked;
-    for (TargetID t : outputSel_) picked.push_back(mapping_.targetName(t));
-    mapping_ = u.result;
     currentOutput_ = current.empty() ? InvalidTarget
-                                     : mapping_.findTarget(current);
+                                     : mapping().findTarget(current);
     outputSel_.clear();
     for (const std::string& nm : picked) {
-        const TargetID t = mapping_.findTarget(nm);
+        const TargetID t = mapping().findTarget(nm);
         if (t != InvalidTarget) outputSel_.push_back(t);
     }
     settleCurrentOutput();
     return changed("using rig " + name + ": "
-                   + std::to_string(mapping_.targetCount()) + " outputs", 3.0f);
+                   + std::to_string(mapping().targetCount()) + " outputs", 3.0f);
 }
 
 BindPlan Model::planBind(const Selection& sel) const {
@@ -472,8 +507,8 @@ BindPlan Model::planBind(const Selection& sel) const {
         // of the selected outputs, so none survives.
         if (p.unbind) {
             bool survives = false;
-            for (std::size_t k = 0; k < mapping_.linkCount(id); ++k) {
-                const Link& l = mapping_.link(id, k);
+            for (std::size_t k = 0; k < mapping().linkCount(id); ++k) {
+                const Link& l = mapping().link(id, k);
                 if (l.kind != DestKind::Output) continue;
                 if (!outputSelected(l.id)) survives = true;
             }
@@ -534,13 +569,13 @@ Result Model::bind(const Selection& sel) {
     for (NodeID id : sel.nodes()) {
         // The fill a node had, kept through the change: removing a binding
         // would otherwise make the node louder or quieter as a side effect.
-        const float fill = outputCount(id) > 0 ? mapping_.outputFraction(id)
+        const float fill = outputCount(id) > 0 ? mapping().outputFraction(id)
                                                : 1.0f;
         bool touched = false;
         for (TargetID t : outputSel_) {
             if (all == !feeds(id, t)) continue;   // already as wanted
-            if (all) mapping_.unbind(id, t);
-            else     mapping_.bind(id, t);
+            if (all) map_.unbind(level_, id, t);
+            else     map_.bind(level_, id, t);
             touched = true;
         }
         if (!touched) continue;
@@ -548,10 +583,10 @@ Result Model::bind(const Selection& sel) {
             // Its last output gone: null, with no silence binding left behind
             // -- a stray one behaves the same but pushes the outputs file to
             // version 2 for nothing.
-            mapping_.clearBindings(id);
+            map_.clearBindings(level_, id);
             silenced.push_back(manifold_.node(id).name);
         } else if (fill < 1.0f) {
-            mapping_.setOutputFraction(id, fill);
+            map_.setOutputFraction(level_, id, fill);
         }
         ++n;
     }
@@ -581,7 +616,7 @@ Result Model::stepFill(const Selection& sel, int direction, bool fine) {
     for (NodeID id : sel.nodes()) {
         if (outputCount(id) == 0) continue;
         any = true;
-        const float before = mapping_.outputFraction(id);
+        const float before = mapping().outputFraction(id);
 
         // Position in steps. A value already on a step -- within float noise
         // -- moves a whole step; one between steps moves to the next step in
@@ -594,8 +629,8 @@ Result Model::stepFill(const Selection& sel, int direction, bool fine) {
                          : (direction > 0 ? std::ceil(k) : std::floor(k));
         const float f = std::min(1.0f, std::max(0.01f, next * unit));
 
-        mapping_.setOutputFraction(id, f);
-        const float after = mapping_.outputFraction(id);
+        map_.setOutputFraction(level_, id, f);
+        const float after = mapping().outputFraction(id);
         if (std::fabs(after - before) > 1e-6f) moved = true;
         lo = std::min(lo, after);
         hi = std::max(hi, after);
@@ -617,51 +652,51 @@ Result Model::stepFill(const Selection& sel, int direction, bool fine) {
 // with one equal binding per output, then restores its fill -- "this node
 // feeds everything, equally, as loudly as before".
 Result Model::bindAll(const Selection& sel) {
-    if (mapping_.targetCount() == 0) {
+    if (mapping().targetCount() == 0) {
         return refusal("no output yet -- press o to make one", 2.5f);
     }
     if (sel.empty()) return Result{};
     for (NodeID id : sel.nodes()) {
-        const float fill = outputCount(id) > 0 ? mapping_.outputFraction(id)
+        const float fill = outputCount(id) > 0 ? mapping().outputFraction(id)
                                                : 1.0f;
-        mapping_.clearBindings(id);
-        for (TargetID t = 0; t < mapping_.targetCount(); ++t) {
-            mapping_.bind(id, t);
+        map_.clearBindings(level_, id);
+        for (TargetID t = 0; t < mapping().targetCount(); ++t) {
+            map_.bind(level_, id, t);
         }
-        if (fill < 1.0f) mapping_.setOutputFraction(id, fill);
+        if (fill < 1.0f) map_.setOutputFraction(level_, id, fill);
     }
     return changed("bound " + plural(sel.size(), " node", " nodes")
-                   + " to every output (" + std::to_string(mapping_.targetCount())
+                   + " to every output (" + std::to_string(mapping().targetCount())
                    + ")", 2.5f);
 }
 
 Result Model::clear(const Selection& sel) {
-    for (NodeID id : sel.nodes()) mapping_.clearBindings(id);
+    for (NodeID id : sel.nodes()) map_.clearBindings(level_, id);
     if (sel.empty()) return Result{};
     return changed("cleared bindings on " + std::to_string(sel.size()), 2.0f);
 }
 
 Result Model::cycleOutput() {
-    if (mapping_.targetCount() == 0) return Result{};
+    if (mapping().targetCount() == 0) return Result{};
     selectOnlyOutput((currentOutput_ == InvalidTarget)
-                     ? 0 : (currentOutput_ + 1) % mapping_.targetCount());
+                     ? 0 : (currentOutput_ + 1) % mapping().targetCount());
     Result r;
-    r.message = "current output: " + mapping_.targetName(currentOutput_);
+    r.message = "current output: " + mapping().targetName(currentOutput_);
     r.seconds = 2.0f;
     return r;
 }
 
 Result Model::pickOutput(TargetID t) {
-    if (t == InvalidTarget || t >= mapping_.targetCount()) return Result{};
+    if (t == InvalidTarget || t >= mapping().targetCount()) return Result{};
     selectOnlyOutput(t);
     Result r;
-    r.message = "current output: " + mapping_.targetName(t);
+    r.message = "current output: " + mapping().targetName(t);
     r.seconds = 2.0f;
     return r;
 }
 
 Result Model::toggleOutput(TargetID t) {
-    if (t == InvalidTarget || t >= mapping_.targetCount()) return Result{};
+    if (t == InvalidTarget || t >= mapping().targetCount()) return Result{};
     if (outputSelected(t)) {
         if (outputSel_.size() == 1) return Result{};   // keep at least one
         std::vector<TargetID> kept;
@@ -684,8 +719,8 @@ Result Model::trimCurrent(float dB) {
     if (outputSel_.empty()) return Result{};
     // Every selected output, by the same number of dB.
     for (TargetID t : outputSel_) {
-        const float g = mapping_.targetTrim(t) * std::pow(10.0f, dB / 20.0f);
-        mapping_.setTargetTrim(t, std::min(g, 3.9810717f));
+        const float g = mapping().targetTrim(t) * std::pow(10.0f, dB / 20.0f);
+        map_.setTrim(t, std::min(g, 3.9810717f));
     }
     Result r;
     r.changed = true;
@@ -721,19 +756,24 @@ Result Model::removeCurrentOutput() {
                        + std::to_string(outputSel_.size())
                        + " are selected", 2.5f);
     }
-    std::size_t feeders = 0;
-    for (NodeID n : mapping_.boundNodes()) {
-        for (std::size_t k = 0; k < mapping_.linkCount(n); ++k) {
-            const Link& l = mapping_.link(n, k);
-            if (l.kind == DestKind::Output && l.id == currentOutput_) {
-                ++feeders;
-                break;
+    // Each node that fed it on ANY level, counted once.
+    std::set<NodeID> fed;
+    for (LevelID lv = 0; lv < map_.count(); ++lv) {
+        const Mapping& mp = map_.level(lv);
+        for (NodeID n : mp.boundNodes()) {
+            for (std::size_t k = 0; k < mp.linkCount(n); ++k) {
+                const Link& l = mp.link(n, k);
+                if (l.kind == DestKind::Output && l.id == currentOutput_) {
+                    fed.insert(n);
+                    break;
+                }
             }
         }
     }
-    const std::string nm = mapping_.targetName(currentOutput_);
+    const std::size_t feeders = fed.size();
+    const std::string nm = mapping().targetName(currentOutput_);
     const TargetID t = currentOutput_;
-    mapping_.removeOutput(t);
+    map_.removeOutput(t);
     afterOutputRemoved(t);
     Result r;
     r.changed = true;
@@ -754,6 +794,121 @@ Result Model::toggleAutoOutput() {
         : "auto-output off: new nodes start unbound";
     r.seconds = 3.0f;
     return r;
+}
+
+// ---------------------------------------------------------------------------
+// levels (round 3A-6)
+// ---------------------------------------------------------------------------
+
+Result Model::switchLevel(int direction) {
+    Result r;
+    r.seconds = 2.0f;
+    const LevelID n = map_.count();
+    if (n == 1) {
+        r.message = "one level -- n makes another";
+        return r;
+    }
+    if (direction < 0 && level_ == 0) {
+        r.message = "already the bottom level";
+        return r;
+    }
+    if (direction > 0 && level_ + 1 >= n) {
+        r.message = "already the top level";
+        return r;
+    }
+    level_ = direction < 0 ? level_ - 1 : level_ + 1;
+    r.message = "level " + std::to_string(level_ + 1) + " of "
+              + std::to_string(n) + ", at "
+              + height(map_.levels().base(level_));
+    return r;
+}
+
+Result Model::newLevel(bool above) {
+    const Levels& lv = map_.levels();
+    const LevelID n = lv.count();
+    const float b = lv.base(level_);
+    // Halfway to the neighbour, or a quarter of the map beyond the end: the
+    // starting heights stay sums of halves and quarters, exact in float.
+    float base;
+    if (above) {
+        base = (level_ + 1 == n) ? b + 0.25f : (b + lv.base(level_ + 1)) * 0.5f;
+    } else {
+        base = (level_ == 0) ? b - 0.25f : (lv.base(level_ - 1) + b) * 0.5f;
+    }
+    std::vector<NodeID> blocked;
+    const LevelID at = map_.copyLevel(level_, base, manifold_.nodeCount(),
+                                      &blocked);
+    if (at >= map_.count()) {
+        std::string who;
+        for (std::size_t i = 0; i < blocked.size(); ++i) {
+            if (blocked[i] >= manifold_.nodeCount()) continue;
+            who += (who.empty() ? "" : ", ") + manifold_.node(blocked[i]).name;
+        }
+        return refusal(std::string("no room for a new level ")
+                       + (above ? "above" : "below") + " -- "
+                       + (who.empty() ? std::string("a level starts there")
+                                      : who)
+                       + " would reach the level next to it", 3.0f);
+    }
+    level_ = at;
+    return changed("new level " + std::to_string(at + 1) + " of "
+                   + std::to_string(n + 1) + ", at " + height(base), 2.5f);
+}
+
+Result Model::raise(const Selection& sel, int direction, bool fine) {
+    if (sel.empty()) return Result{};
+    const Levels& lv = map_.levels();
+    const float unit = fine ? 0.01f : 0.05f;
+    const float base = lv.base(level_);
+
+    // Each node's offset from the level's start, in steps; a value already
+    // on a step -- within float noise -- moves a whole step, one between
+    // steps moves to the next in its direction. As stepFill.
+    std::vector<std::pair<NodeID, float>> moves;
+    for (NodeID id : sel.nodes()) {
+        float k = (lv.height(level_, id) - base) / unit;
+        const float kr = std::round(k);
+        if (std::fabs(k - kr) < 1e-3f) k = kr;
+        const float next = (k == kr) ? kr + float(direction)
+                         : (direction > 0 ? std::ceil(k) : std::floor(k));
+        moves.emplace_back(id, base + next * unit);
+    }
+    // All or nothing: strictly above the level below, strictly below the
+    // level above, for every node, before any moves.
+    std::string blocked;
+    for (const auto& mv : moves) {
+        const bool under = level_ + 1 >= lv.count()
+                        || mv.second < lv.height(level_ + 1, mv.first);
+        const bool over = level_ == 0
+                       || mv.second > lv.height(level_ - 1, mv.first);
+        if (!under || !over) {
+            blocked += (blocked.empty() ? "" : ", ")
+                     + manifold_.node(mv.first).name;
+        }
+    }
+    if (!blocked.empty()) {
+        return refusal(blocked + " would reach the level "
+                       + (direction > 0 ? "above" : "below"), 2.5f);
+    }
+    float lo = 1e9f, hi = -1e9f;
+    for (const auto& mv : moves) {
+        map_.setHeight(level_, mv.first, mv.second);
+        lo = std::min(lo, mv.second - base);
+        hi = std::max(hi, mv.second - base);
+    }
+    const std::string a = offset(lo), b = offset(hi);
+    return changed("height " + a + (a == b ? std::string() : " to " + b), 2.0f);
+}
+
+Result Model::removeLevel() {
+    const LevelID n = map_.count();
+    if (n == 1) return refusal("a map has at least one level", 2.5f);
+    const LevelID gone = level_;
+    map_.removeLevel(gone);
+    level_ = gone > 0 ? gone - 1 : 0;
+    return changed("removed level " + std::to_string(gone + 1)
+                   + "; now on level " + std::to_string(level_ + 1) + " of "
+                   + std::to_string(n - 1), 3.0f);
 }
 
 namespace {

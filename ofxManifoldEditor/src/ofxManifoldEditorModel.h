@@ -20,6 +20,7 @@
 
 #include "authoring/ofxManifoldGrid.h"
 #include "core/ofxManifold2D.h"
+#include "mapping/ofxManifoldMap3D.h"
 #include "mapping/ofxManifoldMapping.h"
 
 #include <string>
@@ -63,8 +64,17 @@ public:
     // model.manifold.addNode() and skip every rule an operation applies; with
     // these members public, it did compile.
     const Manifold2D& manifold() const { return manifold_; }
-    const Mapping&    mapping() const { return mapping_; }
+    // The CURRENT level's bindings, with the outputs every level shares.
+    // Everything written before levels reads this and sees exactly what it
+    // did: a map with one level is today's map.
+    const Mapping&    mapping() const { return map_.level(level_); }
     const TargetID&   currentOutput() const { return currentOutput_; }
+
+    // The whole 3D map, and which of its levels is being edited (round
+    // 3A-6). Output operations reach every level; binding operations, fill
+    // and heights reach the current one.
+    const Map3D&      map3d() const { return map_; }
+    const LevelID&    currentLevel() const { return level_; }
 
     // The selected outputs: shift-click on faders selects several. The
     // current output is always one of them. b binds to all of them, t and T
@@ -85,8 +95,10 @@ public:
     void loadExample();
     void newEmpty();
 
-    // Take over a map and outputs read from files.
+    // Take over a map and outputs read from files: a 2D pair, as one level,
+    // or a 3D map. The first level becomes current.
     void adopt(Manifold2D m, Mapping mp);
+    void adopt(Manifold2D m, Map3D map);
 
     // ---- nodes and regions -------------------------------------------------
 
@@ -156,6 +168,29 @@ public:
     Result removeCurrentOutput();
     Result toggleAutoOutput();
 
+    // ---- levels (round 3A-6) -------------------------------------------------
+
+    // Up (+1) or down (-1) a level. Not an undo step, like picking a fader:
+    // nothing about the map changes. Says where it landed, or that there is
+    // nowhere to go.
+    Result switchLevel(int direction);
+
+    // n and N: a new level above or below the current one, a COPY of it --
+    // heights, bindings, values. Halfway to the next level, or a quarter of
+    // the map beyond the end one. It becomes current. Refused, naming the
+    // nodes, if any copy would reach a level next to it.
+    Result newLevel(bool above);
+
+    // y and h: each selected node's height on the current level steps by
+    // 0.05, or 0.01 when `fine`, landing on the next multiple of the step
+    // above the level's start, as fill does. All or nothing: refused, naming
+    // the nodes, if any would reach the level above or below.
+    Result raise(const Selection& sel, int direction, bool fine);
+
+    // cmd-delete: the current level goes, and the one below becomes current.
+    // Refused for the only level.
+    Result removeLevel();
+
     // ---- queries -----------------------------------------------------------
 
     std::string freshName() const;
@@ -176,7 +211,8 @@ private:
     std::string selectedOutputNames() const;
 
     Manifold2D     manifold_;
-    Mapping        mapping_;
+    Map3D          map_;
+    LevelID        level_ = 0;
     TargetID       currentOutput_ = InvalidTarget;
     std::vector<TargetID> outputSel_;
     bool           autoOutput_ = true;

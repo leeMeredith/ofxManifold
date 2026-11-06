@@ -203,6 +203,28 @@ bool sameMap3(const Map3D& a, const Map3D& b, std::size_t nodes,
             }
         }
     }
+    // Every level holds the room's outputs: the same names, channels and
+    // trims on each. A level missing one reads the same until something is
+    // bound to it there -- then the binding is dropped (round 3A-6, found by
+    // a gate on version 1 files).
+    for (LevelID k = 0; k < a.count(); ++k) {
+        const Mapping& x = a.level(k);
+        const Mapping& y = b.level(k);
+        if (x.targetCount() != y.targetCount()) {
+            d << "level " << k << " has " << x.targetCount()
+              << " outputs, expected " << y.targetCount();
+            return false;
+        }
+        for (TargetID t = 0; t < x.targetCount(); ++t) {
+            if (x.targetName(t) != y.targetName(t)
+                || x.targetChannel(t) != y.targetChannel(t)
+                || !close(x.targetTrim(t), y.targetTrim(t))) {
+                d << "output " << t << " on level " << k << " is "
+                  << x.targetName(t) << ", expected " << y.targetName(t);
+                return false;
+            }
+        }
+    }
     if (a.valueSet().size() != b.valueSet().size()) {
         d << a.valueSet().size() << " values declared, expected "
           << b.valueSet().size();
@@ -517,6 +539,17 @@ int main(int argc, char** argv) {
                     m.setTrim(target(w[1]), std::stof(w[2]));
                 } else if (v == "REMOVELEVEL") {
                     got = m.removeLevel(std::stoul(w[1])) ? "=OK" : "=REFUSED";
+                } else if (v == "USERIG") {
+                    // The rig is another map's room, as an editor saves it.
+                    std::vector<std::string> refused;
+                    if (m.useRig(rigOf(maps3[w[1]].level(0)), &refused)) {
+                        got = "=OK";
+                    } else {
+                        got = "=REFUSED:";
+                        for (std::size_t i = 0; i < refused.size(); ++i) {
+                            got += (i ? "," : "") + refused[i];
+                        }
+                    }
                 } else if (v == "REMAP") {
                     std::vector<NodeID> table;
                     for (const auto& sv : splitOn(w[1], ',')) {

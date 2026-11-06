@@ -15,3 +15,4 @@
 #include "views/ofxManifoldEditorMapView.h"
 #include "views/ofxManifoldEditorOutputChart.h"
 #include "views/ofxManifoldEditorKeyPanel.h"
+#include "views/ofxManifoldEditorLevelView.h"

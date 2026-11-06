@@ -34,7 +34,8 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
     (void)model; (void)selection; (void)manifold; (void)mapping;
     (void)evaluation; (void)renderer; (void)cw; (void)lh; (void)text;
 
-    const float x = renderer->viewport().getRight() + 30.0f;
+    const float x = s.panelLeft >= 0.0f ? s.panelLeft
+                                        : renderer->viewport().getRight() + 30.0f;
     const float room = float(ofGetWidth()) - x - 16.0f;
     const std::size_t width = std::size_t(std::max(12.0f, room / cw));
     // Any line longer than the panel is shortened rather than run off it.

@@ -1,0 +1,63 @@
+{
+  "version": 3,
+  "space": "normalized",
+  "nodes": [
+    {
+      "id": "n0",
+      "position": [
+        0.1,
+        0.1
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n1",
+      "position": [
+        0.9,
+        0.1
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n2",
+      "position": [
+        0.9,
+        0.9
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n3",
+      "position": [
+        0.1,
+        0.9
+      ],
+      "weight": 1.0
+    }
+  ],
+  "regions": [
+    [
+      "n0",
+      "n1",
+      "n2"
+    ],
+    [
+      "n0",
+      "n2",
+      "n3"
+    ]
+  ],
+  "values": [],
+  "levels": [
+    {
+      "base": 0.0,
+      "heights": [],
+      "values": []
+    },
+    {
+      "base": 1.0,
+      "heights": [],
+      "values": []
+    }
+  ]
+}

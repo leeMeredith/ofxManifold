@@ -36,7 +36,12 @@ MUST_FAIL = [
     'm.manifold().addNode("x", {0.5f, 0.5f});',   # through the accessor
     "m.mapping().bind(0, 0);",
     'm.manifold_.addNode("x", {0.5f, 0.5f});',     # around it
-    "m.mapping_.clearBindings(0);",
+    "m.map_.clearBindings(0, 0);",
+    # the 3D map and its current level (round 3A-6)
+    "m.map3d().bind(0, 0, 0);",
+    "m.map3d().raise(0, {0}, 0.1f);",
+    "m.level_ = 1;",
+    "m.currentLevel() = 1;",
     "m.currentOutput_ = 0;",
     "m.autoOutput_ = false;",
 ]

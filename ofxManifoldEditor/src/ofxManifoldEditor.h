@@ -11,3 +11,4 @@
 #include "ofxManifoldEditorHistory.h"
 #include "ofxManifoldEditorFiles.h"
 #include "ofxManifoldEditorKeys.h"
+#include "ofxManifoldEditorListening.h"

@@ -28,7 +28,13 @@ struct Scene {
     const Evaluation*          evaluation = nullptr;
     const Text*                text       = nullptr;
     glm::vec2 listeningPoint{0.5f, 0.5f};
+    // Its height (round 3A-6): on the current level unless audition has
+    // moved it up or down.
+    float     listeningZ = 0.0f;
     bool      auditioning = false;
+    // Where the key panel starts; negative: 30 to the right of the map, as
+    // it always was. The column of dots and the 3D view push it right.
+    float     panelLeft = -1.0f;
     glm::vec2 mouse{-1.0f, -1.0f};       // for hover
 };
 

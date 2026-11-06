@@ -53,6 +53,8 @@ void ofApp::setup() {
     // map for the example that preceded it.
     history.clear();
     rebuildGrid();
+    // The 3D view starts hidden; its camera takes the mouse only when shown.
+    cam.disableMouseInput();
 }
 
 void ofApp::update() {
@@ -61,12 +63,31 @@ void ofApp::update() {
     // taller on a taller window, and never too short for its two label rows.
     const float chartH = std::max(130.0f, ofGetHeight() * 0.2f);
     const float side = std::max(160.0f, ofGetHeight() - 48.0f - chartH);
-    renderer->setViewport(ofRectangle(24, 24, side, side));
+    // With levels, a column of dots right of the map; with the 3D view on,
+    // the map and the view share the width, side by side, and the panel
+    // follows both. A flat map with the view off is laid out as it always
+    // was.
+    const float column = model.map3d().count() > 1 ? 64.0f : 0.0f;
+    float plan = side;
+    if (show3D) {
+        const float room = ofGetWidth() - 48.0f - column - 16.0f - 30.0f
+                         - 40.0f * text.charWidth();
+        plan = std::max(160.0f, std::min(side, room * 0.5f));
+    }
+    renderer->setViewport(ofRectangle(24, 24, plan, plan));
+    float right = 24.0f + plan + column;
+    if (show3D) {
+        view3D = ofRectangle(right + 16.0f, 24.0f, plan, plan);
+        right = view3D.getRight();
+        if (!aimed) { aimLevelView(cam, view3D); aimed = true; }
+        cam.setControlArea(view3D);
+    }
+    panelLeft = right + 30.0f;
     chartTop = 24.0f + side + 16.0f;
 
     // The faders' geometry, laid out by the package from the model. Drawing
     // and clicking both read this one layout, so they cannot disagree.
-    chart = layoutChart(mapping, 24.0f, chartTop, ofGetWidth() - 48.0f,
+    chart = layoutChart(model.mapping(), 24.0f, chartTop, ofGetWidth() - 48.0f,
                         ofGetHeight() - chartTop - 20.0f, ChartText{text.charWidth(), text.lineHeight()});
 
     // The listening point is permanent, so the levels are always live: an
@@ -76,6 +97,18 @@ void ofApp::update() {
     // renumber regions (D-015: at editor sizes the scan costs nothing).
     evaluator->reset();
     evaluation = evaluator->evaluate(auditionPoint);
+
+    // The listening point's height: gliding while up or down is held in
+    // audition, otherwise on the current level under the point.
+    if (!auditioning()) { zFree = false; glideDir = 0; }
+    if (glideDir != 0) {
+        auditionZ = glide(auditionZ, glideDir, ofGetKeyPressed(OF_KEY_SHIFT),
+                          float(ofGetLastFrameTime()));
+        zFree = true;
+        message = "listening at " + ofToString(auditionZ, 2);
+        messageTime = 1.0f;
+    }
+    if (!zFree) auditionZ = listenStart(model, evaluation);
     if (refusedFlash > 0.0f) refusedFlash -= 1.0f / 60.0f;
     if (messageTime > 0.0f) messageTime -= 1.0f / 60.0f;
 
@@ -100,7 +133,9 @@ void ofApp::draw() {
     sc.evaluation = &evaluation;
     sc.text = &text;
     sc.listeningPoint = auditionPoint;
+    sc.listeningZ = auditionZ;
     sc.auditioning = auditioning();
+    sc.panelLeft = panelLeft;
     sc.mouse = mouse;
 
     GridLook look;
@@ -126,7 +161,10 @@ void ofApp::draw() {
     st.warning = refusedFlash > 0.0f;
 
     drawMap(sc, look, over);
-    drawChart(sc, chart, chartLevels(model, selection, evaluation));
+    if (show3D) drawLevelView(sc, cam, view3D);
+    // What reaches the room at the listening point, height included; with
+    // one level exactly the 2D reading.
+    drawChart(sc, chart, chartLevels3D(model, selection, evaluation, auditionZ));
     drawPanel(sc, look, st, keyContext());
 }
 
@@ -209,6 +247,12 @@ NodeID ofApp::nodeAt(glm::vec2 screen) const {
 void ofApp::mousePressed(int x, int y, int) {
     const glm::vec2 screen(x, y);
 
+    // The 3D view's area belongs to its camera: a press there turns the view
+    // and never reaches the map.
+    pressIn3D = show3D && x >= view3D.getX() && x <= view3D.getRight()
+             && y >= view3D.getY() && y <= view3D.getBottom();
+    if (pressIn3D) return;
+
     // A click on the chart picks an output. It never edits the map.
     pressInChart = (y >= chartTop);
     if (pressInChart) {
@@ -274,6 +318,7 @@ void ofApp::mousePressed(int x, int y, int) {
 void ofApp::mouseDragged(int x, int y, int) {
     const glm::vec2 screen(x, y);
     mouse = screen;
+    if (pressIn3D) return;
     if (pressInChart) return;
     if (pressAudition) {
         auditionPoint = renderer->toManifold(screen);
@@ -322,6 +367,7 @@ void ofApp::mouseDragged(int x, int y, int) {
 
 void ofApp::mouseReleased(int x, int y, int) {
     const glm::vec2 screen(x, y);
+    if (pressIn3D) { pressIn3D = false; return; }
     if (pressInChart) { pressInChart = false; return; }
     if (pressAudition) { pressAudition = false; return; }
 
@@ -380,6 +426,8 @@ std::string ofApp::keyId(int key) const {
             return (key == 'R' || shift) ? "saverig" : "userig";
         }
         if (key == 'o' || key == 'O' || key == 15) return "open";
+        if (key == '3' || key == '#') return "view3d";
+        if (key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) return "removelevel";
         return "";
     }
     switch (key) {
@@ -408,6 +456,9 @@ std::string ofApp::keyId(int key) const {
     case 'p':                                       return "autooutput";
     case ' ':                                       return "audition";
     case 'v':                                       return "lock";
+    case OF_KEY_UP: case OF_KEY_DOWN:               return "levelswitch";
+    case 'n': case 'N':                             return "newlevel";
+    case 'y': case 'Y': case 'h': case 'H':         return "raise";
     default:                                        return "";
     }
 }
@@ -550,6 +601,43 @@ void ofApp::keyPressed(int key) {
     }
     if (id == "autooutput") { show(model.toggleAutoOutput()); return; }
 
+    // ---- levels (round 3A-6) ----
+    if (id == "levelswitch") {
+        const int dir = (key == OF_KEY_UP) ? +1 : -1;
+        // In audition, up and down move the listening point instead: held,
+        // it glides (update()).
+        if (auditioning()) { glideDir = dir; return; }
+        show(model.switchLevel(dir));
+        return;
+    }
+    if (id == "newlevel") {
+        const bool above = (key == 'n');
+        act("new level", [above](Model& m) { return m.newLevel(above); });
+        return;
+    }
+    // y up, h down: y sits above h on the keyboard. Shift for fine steps,
+    // arriving as the capital, as fill's does.
+    if (id == "raise") {
+        const int  dir  = (key == 'y' || key == 'Y') ? +1 : -1;
+        const bool fine = (key == 'Y' || key == 'H');
+        act("height", [&, dir, fine](Model& m) {
+            return m.raise(selection, dir, fine); });
+        return;
+    }
+    if (id == "removelevel") {
+        act("remove level", [](Model& m) { return m.removeLevel(); });
+        return;
+    }
+    if (id == "view3d") {
+        show3D = !show3D;
+        if (show3D) cam.enableMouseInput();
+        else        cam.disableMouseInput();
+        message = show3D ? "3D view on -- drag in it to turn it; cmd-3 to hide"
+                         : "3D view off";
+        messageTime = 2.5f;
+        return;
+    }
+
     // ---- listening ----
     if (id == "audition") { auditionHeld = true; return; }
     if (id == "lock") {
@@ -562,6 +650,7 @@ void ofApp::keyPressed(int key) {
 
 void ofApp::keyReleased(int key) {
     if (key == ' ') auditionHeld = false;
+    if (key == OF_KEY_UP || key == OF_KEY_DOWN) glideDir = 0;
 }
 
 // ===========================================================================

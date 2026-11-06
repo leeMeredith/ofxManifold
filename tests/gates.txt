@@ -527,7 +527,7 @@ replace:                             return false && l.id == id;
 
 gate: Editor delete leaves bindings unrenumbered
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     mapping_.remapNodes(remap);
+find:     map_.remapNodes(remap);   // every level's heights, bindings and values
 replace:     (void)remap;
 
 gate: Editor removes an output others still feed
@@ -537,7 +537,7 @@ replace:         if (t != InvalidTarget) {
 
 gate: Editor names ignore outputs
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:         if (manifold_.findNode(nm) == InvalidNode\n            && mapping_.findTarget(nm) == InvalidTarget) {
+find:         if (manifold_.findNode(nm) == InvalidNode\n            && mapping().findTarget(nm) == InvalidTarget) {
 replace:         if (manifold_.findNode(nm) == InvalidNode) {
 nl: yes
 
@@ -599,22 +599,25 @@ nl: yes
 
 gate: Fill steps ignore round numbers
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:                          : (direction > 0 ? std::ceil(k) : std::floor(k));
-replace:                          : k + float(direction);
+find: : (direction > 0 ? std::ceil(k) : std::floor(k));\n        const float f = std::min(
+replace: : k + float(direction);\n        const float f = std::min(
+nl: yes
 
 gate: Fill steps skip values through float noise
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:         if (std::fabs(k - kr) < 1e-3f) k = kr;
-replace:         (void)0;
+find: float k = before / unit;\n        const float kr = std::round(k);\n        if (std::fabs(k - kr) < 1e-3f) k = kr;
+replace: float k = before / unit;\n        const float kr = std::round(k);
+nl: yes
 
 gate: Fine fill steps are coarse
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     const float unit = fine ? 0.01f : 0.05f;
-replace:     const float unit = 0.05f; (void)fine;
+find:     const float unit = fine ? 0.01f : 0.05f;\n    bool any = false
+replace:     const float unit = 0.05f; (void)fine;\n    bool any = false
+nl: yes
 
 gate: Bind to every output doubles an existing binding
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:         mapping_.clearBindings(id);\n        for (TargetID t = 0;
+find:         map_.clearBindings(level_, id);\n        for (TargetID t = 0;
 replace:         for (TargetID t = 0;
 nl: yes
 
@@ -641,7 +644,7 @@ replace:             (void)0;
 
 gate: Unbinding changes a node's fill
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:         } else if (fill < 1.0f) {\n            mapping_.setOutputFraction(id, fill);\n        }
+find:         } else if (fill < 1.0f) {\n            map_.setOutputFraction(level_, id, fill);\n        }
 replace:         }
 nl: yes
 
@@ -1297,8 +1300,8 @@ replace:             if (false) {
 
 gate: d follows only the current fader
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);\n    mapping_.addDerivedFromOutputs(
-replace:     srcs.emplace_back(outputSel_.front(), 1.0f);\n    mapping_.addDerivedFromOutputs(
+find:     for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);\n    map_.addDerivedFromOutputs(
+replace:     srcs.emplace_back(outputSel_.front(), 1.0f);\n    map_.addDerivedFromOutputs(
 nl: yes
 
 gate: d with no output is not refused
@@ -1309,14 +1312,14 @@ nl: yes
 
 gate: Using a rig loses the current output
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     currentOutput_ = current.empty() ? InvalidTarget\n                                     : mapping_.findTarget(current);
+find:     currentOutput_ = current.empty() ? InvalidTarget\n                                     : mapping().findTarget(current);
 replace:     currentOutput_ = InvalidTarget;
 nl: yes
 
 gate: A rig that does not fit is used anyway
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     if (!u.ok) {
-replace:     if (false) {
+find:     if (!map_.useRig(rig, &refused)) {
+replace:     if (!map_.useRig(rig, &refused) && refused.empty()) {
 
 gate: Using a rig drops the picked outputs
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1349,3 +1352,131 @@ gate: The chart is handed silence outside the map
 file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
 find:     lv.silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
 replace:     lv.silence = mapping.silenceShare(evaluation.weights);
+
+# ---- round 3A-6: levels in the editor, the rig on every level, version 1 outputs in 3D ----
+
+gate: A rig moves the first level only
+file: src/mapping/ofxManifoldMap3D.h
+find:         routing_ = std::move(moved);\n        return true;
+replace:         routing_[0] = std::move(moved[0]);\n        return true;
+nl: yes
+
+gate: A version 1 output is made on the first level only
+file: src/io/ofxManifoldSerialize.h
+find:                 for (Mapping& l : levels) t = l.addTarget(b["target"].asString());
+replace:                 t = built.addTarget(b["target"].asString());
+
+gate: Version 1 outputs refused in a 3D map
+file: src/io/ofxManifoldSerialize.h
+find:             } else if (threeD && version < 2) {
+replace:             } else if (false) {
+
+gate: Placing a node binds its output on the current level only
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             for (LevelID k = 0; k < map_.count(); ++k) map_.bind(k, id, t);
+replace:             map_.bind(level_, id, t);
+
+gate: Deleting a node takes an output another level still feeds
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     for (LevelID k = 0; k < map_.count(); ++k) {\n        const Mapping& mp = map_.level(k);
+replace:     for (LevelID k = level_; k <= level_; ++k) {\n        const Mapping& mp = map_.level(k);
+nl: yes
+
+gate: Removing an output counts feeders on the current level only
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     for (LevelID lv = 0; lv < map_.count(); ++lv) {
+replace:     for (LevelID lv = level_; lv <= level_; ++lv) {
+
+gate: Binding lands on the first level
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             else     map_.bind(level_, id, t);
+replace:             else     map_.bind(0, id, t);
+
+gate: A new level above is always a quarter up
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         base = (level_ + 1 == n) ? b + 0.25f : (b + lv.base(level_ + 1)) * 0.5f;
+replace:         base = b + 0.25f;
+
+gate: A new level below is always a quarter down
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         base = (level_ == 0) ? b - 0.25f : (lv.base(level_ - 1) + b) * 0.5f;
+replace:         base = b - 0.25f;
+
+gate: A new level does not become current
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     level_ = at;\n    return changed("new level "
+replace:     return changed("new level "
+nl: yes
+
+gate: Lowering may reach the level below
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                        || mv.second > lv.height(level_ - 1, mv.first);
+replace:                        || true;
+
+gate: A raise is not all or nothing
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!blocked.empty()) {\n        return refusal(blocked + " would reach the level "
+replace:     if (!blocked.empty() && moves.size() == 1) {\n        return refusal(blocked + " would reach the level "
+nl: yes
+
+gate: Heights step by whole steps, not to the next multiple
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find: : (direction > 0 ? std::ceil(k) : std::floor(k));\n        moves.emplace_back(
+replace: : k + float(direction);\n        moves.emplace_back(
+nl: yes
+
+gate: Removing a level leaves the next one current
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     level_ = gone > 0 ? gone - 1 : 0;
+replace:     level_ = gone < map_.count() ? gone : gone - 1;
+
+gate: Up from the top level goes past it
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (direction > 0 && level_ + 1 >= n) {
+replace:     if (direction > 0 && level_ >= n) {
+
+gate: A 3D map is saved as a flat one
+file: ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+find:     if (!writeFile(p.map, io::saveManifold3D(model.manifold(),\n                                             model.map3d()))) {
+replace:     if (!writeFile(p.map, io::saveManifold(model.manifold()))) {
+nl: yes
+
+gate: The selection's part is read from the current level
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:         const Mapping& mp = map.level(w.level);
+replace:         const Mapping& mp = model.mapping();
+
+gate: The chart ignores the listening height
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     if (map.count() == 1) return chartLevels(model, sel, floor);
+replace:     return chartLevels(model, sel, floor);
+
+gate: The listening mark sticks to the level below
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:         c.mark = a + e.t * (b - a);
+replace:         c.mark = a;
+
+gate: Outside is always above
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     const bool above = z > map.levels().heightAt(n - 1, floor.weights);
+replace:     const bool above = true;
+
+gate: Audition starts at the level's start, not under the point
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     return floor.inside ? lv.heightAt(k, floor.weights) : lv.base(k);
+replace:     return lv.base(k);
+
+gate: Fine gliding is as fast as coarse
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:              * (fine ? kGlidePerSecondFine : kGlidePerSecond) * seconds;
+replace:              * kGlidePerSecond * seconds;
+
+gate: Up and down dim while auditioning a flat map
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && (ctx.auditioning || levels > 1),
+replace:               !drag && levels > 1,
+
+gate: Removing the only level is offered
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && levels > 1, unlessDrag("the only level")),
+replace:               !drag, unlessDrag("the only level")),

@@ -158,6 +158,29 @@ public:
 };
 inline ofFileDialogResult ofSystemSaveDialog(const std::string&, const std::string&) { return {}; }
 inline ofFileDialogResult ofSystemLoadDialog(const std::string& = "", bool = false, const std::string& = "") { return {}; }
+// The arrows and the 3D view (round 3A-6). The camera is recorded where it
+// begins and ends; inside, 3D lines and spheres are recorded with their
+// world coordinates.
+#define OF_KEY_LEFT 356
+#define OF_KEY_UP 357
+#define OF_KEY_RIGHT 358
+#define OF_KEY_DOWN 359
+inline double ofGetLastFrameTime() { return 1.0 / 60.0; }
+inline void ofDrawLine(const glm::vec3& a, const glm::vec3& b) { drawlogRecord("line3", {a.x, a.y, a.z, b.x, b.y, b.z}); }
+inline void ofDrawSphere(const glm::vec3& p, float r) { drawlogRecord("sphere", {p.x, p.y, p.z, r}); }
+inline void ofSetSphereResolution(int) {}
+class ofEasyCam {
+public:
+    void begin(const ofRectangle& r) { drawlogRecord("cam", {r.x, r.y, r.width, r.height}); }
+    void end() { drawlogRecord("camend", {}); }
+    void setTarget(const glm::vec3&) {}
+    void setDistance(float) {}
+    void setControlArea(const ofRectangle&) {}
+    void enableMouseInput() {}
+    void disableMouseInput() {}
+    void setPosition(float, float, float) {}
+    void lookAt(const glm::vec3&) {}
+};
 struct ofLogNotice { template <typename T> ofLogNotice& operator<<(const T&) { return *this; } };
 struct ofLogError { template <typename T> ofLogError& operator<<(const T&) { return *this; } };
 struct ofBaseApp {

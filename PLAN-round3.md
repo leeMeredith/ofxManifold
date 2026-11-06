@@ -348,8 +348,11 @@ nothing that refers to other files and nothing that can go missing.
 **Levels.** The editor still edits one map, now a 3D one. Editing stays in
 the 2D plan view, with height set by keys, so there's no picking in 3D:
 
-- **The plan view shows the current level.** The other levels show faintly,
-  for context. Keys move up and down between levels.
+- **The plan view shows the current level.** Keys move up and down between
+  levels. (This said the other levels show faintly. That was written before
+  every level shared one floor plan: their nodes would sit exactly under the
+  current level's. A column of dots, one per level, shows them instead; see
+  the 3A-6 proposal.)
 - **New level:** copies the current level (heights, bindings, values) to a
   chosen height above or below it. Each node is connected to itself
   vertically by construction. One undo step.
@@ -362,6 +365,97 @@ the 2D plan view, with height set by keys, so there's no picking in 3D:
   the player reuses it.
 
 Sources belong to the player.
+
+#### 3A-6 proposal: levels in the editor (agreed 2026-11-05; see Done)
+
+**The model holds a 3D map.** `editor::Model` keeps a `Map3D` and a current
+level. `mapping()` returns the current level's `Mapping`, so every view and
+every existing script reads exactly as before. Output operations (o, O, t, d,
+D, cmd-r) go to every level, as `Map3D` already does; binding operations (b, B,
+q w, c) go to the current level. A map with one level is today's editor: the
+36 scripts and 477 steps pass unchanged, and `make drawlog` records identical
+drawing for the existing session.
+
+**Keys, a new group "levels":**
+
+| Key | Does | Undo step |
+|---|---|---|
+| ↑ ↓ | the level above or below becomes current; "level 2 of 3, at 0.50" | no, like picking a fader |
+| n | new level above: a copy of the current one (heights, bindings, values), halfway to the level above, or 0.25 above the top. It becomes current | yes |
+| N | new level below, the same way | yes |
+| y h | raise or lower the selected nodes on the current level, 0.05 a step (shift: 0.01), landing on the next multiple as fill does. Refused if a node would reach the level above or below, naming it | yes |
+| cmd-delete | remove the current level; refused if it is the only one | yes |
+| cmd-3 | the 3D view on or off | no |
+
+y sits above h on the keyboard, for up and down. Moving a whole level is a
+then y. Heights are in map units: the floor plan is 0 to 1 across, so 0.25
+is a quarter of its width.
+
+**What you see:**
+
+- **A column of dots** at the side of the plan view, one dot per level, top
+  level at the top (Lee, 2026-11-05), so a 3D map reads as one in the 2D
+  plan view without the 3D view open. The current level's dot is filled, the
+  others hollow, with the current level's starting height beside it. Evenly
+  spaced, not spaced by height, so two levels close together stay two
+  readable dots. Drawn only with two or more levels, so a 2D map shows
+  nothing new.
+- **A bent node** shows its offset on the current level ("+0.10") beside
+  it, only where it differs from the level's starting height.
+- **Link lines, node shapes and fills** are the current level's.
+- **Audition moves through the 3D space** (Lee, 2026-11-05). The listening
+  point has a height. It starts on the current level, at that level's height
+  under the cursor, so what you hear first is the level you are editing.
+  While auditioning (space held, or locked with v), **↑ ↓ move the listening
+  point up and down** instead of switching levels: held, it glides at 0.25 a
+  second (shift: 0.05), through the space between levels and on past them, so
+  you hear one level crossfade into the next. The mouse still moves it
+  across. Above the top level or below the bottom one is outside, so it goes
+  silent, as off the edge of the map does. The fader chart shows what the
+  point reaches as it moves; in the column of dots it is a small mark that
+  moves between the two dots it lies between, as far along as it is between
+  those levels (the `t` of the 3D weights), and past the end dots, greyed,
+  when it is outside; the 3D view
+  shows it as a point with a line dropped to the level below, as the player
+  will show a source. When audition ends, the point returns to the current
+  level. The key panel says what ↑ ↓ do at the moment: "level up / down", or
+  "listen higher / lower" while auditioning.
+
+**The 3D view (cmd-3)** splits the map area: plan on the left, 3D on the
+right. Viewing only, no picking; drag to orbit (`ofEasyCam`). Each level is
+drawn as its regions' triangles at their node heights, faint, with the
+current level brighter; each node has a vertical line up to itself on the
+level above; selected nodes are highlighted. It lives in `views/` so the
+player reuses it, with a source as a point and a line dropped to the level
+below it.
+
+**Files** use `saveManifold3D`, `saveMapping3D` and `loadMap3D`. A one-level
+map saves byte-identical, which is already a vector, so opening and saving any
+existing pair changes nothing.
+
+**One kernel addition:** using a rig on a `Map3D`, every level at once, all
+or nothing. Python reference first, in the levels suite.
+
+**Tested by** editor scripts, Python reference first: a new level above and
+below, switching, binding on one level leaving the others alone, raising
+refused at the next level and naming the node, removing a level, undo across
+all of these, placing and removing nodes on a three-level map, a save and
+open round trip of three levels, and using a rig on three levels. The key
+panel's availability for each new key. Mutation gates for each rule. The door
+check covers the new operations. Where each dot and the listening mark sit
+is computed by a pure function and checked by script; how they look, the
+offsets and the 3D view are judged on screen.
+
+**Placing a node with auto-output on binds it on every level** (Lee,
+2026-11-05). Auto-output is for laying out speakers, and a speaker is a
+speaker at every height. b, B, q w and c still act on the current level only.
+
+**Audition is tested too,** not only judged on screen: the chart is handed
+what `Map3D` resolves at (x, y, z) -- checked against the resolve directly,
+at a level, between two, and above the top -- and the listening point's
+height is a small value the editor steps, so a script can hold ↑ for a second
+and check where it got to, and that it glides through a level without
+catching on it.
 
 ### I. What 3B builds on this
 
@@ -600,6 +694,53 @@ on a public repository; this uses 8). The workflow went from 2,136 lines to
   restored-tree step now also checks `git diff` is empty before the clean run.
 - **Every shard was run as CI will run it before it was handed over,** and all
   251 are caught.
+
+### 3A-6: levels in the editor
+
+`editor::Model` holds a `Map3D` and a current level, and `mapping()` is the
+current level's, so everything written before levels reads what it did.
+Output operations reach every level; binding, fill, clear and heights the
+current one. Keys: ↑ ↓, `n` `N`, `y` `h`, ⌘⌫, ⌘3. Placing a node with
+auto-output binds it on every level. Saving and opening go through
+`saveManifold3D`, `saveMapping3D` and `loadMap3D`, and a one-level map still
+saves byte-identical. Listening in 3D is pure and tested
+(`ofxManifoldEditorListening.h`): where audition starts, how far a held key
+glides it, what the chart is handed at (x, y, z), and where the column of dots
+puts each level and the listening mark. The views draw the dots, each bent
+node's offset, and the 3D view (`views/ofxManifoldEditorLevelView.h`), and
+draw nothing new for a flat map. One kernel addition: `Map3D::useRig`, every
+level at once or none.
+
+- **The earlier 36 scripts pass,** their only change the five new keys in
+  their key lists, as 3A-5's keys did. The existing drawing session records
+  identically outside the key panel's new group; the session gained seven
+  frames at its end (levels, an offset, gliding, outside, the 3D view, a level
+  removed).
+- **`loadMap3D` refused every version 1 outputs file,** "binding to undeclared
+  output": version 1 declares nothing, and the 3D reader only bound to
+  declared outputs. Found by the editor's old-pair script, once opening went
+  through it. An output a version 1 binding makes is now made on every level,
+  so the levels still agree; two vectors in the levels suite.
+- **The app held a reference that could dangle.** `ofApp` kept
+  `const Mapping& mapping = model.mapping()`. With the mapping inside the 3D
+  map's list of levels, a new level or an undo moves it; the drawing session
+  crashed, and the address sanitizer named the line. The app now reads
+  `model.mapping()` each time.
+- **My reference forgot that a node with no bindings is silent whole.** The
+  kernel had it right; the listening script's quad, half unbound, showed it.
+- **A gate found the levels suite comparing too little.** Making a version 1
+  output on the first level only went uncaught: comparing two 3D maps checked
+  heights, values and readings, but not that every level holds the room's
+  outputs. A level missing one reads the same until something is bound to it
+  there, and then the binding is dropped. The comparison now checks every
+  level's outputs. `Map3D::adopt` lets such levels through too (its agreement
+  check looks for clashes, not absences); left as it is for now, noted here.
+- 10 editor scripts (46), 126 checked steps (603); 6 vectors in the levels
+  suite (90); 24 new mutation gates (275), and 10 earlier ones moved onto the
+  new code.
+- **Not checked here:** a real openFrameworks build; the 3D view's starting
+  angle and its drag; how the dots, the offsets and the view look. Those are
+  judged on screen.
 
 ---
 
