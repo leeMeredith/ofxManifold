@@ -1,0 +1,1351 @@
+# ofxManifold -- the mutation gates.
+#
+# Each gate breaks one thing on purpose and expects a suite to notice. CI runs
+# them in parallel shards (tests/run_gates.py --shard i/N); locally:
+#
+#     python3 tests/run_gates.py                  every gate, one after another
+#     python3 tests/run_gates.py --only "trim"    gates whose name contains it
+#     python3 tests/run_gates.py --shard 2/6      what CI shard 2 of 6 runs
+#
+# A gate is a block of lines, blocks separated by a blank line:
+#
+#     gate:    what the break is, said as the bug ("Unrenormalized bias")
+#     file:    the file it breaks
+#     find:    text that must appear in that file exactly once
+#     replace: what it becomes
+#     nl:      yes   (optional: \n in find and replace means a newline)
+#
+# find and replace are taken literally: everything after "find: " to the end of
+# the line, spaces included. No quoting, no escaping, no regular expressions.
+# tests/check_workflow.py checks every anchor matches exactly once, so a
+# refactor that moves the code under a gate fails locally rather than in CI.
+#
+# Adding a gate: add a block. Nothing else to change.
+
+# ---- rounds 1 and 2 ----
+
+gate: Transposed sub-area argument
+file: src/core/ofxManifoldTriangle.h
+find: const float sB = signedArea2(p, c, a);
+replace: const float sB = signedArea2(p, a, c);
+
+gate: Unrenormalized bias
+file: src/core/ofxManifoldTriangle.h
+find: r.w[i] = scaled[i] * inv;
+replace: r.w[i] = scaled[i];
+
+gate: Epsilon below the float noise floor
+file: src/core/ofxManifoldTypes.h
+find: kAreaEpsilon = 1e-6f
+replace: kAreaEpsilon = 1e-9f
+
+gate: Epsilon large enough to eat valid topology
+file: src/core/ofxManifoldTypes.h
+find: kAreaEpsilon = 1e-6f
+replace: kAreaEpsilon = 1e-3f
+
+gate: T-junction detection disabled
+file: src/core/ofxManifold2D.h
+find: rep.tJunctions.push_back(TJunction{n, r, ia, ib});
+replace: (void)0;
+
+gate: Orphan detection disabled
+file: src/core/ofxManifold2D.h
+find: if (!used[n]) rep.orphans.push_back(n);
+replace: (void)used;
+
+gate: Node identity rotated in the result
+file: src/core/ofxManifold2D.h
+find: e.weights.push_back(WeightedNode{ids[i], rr.w[i]});
+replace: e.weights.push_back(WeightedNode{ids[(i+1)%ids.size()], rr.w[i]});
+
+gate: positionOf skips the un-bias
+file: src/core/ofxManifold2D.h
+find: out.position += (raw[i] / rawTotal) * nodes_[w[i].id].position;
+replace: out.position += w[i].weight * nodes_[w[i].id].position;
+
+gate: sharesRegion check dropped
+file: src/core/ofxManifold2D.h
+find: && sharesRegion(w);
+replace: && true;
+
+gate: setNodePosition ignores sign flip
+file: src/core/ofxManifold2D.h
+find: || sign != regions_[r].constructionSign()
+replace: || false
+
+gate: Evaluator ignores its hint
+file: src/core/ofxManifoldEvaluator.h
+find: manifold_->evaluate(p, lastRegion_)
+replace: manifold_->evaluate(p, InvalidRegion)
+
+gate: Evaluator keeps a stale hint
+file: src/core/ofxManifoldEvaluator.h
+find: lastRegion_ = e.inside ? e.regionID : InvalidRegion;
+replace: if (e.inside) lastRegion_ = e.regionID;
+
+gate: Curve renormalizes
+file: src/interpretation/ofxManifoldCurves.h
+find:     }\n    return out;\n}\n\n} // namespace curve
+replace:     }\n    return normalize(out);\n}\n\n} // namespace curve
+nl: yes
+
+gate: Curve loses node identity
+file: src/interpretation/ofxManifoldCurves.h
+find: out.push_back(WeightedNode{wn.id, fn(wn.weight)});
+replace: out.push_back(WeightedNode{static_cast<NodeID>(out.size()), fn(wn.weight)});
+
+gate: Wrong equal-power curve
+file: src/interpretation/ofxManifoldCurves.h
+find: return (w <= 0.0f) ? 0.0f : std::sqrt(w);
+replace: return w * 0.5f;
+
+gate: Wrong cosine quadrant
+file: src/interpretation/ofxManifoldCurves.h
+find: return std::sin(w * 1.57079632679489661923f);
+replace: return std::cos(w * 1.57079632679489661923f);
+
+gate: Spread ignores its amount
+file: src/interpretation/ofxManifoldSpread.h
+find: out[wn.id].weight += (1.0f - amount) * wn.weight;
+replace: out[wn.id].weight += wn.weight;
+
+gate: Spread does not clamp
+file: src/interpretation/ofxManifoldSpread.h
+find: if (amount > 1.0f) amount = 1.0f;
+replace: // mutant: no clamp
+
+gate: Blend gains not curved
+file: src/interpretation/ofxManifoldBlend.h
+find: const float ga = fn(1.0f - t);
+replace: const float ga = 1.0f - t;
+
+gate: Blend overwrites shared nodes
+file: src/interpretation/ofxManifoldBlend.h
+find: it->weight += wn.weight * gb;
+replace: it->weight = wn.weight * gb;
+
+gate: Mapping links not normalized within the node
+file: src/mapping/ofxManifoldMapping.h
+find: acc[l.id] += wn.weight * (l.weight / linkTotal);
+replace: acc[l.id] += wn.weight * l.weight;
+
+gate: Duplicate bind replaces instead of accumulating
+file: src/mapping/ofxManifoldMapping.h
+find: l.id == target) {\n                l.weight += weight;
+replace: l.id == target) {\n                l.weight = weight;
+nl: yes
+
+gate: Dense arity follows contributions not targets
+file: src/mapping/ofxManifoldMapping.h
+find: std::vector<float> dense(targetNames_.size(), 0.0f);
+replace: std::vector<float> dense(resolve(w).targets.size(), 0.0f);
+
+gate: Power aggregator skips the root
+file: src/mapping/ofxManifoldMapping.h
+find: v = (v <= 0.0f) ? 0.0f : std::sqrt(v);
+replace: v = v;
+
+gate: Null node redistributes instead of discarding
+file: src/mapping/ofxManifoldMapping.h
+find:                 continue;                   // null node: weight discarded
+replace:                 for (auto& a : acc) a += wn.weight / acc.size(); continue;
+
+gate: JSON exponents not parsed
+file: src/io/ofxManifoldJSON.h
+find: if (i < s.size() && (s[i] == 'e' || s[i] == 'E')) {
+replace: if (false) {
+
+gate: JSON duplicate keys last-wins
+file: src/io/ofxManifoldJSON.h
+find: if (o.find(key) != o.end()) return fail("duplicate key: " + key);
+replace: (void)0;
+
+gate: JSON write precision below float round-trip
+file: src/io/ofxManifoldJSON.h
+find: "%.9g"
+replace: "%.7g"
+
+gate: Loader accepts an unknown space
+file: src/io/ofxManifoldSerialize.h
+find: res.error = "unsupported space: " + root["space"].asString();\n        return res;\n    }\n    if (!root.has("nodes")
+replace: res.error = "unsupported space";\n    }\n    if (!root.has("nodes")
+nl: yes
+
+gate: Loader accepts a dangling region reference
+file: src/io/ofxManifoldSerialize.h
+find: res.error = "region references unknown node: " + nm;\n                    return res;
+replace: continue;
+nl: yes
+
+gate: Mapping written by NodeID instead of name
+file: src/io/ofxManifoldSerialize.h
+find: json::quote(m.node(id).name)\n              << ", \"target\": "
+replace: json::quote(std::to_string(id))\n              << ", \"target\": "
+nl: yes
+
+gate: Mapping target written by id instead of name
+file: src/io/ofxManifoldSerialize.h
+find: << ", \"target\": " << json::quote(mp.targetName(l.id))\n              << ", \"weight\"
+replace: << ", \"target\": " << json::quote(std::to_string(l.id))\n              << ", \"weight\"
+nl: yes
+
+gate: Interpolate ignores node identity
+file: src/interpretation/ofxManifoldInterpolate.h
+find: acc = acc + values[wn.id] * wn.weight;
+replace: acc = acc + values[&wn - &w[0]] * wn.weight;
+
+gate: Interpolate drops the weight
+file: src/interpretation/ofxManifoldInterpolate.h
+find: acc = acc + values[wn.id] * wn.weight;
+replace: acc = acc + values[wn.id];
+
+gate: Coverage counts out-of-range nodes
+file: src/interpretation/ofxManifoldInterpolate.h
+find:         if (wn.id < valueCount) total += wn.weight;
+replace:         total += wn.weight;
+
+gate: Solve using unsigned areas
+file: src/core/ofxManifoldTriangle.h
+find:     const float sA = signedArea2(p, b, c);
+replace:     const float sA = std::fabs(signedArea2(p, b, c));
+
+gate: Finalize must preserve sample spacing
+file: src/sources/ofxManifoldTrajectory.h
+find:             for (auto& s : samples_) s.t = (s.t - t0) / span;
+replace:             for (std::size_t i = 0; i < samples_.size(); ++i) samples_[i].t = float(i)/float(samples_.size()-1);
+
+gate: Finalize must start the path at zero
+file: src/sources/ofxManifoldTrajectory.h
+find:         const float t0 = samples_.front().t;
+replace:         const float t0 = 0.0f;
+
+gate: addSample must clamp backwards time
+file: src/sources/ofxManifoldTrajectory.h
+find:             t = samples_.back().t;      // never allow time to run backwards
+replace:             (void)0;
+
+gate: pointAt must interpolate, not snap
+file: src/sources/ofxManifoldTrajectory.h
+find:         return a.position + (b.position - a.position) * u;
+replace:         return (u < 0.5f) ? a.position : b.position;
+
+gate: pointAt must clamp outside the path
+file: src/sources/ofxManifoldTrajectory.h
+find:         if (t <= samples_.front().t) return samples_.front().position;
+replace:         if (t < -1e9f) return samples_.front().position;
+
+gate: Trajectory loader must refuse backwards time
+file: src/io/ofxManifoldSerialize.h
+find:             res.error = "samples are not in non-decreasing time order";
+replace:             res.error = "";
+
+gate: Trajectory loader accepts an unknown space
+file: src/io/ofxManifoldSerialize.h
+find: res.error = "unsupported space: " + root["space"].asString();\n        return res;\n    }\n    if (!root.has("samples")
+replace: res.error = "unsupported space";\n    }\n    if (!root.has("samples")
+nl: yes
+
+gate: Velocity must divide by the span actually used
+file: src/sources/ofxManifoldTrajectory.h
+find:         return (pointAt(b) - pointAt(a)) / span;   // units per unit of t
+replace:         return (pointAt(b) - pointAt(a)) / (2.0f * window);
+
+gate: Velocity must be a central difference
+file: src/sources/ofxManifoldTrajectory.h
+find:         const float b = std::min(1.0f, t + window);
+replace:         const float b = t;
+
+gate: Finalize must record the duration
+file: src/sources/ofxManifoldTrajectory.h
+find:         duration_ = (span > 0.0f) ? span : 0.0f;
+replace:         duration_ = 0.0f;
+
+gate: pointAtSeconds must divide by the duration
+file: src/sources/ofxManifoldTrajectory.h
+find:         const float d = (duration_ > 0.0f) ? duration_ : 1.0f;\n        return pointAt(seconds / d);
+replace:         return pointAt(seconds);
+nl: yes
+
+gate: Duration must survive a save
+file: src/io/ofxManifoldSerialize.h
+find:         o << "  \"duration\": " << json::number(tr.duration()) << ",\n";
+replace:         (void)0;
+
+gate: Duration must survive a load
+file: src/io/ofxManifoldSerialize.h
+find:     const float dur = root.has("duration") ? root["duration"].asFloat() : 0.0f;
+replace:     const float dur = 0.0f;
+
+gate: blendByName merges by TargetID not name
+file: src/mapping/ofxManifoldMapping.h
+find:         const std::string& name = mb.targetName(wt.id);\n        auto it = std::find_if(out.begin(), out.end(),
+replace:         const std::string& name = mb.targetName(wt.id);\n        auto it = std::find_if(out.end(), out.end(),
+nl: yes
+
+gate: blendByName gains not curved
+file: src/mapping/ofxManifoldMapping.h
+find:     const float ga = fn(1.0f - t);\n    const float gb = fn(t);
+replace:     const float ga = 1.0f - t;\n    const float gb = t;
+nl: yes
+
+gate: blendByName overwrites shared targets
+file: src/mapping/ofxManifoldMapping.h
+find:         if (it != out.end()) it->weight += wt.weight * gb;
+replace:         if (it != out.end()) it->weight = wt.weight * gb;
+
+gate: blendByName does not clamp t
+file: src/mapping/ofxManifoldMapping.h
+find:     if (t < 0.0f) t = 0.0f;\n    if (t > 1.0f) t = 1.0f;\n\n    const float ga = fn(1.0f - t);
+replace:     const float ga = fn(1.0f - t);
+nl: yes
+
+gate: Smoother must honour the half-life
+file: src/interpretation/ofxManifoldSmoother.h
+find:                           ? 1.0f - std::pow(0.5f, dt / halfLife_)
+replace:                           ? 0.2f
+
+gate: Smoother must decay departing nodes
+file: src/interpretation/ofxManifoldSmoother.h
+find:         for (const auto& cur : state_) {\n            float want = 0.0f;
+replace:         for (const auto& cur : state_) {\n            float want = 0.0f; if (true) continue;
+nl: yes
+
+gate: Smoother must clamp to the slew rate
+file: src/interpretation/ofxManifoldSmoother.h
+find:             if (d >  maxStep) v = from + maxStep;
+replace:             if (d >  maxStep) v = v;
+
+gate: Smoother must keep held tiny weights
+file: src/interpretation/ofxManifoldSmoother.h
+find:                            return !std::any_of(target.begin(), target.end(),
+replace:                            return true; return !std::any_of(target.begin(), target.end(),
+
+gate: Disabled smoother must pass through
+file: src/interpretation/ofxManifoldSmoother.h
+find:         if (halfLife_ <= 0.0f && maxRate_ <= 0.0f) {\n            state_ = target;\n            return state_;\n        }
+replace:         (void)0;
+nl: yes
+
+gate: Ring edge special case removed
+file: src/core/ofxManifoldRegion.h
+find:         if (std::fabs(A[i]) < kRingEpsilon && D[i] < 0.0f) {
+replace:         if (false) {
+
+gate: Ring vertex special case removed
+file: src/core/ofxManifoldRegion.h
+find:         if (r[i] < kRingEpsilon) {
+replace:         if (false) {
+
+gate: Region self-intersection check dropped
+file: src/core/ofxManifoldRegion.h
+find:         if (ringSelfIntersects(p)) return "self-intersecting";
+replace:         (void)0;
+
+gate: Non-convex regions refused
+file: src/core/ofxManifoldRegion.h
+find:         if (ringSelfIntersects(p)) return "self-intersecting";
+replace:         if (ringSelfIntersects(p) || !ringIsConvex(p)) return "self-intersecting";
+
+gate: Bias ignored for polygon regions
+file: src/core/ofxManifoldRegion.h
+find:             out.w[i] *= bias[i];
+replace:             (void)bias;
+
+gate: Serializer truncates regions to three nodes
+file: src/io/ofxManifoldSerialize.h
+find:         for (std::size_t k = 0; k < ids.size(); ++k) {
+replace:         for (std::size_t k = 0; k < 3 && k < ids.size(); ++k) {
+
+gate: Polygon maps written as version 1
+file: src/io/ofxManifoldSerialize.h
+find:     const int version = allTriangles ? 1 : 2;
+replace:     const int version = 1;
+
+gate: Containment reverts to weight sign
+file: src/core/ofxManifoldRegion.h
+find:         return ringContains(p, v, eps);
+replace:         const RingResult r = solveRing(p, v); if (!r.valid) return false; for (float x : r.w) if (x < -eps) return false; return true;
+
+gate: Containment always inside
+file: src/core/ofxManifoldRegion.h
+find:         return ringContains(p, v, eps);
+replace:         (void)v; return true;
+
+gate: Boundary not counted as inside
+file: src/core/ofxManifoldRegion.h
+find:         if (dx * dx + dy * dy <= eps * eps) return true;
+replace:         (void)dx; (void)dy;
+
+gate: clampNegative does not renormalize
+file: src/interpretation/ofxManifoldNegative.h
+find:             out.push_back(WeightedNode{wn.id, wn.weight * inv});
+replace:             out.push_back(WeightedNode{wn.id, wn.weight});
+
+gate: anyNegative fires on edge noise
+file: src/interpretation/ofxManifoldNegative.h
+find:         if (wn.weight < -eps) return true;
+replace:         if (wn.weight < 0.0f) return true;
+
+gate: Snap without neighbour search
+file: src/authoring/ofxManifoldGrid.h
+find:         for (long d0 = -1; d0 <= 1; ++d0) {
+replace:         for (long d0 = 0; d0 <= 0; ++d0) {
+
+gate: Lattice basis not reduced
+file: src/authoring/ofxManifoldGrid.h
+find:         for (int guard = 0; guard < 64; ++guard) {
+replace:         for (int guard = 0; guard < 0; ++guard) {
+
+gate: Tie broken by highest address
+file: src/authoring/ofxManifoldGrid.h
+find:             if (a != bestA) return a < bestA;
+replace:             if (a != bestA) return a > bestA;
+
+gate: Polar searches too few rings
+file: src/authoring/ofxManifoldGrid.h
+find:         for (int ring = 1; ring <= top; ++ring) {
+replace:         for (int ring = (int(r / dr_) > 1 ? int(r / dr_) - 1 : 1); ring <= int(r / dr_) + 1; ++ring) {
+
+gate: Free mode snaps
+file: src/authoring/ofxManifoldGrid.h
+find:         r.point = p;               // free: the identity, exactly
+replace:         r.point = {std::floor(p.x * 10.0f) / 10.0f, p.y};
+
+gate: Hysteresis removed
+file: src/authoring/ofxManifoldGrid.h
+find:         if (dc <= ds + double(dead) * spacing()) {
+replace:         if (false) { (void)dc; (void)ds;
+
+gate: Move allows a self-intersecting region
+file: src/core/ofxManifold2D.h
+find:                 || (ids.size() > 3 && ringSelfIntersects(ring));
+replace:                 ;
+
+gate: Refused batch applied partially
+file: src/core/ofxManifold2D.h
+find:                     nodes_[it->first].position = it->second;
+replace:                     (void)it;
+
+gate: Removal shrinks a region instead of removing it
+file: src/core/ofxManifold2D.h
+find:                 if (gone[n]) { keep = false; break; }
+replace:                 if (gone[n]) continue;
+
+gate: Removal accepts an out-of-range id
+file: src/core/ofxManifold2D.h
+find:             if (id >= nodes_.size()) return false;\n        }\n        std::vector<bool> gone(nodes_.size(), false);
+replace:         }\n        std::vector<bool> gone(nodes_.size(), false);
+nl: yes
+
+gate: Duplicate node name accepted
+file: src/core/ofxManifold2D.h
+find:         if (byName_.count(name) != 0) return InvalidNode;
+replace:         (void)0;
+
+gate: Removal remap not reported
+file: src/core/ofxManifold2D.h
+find:         if (remap) *remap = std::move(map);
+replace:         if (remap) remap->assign(map.size(), 0);
+
+gate: Unjoin removes the wrong regions
+file: src/core/ofxManifold2D.h
+find:             if (!gone[r]) built.addRegion(regions_[r].ids());
+replace:             if (gone[r]) built.addRegion(regions_[r].ids());
+
+gate: Silence left out of normalization
+file: src/mapping/ofxManifoldMapping.h
+find:             for (const auto& l : it->second) linkTotal += l.weight;
+replace:             for (const auto& l : it->second) if (l.kind == DestKind::Output) linkTotal += l.weight;
+
+gate: Trim applied to routed share
+file: src/mapping/ofxManifoldMapping.h
+find:                 t.weight * (levels ? trims_[t.id] : 1.0f);
+replace:                 t.weight * trims_[t.id];
+
+gate: Derived output missing from channels
+file: src/mapping/ofxManifoldMapping.h
+find:             if (ch < 0) continue;\n            out[static_cast<std::size_t>(ch)] =
+replace:             if (true) continue;\n            out[static_cast<std::size_t>(ch)] =
+nl: yes
+
+gate: Mapping ignores node renumbering
+file: src/mapping/ofxManifoldMapping.h
+find:             moved[to] = std::move(kv.second);
+replace:             moved[kv.first] = std::move(kv.second);
+
+gate: Duplicate channel accepted
+file: src/mapping/ofxManifoldMapping.h
+find:         if (channel < 0 || channelInUse(channel)) return InvalidTarget;
+replace:         if (channel < 0) return InvalidTarget;
+
+gate: Derived source weights ignored
+file: src/mapping/ofxManifoldMapping.h
+find:                 const float a = g * wn.weight;
+replace:                 const float a = wn.weight; (void)g;
+
+gate: Silence forgets null nodes
+file: src/mapping/ofxManifoldMapping.h
+find:             if (it == links_.end() || it->second.empty()) {\n                s += wn.weight;
+replace:             if (it == links_.end() || it->second.empty()) {\n                (void)0;
+nl: yes
+
+gate: Version 1 written after reordering
+file: src/io/ofxManifoldSerialize.h
+find:             if (l.id != next) return true;                    // reordered
+replace:             (void)next;
+
+gate: Version 1 written with an unbound output
+file: src/io/ofxManifoldSerialize.h
+find:     return next != mp.targetCount();                          // unbound
+replace:     return false;
+
+gate: Unknown binding kind accepted
+file: src/io/ofxManifoldSerialize.h
+find:             if (kind != "output" && kind != "silence") {
+replace:             if (false) {
+
+gate: Clearing bindings does nothing
+file: src/mapping/ofxManifoldMapping.h
+find:     void clearBindings(NodeID node) { links_.erase(node); }
+replace:     void clearBindings(NodeID node) { (void)node; }
+
+gate: Removed output leaves binding ids unshifted
+file: src/mapping/ofxManifoldMapping.h
+find:                 if (l.kind == DestKind::Output && l.id > id) --l.id;
+replace:                 (void)l;
+
+gate: Removed output leaves name lookup unshifted
+file: src/mapping/ofxManifoldMapping.h
+find:             if (kv.second > id) --kv.second;
+replace:             (void)kv;
+
+gate: Removed output keeps its bindings
+file: src/mapping/ofxManifoldMapping.h
+find:                             return l.kind == DestKind::Output && l.id == id;
+replace:                             return false && l.id == id;
+
+gate: Editor delete leaves bindings unrenumbered
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     mapping_.remapNodes(remap);
+replace:     (void)remap;
+
+gate: Editor removes an output others still feed
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (t != InvalidTarget && !outputInUse(t)) {
+replace:         if (t != InvalidTarget) {
+
+gate: Editor names ignore outputs
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (manifold_.findNode(nm) == InvalidNode\n            && mapping_.findTarget(nm) == InvalidTarget) {
+replace:         if (manifold_.findNode(nm) == InvalidNode) {
+nl: yes
+
+gate: Editor box join ignores angle order
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!sel.ordered()) {\n        std::vector<glm::vec2> pts;
+replace:     if (false) {\n        std::vector<glm::vec2> pts;
+nl: yes
+
+gate: Editor allows a duplicate region
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             return refusal("those nodes already form a region", 2.0f);
+replace:             (void)0;
+
+gate: Editor current output stranded by removal
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {\n        --currentOutput_;
+replace:     } else if (currentOutput_ != InvalidTarget && currentOutput_ > t) {\n        (void)0;
+nl: yes
+
+gate: Box selection keeps click order
+file: ofxManifoldEditor/src/ofxManifoldEditorSelection.cpp
+find:     nodes_.push_back(id);\n    ordered_ = false;
+replace:     nodes_.push_back(id);
+nl: yes
+
+gate: Faders not narrowed as outputs are added
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     bw = std::min(46.0f, std::max(2.0f, bw));
+replace:     bw = std::max(46.0f, std::max(2.0f, bw));
+
+gate: Silence fader loses its extra gap
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     const float silenceX = x + gap;
+replace:     const float silenceX = x;
+
+gate: Fader click ignores height
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     if (empty || y < top || y > top + height) return kNothing;
+replace:     if (empty) return kNothing;
+
+gate: Picking an output does nothing
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     selectOnlyOutput(t);\n    Result r;
+replace:     Result r;
+nl: yes
+
+gate: Setting a fill stacks silence shares
+file: src/mapping/ofxManifoldMapping.h
+find:         v.erase(std::remove_if(v.begin(), v.end(),\n                    [](const Link& l) { return l.kind == DestKind::Silence; }),\n                v.end());
+replace:         (void)0;
+nl: yes
+
+gate: A full fill leaves a zero silence binding
+file: src/mapping/ofxManifoldMapping.h
+find:         if (f < 1.0f) {\n            v.push_back(Link{DestKind::Silence, InvalidTarget,
+replace:         if (true) {\n            v.push_back(Link{DestKind::Silence, InvalidTarget,
+nl: yes
+
+gate: Fill steps ignore round numbers
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                          : (direction > 0 ? std::ceil(k) : std::floor(k));
+replace:                          : k + float(direction);
+
+gate: Fill steps skip values through float noise
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (std::fabs(k - kr) < 1e-3f) k = kr;
+replace:         (void)0;
+
+gate: Fine fill steps are coarse
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     const float unit = fine ? 0.01f : 0.05f;
+replace:     const float unit = 0.05f; (void)fine;
+
+gate: Bind to every output doubles an existing binding
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         mapping_.clearBindings(id);\n        for (TargetID t = 0;
+replace:         for (TargetID t = 0;
+nl: yes
+
+gate: Refusals become undo steps
+file: ofxManifoldEditor/src/ofxManifoldEditorHistory.h
+find:         if (r.changed) record(std::move(before), label);
+replace:         record(std::move(before), label);
+
+gate: A new action keeps stale redo steps
+file: ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
+find:     future_.clear();\n}
+replace: }
+nl: yes
+
+gate: History limit drops the newest step
+file: ofxManifoldEditor/src/ofxManifoldEditorHistory.cpp
+find:     if (limit_ > 0 && past_.size() > limit_) past_.erase(past_.begin());
+replace:     if (limit_ > 0 && past_.size() > limit_) past_.pop_back();
+
+gate: Binding twice feeds an output double
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             if (all == !feeds(id, t)) continue;   // already as wanted
+replace:             (void)0;
+
+gate: Unbinding changes a node's fill
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         } else if (fill < 1.0f) {\n            mapping_.setOutputFraction(id, fill);\n        }
+replace:         }
+nl: yes
+
+gate: Unbinding the last output leaves stray silence
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (outputCount(id) == 0) {\n            // Its last output gone
+replace:         if (false) {\n            // Its last output gone
+nl: yes
+
+gate: Opening the outputs file looks for the wrong map
+file: ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+find:     for (const char* tail : {"-outputs.json", "-mapping.json", ".json"}) {
+replace:     for (const char* tail : {".json", "-outputs.json", "-mapping.json"}) {
+
+gate: Earlier editors' saves lose their outputs
+file: ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+find:     if (readFile(p.outputs, otext) || readFile(p.legacy, otext)) {
+replace:     if (readFile(p.outputs, otext)) {
+
+gate: A refused outputs file goes unflagged
+file: ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+find:             note = " -- outputs file refused: " + mr.error;\n            r.refused = true;
+replace:             note = " -- outputs file refused: " + mr.error;
+nl: yes
+
+gate: Fader line drawn for silence
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:             if (l.kind == DestKind::Output) marks.push_back({l.id, id, fill});
+replace:             marks.push_back({l.id, id, fill});
+
+gate: Placing a node moves the current output
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             if (currentOutput_ == InvalidTarget) selectOnlyOutput(t);
+replace:             selectOnlyOutput(t);
+
+gate: An unbind silences a node without saying so
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!silenced.empty()) {\n        r.message += " -- "
+replace:     if (false) {\n        r.message += " -- "
+nl: yes
+
+gate: Selected outputs not shifted on removal
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         kept.push_back(s > t ? s - 1 : s);
+replace:         kept.push_back(s);
+
+gate: b ignores the other selected outputs
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         for (TargetID t : outputSel_) {\n            if (all == !feeds(id, t)) continue;   // already as wanted
+replace:         for (TargetID t : {currentOutput_}) {\n            if (all == !feeds(id, t)) continue;   // already as wanted
+nl: yes
+
+gate: Removing outputs with several selected
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (outputSel_.size() > 1) {\n        return refusal("select one output
+replace:     if (false) {\n        return refusal("select one output
+nl: yes
+
+gate: Incoming link lines drawn heavy
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             ln.heavy = out;
+replace:             ln.heavy = true;
+
+gate: Mutual link lines drawn on top of each other
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                 a.lane = (a.from < a.to) ? +1 : -1;
+replace:                 a.lane = 0;
+
+gate: Fader contribution ignores silence
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:                 out[std::size_t(ch)] += wn.weight * l.weight / total;
+replace:                 out[std::size_t(ch)] += wn.weight * l.weight;
+
+gate: Link arc bends toward the nearest node
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         l.bend = (clearance[1] > clearance[0] + 1e-4f) ? -1 : +1;
+replace:         l.bend = (clearance[1] > clearance[0] + 1e-4f) ? +1 : -1;
+
+gate: Mutual link arcs bend to the same side
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (l.lane != 0) { l.bend = l.lane; continue; }
+replace:         if (l.lane != 0) { l.bend = +1; continue; }
+
+gate: Link labels measured from the receiver
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     return arcPoint(p, c, q, line.from < line.to ? t : 1.0f - t);
+replace:     return arcPoint(p, c, q, t);
+
+gate: Faders take the total's column
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     const float room = width - 16.0f * text.charWidth;   // the total's column
+replace:     const float room = width;
+
+gate: Unused channels drawn full width
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:         b.w = (b.kind == ChartBar::Kind::Unused) ? std::min(sliver, bw) : bw;
+replace:         b.w = bw;
+
+gate: Fader labels ignore the text size
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:         if (!fits(b.name)) allNames = false;
+replace:         (void)0;
+
+gate: Fader hit area excludes the gap
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     const float half = gap * 0.5f;
+replace:     const float half = 0.0f;
+
+gate: Fader numbers decided bar by bar
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:         if (!fits(std::to_string(b.channel))) allNumbers = false;
+replace:         (void)0;
+
+gate: Fader ruler room ignores the next mark
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:                 const float end = j < L.bars.size() ? L.bars[j].x : silenceX;
+replace:                 const float end = silenceX;
+
+gate: Channel line shown when numbers do not fit
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:                 if (allNumbers) b.sub = ch;
+replace:                 b.sub = ch;
+
+gate: Keys act in the middle of a drag
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("remove", "delete", "remove nodes", !drag && !sel.empty(),
+replace:         entry("remove", "delete", "remove nodes", !sel.empty(),
+
+gate: Audition leaves mouse editing lit
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:     const bool mouse = !ctx.auditioning && !drag;   // mouse editing allowed
+replace:     const bool mouse = !drag;
+
+gate: Remove output lit with several picked
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && picked == 1,
+replace:               !drag && picked >= 1,
+
+gate: Undo lit with nothing to undo
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("undo", "cmd-z", "undo", !drag && ctx.canUndo,
+replace:         entry("undo", "cmd-z", "undo", !drag,
+
+gate: b preview never predicts silence
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             if (!survives) p.silenced.push_back(manifold_.node(id).name);
+replace:             (void)survives;
+
+gate: b preview counts nodes already as wanted
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (!changes) continue;\n        ++p.count;
+replace:         ++p.count;
+nl: yes
+
+# ---- round 3A-1: derived outputs after the fader, rig files ----
+
+gate: After-derived output ignores trim
+file: src/mapping/ofxManifoldMapping.h
+find: const float a = g * acc[t] * trims_[t];
+replace: const float a = g * acc[t];
+
+gate: Removed output leaves after-derived source ids unshifted
+file: src/mapping/ofxManifoldMapping.h
+find: o.push_back(t > id ? t - 1 : t);
+replace: o.push_back(t);
+
+gate: Removed output stays an after-derived source
+file: src/mapping/ofxManifoldMapping.h
+find:                 if (t == id) continue;\n                o.push_back
+replace:                 o.push_back
+nl: yes
+
+gate: Node renumbering wipes after-derived gains
+file: src/mapping/ofxManifoldMapping.h
+find:             if (ag.feed == Feed::Outputs) continue;\n            std::vector<NodeID> s;
+replace:             std::vector<NodeID> s;
+nl: yes
+
+gate: After-derived output accepts an unknown source
+file: src/mapping/ofxManifoldMapping.h
+find:             if (sw.first >= targetNames_.size()) {\n                return static_cast<std::size_t>(-1);
+replace:             if (false) {\n                return static_cast<std::size_t>(-1);
+nl: yes
+
+gate: After-derived power sum skips the root
+file: src/mapping/ofxManifoldMapping.h
+find: v = (v > 0.0f) ? std::sqrt(v) : 0.0f;
+replace: v = v;
+
+gate: Rig drops channels the map fills
+file: src/mapping/ofxManifoldMapping.h
+find:             if (ag.channel == NoChannel) continue;\n            r.addDerived(ag.name, ag.channel, ag.trim, ag.mode, {});\n            continue;
+replace:             continue;
+nl: yes
+
+gate: Output sources written as version 1
+file: src/io/ofxManifoldSerialize.h
+find:     for (const auto& a : mp.aggregators()) {\n        if (a.feed == Feed::Outputs) return true;\n    }\n    for (TargetID t = 0;
+replace:     for (TargetID t = 0;
+nl: yes
+
+gate: Output sources written as version 2
+file: src/io/ofxManifoldSerialize.h
+find: (mappingNeedsV3(mp) ? 3 : 2)
+replace: 2
+
+gate: Version 2 file reads an output source
+file: src/io/ofxManifoldSerialize.h
+find:                     if (version < 3) {
+replace:                     if (false) {
+
+gate: Derived output mixing nodes and outputs accepted
+file: src/io/ofxManifoldSerialize.h
+find:         if (!nodeSrcs.empty() && !outSrcs.empty()) {
+replace:         if (false) {
+
+gate: Rig accepts bindings
+file: src/io/ofxManifoldSerialize.h
+find:     if (root.has("bindings")) {\n        res.error = "a rig holds no bindings";
+replace:     if (false) {\n        res.error = "a rig holds no bindings";
+nl: yes
+
+gate: A file not marked as a rig accepted as a rig
+file: src/io/ofxManifoldSerialize.h
+find:     if (!root.has("kind") || root["kind"].asString() != "rig") {
+replace:     if (false) {
+
+gate: Channel the map fills accepts sources
+file: src/io/ofxManifoldSerialize.h
+find:             if (a.has("sources")) {\n                error = "aggregator " + name + " is filled by the map and "
+replace:             if (false) {\n                error = "aggregator " + name + " is filled by the map and "
+nl: yes
+
+gate: Unknown file kind read as a map
+file: src/io/ofxManifoldSerialize.h
+find:     if (root.has("kind") && root["kind"].asString() != "rig") {
+replace:     if (false) {
+
+# ---- round 3A-2: paths with height ----
+
+gate: Height not interpolated between samples
+file: src/sources/ofxManifoldTrajectory.h
+find: return lo.z + (hi->z - lo.z) * ((t - lo.t) / gap);
+replace: return lo.z;
+
+gate: A path that hops in the middle reads as flat
+file: src/sources/ofxManifoldTrajectory.h
+find:         for (const auto& s : samples_) if (s.z != 0.0f) return true;
+replace:         if (!samples_.empty() && (samples_.front().z != 0.0f || samples_.back().z != 0.0f)) return true;
+
+gate: Recording drops the height
+file: src/sources/ofxManifoldTrajectory.h
+find:         samples_.back().z = p.z;
+replace:         (void)p;
+
+gate: Climb divided by the requested window at the ends
+file: src/sources/ofxManifoldTrajectory.h
+find: if (to > from) climb = (heightAt(to) - heightAt(from)) / (to - from);
+replace: if (to > from) climb = (heightAt(to) - heightAt(from)) / (2.0f * window);
+
+gate: 3D velocity in seconds not divided by the duration
+file: src/sources/ofxManifoldTrajectory.h
+find: return velocity3At(seconds / span, windowSeconds / span) / span;
+replace: return velocity3At(seconds / span, windowSeconds / span);
+
+gate: Height in seconds ignores the duration
+file: src/sources/ofxManifoldTrajectory.h
+find: return heightAt(seconds / ((duration_ > 0.0f) ? duration_ : 1.0f));
+replace: return heightAt(seconds);
+
+gate: 3D length ignores height
+file: src/sources/ofxManifoldTrajectory.h
+find:                                        b.z - a.z));
+replace:                                        0.0f));
+
+gate: Height not written
+file: src/io/ofxManifoldSerialize.h
+find:         if (height) o << ", " << json::number(s.z);
+replace:         (void)height;
+
+gate: A path with height written as version 1
+file: src/io/ofxManifoldSerialize.h
+find: (height ? 2 : kFormatVersion)
+replace: kFormatVersion
+
+gate: Height not read
+file: src/io/ofxManifoldSerialize.h
+find:         if (dims == 3) samples.back().z = s["p"].asArray()[2].asFloat();
+replace:         (void)0;
+
+gate: Version 1 file accepts a height
+file: src/io/ofxManifoldSerialize.h
+find:         if (dims == 2 && s.isObject() && s["p"].isArray()
+replace:         if (false && s.isObject() && s["p"].isArray()
+
+gate: A version newer than 2 accepted for paths
+file: src/io/ofxManifoldSerialize.h
+find:     if (version != kFormatVersion && version != 2) {
+replace:     if (version != kFormatVersion && version != 2 && version != 3) {
+
+# ---- round 3A-3: blending maps, the rig, agreement, using a rig ----
+
+gate: A blend gain above 1 not clamped
+file: src/mapping/ofxManifoldRig.h
+find:         if (g > 1.0f) g = 1.0f;\n        g = fn(g);
+replace:         g = fn(g);
+nl: yes
+
+gate: A negative blend gain not clamped
+file: src/mapping/ofxManifoldRig.h
+find:         if (g < 0.0f) g = 0.0f;\n        if (g > 1.0f)
+replace:         if (g > 1.0f)
+nl: yes
+
+gate: The blend curve not applied to the gains
+file: src/mapping/ofxManifoldRig.h
+find:         g = fn(g);
+replace:         (void)fn;
+
+gate: Channels the maps fill not blended
+file: src/mapping/ofxManifoldRig.h
+find:             if (ags[a].feed != Feed::Nodes) continue;
+replace:             continue;
+
+gate: Silence blended without the gains
+file: src/mapping/ofxManifoldRig.h
+find:         b.silence += m.silenceShare(mi.weights) * g;
+replace:         b.silence += m.silenceShare(mi.weights);
+
+gate: The rig's sub reads shares, not what outputs send
+file: src/mapping/ofxManifoldRig.h
+find:         sent[t] = s * rig.targetTrim(t);
+replace:         sent[t] = s;
+
+gate: The rig's output levels ignore trim
+file: src/mapping/ofxManifoldRig.h
+find:             levels ? sent[t] : s;
+replace:             s;
+
+gate: The rig's derived outputs ignore their own trim
+file: src/mapping/ofxManifoldRig.h
+find:             v * (levels ? ag.trim : 1.0f);
+replace:             v;
+
+gate: The rig's power-summed sub skips the root
+file: src/mapping/ofxManifoldRig.h
+find:                 v = (v > 0.0f) ? std::sqrt(v) : 0.0f;
+replace:                 v = v;
+
+gate: Agreement checked against the first map only
+file: src/mapping/ofxManifoldRig.h
+find:     for (std::size_t i = 0; i < parts.size(); ++i) {\n        for (std::size_t j = i + 1; j < parts.size(); ++j) {
+replace:     for (std::size_t i = 0; i < 1 && i < parts.size(); ++i) {\n        for (std::size_t j = i + 1; j < parts.size(); ++j) {
+nl: yes
+
+gate: A channel the rig lacks goes unreported
+file: src/mapping/ofxManifoldRig.h
+find:                 if (!there) {
+replace:                 if (false) {
+
+gate: A different trim reported as a disagreement
+file: src/mapping/ofxManifoldRig.h
+find: detail::report(found, true, "trim", a.name,
+replace: detail::report(found, false, "trim", a.name,
+
+gate: A sub computed in one map and filled in another passes
+file: src/mapping/ofxManifoldRig.h
+find:                         } else if (a.kind != b.kind) {
+replace:                         } else if (false) {
+
+gate: Two names on one channel pass
+file: src/mapping/ofxManifoldRig.h
+find:                     } else if (a.channel == b.channel) {
+replace:                     } else if (false) {
+
+gate: Using a rig ignores a difference in kind
+file: src/mapping/ofxManifoldRig.h
+find:             if (r.name == e.name && r.kind == e.kind) { match = true; break; }
+replace:             if (r.name == e.name) { match = true; break; }
+
+gate: Using a rig drops the map's own fill sources
+file: src/mapping/ofxManifoldRig.h
+find:         if (fill) {\n            for (std::size_t i = 0; i < fill->sources.size(); ++i) {
+replace:         if (false) {\n            for (std::size_t i = 0; i < fill->sources.size(); ++i) {
+nl: yes
+
+gate: Using a rig keeps the map's trim on a filled channel
+file: src/mapping/ofxManifoldRig.h
+find:         out.addDerived(ag.name, ag.channel, ag.trim,\n                       fill ? fill->mode : ag.mode, srcs);
+replace:         out.addDerived(ag.name, ag.channel, fill ? fill->trim : ag.trim,\n                       fill ? fill->mode : ag.mode, srcs);
+nl: yes
+
+gate: Using a rig keeps the map's output trims
+file: src/mapping/ofxManifoldRig.h
+find:         out.addOutput(rig.targetName(t), rig.targetChannel(t),\n                      rig.targetTrim(t));
+replace:         out.addOutput(rig.targetName(t), rig.targetChannel(t), 1.0f);
+nl: yes
+
+gate: Using a rig drops silence shares
+file: src/mapping/ofxManifoldRig.h
+find:                 out.bindSilence(n, l.weight);
+replace:                 (void)0;
+
+# ---- round 3A-4: the 3D map's geometry ----
+
+gate: A node may touch the level below
+file: src/core/ofxManifoldLevels.h
+find:         if (k > 0 && !(h > height(k - 1, n))) return false;
+replace:         if (k > 0 && h < height(k - 1, n)) return false;
+
+gate: A node may reach the level above
+file: src/core/ofxManifoldLevels.h
+find:         if (k + 1 < levels_.size() && !(h < height(k + 1, n))) return false;
+replace:         if (false) return false;
+
+gate: Raising is not all or nothing
+file: src/core/ofxManifoldLevels.h
+find:         if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }\n        for (NodeID n : nodes) set(k, n, height(k, n) + dz);
+replace:         for (NodeID n : nodes) if (std::find(bad.begin(), bad.end(), n) == bad.end()) set(k, n, height(k, n) + dz);\n        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }
+nl: yes
+
+gate: A copied level loses its bends
+file: src/core/ofxManifoldLevels.h
+find: made.heights[i] = height(from, i) + shift;
+replace: made.heights[i] = levels_[from].base + shift;
+
+gate: A copied level always goes on top
+file: src/core/ofxManifoldLevels.h
+find:         while (at < levels_.size() && levels_[at].base < newBase) ++at;
+replace:         at = levels_.size();
+
+gate: Two levels may start at one height
+file: src/core/ofxManifoldLevels.h
+find:             if (l.base == newBase) return levels_.size();
+replace:             (void)l;
+
+gate: A copy is not checked against the level below
+file: src/core/ofxManifoldLevels.h
+find:             const bool overLower = (at == 0) || h > height(at - 1, i);
+replace:             const bool overLower = true;
+
+gate: A point above the top level is inside
+file: src/core/ofxManifoldLevels.h
+find:         if (z < h[0] - onLevel || z > h[n - 1] + onLevel) return out;
+replace:         if (z < h[0] - onLevel) return out;
+
+gate: The lower level weighs t, not 1 - t
+file: src/core/ofxManifoldLevels.h
+find:                                                   wn.weight * (1.0f - t)});
+replace:                                                   wn.weight * t});
+
+gate: z always placed between the bottom two levels
+file: src/core/ofxManifoldLevels.h
+find:         while (k + 2 < n && h[k + 1] <= z) ++k;
+replace:         while (false) ++k;
+
+gate: A level's height ignores its bends
+file: src/core/ofxManifoldLevels.h
+find:         for (const auto& wn : w) h += wn.weight * height(k, wn.id);
+replace:         for (const auto& wn : w) h += wn.weight * base(k);
+
+gate: One level does not ignore z
+file: src/core/ofxManifoldLevels.h
+find:         if (n == 1) {
+replace:         if (false) {
+
+gate: Removing nodes does not renumber heights
+file: src/core/ofxManifoldLevels.h
+find:                 const NodeID now = table[old];
+replace:                 const NodeID now = old;
+
+gate: The last level can be removed
+file: src/core/ofxManifoldLevels.h
+find:         if (levels_.size() <= 1 || k >= levels_.size()) return false;
+replace:         if (k >= levels_.size()) return false;
+
+gate: No tolerance for a point on the top or bottom level
+file: src/core/ofxManifoldLevels.h
+find:         const float onLevel = 1e-6f;
+replace:         const float onLevel = 0.0f;
+
+gate: A copy is not checked against the level above
+file: src/core/ofxManifoldLevels.h
+find:             const bool underUpper = (at == levels_.size()) || h < height(at, i);
+replace:             const bool underUpper = true;
+
+# ---- round 3A-4b: what the 3D map drives ----
+
+gate: An output added to the first level only
+file: src/mapping/ofxManifoldMap3D.h
+find:         for (Mapping& m : routing_) id = m.addOutput(name, channel, trim);
+replace:         id = routing_[0].addOutput(name, channel, trim);
+
+gate: An output removed from the first level only
+file: src/mapping/ofxManifoldMap3D.h
+find:         for (Mapping& m : routing_) ok = m.removeOutput(id) && ok;
+replace:         ok = routing_[0].removeOutput(id);
+
+gate: A trim set on the first level only
+file: src/mapping/ofxManifoldMap3D.h
+find:         for (Mapping& m : routing_) m.setTargetTrim(id, trim);
+replace:         routing_[0].setTargetTrim(id, trim);
+
+gate: A copied level loses its values
+file: src/mapping/ofxManifoldMap3D.h
+find:         values_.insert(values_.begin() + static_cast<std::ptrdiff_t>(at), vals);
+replace:         values_.insert(values_.begin() + static_cast<std::ptrdiff_t>(at), std::vector<std::vector<float>>());
+
+gate: A removed level leaves its values behind
+file: src/mapping/ofxManifoldMap3D.h
+find:         values_.erase(values_.begin() + static_cast<std::ptrdiff_t>(k));
+replace:         (void)0;
+
+gate: Values do not follow removed nodes
+file: src/mapping/ofxManifoldMap3D.h
+find:                     const NodeID now = table[old];
+replace:                     const NodeID now = old;
+
+gate: Bindings do not follow removed nodes
+file: src/mapping/ofxManifoldMap3D.h
+find:         for (Mapping& m : routing_) m.remapNodes(table);
+replace:         (void)0;
+
+gate: A node-fed derived output reads only the first level
+file: src/mapping/ofxManifoldMap3D.h
+find:         const Resolved onFloor = room.resolve(floor);
+replace:         const Resolved onFloor = room.resolve(per[0]);
+
+gate: Silence from one level only
+file: src/mapping/ofxManifoldMap3D.h
+find:             b.silence += routing_[k].silenceShare(per[k]);
+replace:             b.silence = routing_[k].silenceShare(per[k]);
+
+gate: A value outside the map is zero, not its fallback
+file: src/mapping/ofxManifoldMap3D.h
+find:         if (!e.inside) return defs_[v].fallback;
+replace:         if (!e.inside) return 0.0f;
+
+gate: Two values may share a name
+file: src/mapping/ofxManifoldMap3D.h
+find:         if (findValue(name) != static_cast<std::size_t>(-1)) {\n            return static_cast<std::size_t>(-1);\n        }
+replace:         (void)0;
+nl: yes
+
+gate: A binding lands on the first level
+file: src/mapping/ofxManifoldMap3D.h
+find:             routing_[k].bind(n, t, w);
+replace:             routing_[0].bind(n, t, w);
+
+gate: A node with no value of its own reads zero
+file: src/mapping/ofxManifoldMap3D.h
+find:             return defs_[v].fallback;\n        }\n        return values_[k][v][n];
+replace:             return 0.0f;\n        }\n        return values_[k][v][n];
+nl: yes
+
+gate: Shares from one level only
+file: src/mapping/ofxManifoldMap3D.h
+find:                 if (wt.id < acc.size()) acc[wt.id] += wt.weight;
+replace:                 if (wt.id < acc.size()) acc[wt.id] = wt.weight;
+
+# ---- round 3A-4c: files for the 3D map ----
+
+gate: Several levels saved as a flat map
+file: src/io/ofxManifoldSerialize3D.h
+find:     if (lv.count() > 1 || !map.valueSet().empty()) return true;
+replace:     if (!map.valueSet().empty()) return true;
+
+gate: A bent ground saved as a flat map
+file: src/io/ofxManifoldSerialize3D.h
+find:         if (lv.bent(0, n)) return true;
+replace:         (void)n;
+
+gate: A level not starting at 0 saved as a flat map
+file: src/io/ofxManifoldSerialize3D.h
+find:     if (lv.base(0) != 0.0f) return true;
+replace:     (void)0;
+
+gate: Bindings saved without their level
+file: src/io/ofxManifoldSerialize3D.h
+find:                 if (k > 0) o << ", \"level\": " << k;
+replace:                 (void)k;
+
+gate: Bent nodes not saved
+file: src/io/ofxManifoldSerialize3D.h
+find:             if (!lv.bent(k, n)) continue;
+replace:             continue;
+
+gate: Node values not saved
+file: src/io/ofxManifoldSerialize3D.h
+find:                 if (x == defs[v].fallback) continue;
+replace:                 continue;
+
+gate: A one-level map not saved as a 2D outputs file
+file: src/io/ofxManifoldSerialize3D.h
+find:     if (map.count() == 1) return saveMapping(map.level(0), m);
+replace:     (void)0;
+
+gate: A flat map not saved as a 2D map file
+file: src/io/ofxManifoldSerialize3D.h
+find:     if (!detail::needs3D(map, m.nodeCount())) return saveManifold(m);
+replace:     (void)0;
+
+gate: A value declared twice accepted
+file: src/io/ofxManifoldSerialize3D.h
+find:                 == static_cast<std::size_t>(-1)) {\n                res.error = "value declared twice: " + name;\n                return res;
+replace:                 == static_cast<std::size_t>(-2)) {\n                res.error = "value declared twice: " + name;\n                return res;
+nl: yes
+
+gate: A value never declared accepted
+file: src/io/ofxManifoldSerialize3D.h
+find:         if (v == static_cast<std::size_t>(-1)) {\n            res.error = "value set but never declared: " + sv.name;
+replace:         if (false) {\n            res.error = "value set but never declared: " + sv.name;
+nl: yes
+
+gate: Levels accepted in a version 2 map file
+file: src/io/ofxManifoldSerialize3D.h
+find:         && static_cast<int>(root["version"].asNumber()) < 3) {
+replace:         && false) {
+
+gate: A binding with a level accepted in a version 2 outputs file
+file: src/io/ofxManifoldSerialize.h
+find:                 if (version < 3) {\n                    error = "a binding with a level needs version 3";
+replace:                 if (false) {\n                    error = "a binding with a level needs version 3";
+nl: yes
+
+gate: The 2D outputs reader accepts a binding with a level
+file: src/io/ofxManifoldSerialize.h
+find:                 if (!threeD) {
+replace:                 if (false) {
+
+gate: The 2D map reader accepts a 3D map file
+file: src/io/ofxManifoldSerialize.h
+find:     return detail::loadFloor(text, out, 2);
+replace:     return detail::loadFloor(text, out, 3);
+
+gate: A binding to an undeclared output accepted
+file: src/io/ofxManifoldSerialize.h
+find:                 if (t == InvalidTarget) {\n                    error = "binding to undeclared output: "
+replace:                 if (false) {\n                    error = "binding to undeclared output: "
+nl: yes
+
+gate: Levels that cross accepted from a file
+file: src/core/ofxManifoldLevels.h
+find:                 if (!(at(k, i) > at(k - 1, i))) {
+replace:                 if (false) {
+
+gate: Level starting heights out of order accepted
+file: src/core/ofxManifoldLevels.h
+find:             if (!(bases[k] > bases[k - 1])) {
+replace:             if (false) {
+
+# ---- round 3A-5: the editor, after the fader, rigs, the chart handed its levels ----
+
+gate: d follows only the current fader
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     for (TargetID t : outputSel_) srcs.emplace_back(t, 1.0f);\n    mapping_.addDerivedFromOutputs(
+replace:     srcs.emplace_back(outputSel_.front(), 1.0f);\n    mapping_.addDerivedFromOutputs(
+nl: yes
+
+gate: d with no output is not refused
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (outputSel_.empty()) {\n        return refusal("no output yet -- press o to make one", 2.5f);\n    }\n    const int ch
+replace:     if (false) {\n        return refusal("no output yet -- press o to make one", 2.5f);\n    }\n    const int ch
+nl: yes
+
+gate: Using a rig loses the current output
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     currentOutput_ = current.empty() ? InvalidTarget\n                                     : mapping_.findTarget(current);
+replace:     currentOutput_ = InvalidTarget;
+nl: yes
+
+gate: A rig that does not fit is used anyway
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!u.ok) {
+replace:     if (false) {
+
+gate: Using a rig drops the picked outputs
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (t != InvalidTarget) outputSel_.push_back(t);
+replace:         (void)t;
+
+gate: A rig file chosen by its full name gets the wrong path
+file: ofxManifoldEditor/src/ofxManifoldEditorFiles.cpp
+find:     for (const char* tail : {"-rig.json", ".json"}) {
+replace:     for (const char* tail : {".json"}) {
+
+gate: d lit with no output
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("derivedafter", "d", "derived output after the picked faders",\n              !drag && picked > 0,
+replace:         entry("derivedafter", "d", "derived output after the picked faders",\n              !drag,
+nl: yes
+
+gate: Saving a rig lit with no outputs
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("saverig", "shift-cmd-r", "save the outputs as a rig",\n              !drag && outputs > 0,
+replace:         entry("saverig", "shift-cmd-r", "save the outputs as a rig",\n              !drag,
+nl: yes
+
+gate: The chart is handed no selection share
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     if (!sel.empty()) lv.fromSelection = contributions(model, sel, wv);
+replace:     (void)sel;
+
+gate: The chart is handed silence outside the map
+file: ofxManifoldEditor/src/ofxManifoldEditorChartLayout.cpp
+find:     lv.silence = evaluation.inside ? mapping.silenceShare(wv) : 0.0f;
+replace:     lv.silence = mapping.silenceShare(evaluation.weights);

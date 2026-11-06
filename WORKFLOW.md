@@ -98,6 +98,7 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make clean` | remove `build/` |
 | `make fma` | all suites as an arm64 Mac builds them (fused multiply-add), on x86 Linux with clang |
 | `python3 tests/gate.py FILE` | run only the suites that compile FILE; what each CI mutation gate runs |
+| `python3 tests/run_gates.py` | every mutation gate in `tests/gates.txt`; `--only TEXT` for those whose name contains it, `--shard i/N` for what one CI job runs, `--list` to see them |
 | `make headers` | assert every header compiles standalone |
 | `make workflow` | assert the CI workflow is still valid |
 | `make door` | nothing outside `editor::Model` can change a map; snippets that must fail to compile |
@@ -227,10 +228,19 @@ and dumping it back rewrites the key as `true:` and GitHub rejects the whole
 workflow. `make test` runs `tests/check_workflow.py`, which asserts the literal
 key survives. See DECISIONS.md D-008.
 
-**Job `mutation`** — introduces four known faults and requires each to be
-caught: transposed sub-area argument, unrenormalized bias, `kAreaEpsilon` too
-small, `kAreaEpsilon` too large. Linux only, since it tests the suite rather
-than the platform.
+**Job `mutation`** — introduces known faults and requires each to be caught.
+The faults are listed in `tests/gates.txt`, one block per gate (`gate:`,
+`file:`, `find:`, `replace:`), and `tests/run_gates.py` applies each one
+literally, runs the suites that compile that file (`tests/gate.py`), and
+restores the file's exact bytes. The job runs as six shards side by side, each
+taking every sixth gate; `make workflow` checks the shards run 0 to 5 with
+nothing skipped, and that every anchor matches exactly once. Linux only, since
+it tests the suite rather than the platform. The first four gates, still at the
+top of the list: transposed sub-area argument, unrenormalized bias,
+`kAreaEpsilon` too small, `kAreaEpsilon` too large.
+
+To add a gate, add a block to `tests/gates.txt` and run it alone:
+`python3 tests/run_gates.py --only "its name"`. It must say `caught`.
 
 The last two are a pair on purpose. Too small accepts degenerate triangles; too
 large eats legitimate fine-mesh topology. Checking only one direction leaves a

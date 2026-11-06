@@ -24,36 +24,40 @@ Run: python3 tests/check_workflow.py
 """
 
 import os
-import shlex
+import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from run_gates import Malformed, read_gates  # noqa: E402
 
 PATH = ".github/workflows/kernel.yml"
 
 
-def gate_commands(raw):
+def shard_fails(raw):
     """
-    Yield the argv of every `python3 tests/mutate.py ...` invocation.
-
-    Line continuations are joined, since the gates are written across three
-    lines for readability.
+    The mutation job must run every shard. A matrix of [0, 1, 2] with a run
+    line dividing by 4 would quietly skip a quarter of the gates and stay
+    green, so both are read and compared.
     """
-    lines = raw.split("\n")
-    i = 0
-    while i < len(lines):
-        stripped = lines[i].strip()
-        if stripped.startswith("python3 tests/mutate.py"):
-            parts = []
-            while i < len(lines):
-                cur = lines[i].rstrip()
-                parts.append(cur.rstrip("\\").strip())
-                if not cur.endswith("\\"):
-                    break
-                i += 1
-            try:
-                yield shlex.split(" ".join(parts))
-            except ValueError as e:
-                yield ["<unparseable>", str(e)]
-        i += 1
+    fails = []
+    m = re.search(r"\n {8}shard: \[([0-9, ]*)\]\n", raw)
+    runs = re.findall(r"tests/run_gates\.py --shard \$\{\{ matrix\.shard \}\}/(\d+)",
+                      raw)
+    if not m:
+        fails.append("no 'shard: [...]' matrix for the mutation job")
+        return fails
+    if len(runs) != 1:
+        fails.append(f"expected one run_gates.py --shard line, found {len(runs)}")
+        return fails
+    shards = [int(x) for x in m.group(1).replace(" ", "").split(",") if x]
+    n = int(runs[0])
+    if shards != list(range(n)):
+        fails.append(f"the matrix runs shards {shards} but the run line divides "
+                     f"by {n}; it must run 0 to {n - 1}, each once")
+    if "tests/mutate.py" in raw.split("\njobs:\n", 1)[-1]:
+        fails.append("a gate is still written into the workflow; gates belong "
+                     "in tests/gates.txt")
+    return fails
 
 
 def main():
@@ -81,41 +85,39 @@ def main():
         if line.startswith("\t") or (line.strip() and "\t" in line[:len(line) - len(line.lstrip())]):
             fails.append(f"tab used for indentation on line {n}")
 
+    fails += shard_fails(raw)
+
     # Every gate must name a file that exists, or the gate silently cannot run.
-    gates = 0
-    for argv in gate_commands(raw):
-        if argv and argv[0] == "<unparseable>":
-            fails.append(f"a mutate.py invocation will not tokenize: {argv[1]}")
-            continue
-        gates += 1
-        try:
-            path = argv[3] if "--nl" in argv else argv[2]
-        except IndexError:
-            fails.append(f"a mutate.py invocation has too few arguments: "
-                         f"{' '.join(argv)[:80]}")
-            continue
+    try:
+        gates = read_gates()
+    except Malformed as e:
+        fails.append(str(e))
+        gates = []
+    for g in gates:
+        path = g["file"]
         if not os.path.exists(path):
-            fails.append(f"gate targets a file that does not exist: {path}")
+            fails.append(f"gate {g['gate']!r} targets a file that does not "
+                         f"exist: {path}")
             continue
 
         # The anchor must match EXACTLY ONCE, checked here rather than left for
-        # CI. mutate.py refuses a missing or ambiguous anchor at run time, which
-        # is correct -- but it means a refactor that renames the code a gate
-        # targets breaks CI rather than the local build.
+        # CI. run_gates.py refuses a missing or ambiguous anchor at run time,
+        # which is correct -- but it means a refactor that renames the code a
+        # gate targets breaks CI rather than the local build.
         #
         # This recurred: once when trajectory serialization duplicated a guard
         # (D-012), and twice more when the regions work rewrote fill() and the
         # loader's error text. Each time the gate was fine and the code under
         # it had moved.
-        find = argv[4] if "--nl" in argv else argv[3]
-        if "--nl" in argv:
-            find = find.replace("\\n", "\n")
-        n = open(path).read().count(find)
+        n = open(path).read().count(g["find"])
         if n != 1:
-            fails.append(f"gate anchor matches {n} times in {path}, must be "
-                         f"exactly once: {find[:60]}")
+            fails.append(f"gate {g['gate']!r} (tests/gates.txt line {g['line']}): "
+                         f"anchor matches {n} times in {path}, must be exactly "
+                         f"once: {g['find'][:60]}")
+        elif g["find"] == g["replace"]:
+            fails.append(f"gate {g['gate']!r} replaces its anchor with itself")
 
-    if gates == 0:
+    if not gates:
         fails.append("no mutation gates found; the suite-can-fail job would "
                      "assert nothing")
 
@@ -125,7 +127,8 @@ def main():
         return 1
 
     print("  ok  literal 'on:' trigger present")
-    print(f"  ok  {gates} mutation gates, every anchor matching exactly once")
+    print(f"  ok  {len(gates)} mutation gates in tests/gates.txt, every anchor "
+          f"matching exactly once, every shard run")
     return 0
 
 

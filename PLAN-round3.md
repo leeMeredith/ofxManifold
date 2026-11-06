@@ -580,6 +580,27 @@ run.
   back to the first -- could no longer fail. The script now picks n0 first
   and toggles n1, so n1 is current but not first. Both gates are caught.
 
+### Between 3A-5 and 3A-6: the gates split across six CI jobs
+
+The 251 gates moved out of the workflow into a plain list, `tests/gates.txt`,
+four lines a gate instead of eight lines of YAML, and `tests/run_gates.py`
+runs them. CI's mutation job is now a matrix of six shards, each taking every
+sixth gate, all running at once (GitHub's free plan allows 20 jobs at a time
+on a public repository; this uses 8). The workflow went from 2,136 lines to
+126.
+
+- **The list was checked against the workflow it replaced:** every name,
+  file, anchor and replacement read back identical before the YAML steps were
+  removed.
+- **`make workflow` guards the split:** the matrix must run shards 0 to N-1
+  with the run line dividing by the same N, so a shard cannot be dropped
+  without it failing; every anchor must match once; names must be unique; and
+  no gate may be left written in the workflow.
+- **Each gate restores its file's exact bytes,** caught or not, and the
+  restored-tree step now also checks `git diff` is empty before the clean run.
+- **Every shard was run as CI will run it before it was handed over,** and all
+  251 are caught.
+
 ---
 
 ## Answered

@@ -262,7 +262,9 @@ Vectors are classed by where their authority comes from:
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite
-that cannot see a file cannot catch a fault in it. CI runs on Linux x86_64 and macOS arm64,
+that cannot see a file cannot catch a fault in it. The gates are a plain list,
+`tests/gates.txt`, run in six parallel CI jobs by `tests/run_gates.py`; adding
+one is adding a block of four lines. CI runs on Linux x86_64 and macOS arm64,
 which has twice caught floating-point differences invisible on one platform
 alone.
 
