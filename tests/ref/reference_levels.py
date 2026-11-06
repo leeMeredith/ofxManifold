@@ -77,6 +77,33 @@ class Stack:
         self.H = H
         return []
 
+    def move(self, k, dz):
+        """A whole level: its start and every node. Refused if a node, or
+        the start, would reach a neighbour."""
+        row = [h + dz for h in self.H[k]]
+        nb = self.bases[k] + dz
+        bad = [i for i in range(self.n)
+               if (k > 0 and not row[i] > self.H[k - 1][i])
+               or (k + 1 < len(self.H) and not row[i] < self.H[k + 1][i])]
+        bases_fit = ((k == 0 or nb > self.bases[k - 1])
+                     and (k + 1 >= len(self.H) or nb < self.bases[k + 1]))
+        if bad or not bases_fit:
+            return bad if bad else ["-"]
+        self.H[k] = row
+        self.bases[k] = nb
+        return []
+
+    def room(self, k):
+        inf = float("inf")
+        down = up = inf
+        if k > 0:
+            down = min([self.bases[k] - self.bases[k - 1]]
+                       + [self.H[k][i] - self.H[k - 1][i] for i in range(self.n)])
+        if k + 1 < len(self.H):
+            up = min([self.bases[k + 1] - self.bases[k]]
+                     + [self.H[k + 1][i] - self.H[k][i] for i in range(self.n)])
+        return down, up
+
     def set(self, k, i, h):
         H = [list(r) for r in self.H]
         H[k][i] = h
@@ -212,6 +239,15 @@ def build():
                 ok = st.set(op[1], op[2], op[3])
                 results.append(f"SET {op[1]} {op[2]} {fmt(op[3])} ="
                                + ("OK" if ok else "REFUSED"))
+            elif kind == "MOVE":
+                bad = st.move(op[1], op[2])
+                results.append(f"MOVE {op[1]} {fmt(op[2])} ="
+                               + ("OK" if not bad else
+                                  "REFUSED:" + ",".join(map(str, bad))))
+            elif kind == "ROOM":
+                d, u = st.room(op[1])
+                f = (lambda v: "inf" if v == float("inf") else fmt(v))
+                results.append(f"ROOM {op[1]} ={f(d)},{f(u)}")
             elif kind == "REMOVE":
                 ok = st.remove(op[1])
                 results.append(f"REMOVE {op[1]} ="
@@ -244,6 +280,33 @@ def build():
                ("COPY", 1, 1.0)],
               ["copying a bent level copies the bend: the new level at 1.0",
                "has nodes 0 and 1 at 1.2"])
+    out.append("")
+
+    out.append("# Round 3A-6b: a WHOLE level moved, its start and every node, bends")
+    out.append("# kept; refused, all or nothing, where any node -- or its start --")
+    out.append("# would reach a neighbour. ROOM: how far it can go, down and up.")
+    stack_rec("moved",
+              [("COPY", 0, 0.5), ("COPY", 1, 1.0), ("RAISE", 1, 0.3, [2]),
+               ("ROOM", 1), ("ROOM", 0), ("ROOM", 2),
+               ("MOVE", 1, -0.25), ("MOVE", 1, 0.2), ("MOVE", 1, -0.25),
+               ("MOVE", 2, 0.5), ("MOVE", 0, -0.25), ("ROOM", 1)],
+              ["the bent middle level (node 2 at 0.8) has room 0.5 down and",
+               "0.2 up -- node 2 is 0.2 under the top. Down 0.25 keeps the",
+               "bend (node 2 at 0.55); up 0.2 is fine from there; down 0.25",
+               "again. The ends move freely away from their one neighbour,",
+               "and the middle's room follows"])
+    stack_rec("moved_refused",
+              [("COPY", 0, 0.5), ("RAISE", 1, -0.3, [0]),
+               ("MOVE", 1, -0.25), ("MOVE", 0, 0.25), ("MOVE", 1, -0.2)],
+              ["node 0 bent down to 0.2 on the upper level: moving that level",
+               "down 0.25 would put node 0 below the ground -- refused, naming",
+               "it; the ground up 0.25 likewise; down 0.2 touches -- refused"])
+    stack_rec("moved_bases",
+              [("COPY", 0, 0.5), ("RAISE", 1, 0.3, [0, 1, 2, 3]),
+               ("MOVE", 0, 0.6), ("MOVE", 0, 0.4)],
+              ["every node of the upper level raised to 0.8: the ground can",
+               "rise 0.6 without a node touching, but its start would pass the",
+               "upper level's start (0.5) -- refused, naming no node; 0.4 fits"])
     out.append("")
 
     out.append("# REFUSED, changing nothing, and naming the nodes:")

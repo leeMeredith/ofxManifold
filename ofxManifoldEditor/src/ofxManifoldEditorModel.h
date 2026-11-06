@@ -187,6 +187,20 @@ public:
     // the nodes, if any would reach the level above or below.
     Result raise(const Selection& sel, int direction, bool fine);
 
+    // A click on a level's dot (round 3A-6b): that level becomes current.
+    // Not an undo step, like up and down.
+    Result goToLevel(LevelID k);
+
+    // Move a whole level -- its start and every node on it, bends kept -- so
+    // that it starts at `base`; it becomes current. Dragging its dot ends in
+    // this. All or nothing: refused, naming the nodes, if any would reach the
+    // level above or below, or if its start would pass a neighbour's.
+    Result moveLevel(LevelID k, float base);
+
+    // i and k: the current level's start steps by 0.05, or 0.01 when
+    // `fine`, landing on the next multiple as heights do; every node with it.
+    Result stepLevel(int direction, bool fine);
+
     // cmd-delete: the current level goes, and the one below becomes current.
     // Refused for the only level.
     Result removeLevel();

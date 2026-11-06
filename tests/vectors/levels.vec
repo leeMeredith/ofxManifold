@@ -34,6 +34,27 @@ HEIGHTS heights_between ANALYTIC between L0 0,0,0,0 L1 0.4,0.4,0.4,0.4 L2 1,1,1,
 STACK copybent NODES square OPS COPY 0 0.5 =1 ; RAISE 1 0.2 0,1 =OK ; COPY 1 1 =2
 HEIGHTS heights_copybent ANALYTIC copybent L0 0,0,0,0 L1 0.7,0.7,0.5,0.5 L2 1.2,1.2,1,1
 
+# Round 3A-6b: a WHOLE level moved, its start and every node, bends
+# kept; refused, all or nothing, where any node -- or its start --
+# would reach a neighbour. ROOM: how far it can go, down and up.
+# the bent middle level (node 2 at 0.8) has room 0.5 down and
+# 0.2 up -- node 2 is 0.2 under the top. Down 0.25 keeps the
+# bend (node 2 at 0.55); up 0.2 is fine from there; down 0.25
+# again. The ends move freely away from their one neighbour,
+# and the middle's room follows
+STACK moved NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 0.3 2 =OK ; ROOM 1 =0.5,0.2 ; ROOM 0 =inf,0.5 ; ROOM 2 =0.2,inf ; MOVE 1 -0.25 =OK ; MOVE 1 0.2 =OK ; MOVE 1 -0.25 =OK ; MOVE 2 0.5 =OK ; MOVE 0 -0.25 =OK ; ROOM 1 =0.45,1
+HEIGHTS heights_moved ANALYTIC moved L0 -0.25,-0.25,-0.25,-0.25 L1 0.2,0.2,0.5,0.2 L2 1.5,1.5,1.5,1.5
+# node 0 bent down to 0.2 on the upper level: moving that level
+# down 0.25 would put node 0 below the ground -- refused, naming
+# it; the ground up 0.25 likewise; down 0.2 touches -- refused
+STACK moved_refused NODES square OPS COPY 0 0.5 =1 ; RAISE 1 -0.3 0 =OK ; MOVE 1 -0.25 =REFUSED:0 ; MOVE 0 0.25 =REFUSED:0 ; MOVE 1 -0.2 =REFUSED:0
+HEIGHTS heights_moved_refused ANALYTIC moved_refused L0 0,0,0,0 L1 0.2,0.5,0.5,0.5
+# every node of the upper level raised to 0.8: the ground can
+# rise 0.6 without a node touching, but its start would pass the
+# upper level's start (0.5) -- refused, naming no node; 0.4 fits
+STACK moved_bases NODES square OPS COPY 0 0.5 =1 ; RAISE 1 0.3 0,1,2,3 =OK ; MOVE 0 0.6 =REFUSED:- ; MOVE 0 0.4 =OK
+HEIGHTS heights_moved_bases ANALYTIC moved_bases L0 0.4,0.4,0.4,0.4 L1 0.8,0.8,0.8,0.8
+
 # REFUSED, changing nothing, and naming the nodes:
 # raising the middle level's node 2 by 0.5 would TOUCH the top
 # level (1.0): touching is refused, not just crossing. Then

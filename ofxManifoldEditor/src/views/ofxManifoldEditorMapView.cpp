@@ -216,12 +216,20 @@ void drawOffsets(const Scene& s) {
 void drawLevelColumn(const Scene& s) {
     const Model& model = *s.model;
     const ofRectangle vp = s.renderer->viewport();
-    const float inset = vp.getHeight() * 0.15f;
+    const float inset = vp.getHeight() * kColumnInset;
     const DotColumn c = dotColumn(model, vp.getY() + inset,
                                   vp.getBottom() - inset, true,
                                   *s.evaluation, s.listeningZ);
     if (!c.shown) return;
-    const float x = vp.getRight() + 15.0f;
+    const float x = vp.getRight() + kColumnOffset;
+    const Levels& lv = model.map3d().levels();
+    // A dot being dragged sits where its level would land, a gap between
+    // dots being a quarter of the map, and its label says where.
+    const float gap = c.dots.size() > 1 ? c.dots[0] - c.dots[1] : 1.0f;
+    auto dotY = [&](std::size_t k) {
+        if (int(k) != s.levelDrag) return c.dots[k];
+        return c.dots[k] - (s.levelDragBase - lv.base(LevelID(k))) / 0.25f * gap;
+    };
     ofPushStyle();
     // the spine, faint, then a dot per level
     ofSetLineWidth(1.0f);
@@ -235,14 +243,23 @@ void drawLevelColumn(const Scene& s) {
             ofNoFill();
             ofSetColor(150, 156, 170);
         }
-        ofDrawCircle(x, c.dots[k], 4.0f);
+        if (int(k) == s.levelDrag) {
+            ofFill();
+            ofSetColor(255, 214, 90);
+        }
+        ofDrawCircle(x, dotY(k), 4.0f);
     }
-    // the current level's starting height, beside its dot
+    // the current level's starting height beside its dot -- or, while one
+    // is dragged, where that one would land
+    const std::size_t shownK = s.levelDrag >= 0 ? std::size_t(s.levelDrag)
+                                                : c.current;
     char b[16];
     std::snprintf(b, sizeof b, "%g",
-                  double(model.map3d().levels().base(c.current)));
-    ofSetColor(235, 238, 245);
-    s.text->draw(b, x + 9.0f, c.dots[c.current] + s.text->lineHeight() * 0.35f);
+                  double(s.levelDrag >= 0 ? s.levelDragBase
+                                          : lv.base(LevelID(shownK))));
+    if (s.levelDrag >= 0) ofSetColor(255, 214, 90);
+    else                  ofSetColor(235, 238, 245);
+    s.text->draw(b, x + 9.0f, dotY(shownK) + s.text->lineHeight() * 0.35f);
     // the listening mark: green among the levels, grey outside them
     if (c.marked) {
         ofSetLineWidth(2.0f);

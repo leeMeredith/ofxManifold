@@ -1480,3 +1480,64 @@ gate: Removing the only level is offered
 file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 find:               !drag && levels > 1, unlessDrag("the only level")),
 replace:               !drag, unlessDrag("the only level")),
+
+# ---- round 3A-6b: a level gone to by its dot, moved whole ----
+
+gate: A moved level may cross a neighbour's node
+file: src/core/ofxManifoldLevels.h
+find:             if (!fits(k, i, height(k, i) + dz)) bad.push_back(i);
+replace:             (void)i;
+
+gate: A moved level's start may pass a neighbour's
+file: src/core/ofxManifoldLevels.h
+find:             (k == 0 || nb > levels_[k - 1].base)
+replace:             (true)
+
+gate: A moved level leaves its bends behind
+file: src/core/ofxManifoldLevels.h
+find:         for (float& h : l.heights) h += dz;   // unbent stay equal to the base
+replace:         (void)l.heights;
+
+gate: A level's room upward ignores its nodes
+file: src/core/ofxManifoldLevels.h
+find:                 up = std::min(up, height(k + 1, i) - height(k, i));
+replace:                 (void)i;
+
+gate: Moving a level leaves another current
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     level_ = k;\n    return changed("level " + std::to_string(k + 1) + " now starts at "
+replace:     return changed("level " + std::to_string(k + 1) + " now starts at "
+nl: yes
+
+gate: A level steps by whole steps, not to the next multiple
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                      : (direction > 0 ? std::ceil(q) : std::floor(q));\n    return moveLevel(level_, next * unit);
+replace:                      : q + float(direction);\n    return moveLevel(level_, next * unit);
+nl: yes
+
+gate: Going to a level goes nowhere
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (k >= map_.count()) return Result{};\n    level_ = k;
+replace:     if (k >= map_.count()) return Result{};
+nl: yes
+
+gate: A dragged level may land on a neighbour
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     if (nb >= base + room.second) nb = base + room.second - 0.01f;
+replace:     if (nb > base + room.second) nb = base + room.second;
+
+gate: A dragged dot moves a level a whole map per gap
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     float nb = std::round((base - pixels / gap * 0.25f) / 0.01f) * 0.01f;
+replace:     float nb = std::round((base - pixels / gap) / 0.01f) * 0.01f;
+
+gate: A click beside the column hits a dot
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     if (!c.shown || std::fabs(x - columnX) > 8.0f) return -1;
+replace:     if (!c.shown) return -1;
+
+gate: i and k work with one level
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && levels > 1,\n              unlessDrag("one level -- nothing to move it toward")),
+replace:               !drag,\n              unlessDrag("one level -- nothing to move it toward")),
+nl: yes

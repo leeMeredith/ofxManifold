@@ -195,6 +195,14 @@ public:
         return made;
     }
 
+    // Move a whole level, its start and every node on it (Levels::moveLevel).
+    // Bindings and values are untouched: they belong to the level, not to a
+    // height.
+    bool moveLevel(LevelID k, float dz, std::size_t nodeCount,
+                   std::vector<NodeID>* blocked = nullptr) {
+        return levels_.moveLevel(k, dz, nodeCount, blocked);
+    }
+
     // Move every level onto a rig at once (the editor's cmd-r, round 3A-6):
     // each level as useRig() moves one map, its bindings following by name.
     // All or nothing: refused, changing nothing, if any level sends what the

@@ -900,6 +900,50 @@ Result Model::raise(const Selection& sel, int direction, bool fine) {
     return changed("height " + a + (a == b ? std::string() : " to " + b), 2.0f);
 }
 
+Result Model::goToLevel(LevelID k) {
+    if (k >= map_.count()) return Result{};
+    level_ = k;
+    Result r;
+    r.seconds = 2.0f;
+    r.message = "level " + std::to_string(k + 1) + " of "
+              + std::to_string(map_.count()) + ", at "
+              + height(map_.levels().base(k));
+    return r;
+}
+
+Result Model::moveLevel(LevelID k, float base) {
+    if (k >= map_.count()) return Result{};
+    const float dz = base - map_.levels().base(k);
+    if (dz == 0.0f) return Result{};
+    const std::string where = dz > 0.0f ? "above" : "below";
+    std::vector<NodeID> blocked;
+    if (!map_.moveLevel(k, dz, manifold_.nodeCount(), &blocked)) {
+        std::string who;
+        for (NodeID n : blocked) {
+            if (n >= manifold_.nodeCount()) continue;
+            who += (who.empty() ? "" : ", ") + manifold_.node(n).name;
+        }
+        return refusal("level " + std::to_string(k + 1) + " cannot start at "
+                       + height(base) + " -- "
+                       + (who.empty() ? "it would pass the level " + where
+                                      : who + " would reach the level " + where),
+                       3.0f);
+    }
+    level_ = k;
+    return changed("level " + std::to_string(k + 1) + " now starts at "
+                   + height(base), 2.0f);
+}
+
+Result Model::stepLevel(int direction, bool fine) {
+    const float unit = fine ? 0.01f : 0.05f;
+    float q = map_.levels().base(level_) / unit;
+    const float qr = std::round(q);
+    if (std::fabs(q - qr) < 1e-3f) q = qr;
+    const float next = (q == qr) ? qr + float(direction)
+                     : (direction > 0 ? std::ceil(q) : std::floor(q));
+    return moveLevel(level_, next * unit);
+}
+
 Result Model::removeLevel() {
     const LevelID n = map_.count();
     if (n == 1) return refusal("a map has at least one level", 2.5f);

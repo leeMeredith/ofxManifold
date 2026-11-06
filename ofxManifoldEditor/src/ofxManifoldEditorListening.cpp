@@ -1,5 +1,7 @@
 #include "ofxManifoldEditorListening.h"
 
+#include <cmath>
+
 namespace ofxManifold {
 namespace editor {
 
@@ -73,6 +75,25 @@ DotColumn dotColumn(const Model& model, float top, float bottom,
     const bool above = z > map.levels().heightAt(n - 1, floor.weights);
     c.mark = above ? c.dots[n - 1] - gap * 0.5f : c.dots[0] + gap * 0.5f;
     return c;
+}
+
+int dotAt(const DotColumn& c, float columnX, float x, float y) {
+    if (!c.shown || std::fabs(x - columnX) > 8.0f) return -1;
+    int hit = -1;
+    for (std::size_t k = 0; k < c.dots.size(); ++k) {
+        if (std::fabs(y - c.dots[k]) <= 8.0f) hit = int(k);
+    }
+    return hit;
+}
+
+float levelDragTo(const Model& model, LevelID k, float pixels, float gap) {
+    const Levels& lv = model.map3d().levels();
+    const float base = lv.base(k);
+    float nb = std::round((base - pixels / gap * 0.25f) / 0.01f) * 0.01f;
+    const auto room = lv.room(k, model.manifold().nodeCount());
+    if (nb >= base + room.second) nb = base + room.second - 0.01f;
+    if (nb <= base - room.first)  nb = base - room.first + 0.01f;
+    return nb;
 }
 
 } // namespace editor

@@ -35,6 +35,18 @@ struct Scene {
     // Where the key panel starts; negative: 30 to the right of the map, as
     // it always was. The column of dots and the 3D view push it right.
     float     panelLeft = -1.0f;
+    // With the 3D view open the panel sits BENEATH the views instead, from
+    // panelTop to panelBottom, its keys spread across in columns; negative:
+    // beside the map.
+    float     panelTop    = -1.0f;
+    float     panelBottom = -1.0f;
+    // Beneath: is the status block beside the views (at panelLeft, as
+    // always) with only the keys beneath, or beneath with them?
+    bool      statusBeside = false;
+    // A level's dot being dragged (round 3A-6b): which level, and where its
+    // start would land if let go now. -1: none.
+    int       levelDrag     = -1;
+    float     levelDragBase = 0.0f;
     glm::vec2 mouse{-1.0f, -1.0f};       // for hover
 };
 

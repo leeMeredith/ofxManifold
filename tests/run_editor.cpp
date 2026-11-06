@@ -234,7 +234,8 @@ std::string label(const std::string& op) {
         {"removeoutput", "remove output"}, {"example", "example map"},
         {"empty", "new map"}, {"move", "move"}, {"openpair", "open"},
         {"newlevel", "new level"}, {"raise", "height"},
-        {"removelevel", "remove level"}};
+        {"removelevel", "remove level"}, {"movelevel", "move level"},
+        {"steplevel", "move level"}};
     auto it = L.find(op);
     return it == L.end() ? op : it->second;
 }
@@ -385,6 +386,18 @@ int main(int argc, char** argv) {
                     return m.raise(sel, dir, fine != 0); };
             }
             else if (lastOp == "removelevel") op = [](Model& m) { return m.removeLevel(); };
+            else if (lastOp == "golevel") {
+                LevelID k; in >> k;
+                op = [k](Model& m) { return m.goToLevel(k); };
+            }
+            else if (lastOp == "movelevel") {
+                LevelID k; float b; in >> k >> b;
+                op = [k, b](Model& m) { return m.moveLevel(k, b); };
+            }
+            else if (lastOp == "steplevel") {
+                int dir, fine; in >> dir >> fine;
+                op = [dir, fine](Model& m) { return m.stepLevel(dir, fine != 0); };
+            }
             else if (lastOp == "example") op = [&](Model& m) {
                 m.loadExample(); Result r; r.changed = true; return r; };
             else if (lastOp == "empty")   op = [&](Model& m) {
@@ -602,6 +615,26 @@ int main(int argc, char** argv) {
                     ok = false;
                     why << "one level, but the 3D chart differs from the 2D";
                 }
+            }
+        } else if (kind == "DRAGLEVEL") {
+            LevelID k; float px, gap, want; std::string kw;
+            in >> k >> px >> gap >> kw >> want;
+            const float got = levelDragTo(md, k, px, gap);
+            if (ok && std::fabs(got - want) > tolerance) {
+                ok = false;
+                why << "dragging level " << k << " by " << px << " gave "
+                    << got << ", expected " << want;
+            }
+        } else if (kind == "DOTAT") {
+            float x, y, top, bottom, cx; int want; std::string kw;
+            in >> x >> y >> top >> bottom >> cx >> kw >> want;
+            const DotColumn c = dotColumn(md, top, bottom, false,
+                                          Evaluation{}, 0.0f);
+            const int got = dotAt(c, cx, x, y);
+            if (ok && got != want) {
+                ok = false;
+                why << "a click at " << x << "," << y << " hit dot " << got
+                    << ", expected " << want;
             }
         } else if (kind == "STARTZ") {
             const Evaluation floor = readWeights(in, md, "EXPECT");

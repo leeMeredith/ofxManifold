@@ -63,5 +63,21 @@ struct DotColumn {
 DotColumn dotColumn(const Model& model, float top, float bottom,
                     bool listening, const Evaluation& floor, float z);
 
+// Where the column sits in a map viewport: this far in from its top and its
+// bottom, as a fraction of its height; 15 pixels right of it. The view draws
+// it and the app hit-tests it from these, so they cannot drift apart.
+constexpr float kColumnInset = 0.15f;
+constexpr float kColumnOffset = 15.0f;
+
+// Which level's dot a click at (x, y) is on -- within 8 pixels of it, in the
+// column at `columnX` -- or -1.
+int dotAt(const DotColumn& c, float columnX, float x, float y);
+
+// Where dragging level k's dot by `pixels` (down positive) would put the
+// level's start, with `gap` pixels between neighbouring dots: a gap is a
+// quarter of the map, in steps of 0.01, stopping 0.01 short of where a node
+// or its start would reach a neighbour -- so letting go always lands.
+float levelDragTo(const Model& model, LevelID k, float pixels, float gap);
+
 } // namespace editor
 } // namespace ofxManifold

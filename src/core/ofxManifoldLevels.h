@@ -44,6 +44,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -171,6 +172,57 @@ public:
         }
         for (NodeID n : nodes) set(k, n, height(k, n) + dz);
         return true;
+    }
+
+    // Move a whole level up (dz > 0) or down: its starting height and every
+    // node on it, bends kept (round 3A-6b). All or nothing: refused, changing
+    // nothing, if any node -- of `nodeCount`, or any bent one -- would reach
+    // the level above or below; `blocked` receives those nodes. Refused too,
+    // with `blocked` empty, if its start would reach a neighbour's start.
+    bool moveLevel(LevelID k, float dz, std::size_t nodeCount,
+                   std::vector<NodeID>* blocked = nullptr) {
+        if (blocked) blocked->clear();
+        if (k >= levels_.size()) return false;
+        const float nb = levels_[k].base + dz;
+        const std::size_t n = std::max(nodeCount, levels_[k].heights.size());
+        std::vector<NodeID> bad;
+        for (NodeID i = 0; i < n; ++i) {
+            if (!fits(k, i, height(k, i) + dz)) bad.push_back(i);
+        }
+        const bool basesFit =
+            (k == 0 || nb > levels_[k - 1].base)
+            && (k + 1 >= levels_.size() || nb < levels_[k + 1].base);
+        if (!bad.empty() || !basesFit) {
+            if (blocked) *blocked = bad;
+            return false;
+        }
+        Level& l = levels_[k];
+        for (float& h : l.heights) h += dz;   // unbent stay equal to the base
+        l.base = nb;
+        return true;
+    }
+
+    // How far a whole level can move before it would reach a neighbour:
+    // {down, up}, each the smallest gap over its nodes and its start; a move
+    // must stay strictly inside. Infinite where there is no neighbour.
+    std::pair<float, float> room(LevelID k, std::size_t nodeCount) const {
+        const float inf = std::numeric_limits<float>::infinity();
+        float down = inf, up = inf;
+        if (k >= levels_.size()) return {0.0f, 0.0f};
+        const std::size_t n = std::max(nodeCount, levels_[k].heights.size());
+        if (k > 0) {
+            down = levels_[k].base - levels_[k - 1].base;
+            for (NodeID i = 0; i < n; ++i) {
+                down = std::min(down, height(k, i) - height(k - 1, i));
+            }
+        }
+        if (k + 1 < levels_.size()) {
+            up = levels_[k + 1].base - levels_[k].base;
+            for (NodeID i = 0; i < n; ++i) {
+                up = std::min(up, height(k + 1, i) - height(k, i));
+            }
+        }
+        return {down, up};
     }
 
     // Put one node at a height on one level -- what a file does on load.

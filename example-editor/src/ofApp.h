@@ -107,8 +107,6 @@ private:
     ofxManifold::editor::Selection selection;
     ofxManifold::editor::History   history;
     const ofxManifold::Manifold2D& manifold      = model.manifold();
-    const ofxManifold::TargetID&   currentOutput = model.currentOutput();
-    const bool&                    autoOutput    = model.autoOutput();
 
     // ---- state: drawing and listening --------------------------------------
     std::unique_ptr<ofxManifoldRenderer>    renderer;
@@ -126,6 +124,19 @@ private:
     ofRectangle view3D;
     bool        pressIn3D = false;
     float       panelLeft = 0.0f;     // pushed right by the dots and the view
+    float       panelTop = -1.0f;     // with the view open: the panel beneath
+    float       panelBottom = -1.0f;
+    bool        statusBeside = false; // ...and the status beside the views
+
+    // ---- state: a level's dot pressed, and maybe dragged (3A-6b) ----------
+    // A click goes to the level; a drag moves the whole level, landing where
+    // the dot is let go -- one undo step.
+    int         levelPress = -1;
+    float       levelPressY = 0.0f;
+    float       levelDragBase = 0.0f;
+    bool        levelMoved = false;
+    ofxManifold::editor::DotColumn columnNow() const;
+    float       columnX() const;
 
     // Audition: dragging moves the listening point and can NEVER move a node.
     glm::vec2 auditionPoint{0.5f, 0.5f};

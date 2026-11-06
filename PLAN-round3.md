@@ -742,6 +742,40 @@ level at once or none.
   angle and its drag; how the dots, the offsets and the view look. Those are
   judged on screen.
 
+### 3A-6b: the dots answer the mouse; a level moved whole; the keys beneath
+
+Lee, on screen (2026-11-06): click a dot to go to its level; hold a dot and
+drag it to bring a level closer to or further from its neighbours; and with
+the 3D view open the key text ran off the window -- put it beneath the maps.
+The 3D view itself stays where it is.
+
+- **A click on a dot** makes that level current (`Model::goToLevel`), not an
+  undo step.
+- **Dragging a dot moves the whole level** -- its start and every node on
+  it, bends kept -- and makes it current; one undo step on letting go
+  (`Model::moveLevel`). A gap between dots is a quarter of the map, in steps
+  of 0.01, and the drag stops 0.01 short of where a node or its start would
+  reach a neighbour, so letting go always lands (`levelDragTo`). The dot
+  follows the drag, yellow, with where it would land beside it.
+- **`i` and `k`** move the current level 0.05 (shift: 0.01), landing on the
+  next multiple as heights do (`Model::stepLevel`). i sits above k. They need
+  two levels.
+- **Kernel:** `Levels::moveLevel`, all or nothing, refused where any node or
+  the level's start would reach a neighbour; `Levels::room`, how far a level
+  can go each way. Three stacks of vectors.
+- **With the 3D view open the keys go beneath the views,** in columns across
+  the window, each group whole. The status lines stay beside the views when
+  the space the views leave holds them, otherwise go beneath on the left. The
+  views give up as much height as the keys need at that width. A window too
+  small for all of it keeps the views at their least and lets the last
+  column run on to the right rather than over the faders -- the drawing
+  session's 1024 by 640 window is one such.
+- The two unused references the Mac build warned about (`currentOutput`,
+  `autoOutput` in `ofApp.h`) are gone.
+- 3 editor scripts (49), 37 checked steps (640); 3 vectors in the levels
+  suite (93); 11 mutation gates (286). The drawing session gained four
+  frames: a dot clicked, a dot dragged, let go, `i` then shift-`k`.
+
 ---
 
 ## Answered

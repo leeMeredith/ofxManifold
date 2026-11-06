@@ -580,6 +580,80 @@ class Editor:
         lo, hi = f"{min(offs):+.3g}", f"{max(offs):+.3g}"
         return (1, 0, f"height {lo}" + ("" if lo == hi else f" to {hi}"))
 
+    # ---- round 3A-6b: going to a level, moving a whole level -------------
+
+    def go_level(self, k):
+        """A click on a level's dot: that level becomes current."""
+        if not 0 <= k < len(self.levels):
+            return (0, 0, "")
+        self.cur = k
+        return (0, 0, f"level {k + 1} of {len(self.levels)}, at "
+                f"{fmt(self.levels[k]['base'])}")
+
+    def level_room(self, k):
+        """How far level k can move, down and up, before a node or its start
+        would reach a neighbour."""
+        inf = float("inf")
+        down = up = inf
+        lv = self.levels
+        if k > 0:
+            down = min([lv[k]["base"] - lv[k - 1]["base"]]
+                       + [self.height(k, n) - self.height(k - 1, n)
+                          for n in self.names()])
+        if k + 1 < len(lv):
+            up = min([lv[k + 1]["base"] - lv[k]["base"]]
+                     + [self.height(k + 1, n) - self.height(k, n)
+                        for n in self.names()])
+        return down, up
+
+    def move_level(self, k, new_base):
+        """The whole level: its start and every node, bends kept. It
+        becomes current. All or nothing."""
+        lv = self.levels[k]
+        dz = new_base - lv["base"]
+        if dz == 0:
+            return (0, 0, "")
+        where = "above" if dz > 0 else "below"
+        bad = [n for n in self.names()
+               if not self.fits(k, n, self.height(k, n) + dz)]
+        nb = lv["base"] + dz
+        bases_fit = ((k == 0 or nb > self.levels[k - 1]["base"])
+                     and (k + 1 >= len(self.levels)
+                          or nb < self.levels[k + 1]["base"]))
+        if bad or not bases_fit:
+            return (0, 1, f"level {k + 1} cannot start at {fmt(new_base)} -- "
+                    + (", ".join(bad) + " would reach the level " + where
+                       if bad else "it would pass the level " + where))
+        lv["base"] = nb
+        lv["heights"] = {n: h + dz for n, h in lv["heights"].items()}
+        self.cur = k
+        return (1, 0, f"level {k + 1} now starts at {fmt(new_base)}")
+
+    def step_level(self, direction, fine):
+        """i and k: the current level's start steps to the next multiple of
+        0.05 (0.01 fine), as heights do, and every node with it."""
+        unit = 0.01 if fine else 0.05
+        q = self.levels[self.cur]["base"] / unit
+        qr = round(q)
+        if abs(q - qr) < 1e-3:
+            nxt = qr + direction
+        else:
+            nxt = math.ceil(q) if direction > 0 else math.floor(q)
+        return self.move_level(self.cur, nxt * unit)
+
+    def level_drag_to(self, k, pixels, gap):
+        """Where a dot dragged `pixels` down (negative: up) puts its level:
+        a gap between dots is a quarter of the map, steps of 0.01, and it
+        stops 0.01 short of a neighbour."""
+        base = self.levels[k]["base"]
+        nb = round((base - pixels / gap * 0.25) / 0.01) * 0.01
+        down, up = self.level_room(k)
+        if nb >= base + up:
+            nb = base + up - 0.01
+        if nb <= base - down:
+            nb = base - down + 0.01
+        return nb
+
     def remove_level(self):
         n = len(self.levels)
         if n == 1:
@@ -876,6 +950,7 @@ class Editor:
             # point, so they work with one level too
             ("levelswitch", nd and (aud or len(self.levels) > 1)),
             ("newlevel", nd), ("raise", nd and bool(sel)),
+            ("movelevel", nd and len(self.levels) > 1),
             ("removelevel", nd and len(self.levels) > 1), ("view3d", True),
             ("audition", nd), ("lock", nd),
             ("undo", nd and can_undo), ("redo", nd and can_redo),
@@ -1021,7 +1096,8 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "empty": "new map", "move": "move", "openpair": "open",
           "derivedafter": "derived output", "userig": "use rig",
           "newlevel": "new level", "raise": "height",
-          "removelevel": "remove level"}
+          "removelevel": "remove level", "movelevel": "move level",
+          "steplevel": "move level"}
 
 
 class Script:
@@ -1098,6 +1174,9 @@ class Script:
             "newlevel": lambda: e.new_level(args[0] > 0),
             "raise":    lambda: e.raise_nodes(s, args[0], args[1]),
             "removelevel": e.remove_level,
+            "golevel":  lambda: e.go_level(args[0]),
+            "movelevel": lambda: e.move_level(args[0], args[1]),
+            "steplevel": lambda: e.step_level(args[0], args[1]),
             "example":  lambda: (e.example(), (1, 0, ""))[1],
             "empty":    lambda: (e.new_empty(), (1, 0, ""))[1],
         }[op]()
@@ -1108,7 +1187,11 @@ class Script:
             argtxt = f" {fmt(args[0])}"
         elif op in ("pick", "toggleout"):
             argtxt = f" {args[0]}"
-        elif op in ("fill", "raise"):
+        elif op == "golevel":
+            argtxt = f" {args[0]}"
+        elif op == "movelevel":
+            argtxt = f" {args[0]} {fmt(args[1])}"
+        elif op in ("fill", "raise", "steplevel"):
             argtxt = f" {args[0]} {1 if args[1] else 0}"
         elif op == "newlevel":
             argtxt = f" {args[0]}"
@@ -1291,6 +1374,25 @@ class Script:
             + f" SILENCE {fmt(sil)} SEL "
             + ("-" if mine is None else (" ".join(fmt(x) for x in mine) or "-"))
             + f" DOTS {dots}")
+
+    def drag_level(self, k, pixels, gap):
+        """Where dragging level k's dot puts it (round 3A-6b)."""
+        nb = self.ed.level_drag_to(k, pixels, gap)
+        self.out.append(f"DRAGLEVEL {k} {fmt(pixels)} {fmt(gap)} EXPECT {fmt(nb)}")
+        return nb
+
+    def dot_at(self, x, y, top, bottom, cx):
+        """Which level's dot a click at (x, y) is on, or -1: within 8 pixels
+        of a dot, in the column at cx."""
+        col = self.ed.dots([], 0.0, top, bottom, False)
+        k = -1
+        if col is not None and abs(x - cx) <= 8.0:
+            for i, yy in enumerate(col[0]):
+                if abs(y - yy) <= 8.0:
+                    k = i
+        self.out.append(f"DOTAT {fmt(x)} {fmt(y)} {fmt(top)} {fmt(bottom)} "
+                        f"{fmt(cx)} EXPECT {k}")
+        return k
 
     def start_z(self, weights):
         """Where audition starts: the current level, under the point."""
@@ -1828,6 +1930,7 @@ def build():
     t.end()
     build_round3(out)
     build_levels(out)
+    build_levels_b(out)
     return out
 
 
@@ -2137,6 +2240,78 @@ def build_levels(out):
     out.append("# on the level as bent, not at its starting height")
     t.do("levelup")
     t.start_z(w)
+    t.end()
+
+
+
+def build_levels_b(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-6b: A LEVEL GONE TO BY ITS DOT, AND MOVED WHOLE")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "levels_go_and_move",
+               "a click on a dot goes to that level (not an undo step); "
+               "moving a level moves its start and every node on it, bends "
+               "kept, and makes it current -- one undo step, refused where a "
+               "node or its start would reach a neighbour")
+    t.do("example")
+    t.keys()
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.keys()
+    t.do("golevel", 0)
+    t.do("golevel", 1)
+    t.select("O"); t.do("raise", 1, False); t.do("raise", 1, False)
+    out.append("# O at 0.35 on the middle level; the top starts at 0.5")
+    t.do("movelevel", 1, 0.4)
+    t.do("movelevel", 1, 0.3)
+    t.do("movelevel", 1, 0.1)
+    t.do("movelevel", 1, -0.1)
+    out.append("# its start would pass the ground's, though no node touches")
+    t.do("golevel", 0)
+    t.select("O", "N", "E", "S", "W", "A", "B", "C", "D")
+    for _ in range(5):
+        t.do("raise", -1, False)
+    t.do("movelevel", 1, -0.05)
+    t.do("movelevel", 2, 2.0)
+    t.do("undo"); t.do("undo")
+    t.end()
+
+    t = Script(out, "levels_step",
+               "i and k move the current level 0.05 (shift 0.01), landing on "
+               "the next multiple as heights do")
+    t.do("example")
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.do("leveldown")
+    t.do("steplevel", 1, False)
+    t.do("steplevel", 1, True)
+    t.do("steplevel", -1, False)
+    for _ in range(4):
+        t.do("steplevel", -1, False)
+    t.do("steplevel", 1, True)
+    t.end()
+
+    t = Script(out, "levels_drag",
+               "dragging a dot: a gap between dots is a quarter of the map, "
+               "in steps of 0.01, stopping 0.01 short of a neighbour; and "
+               "which dot a click is on")
+    t.do("example")
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.select("O"); t.do("raise", -1, False)
+    t.drag_level(1, 0.0, 60.0)
+    t.drag_level(1, 12.0, 60.0)
+    t.drag_level(1, -13.0, 60.0)
+    t.drag_level(1, 200.0, 60.0)
+    out.append("# up a whole gap: O on the top level is only 0.2 above, so it")
+    out.append("# stops at 0.44, 0.01 short")
+    t.drag_level(1, -60.0, 60.0)
+    t.drag_level(2, 70.0, 60.0)
+    t.drag_level(2, -500.0, 60.0)
+    t.drag_level(0, 40.0, 60.0)
+    t.dot_at(500.0, 100.0, 10.0, 100.0, 500.0)
+    t.dot_at(503.0, 61.0, 10.0, 100.0, 500.0)
+    t.dot_at(500.0, 17.0, 10.0, 100.0, 500.0)
+    t.dot_at(520.0, 55.0, 10.0, 100.0, 500.0)
+    t.dot_at(500.0, 80.0, 10.0, 100.0, 500.0)
     t.end()
 
 

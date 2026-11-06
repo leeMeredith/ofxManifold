@@ -423,6 +423,33 @@ int main(int argc, char** argv) {
                 } else if (verb == "SET") {
                     LevelID k; NodeID n; float h; o >> k >> n >> h >> want;
                     got = st.levels.setHeight(k, n, h) ? "=OK" : "=REFUSED";
+                } else if (verb == "MOVE") {
+                    LevelID k; float dz; o >> k >> dz >> want;
+                    std::vector<NodeID> blocked;
+                    if (st.levels.moveLevel(k, dz, nodes, &blocked)) got = "=OK";
+                    else {
+                        got = "=REFUSED:";
+                        if (blocked.empty()) got += "-";
+                        for (std::size_t i = 0; i < blocked.size(); ++i) {
+                            got += (i ? "," : "") + std::to_string(blocked[i]);
+                        }
+                    }
+                } else if (verb == "ROOM") {
+                    LevelID k; o >> k >> want;
+                    // Compared as numbers: a gap is a difference of heights,
+                    // float here and double in the reference.
+                    const auto r = st.levels.room(k, nodes);
+                    const std::vector<std::string> pair =
+                        splitOn(want.substr(1), ',');
+                    auto same = [](float v, const std::string& w) {
+                        if (w == "inf") return std::isinf(v);
+                        return !std::isinf(v)
+                            && std::fabs(v - std::stof(w)) < 1e-5f;
+                    };
+                    got = (pair.size() == 2 && same(r.first, pair[0])
+                           && same(r.second, pair[1]))
+                        ? want : "=" + std::to_string(r.first) + ","
+                                 + std::to_string(r.second);
                 } else if (verb == "REMOVE") {
                     LevelID k; o >> k >> want;
                     got = st.levels.removeLevel(k) ? "=OK" : "=REFUSED";

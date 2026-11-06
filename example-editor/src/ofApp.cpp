@@ -67,12 +67,37 @@ void ofApp::update() {
     // the map and the view share the width, side by side, and the panel
     // follows both. A flat map with the view off is laid out as it always
     // was.
+    //
+    // With the view open the key panel moves BENEATH the two views (3A-6b),
+    // spread across in columns, so nothing runs off the window: the views
+    // give up as much height as the panel needs at this width.
     const float column = model.map3d().count() > 1 ? 64.0f : 0.0f;
     float plan = side;
+    float panelH = 0.0f;
     if (show3D) {
-        const float room = ofGetWidth() - 48.0f - column - 16.0f - 30.0f
-                         - 40.0f * text.charWidth();
-        plan = std::max(160.0f, std::min(side, room * 0.5f));
+        // The status block goes beside the views if it fits in the space
+        // they leave, the keys alone beneath; otherwise both beneath.
+        const auto groups = keyMap(keyContext());
+        const float cw = text.charWidth(), lh = text.lineHeight();
+        const float across = (ofGetWidth() - 48.0f - column - 16.0f) * 0.5f;
+        auto planFor = [&](float h) {
+            // A window too small for all of the panel keeps the views at
+            // their least and gives the panel the rest; its last columns then
+            // run on to the right rather than over the faders.
+            h = std::min(h, side - 160.0f - 16.0f);
+            return std::make_pair(
+                std::max(160.0f, std::min(side - h - 16.0f, across)), h);
+        };
+        auto fit = planFor(panelBelowHeight(groups, cw, lh,
+                                            ofGetWidth() - 40.0f, false));
+        statusBeside = 24.0f + 2.0f * fit.first + column + 16.0f + 30.0f
+                     + kStatusChars * cw <= ofGetWidth();
+        if (!statusBeside) {
+            fit = planFor(panelBelowHeight(groups, cw, lh,
+                                           ofGetWidth() - 40.0f, true));
+        }
+        plan = fit.first;
+        panelH = fit.second;
     }
     renderer->setViewport(ofRectangle(24, 24, plan, plan));
     float right = 24.0f + plan + column;
@@ -81,6 +106,10 @@ void ofApp::update() {
         right = view3D.getRight();
         if (!aimed) { aimLevelView(cam, view3D); aimed = true; }
         cam.setControlArea(view3D);
+        panelTop = 24.0f + plan + 16.0f;
+        panelBottom = panelTop + panelH;
+    } else {
+        panelTop = panelBottom = -1.0f;
     }
     panelLeft = right + 30.0f;
     chartTop = 24.0f + side + 16.0f;
@@ -136,6 +165,11 @@ void ofApp::draw() {
     sc.listeningZ = auditionZ;
     sc.auditioning = auditioning();
     sc.panelLeft = panelLeft;
+    sc.panelTop = panelTop;
+    sc.panelBottom = panelBottom;
+    sc.statusBeside = statusBeside;
+    sc.levelDrag = levelMoved ? levelPress : -1;
+    sc.levelDragBase = levelDragBase;
     sc.mouse = mouse;
 
     GridLook look;
@@ -253,6 +287,15 @@ void ofApp::mousePressed(int x, int y, int) {
              && y >= view3D.getY() && y <= view3D.getBottom();
     if (pressIn3D) return;
 
+    // A level's dot: a click goes to that level, a drag moves the level.
+    levelPress = dotAt(columnNow(), columnX(), float(x), float(y));
+    if (levelPress >= 0) {
+        levelPressY = float(y);
+        levelDragBase = model.map3d().levels().base(LevelID(levelPress));
+        levelMoved = false;
+        return;
+    }
+
     // A click on the chart picks an output. It never edits the map.
     pressInChart = (y >= chartTop);
     if (pressInChart) {
@@ -319,6 +362,16 @@ void ofApp::mouseDragged(int x, int y, int) {
     const glm::vec2 screen(x, y);
     mouse = screen;
     if (pressIn3D) return;
+    if (levelPress >= 0) {
+        const DotColumn c = columnNow();
+        const float gap = c.dots.size() > 1 ? c.dots[0] - c.dots[1] : 1.0f;
+        const float px = float(y) - levelPressY;
+        if (std::fabs(px) > 3.0f) levelMoved = true;
+        if (levelMoved) {
+            levelDragBase = levelDragTo(model, LevelID(levelPress), px, gap);
+        }
+        return;
+    }
     if (pressInChart) return;
     if (pressAudition) {
         auditionPoint = renderer->toManifold(screen);
@@ -368,6 +421,18 @@ void ofApp::mouseDragged(int x, int y, int) {
 void ofApp::mouseReleased(int x, int y, int) {
     const glm::vec2 screen(x, y);
     if (pressIn3D) { pressIn3D = false; return; }
+    if (levelPress >= 0) {
+        const LevelID k = LevelID(levelPress);
+        const float base = levelDragBase;
+        if (levelMoved) {
+            act("move level", [k, base](Model& m) { return m.moveLevel(k, base); });
+        } else {
+            show(model.goToLevel(k));
+        }
+        levelPress = -1;
+        levelMoved = false;
+        return;
+    }
     if (pressInChart) { pressInChart = false; return; }
     if (pressAudition) { pressAudition = false; return; }
 
@@ -459,8 +524,21 @@ std::string ofApp::keyId(int key) const {
     case OF_KEY_UP: case OF_KEY_DOWN:               return "levelswitch";
     case 'n': case 'N':                             return "newlevel";
     case 'y': case 'Y': case 'h': case 'H':         return "raise";
+    case 'i': case 'I': case 'k': case 'K':         return "movelevel";
     default:                                        return "";
     }
+}
+
+// The column of dots as the map view draws it, for clicks on it.
+DotColumn ofApp::columnNow() const {
+    const ofRectangle vp = renderer->viewport();
+    const float inset = vp.getHeight() * kColumnInset;
+    return dotColumn(model, vp.getY() + inset, vp.getBottom() - inset, false,
+                     evaluation, 0.0f);
+}
+
+float ofApp::columnX() const {
+    return renderer->viewport().getRight() + kColumnOffset;
 }
 
 KeyContext ofApp::keyContext() const {
@@ -622,6 +700,14 @@ void ofApp::keyPressed(int key) {
         const bool fine = (key == 'Y' || key == 'H');
         act("height", [&, dir, fine](Model& m) {
             return m.raise(selection, dir, fine); });
+        return;
+    }
+    // i up, k down, for the whole level: i sits above k. Shift for fine.
+    if (id == "movelevel") {
+        const int  dir  = (key == 'i' || key == 'I') ? +1 : -1;
+        const bool fine = (key == 'I' || key == 'K');
+        act("move level", [dir, fine](Model& m) {
+            return m.stepLevel(dir, fine); });
         return;
     }
     if (id == "removelevel") {

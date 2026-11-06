@@ -157,10 +157,28 @@ int main() {
     a.keyReleased(OF_KEY_UP);
     a.keyReleased(' ');
     frame("audition released: back on the middle level");
+    // 3A-6b: the dots answer the mouse; i and k move a whole level.
+    {
+        // the column as the map view places it: the map is 462 square at
+        // (24, 24) in this window, the column 15 to its right, inset 15%
+        const float x = 24.0f + 462.0f + 15.0f;
+        const float top = 24.0f + 462.0f * 0.15f;
+        const float bottom = 24.0f + 462.0f * 0.85f;
+        click(int(x), int(top));                     // the top level's dot
+        frame("clicked the top dot: level 3 current");
+        a.mousePressed(int(x), int((top + bottom) / 2), 0);
+        a.mouseDragged(int(x), int((top + bottom) / 2 + 20), 0);
+        frame("dragging the middle dot down: its landing shown");
+        a.mouseReleased(int(x), int((top + bottom) / 2 + 20), 0);
+        frame("let go: the middle level moved");
+    }
+    key('i');
+    key('K');
+    frame("i then shift-k on the middle level");
     hold(OF_KEY_COMMAND);
     key('3');
     release(OF_KEY_COMMAND);
-    frame("the 3D view");
+    frame("the 3D view, the keys beneath the views");
     hold(OF_KEY_COMMAND);
     key(OF_KEY_DEL);
     release(OF_KEY_COMMAND);
