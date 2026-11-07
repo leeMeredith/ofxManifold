@@ -940,6 +940,41 @@ its range or both.
   values group adds five rows to it. On a wider window the panel is two
   columns.
 
+### 3A-8: a ring or a block in one step
+
+As proposed, with Lee's answer (2026-11-07): yes, all as recommended -- the
+layout goes where the mouse points, and the triangular grid gets a block
+too.
+
+- **`l` on the polar grid** lays out a ring on the ring nearest the mouse:
+  one node per spoke, numbered clockwise from the spoke nearest the front
+  (map +y, up on screen); of two equally near, the one just right of front.
+  The ring is joined as one region.
+- **`l` on the square grid** lays out an n x n block centred on the grid
+  point nearest the mouse (for an even n, the extra row and column go up and
+  right), numbered row by row from the front-left, joined as squares. **On
+  the triangular grid** the block is a rhombus of n x n points, each cell
+  split into two triangles across its short diagonal.
+- **`[ ]`** set n, 2 to 8 (3 to start), on a square or triangular grid; on
+  the polar grid they still set the spokes, which is the ring's size. The key
+  panel names what `l` would lay out: `lay out a ring of 8`, `lay out a 3 x 3
+  block`.
+- **Each node is placed as a click places it**, so with auto-output each gets
+  its own output on every level; the outputs are made level by level, so a
+  ring of 8 on two levels takes channels 0-7 on the first and 8-15 on the
+  second. One undo step, labelled `lay out`. The new nodes are left selected,
+  so `y`, `m` or a drag acts on the whole layout next.
+- **All or nothing:** refused on the free grid, at the polar centre, if any
+  node would land off the map, or on a node already there. A ring of radius
+  0.5 touches the edges exactly; the spacing is a float, so the edge is
+  allowed a hundred-thousandth of slack and the nodes are held on the map.
+- **Refactor:** `place` is now `placeAt` (the node) and `giveOutputs` (its
+  outputs, level by level), shared with `layout`. The grid gained `spokes()`,
+  `angle()` and `centre()`.
+- 5 editor scripts (60), 18 checked steps (790); 18 mutation gates (332).
+  The drawing session gained four frames: a ring, a 4 x 4 block, a block in
+  triangles, `l` refused with the grid off. `make keys` covers `l` (47).
+
 ---
 
 ## Answered

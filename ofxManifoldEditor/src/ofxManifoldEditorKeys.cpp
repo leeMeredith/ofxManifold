@@ -88,11 +88,20 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("the grid is off (1)")),
         entry("spacing", "- =", "grid spacing", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
-        entry("spokes", "[ ]", "polar spokes",
-              !drag && ctx.grid == GridShape::Polar,
-              unlessDrag("polar grid only (4)")),
+        // [ ] sets what l lays out: the spokes on the polar grid, the
+        // block's size on a lattice (round 3A-8).
+        entry("spokes", "[ ]",
+              ctx.grid == GridShape::Polar ? "polar spokes" : "block size",
+              !drag && gridOn, unlessDrag("the grid is off (1)")),
         entry("deadzone", ", .", "snap dead zone", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
+        entry("layout", "l",
+              ctx.grid == GridShape::Polar
+                  ? "lay out a ring of " + std::to_string(ctx.spokes)
+                  : "lay out a " + std::to_string(ctx.blockSize) + " x "
+                        + std::to_string(ctx.blockSize) + " block"
+                        + (ctx.triangles ? " in triangles" : ""),
+              !drag && gridOn, unlessDrag("the grid is off (1)")),
     }});
 
     g.push_back({"outputs", {

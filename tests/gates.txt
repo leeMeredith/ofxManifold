@@ -677,8 +677,8 @@ replace:             marks.push_back({l.id, id, fill});
 
 gate: Placing a node moves the current output
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:         if (first != InvalidTarget && currentOutput_ == InvalidTarget) {
-replace:         if (first != InvalidTarget) {
+find:     if (first != InvalidTarget && currentOutput_ == InvalidTarget) {
+replace:     if (first != InvalidTarget) {
 
 gate: An unbind silences a node without saying so
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1698,3 +1698,99 @@ gate: g is listed but not wired
 file: example-editor/src/ofApp.cpp
 find:     case 'g':                                       return "newvalue";
 replace:     case '\x02':                                    return "newvalue";
+
+# ---- round 3A-8: a ring or a block in one step ----
+
+gate: l lays out on the free grid
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (grid.mode() == GridMode::Free) {
+replace:     if (false) {
+
+gate: A ring at the polar centre
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (ring == 0) return refusal("point at a ring, not the centre", 2.0f);
+replace:         (void)ring;
+
+gate: The ring runs anticlockwise
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             a.b = ((b0 - i) % S + S) % S;
+replace:             a.b = ((b0 + i) % S + S) % S;
+
+gate: A tie goes to the spoke left of front
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find: (std::fabs(d - bestD) <= 1e-5 && cw < bestCw)
+replace: (std::fabs(d - bestD) <= 1e-5 && cw > bestCw)
+
+gate: The ring starts at spoke 0
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                 bestD = d; bestCw = cw; b0 = b;
+replace:                 bestD = d; bestCw = cw; b0 = 0;
+
+gate: The block starts at the point, not around it
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         const int i0 = snap.address.a - (size - 1) / 2;
+replace:         const int i0 = snap.address.a;
+
+gate: The block is numbered from the back
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         for (int j = size - 1; j >= 0; --j) {
+replace:         for (int j = 0; j < size; ++j) {
+
+gate: A block on the triangular grid is joined as squares
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                 if (triangles) {
+replace:                 if (false) {
+
+gate: Triangles split across the long diagonal
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                     manifold_.addRegion({a, b, d});\n                    manifold_.addRegion({b, c, d});
+replace:                     manifold_.addRegion({a, b, c});\n                    manifold_.addRegion({a, c, d});
+nl: yes
+
+gate: The ring is not joined
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         manifold_.addRegion(ids);
+replace:         (void)ids;
+
+gate: A layout may run off the map
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (q.x < -tol || q.x > 1.0f + tol || q.y < -tol || q.y > 1.0f + tol) {
+replace:         if (false) {
+
+gate: A ring touching the edge is refused
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     const float tol = 1e-5f;
+replace:     const float tol = 0.0f;
+
+gate: A layout lands on a node
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (occupied(pts[i], addrs[i], grid)) {
+replace:         if (false) {
+
+gate: A layout's outputs interleave the levels
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     giveOutputs(ids);\n    if (placed) *placed = ids;
+replace:     for (NodeID n : ids) giveOutputs({n});\n    if (placed) *placed = ids;
+nl: yes
+
+gate: Placing a node gives it no outputs
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     giveOutputs({id});
+replace:     (void)id;
+
+gate: [ ] only on the polar grid
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               ctx.grid == GridShape::Polar ? "polar spokes" : "block size",\n              !drag && gridOn,
+replace:               ctx.grid == GridShape::Polar ? "polar spokes" : "block size",\n              !drag && ctx.grid == GridShape::Polar,
+nl: yes
+
+gate: l is listed with the grid off
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:                         + (ctx.triangles ? " in triangles" : ""),\n              !drag && gridOn,
+replace:                         + (ctx.triangles ? " in triangles" : ""),\n              !drag,
+nl: yes
+
+gate: l is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case 'l':                                       return "layout";
+replace:     case '\x02':                                    return "layout";

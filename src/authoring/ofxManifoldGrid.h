@@ -91,6 +91,12 @@ public:
 
     // Smallest distance between neighbouring grid points, the unit hysteresis
     // is measured in. Zero in free mode.
+    // The polar grid's shape (for laying out a ring, editor round 3A-8):
+    // how many spokes, the first spoke's angle, the centre.
+    int       spokes() const { return spokes_; }
+    float     angle()  const { return angle_; }
+    glm::vec2 centre() const { return {float(ox_), float(oy_)}; }
+
     double spacing() const {
         if (mode_ == GridMode::Polar) return dr_;
         if (mode_ == GridMode::Lattice) {

@@ -295,19 +295,32 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
     if (occupied(s.point, s.address, grid)) {
         return refusal("a node is already there", 1.5f);
     }
-    const NodeID id = manifold_.addNode(freshName(), s.point);
+    const NodeID id = placeAt(s.point);
     if (id == InvalidNode) return Result{};
+    giveOutputs({id});
+    refreshTopology();
+    if (placed) *placed = id;
+    Result r;
+    r.changed = true;
+    return r;
+}
 
-    // The output takes the NODE'S NAME. That is what pairs them, and it
-    // survives save and reload with no extra bookkeeping -- which is how
-    // deleting the node later finds its own fader.
-    //
-    // With levels, an output of its own on EVERY level (3A-6d): each level's
-    // node puts out its own number -- P, P-2, P-3 -- each made only if its
-    // name is free.
-    if (autoOutput_) {
-        TargetID first = InvalidTarget;
-        for (LevelID k = 0; k < map_.count(); ++k) {
+NodeID Model::placeAt(glm::vec2 q) {
+    return manifold_.addNode(freshName(), q);
+}
+
+// The output takes the NODE'S NAME. That is what pairs them, and it survives
+// save and reload with no extra bookkeeping -- which is how deleting the node
+// later finds its own fader.
+//
+// With levels, an output of its own on EVERY level (3A-6d): each level's node
+// puts out its own number -- P, P-2, P-3 -- each made only if its name is
+// free. Level by level, so one level's outputs take one run of channels.
+void Model::giveOutputs(const std::vector<NodeID>& ids) {
+    if (!autoOutput_) return;
+    TargetID first = InvalidTarget;
+    for (LevelID k = 0; k < map_.count(); ++k) {
+        for (NodeID id : ids) {
             const std::string on = levelOutput(manifold_.node(id).name, k);
             if (mapping().findTarget(on) != InvalidTarget) continue;
             const TargetID t = map_.addOutput(on, nextFreeChannel());
@@ -315,20 +328,123 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
             map_.bind(k, id, t);
             if (first == InvalidTarget) first = t;
         }
-        // The current output changes only if there was none. It used to
-        // follow every new node, so the output `b` acted on was usually the
-        // one the newest node already fed -- and b, a toggle, then UNBOUND
-        // it, leaving it silent. The current output is the one the user
-        // picked, and placing a node must not move it.
-        if (first != InvalidTarget && currentOutput_ == InvalidTarget) {
-            selectOnlyOutput(first);
+    }
+    // The current output changes only if there was none. It used to follow
+    // every new node, so the output `b` acted on was usually the one the
+    // newest node already fed -- and b, a toggle, then UNBOUND it, leaving it
+    // silent. The current output is the one the user picked, and placing a
+    // node must not move it.
+    if (first != InvalidTarget && currentOutput_ == InvalidTarget) {
+        selectOnlyOutput(first);
+    }
+}
+
+Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
+                     std::vector<NodeID>* placed) {
+    if (placed) placed->clear();
+    if (grid.mode() == GridMode::Free) {
+        return refusal("pick a square, triangular or polar grid first "
+                       "(2, 3 or 4)", 2.5f);
+    }
+    const SnapResult snap = grid.snap(p);
+    std::vector<GridAddress> addrs;
+    std::string what;
+    if (grid.mode() == GridMode::Polar) {
+        const int ring = snap.address.a;
+        if (ring == 0) return refusal("point at a ring, not the centre", 2.0f);
+        // The spoke nearest the front; of two equally near, the one just
+        // right of it. Then clockwise -- with up as +y, clockwise is falling
+        // angle, so falling spoke number.
+        const int S = grid.spokes();
+        const double twoPi = 2.0 * 3.14159265358979323846;
+        int b0 = 0;
+        double bestD = 1e9, bestCw = 1e9;
+        for (int b = 0; b < S; ++b) {
+            const double t = double(grid.angle()) + b * twoPi / double(S);
+            double cw = std::fmod(twoPi * 0.25 - t, twoPi);
+            if (cw < 0.0) cw += twoPi;
+            const double d = std::min(cw, twoPi - cw);
+            if (d < bestD - 1e-5 || (std::fabs(d - bestD) <= 1e-5 && cw < bestCw)) {
+                bestD = d; bestCw = cw; b0 = b;
+            }
+        }
+        for (int i = 0; i < S; ++i) {
+            GridAddress a;
+            a.a = ring;
+            a.b = ((b0 - i) % S + S) % S;
+            a.valid = true;
+            addrs.push_back(a);
+        }
+        what = "ring";
+    } else {
+        const int i0 = snap.address.a - (size - 1) / 2;
+        const int j0 = snap.address.b - (size - 1) / 2;
+        for (int j = size - 1; j >= 0; --j) {
+            for (int i = 0; i < size; ++i) {
+                GridAddress a;
+                a.a = i0 + i;
+                a.b = j0 + j;
+                a.valid = true;
+                addrs.push_back(a);
+            }
+        }
+        what = "block";
+    }
+
+    // All or nothing: every spot on the map, and free. On the map within a
+    // hair -- the spacing is a float, so a ring touching the edge (radius
+    // 0.5 = 5 x 0.1f) lands a few 1e-9 outside it -- and then held on it.
+    const float tol = 1e-5f;
+    std::vector<glm::vec2> pts;
+    for (const GridAddress& a : addrs) pts.push_back(grid.point(a));
+    for (glm::vec2& q : pts) {
+        if (q.x < -tol || q.x > 1.0f + tol || q.y < -tol || q.y > 1.0f + tol) {
+            return refusal("refused: the " + what + " would run off the map",
+                           2.5f);
+        }
+        q = glm::clamp(q, glm::vec2(0.0f), glm::vec2(1.0f));
+    }
+    for (std::size_t i = 0; i < pts.size(); ++i) {
+        if (occupied(pts[i], addrs[i], grid)) {
+            return refusal("refused: a node is already in the way", 2.5f);
         }
     }
+
+    // The nodes first, then their outputs level by level.
+    std::vector<NodeID> ids;
+    for (const glm::vec2& q : pts) ids.push_back(placeAt(q));
+    giveOutputs(ids);
+    if (placed) *placed = ids;
+
+    std::string msg;
+    if (what == "ring") {
+        manifold_.addRegion(ids);
+        msg = "ring of " + std::to_string(ids.size()) + " nodes";
+    } else {
+        // ids are row by row from the front: row r (0 = front) holds
+        // j = j0 + size - 1 - r. The node at (i, j) is ids[r * size + i].
+        auto at = [&](int i, int j) {
+            const int r = size - 1 - j;
+            return ids[std::size_t(r * size + i)];
+        };
+        for (int j = 0; j + 1 < size; ++j) {
+            for (int i = 0; i + 1 < size; ++i) {
+                const NodeID a = at(i, j), b = at(i + 1, j);
+                const NodeID c = at(i + 1, j + 1), d = at(i, j + 1);
+                if (triangles) {
+                    manifold_.addRegion({a, b, d});
+                    manifold_.addRegion({b, c, d});
+                } else {
+                    manifold_.addRegion({a, b, c, d});
+                }
+            }
+        }
+        msg = std::to_string(size) + " x " + std::to_string(size) + " block, "
+            + std::to_string(size * size) + " nodes"
+            + (triangles ? " in triangles" : "");
+    }
     refreshTopology();
-    if (placed) *placed = id;
-    Result r;
-    r.changed = true;
-    return r;
+    return changed(msg, 2.5f);
 }
 
 // One operation, all or nothing, checked against FINAL shapes. On refusal

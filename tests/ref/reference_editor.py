@@ -194,16 +194,95 @@ class Editor:
             return (0, 0, "")
         if self.occupied(q, addr, grid):
             return (0, 1, "a node is already there")
+        self.place_at(q)
+        return (1, 0, "")
+
+    # ---- round 3A-8: a ring or a block in one step ------------------------
+
+    def layout(self, p, grid, size, triangles):
+        """l: on the polar grid, a ring -- one node per spoke on the ring
+        nearest the point, numbered clockwise from the spoke nearest the
+        front (up), joined as one region. On a lattice, a size x size block
+        centred on the grid point nearest the point, numbered row by row
+        from the front-left, joined as squares -- or triangles, each square
+        split across its short diagonal. Each node placed as a click places
+        it. All or nothing: refused if any would land off the map or on a
+        node."""
+        if isinstance(grid, G.Free):
+            return (0, 1, "pick a square, triangular or polar grid first "
+                    "(2, 3 or 4)")
+        q, addr = grid.snap(p)
+        if isinstance(grid, G.Polar):
+            ring = addr[0]
+            if ring == 0:
+                return (0, 1, "point at a ring, not the centre")
+            S = grid.spokes
+            best = None
+            for b in range(S):
+                t = grid.angle + b * 2.0 * math.pi / S
+                cw = (math.pi / 2 - t) % (2.0 * math.pi)
+                d = min(cw, 2.0 * math.pi - cw)
+                if best is None or d < best[0] - 1e-5 or \
+                        (abs(d - best[0]) <= 1e-5 and cw < best[1]):
+                    best = (d, cw, b)
+            b0 = best[2]
+            addrs = [(ring, (b0 - i) % S) for i in range(S)]
+            what = "ring"
+        else:
+            i0, j0 = addr[0] - (size - 1) // 2, addr[1] - (size - 1) // 2
+            addrs = [(i0 + i, j0 + j) for j in reversed(range(size))
+                     for i in range(size)]
+            what = "block"
+        # On the map within a hair (the editor's grid spacing is a float,
+        # so a ring touching the edge can land a few 1e-9 outside it), and
+        # then held on it.
+        pts = [grid.point(a) for a in addrs]
+        tol = 1e-5
+        if any(not (-tol <= x <= 1.0 + tol and -tol <= y <= 1.0 + tol)
+               for x, y in pts):
+            return (0, 1, f"refused: the {what} would run off the map")
+        pts = [(min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0)) for x, y in pts]
+        if any(self.occupied(pt, a, grid) for pt, a in zip(pts, addrs)):
+            return (0, 1, "refused: a node is already in the way")
+        # The nodes first, then their outputs level by level, so each level's
+        # take one run of channels: a ring of 8 on two levels is 0-7, 8-15.
+        names = {a: self.place_at(pt, outputs=False) for a, pt in zip(addrs, pts)}
+        self.give_outputs([names[a] for a in addrs])
+        if what == "ring":
+            self.regions.append(tuple(names[a] for a in addrs))
+            return (1, 0, f"ring of {len(addrs)} nodes")
+        for j in range(j0, j0 + size - 1):
+            for i in range(i0, i0 + size - 1):
+                a, b = names[(i, j)], names[(i + 1, j)]
+                c, d = names[(i + 1, j + 1)], names[(i, j + 1)]
+                if triangles:
+                    self.regions.append((a, b, d))
+                    self.regions.append((b, c, d))
+                else:
+                    self.regions.append((a, b, c, d))
+        return (1, 0, f"{size} x {size} block, {size * size} nodes"
+                + (" in triangles" if triangles else ""))
+
+    def place_at(self, q, outputs=True):
+        """A node at q, exactly; its own outputs as a click gives it."""
         nm = self.fresh()
         self.nodes.append([nm, (q[0], q[1])])
-        if self.auto:
-            # An output of its own on EVERY level (3A-6d): each level's node
-            # puts out its own number. Named after the node, and on levels
-            # past the first after the level too -- P, P-2, P-3 -- each made
-            # only if its name is free.
-            made = None
-            keep = self.cur
-            for k in range(len(self.levels)):
+        if outputs:
+            self.give_outputs([nm])
+        return nm
+
+    def give_outputs(self, names):
+        """With auto-output on, each node its own output on EVERY level
+        (3A-6d): each level's node puts out its own number. Named after the
+        node, and on levels past the first after the level too -- P, P-2,
+        P-3 -- each made only if its name is free. Level by level, so one
+        level's outputs take one run of channels."""
+        if not self.auto:
+            return
+        made = None
+        keep = self.cur
+        for k in range(len(self.levels)):
+            for nm in names:
                 on = self.level_output(nm, k)
                 if on in self.out_names():
                     continue
@@ -211,10 +290,9 @@ class Editor:
                 self.cur = k
                 self.bind_one(nm, on)
                 made = made or on
-            self.cur = keep
-            if made is not None and self.current is None:
-                self.select_only(made)
-        return (1, 0, "")
+        self.cur = keep
+        if made is not None and self.current is None:
+            self.select_only(made)
 
     @staticmethod
     def level_output(nm, k):
@@ -1183,8 +1261,8 @@ class Editor:
             ("join", nd and len(sel) >= 3), ("unjoin", nd and region_sel),
             ("remove", nd and bool(sel)),
             ("gridkind", nd), ("rotate", nd and grid_on),
-            ("spacing", nd and grid_on), ("spokes", nd and grid == "polar"),
-            ("deadzone", nd and grid_on),
+            ("spacing", nd and grid_on), ("spokes", nd and grid_on),
+            ("deadzone", nd and grid_on), ("layout", nd and grid_on),
             ("newoutput", nd), ("pickoutput", nd and outs > 0),
             ("addoutput", nd and outs >= 2), ("nextoutput", nd and outs >= 2),
             ("bind", nd and possible), ("bindall", nd and outs > 0 and bool(sel)),
@@ -1363,6 +1441,7 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "removelevel": "remove level", "movelevel": "move level",
           "steplevel": "move level", "match": "height",
           "flatten": "height", "newvalue": "new value", "editvalue": "value",
+          "layout": "lay out",
           "stepvalue": "value", "removevalue": "remove value"}
 
 
@@ -1414,6 +1493,7 @@ class Script:
         e, s = self.ed, self.sel
         res = {
             "place":    lambda: e.place(args[0], self.grid),
+            "layout":   lambda: e.layout(args[0], self.grid, args[1], args[2]),
             "join":     lambda: e.join(s, self.ordered),
             "unjoin":   lambda: e.unjoin(s),
             "remove":   lambda: e.remove(s),
@@ -1456,6 +1536,9 @@ class Script:
         argtxt = ""
         if op == "place":
             argtxt = f" {fmt(args[0][0])} {fmt(args[0][1])}"
+        elif op == "layout":
+            argtxt = (f" {fmt(args[0][0])} {fmt(args[0][1])} {args[1]} "
+                      f"{1 if args[2] else 0}")
         elif op == "trim":
             argtxt = f" {fmt(args[0])}"
         elif op in ("pick", "toggleout"):
@@ -2240,6 +2323,7 @@ def build():
     build_levels_c(out)
     build_levels_d(out)
     build_values(out)
+    build_layout(out)
     return out
 
 
@@ -2842,6 +2926,70 @@ def build_values(out):
     t.type_keys("", [ord("a"), 27, ord("b")])
     t.type_keys("", [357, 9, ord("q")])
     t.type_keys("", [ord("x")] * 45)
+    t.end()
+
+
+
+def build_layout(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-8: A RING OR A BLOCK IN ONE STEP")
+    out.append("#" + "-" * 68)
+
+    polar = G.Polar((0.5, 0.5), 0.1, 8, 0.0)
+    t = Script(out, "layout_ring",
+               "l on the polar grid: a ring on the ring nearest the point, one "
+               "node per spoke, numbered clockwise from the spoke nearest the "
+               "front, joined as one region, each with its own outputs -- on "
+               "every level. Refused at the centre, off the map, or on a node",
+               grid=polar, spec=polar.spec())
+    t.keys(grid="polar")
+    t.do("newlevel", 1)
+    t.do("layout", (0.52, 0.79), 3, False)
+    t.do("layout", (0.5, 0.82), 3, False)
+    t.do("layout", (0.51, 0.49), 3, False)
+    t.do("layout", (0.5, 0.95), 3, False)
+    out.append("# the outermost ring that fits: radius 0.5 touches the edges")
+    t.do("layout", (0.5, 1.0), 3, False)
+    t.do("undo")
+    t.do("layout", (0.5, 1.08), 3, False)
+    t.do("layout", (0.62, 0.5), 3, False)
+    t.end()
+
+    tilted = G.Polar((0.5, 0.5), 0.1, 8, math.pi / 8)
+    t = Script(out, "layout_ring_tilted",
+               "with the spokes tilted so two are equally near the front, the "
+               "ring starts at the one just right of it",
+               grid=tilted, spec=tilted.spec())
+    t.do("layout", (0.5, 0.7), 3, False)
+    t.end()
+
+    square = G.Lattice((0.1, 0.0), (0.0, 0.1))
+    t = Script(out, "layout_block",
+               "l on the square grid: an n x n block centred on the grid point "
+               "nearest the point, numbered row by row from the front-left, "
+               "joined as squares; refused off the map or on a node; nothing "
+               "on the free grid",
+               grid=square, spec=square.spec())
+    t.do("layout", (0.49, 0.52), 3, False)
+    t.do("layout", (0.5, 0.5), 3, False)
+    t.do("layout", (0.21, 0.19), 4, False)
+    t.do("layout", (0.11, 0.19), 4, False)
+    t.do("layout", (0.05, 0.05), 4, False)
+    t.do("layout", (0.8, 0.8), 2, False)
+    t.end()
+
+    tri = G.Lattice((0.1, 0.0), (0.05, 0.08660254))
+    t = Script(out, "layout_triangles",
+               "on the triangular grid the block is a rhombus of n x n points, "
+               "each cell split into two triangles across its short diagonal",
+               grid=tri, spec=tri.spec())
+    t.do("layout", (0.4, 0.4), 3, True)
+    t.end()
+
+    t = Script(out, "layout_free",
+               "on the free grid there is nothing to lay out on")
+    t.keys(grid="free")
+    t.do("layout", (0.5, 0.5), 3, False)
     t.end()
 
 

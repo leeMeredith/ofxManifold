@@ -36,6 +36,9 @@ struct KeyContext {
     bool      dragging    = false;   // a node drag in progress
     bool      auditioning = false;
     GridShape grid        = GridShape::Lattice;
+    bool      triangles   = false;   // the lattice is the triangular one
+    int       spokes      = 8;       // l on the polar grid: a ring of this many
+    int       blockSize   = 3;       // l on a lattice: a block this many across
 };
 
 struct KeyEntry {

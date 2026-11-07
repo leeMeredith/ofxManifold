@@ -488,6 +488,7 @@ std::string ofApp::keyId(int key) const {
     case '-': case '=': case '+':                   return "spacing";
     case '[': case ']':                             return "spokes";
     case ',': case '.':                             return "deadzone";
+    case 'l':                                       return "layout";
     case 'a':                                       return "all";
     case OF_KEY_ESC:                                return "none";
     case 'x':                                       return "empty";
@@ -545,6 +546,9 @@ KeyContext ofApp::keyContext() const {
     ctx.grid = kind == GridKind::Free ? GridShape::Free
              : kind == GridKind::Polar ? GridShape::Polar
              : GridShape::Lattice;
+    ctx.triangles = kind == GridKind::Triangular;
+    ctx.spokes = spokes;
+    ctx.blockSize = blockSize;
     return ctx;
 }
 
@@ -624,9 +628,37 @@ void ofApp::keyPressed(int key) {
         else if (key == '0') rotation = 0.0f;
         else if (key == '-') spacing = std::max(0.02f, spacing * 0.8f);
         else if (key == '=' || key == '+') spacing = std::min(0.25f, spacing * 1.25f);
-        else if (key == '[') spokes = std::max(3, spokes - 1);
-        else if (key == ']') spokes = std::min(24, spokes + 1);
+        else if (key == '[' || key == ']') {
+            // [ ] set what l lays out (3A-8): the spokes of the polar grid,
+            // the size of a block on a square or triangular one.
+            const int d = key == '[' ? -1 : 1;
+            if (kind == GridKind::Polar) {
+                spokes = std::min(24, std::max(3, spokes + d));
+            } else {
+                blockSize = std::min(8, std::max(2, blockSize + d));
+                const std::string n = std::to_string(blockSize);
+                show(Result{false, false, "l lays out a " + n + " x " + n
+                            + " block", 2.0f});
+            }
+        }
         rebuildGrid();
+        return;
+    }
+    // l: a ring or a block in one step, at the grid point nearest the mouse.
+    // The new nodes are left selected, so the next key -- y to lift them, m
+    // to match, f is not needed -- acts on the whole layout.
+    if (id == "layout") {
+        std::vector<NodeID> placed;
+        const glm::vec2 p = renderer->toManifold(mouse);
+        const int size = kind == GridKind::Polar ? spokes : blockSize;
+        const bool tri = kind == GridKind::Triangular;
+        act("lay out", [&](Model& m) {
+            return m.layout(p, grid, size, tri, &placed);
+        });
+        if (!placed.empty()) {
+            selection.clear();
+            for (NodeID n : placed) selection.toggle(n);
+        }
         return;
     }
     // Dead zone for drag hysteresis, as a fraction of grid spacing.

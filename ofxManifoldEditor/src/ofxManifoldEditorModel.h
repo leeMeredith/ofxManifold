@@ -109,6 +109,18 @@ public:
     // Place a node at p, snapped by `grid`. `placed` receives its id.
     Result place(glm::vec2 p, const Grid& grid, NodeID* placed = nullptr);
 
+    // l (round 3A-8): many nodes in one step, from the grid point nearest p.
+    // On the polar grid, a ring: one node per spoke on that ring, numbered
+    // clockwise from the spoke nearest the front (up), joined as one region.
+    // On a lattice, a size x size block centred there, numbered row by row
+    // from the front-left, joined as squares -- or, `triangles`, each square
+    // split across its short diagonal. Each node placed as a click places it,
+    // its outputs taking one run of channels per level. All or nothing:
+    // refused on the free grid, at the polar centre, off the map, or on a
+    // node. `placed` receives the new nodes, in their order.
+    Result layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
+                  std::vector<NodeID>* placed = nullptr);
+
     // Move nodes as ONE operation, all or nothing (setNodePositions).
     Result move(const std::vector<std::pair<NodeID, glm::vec2>>& moves);
 
@@ -267,6 +279,11 @@ private:
     std::string selectedOutputNames() const;
 
     Manifold2D     manifold_;
+    // A node at q exactly, and -- with auto-output -- each node its own
+    // outputs, level by level.
+    NodeID placeAt(glm::vec2 q);
+    void   giveOutputs(const std::vector<NodeID>& ids);
+
     Map3D          map_;
     LevelID        level_ = 0;
     std::size_t    currentValue_ = NoValue;

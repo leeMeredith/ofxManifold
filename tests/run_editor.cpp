@@ -249,7 +249,7 @@ bool writeText(const std::string& path, const std::string& text) {
 // uses, so an undo message naming the wrong action fails a vector.
 std::string label(const std::string& op) {
     static const std::map<std::string, std::string> L = {
-        {"place", "place"}, {"join", "join"}, {"unjoin", "unjoin"},
+        {"place", "place"}, {"layout", "lay out"}, {"join", "join"}, {"unjoin", "unjoin"},
         {"remove", "delete"}, {"newoutput", "new output"},
         {"derived", "derived output"}, {"bind", "binding"},
         {"derivedafter", "derived output"}, {"userig", "use rig"},
@@ -331,6 +331,12 @@ int main(int argc, char** argv) {
             if (lastOp == "place") {
                 float x, y; in >> x >> y;
                 op = [&, x, y](Model& m) { return m.place({x, y}, grid); };
+            }
+            else if (lastOp == "layout") {
+                float x, y; int size, tri; in >> x >> y >> size >> tri;
+                op = [&, x, y, size, tri](Model& m) {
+                    return m.layout({x, y}, grid, size, tri != 0);
+                };
             }
             else if (lastOp == "join")    op = [&](Model& m) { return m.join(sel); };
             else if (lastOp == "unjoin")  op = [&](Model& m) { return m.unjoin(sel); };

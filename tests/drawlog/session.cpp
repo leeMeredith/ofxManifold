@@ -204,6 +204,30 @@ int main() {
     release(OF_KEY_COMMAND);
     frame("the middle level removed");
 
+    // round 3A-8: l lays out a ring or a block where the mouse points.
+    hold(OF_KEY_COMMAND);
+    key('3');
+    release(OF_KEY_COMMAND);
+    key('x');
+    key('4');
+    a.mouseMoved(sx(0.52f), sy(0.79f));
+    key('l');
+    frame("l on the polar grid: a ring, one node per spoke, selected");
+    key('2');
+    key(']');
+    a.mouseMoved(sx(0.2f), sy(0.2f));
+    key('l');
+    frame("] then l on the square grid: a 4 x 4 block");
+    key('3');
+    key('[');
+    key('[');
+    a.mouseMoved(sx(0.8f), sy(0.25f));
+    key('l');
+    frame("l on the triangular grid: a 2 x 2 block in triangles");
+    key('1');
+    key('l');
+    frame("l with the grid off: the key panel says why");
+
     std::fputs(drawlog().c_str(), stdout);
     return 0;
 }

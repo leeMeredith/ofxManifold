@@ -164,6 +164,7 @@ private:
     float    spacing  = 0.05f;
     float    rotation = 0.0f;           // radians
     int      spokes   = 8;
+    int      blockSize = 3;             // l on a square or triangular grid
     float    deadZone = 0.25f;          // fraction of grid spacing
 
     // ---- state: an in-progress drag or press -------------------------------
