@@ -447,8 +447,9 @@ is computed by a pure function and checked by script; how they look, the
 offsets and the 3D view are judged on screen.
 
 **Placing a node with auto-output on binds it on every level** (Lee,
-2026-11-05). Auto-output is for laying out speakers, and a speaker is a
-speaker at every height. b, B, q w and c still act on the current level only.
+2026-11-05) -- *superseded by 3A-6d (2026-11-06): each level's node gets an
+output of its own, P, P-2, P-3.* b, B, q w and c still act on the current
+level only.
 
 **Audition is tested too,** not only judged on screen: the chart is handed
 what `Map3D` resolves at (x, y, z) -- checked against the resolve directly,
@@ -701,7 +702,7 @@ on a public repository; this uses 8). The workflow went from 2,136 lines to
 current level's, so everything written before levels reads what it did.
 Output operations reach every level; binding, fill, clear and heights the
 current one. Keys: ↑ ↓, `n` `N`, `y` `h`, ⌘⌫, ⌘3. Placing a node with
-auto-output binds it on every level. Saving and opening go through
+auto-output bound it on every level (changed in 3A-6d). Saving and opening go through
 `saveManifold3D`, `saveMapping3D` and `loadMap3D`, and a one-level map still
 saves byte-identical. Listening in 3D is pure and tested
 (`ofxManifoldEditorListening.h`): where audition starts, how far a held key
@@ -806,6 +807,44 @@ the others. And every level's nodes made when it is copied, so moving through
 - 1 editor script (50), 34 checked steps (674); 5 mutation gates (291). The
   drawing session gained a frame auditioning between levels with the view
   open.
+
+### 3A-6d: each level puts out its own numbers
+
+Lee (2026-11-06): "What is the use of having them if they can't produce any
+number by itself… if I wanted a flat map I wouldn't add levels." And, on what
+the numbers are for: "the point of it isn't to be speakers, but to be capable
+of putting out information as an individual -- that is what makes it a 3-D
+map. That it could be used for speakers, or for modelling 3-D space around two
+speakers or several, is determined by use and what you hook it up to."
+
+So an output is a channel of information, and what it drives belongs to
+whatever it is connected to (the boundary of decision B, kept).
+
+- **A new level gets outputs of its own.** With auto-output on, `n` and `N`
+  give each node of the new level an output named after it and the level it
+  was made as -- `N-2`, `E-2` -- on the next free channels, kept unique with
+  `_2`. What the node sent to outputs goes to its own; its silence stays, so
+  its fill carries over. With auto-output off the new level shares the
+  outputs it was copied from, as before -- for levels that are positions
+  mixed over one fixed set of channels.
+- **Placing a node** with auto-output on gives it an output of its own on
+  every level: `P`, `P-2`, `P-3`, each made if its name is free. This
+  replaces 3A-6's one output shared by every level.
+- **Deleting a node** takes its own outputs on every level (`P`, `P-2`,
+  `P-2_2`), each only if nothing still feeds it.
+- **Removing a level** takes the outputs only that level used.
+- Names keep the number the level had when it was made; a level inserted
+  below later shifts the numbers shown, not the names.
+- 1 editor script (51), 14 checked steps (688); 7 mutation gates (298), and
+  three earlier ones moved onto the new code. The 3A-6 scripts' expectations
+  changed with the rule -- new levels now report their outputs -- and the rig
+  script turns auto-output off to keep its shared-output case.
+- **A gate killed mid-run leaves its break in the file.** The machine running
+  the gates restarted while one had `ofxManifoldEditorModel.cpp` mutated;
+  `run_gates.py` restores in a `finally`, which a killed process never
+  reaches. `make workflow` caught it at once -- the gate's anchor no longer
+  matched -- and the line was put back by hand. After any interrupted gate
+  run, run `make workflow` (or `git diff`) before anything else.
 
 ---
 

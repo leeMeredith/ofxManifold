@@ -677,8 +677,8 @@ replace:             marks.push_back({l.id, id, fill});
 
 gate: Placing a node moves the current output
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:             if (currentOutput_ == InvalidTarget) selectOnlyOutput(t);
-replace:             selectOnlyOutput(t);
+find:         if (first != InvalidTarget && currentOutput_ == InvalidTarget) {
+replace:         if (first != InvalidTarget) {
 
 gate: An unbind silences a node without saying so
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1373,8 +1373,9 @@ replace:             } else if (false) {
 
 gate: Placing a node binds its output on the current level only
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:             for (LevelID k = 0; k < map_.count(); ++k) map_.bind(k, id, t);
-replace:             map_.bind(level_, id, t);
+find:             map_.bind(k, id, t);\n            if (first == InvalidTarget) first = t;
+replace:             map_.bind(level_, id, t);\n            if (first == InvalidTarget) first = t;
+nl: yes
 
 gate: Deleting a node takes an output another level still feeds
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
@@ -1404,8 +1405,8 @@ replace:         base = b - 0.25f;
 
 gate: A new level does not become current
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     level_ = at;\n    return changed("new level "
-replace:     return changed("new level "
+find:     level_ = at;\n    std::string msg = "new level "
+replace:     std::string msg = "new level "
 nl: yes
 
 gate: Lowering may reach the level below
@@ -1571,3 +1572,44 @@ file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 find:               !drag && !sel.empty(),\n              unlessDrag("select the node to match, then the others")),
 replace:               !drag,\n              unlessDrag("select the node to match, then the others")),
 nl: yes
+
+# ---- round 3A-6d: each level puts out its own numbers ----
+
+gate: A new level shares its outputs with auto-output on
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (autoOutput_) {\n        std::size_t made = 0;
+replace:     if (false) {\n        std::size_t made = 0;
+nl: yes
+
+gate: A new level's own outputs lose their silence
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             for (float w : silence) map_.bindSilence(at, id, w);
+replace:             (void)silence;
+
+gate: A new level's own output names are not kept unique
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             for (int j = 2; mapping().findTarget(on) != InvalidTarget; ++j) {
+replace:             for (int j = 2; false; ++j) {
+
+gate: Removing a level keeps the outputs only it used
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             && !outputInUse(t)) {\n            doomed.push_back(nm);
+replace:             && false) {\n            doomed.push_back(nm);
+nl: yes
+
+gate: Removing a level takes outputs other levels still use
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             && !outputInUse(t)) {\n            doomed.push_back(nm);
+replace:             ) {\n            doomed.push_back(nm);
+nl: yes
+
+gate: Deleting a node leaves its own outputs on other levels
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (out == nm) return true;\n    if (out.size() <= nm.size() + 1
+replace:     return out == nm;\n    if (out.size() <= nm.size() + 1
+nl: yes
+
+gate: An own output kept unique with _2 is not the node's
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     return digits() && i == out.size();
+replace:     return false;

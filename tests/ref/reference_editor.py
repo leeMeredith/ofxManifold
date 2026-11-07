@@ -19,6 +19,7 @@ vector changes in the same commit, visibly.
 """
 
 import math
+import re
 import sys
 
 sys.path.insert(0, "tests/ref")
@@ -190,17 +191,37 @@ class Editor:
             return (0, 1, "a node is already there")
         nm = self.fresh()
         self.nodes.append([nm, (q[0], q[1])])
-        if self.auto and nm not in self.out_names():
-            self.outputs.append([nm, self.next_channel(), 1.0])
-            # on every level: a speaker is a speaker at every height
+        if self.auto:
+            # An output of its own on EVERY level (3A-6d): each level's node
+            # puts out its own number. Named after the node, and on levels
+            # past the first after the level too -- P, P-2, P-3 -- each made
+            # only if its name is free.
+            made = None
             keep = self.cur
             for k in range(len(self.levels)):
+                on = self.level_output(nm, k)
+                if on in self.out_names():
+                    continue
+                self.outputs.append([on, self.next_channel(), 1.0])
                 self.cur = k
-                self.bind_one(nm, nm)
+                self.bind_one(nm, on)
+                made = made or on
             self.cur = keep
-            if self.current is None:        # only if there was none
-                self.select_only(nm)
+            if made is not None and self.current is None:
+                self.select_only(made)
         return (1, 0, "")
+
+    @staticmethod
+    def level_output(nm, k):
+        """The name of node nm's own output on level k (0-based)."""
+        return nm if k == 0 else f"{nm}-{k + 1}"
+
+    @staticmethod
+    def owns(nm, out):
+        """Is `out` node nm's own output: nm itself, or nm-<level>, maybe
+        with a _<n> made to keep it unique?"""
+        return out == nm or re.fullmatch(re.escape(nm) + r"-\d+(_\d+)?",
+                                         out) is not None
 
     def move(self, name, p):
         # Single-node moves only in these scripts, and only valid ones.
@@ -258,9 +279,10 @@ class Editor:
                         + d[3:] for d in self.derived]
         og = 0
         for nm in sel:
-            if nm in self.out_names() and not self.in_use(nm):
-                self.remove_output(nm)
-                og += 1
+            for out in [o[0] for o in self.outputs if self.owns(nm, o[0])]:
+                if not self.in_use(out):
+                    self.remove_output(out)
+                    og += 1
         k = len(sel)
         msg = f"removed {k} node" + ("" if k == 1 else "s")
         if rg:
@@ -551,7 +573,27 @@ class Editor:
                 level["heights"][nm] = h
         self.levels.insert(at, level)
         self.cur = at
-        return (1, 0, f"new level {at + 1} of {n + 1}, at {fmt(base)}")
+        msg = f"new level {at + 1} of {n + 1}, at {fmt(base)}"
+        if self.auto:
+            # Its own outputs (3A-6d): each node of the new level bound to
+            # an output of its own, named after it and the level, on the next
+            # free channel; what it sent to outputs goes to that one, its
+            # silence stays, so its fill carries over.
+            made = 0
+            for nm in self.names():
+                stem = f"{nm}-{at + 1}"
+                on, j = stem, 2
+                while on in self.out_names():
+                    on, j = f"{stem}_{j}", j + 1
+                self.outputs.append([on, self.next_channel(), 1.0])
+                made += 1
+                ls = level["links"].get(nm, [])
+                w = sum(l[2] for l in ls if l[0] == "out")
+                level["links"][nm] = ([("out", on, w if w > 0 else 1.0)]
+                                      + [l for l in ls if l[0] != "out"])
+            msg += (f", with {made} output" + ("" if made == 1 else "s")
+                    + " of its own")
+        return (1, 0, msg)
 
     def raise_nodes(self, sel, direction, fine):
         """Each node's offset from the level's start steps to the next
@@ -703,10 +745,19 @@ class Editor:
         if n == 1:
             return (0, 1, "a map has at least one level")
         gone = self.cur
+        used = {l[1] for ls in self.levels[gone]["links"].values()
+                for l in ls if l[0] == "out"}
         del self.levels[gone]
         self.cur = max(0, gone - 1)
-        return (1, 0, f"removed level {gone + 1}; now on level "
-                f"{self.cur + 1} of {n - 1}")
+        # The outputs only that level used go with it (3A-6d).
+        og = 0
+        for out in [o[0] for o in self.outputs if o[0] in used]:
+            if not self.in_use(out):
+                self.remove_output(out)
+                og += 1
+        return (1, 0, f"removed level {gone + 1}"
+                + (f" and {og} output" + ("" if og == 1 else "s") if og else "")
+                + f"; now on level {self.cur + 1} of {n - 1}")
 
     # ---- round 3A-6: listening in three dimensions ------------------------
     #
@@ -1980,6 +2031,7 @@ def build():
     build_levels(out)
     build_levels_b(out)
     build_levels_c(out)
+    build_levels_d(out)
     return out
 
 
@@ -2184,8 +2236,10 @@ def build_levels(out):
     t.end()
 
     t = Script(out, "levels_nodes",
-               "placing a node on a map with levels: its output is bound on "
-               "every level, and it starts at each level's own height. "
+               "placing a node on a map with levels: it gets an output of its "
+               "own on "
+               "every level -- P, P-2, P-3 -- and it starts at each level's "
+               "own height. "
                "Removing nodes takes their heights and bindings from every "
                "level; a node's own output stays while ANY level still feeds "
                "it")
@@ -2197,7 +2251,8 @@ def build_levels(out):
     t.select("n0"); t.do("pick", "n1"); t.do("bind")
     t.do("leveldown")
     t.select("n1"); t.do("remove")
-    out.append("# n1's own output stays: n0 still feeds it on the middle level")
+    out.append("# n1's own outputs on the upper levels go; n1 itself stays: n0")
+    out.append("# still feeds it on the middle level")
     t.select("n2"); t.do("remove")
     t.do("undo")
     t.end()
@@ -2242,10 +2297,16 @@ def build_levels(out):
     t.do("saverig", "room")
     t.do("empty")
     t.do("place", (0.8, 0.2)); t.do("place", (0.2, 0.2))
+    out.append("# auto-output off: the new level shares the first's outputs")
+    t.do("auto")
     t.do("newlevel", 1)
     t.select("n0"); t.do("pick", "n1"); t.do("bind")
     t.do("userig", "room")
     t.do("undo")
+    out.append("# auto-output on: a new level brings outputs the rig lacks")
+    t.do("auto")
+    t.do("newlevel", 1)
+    t.do("userig", "room")
     t.end()
 
     t = Script(out, "levels_listening",
@@ -2417,6 +2478,40 @@ def build_levels_c(out):
     t.do("leveldown")
     t.do("flatten")
     t.end()
+
+
+def build_levels_d(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-6d: EACH LEVEL PUTS OUT ITS OWN NUMBERS")
+    out.append("#")
+    out.append("# With auto-output on, a new level's nodes each get an output of")
+    out.append("# their own -- N-2, E-2 -- on the next free channels; what each")
+    out.append("# sent to outputs goes to that one, its silence stays. What the")
+    out.append("# outputs drive is up to what they are connected to.")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "levels_own_outputs",
+               "a new level's own outputs: named after the node and the level "
+               "it was made as, kept unique with _2; fills and silence carry "
+               "over; with auto-output off the level shares the outputs it "
+               "was copied from. Removing a level takes the outputs only it "
+               "used")
+    t.do("example")
+    t.do("newlevel", 1)
+    t.do("leveldown")
+    out.append("# n from the ground with level 2 there: halfway, and the new")
+    out.append("# level is level 2 now -- its names are taken, so _2")
+    t.do("newlevel", 1)
+    t.do("auto")
+    t.do("newlevel", 1)
+    t.do("removelevel")
+    t.do("removelevel")
+    t.do("undo")
+    out.append("# deleting O takes its own outputs on every level, O-2_2 too")
+    t.select("O")
+    t.do("remove")
+    t.end()
+
 
 def main():
     out = build()

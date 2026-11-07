@@ -42,6 +42,33 @@ std::string height(float h) {
     return b;
 }
 
+// Node `nm`'s own output on level k (0-based): nm itself on the first level,
+// nm-<level> past it (3A-6d).
+std::string levelOutput(const std::string& nm, LevelID k) {
+    return k == 0 ? nm : nm + "-" + std::to_string(k + 1);
+}
+
+// Is `out` node nm's own output: nm, or nm-<digits>, maybe with _<digits>
+// added to keep it unique?
+bool owns(const std::string& nm, const std::string& out) {
+    if (out == nm) return true;
+    if (out.size() <= nm.size() + 1 || out.compare(0, nm.size(), nm) != 0
+        || out[nm.size()] != '-') {
+        return false;
+    }
+    std::size_t i = nm.size() + 1;
+    auto digits = [&]() {
+        const std::size_t from = i;
+        while (i < out.size() && out[i] >= '0' && out[i] <= '9') ++i;
+        return i > from;
+    };
+    if (!digits()) return false;
+    if (i == out.size()) return true;
+    if (out[i] != '_') return false;
+    ++i;
+    return digits() && i == out.size();
+}
+
 // An offset from a level's start, always signed: "+0.05", "-0.1", "+0".
 std::string offset(float d) {
     char b[32];
@@ -269,20 +296,27 @@ Result Model::place(glm::vec2 p, const Grid& grid, NodeID* placed) {
     // The output takes the NODE'S NAME. That is what pairs them, and it
     // survives save and reload with no extra bookkeeping -- which is how
     // deleting the node later finds its own fader.
-    if (autoOutput_ && mapping().findTarget(manifold_.node(id).name)
-                          == InvalidTarget) {
-        const TargetID t = map_.addOutput(manifold_.node(id).name,
-                                          nextFreeChannel());
-        if (t != InvalidTarget) {
-            // On every level: a speaker is a speaker at every height
-            // (PLAN-round3.md, 3A-6).
-            for (LevelID k = 0; k < map_.count(); ++k) map_.bind(k, id, t);
-            // The current output changes only if there was none. It used to
-            // follow every new node, so the output `b` acted on was usually
-            // the one the newest node already fed -- and b, a toggle, then
-            // UNBOUND it, leaving it silent. The current output is the one
-            // the user picked, and placing a node must not move it.
-            if (currentOutput_ == InvalidTarget) selectOnlyOutput(t);
+    //
+    // With levels, an output of its own on EVERY level (3A-6d): each level's
+    // node puts out its own number -- P, P-2, P-3 -- each made only if its
+    // name is free.
+    if (autoOutput_) {
+        TargetID first = InvalidTarget;
+        for (LevelID k = 0; k < map_.count(); ++k) {
+            const std::string on = levelOutput(manifold_.node(id).name, k);
+            if (mapping().findTarget(on) != InvalidTarget) continue;
+            const TargetID t = map_.addOutput(on, nextFreeChannel());
+            if (t == InvalidTarget) continue;
+            map_.bind(k, id, t);
+            if (first == InvalidTarget) first = t;
+        }
+        // The current output changes only if there was none. It used to
+        // follow every new node, so the output `b` acted on was usually the
+        // one the newest node already fed -- and b, a toggle, then UNBOUND
+        // it, leaving it silent. The current output is the one the user
+        // picked, and placing a node must not move it.
+        if (first != InvalidTarget && currentOutput_ == InvalidTarget) {
+            selectOnlyOutput(first);
         }
     }
     refreshTopology();
@@ -383,13 +417,22 @@ Result Model::remove(const Selection& sel) {
     // if nothing else is bound to it. Otherwise deleting a speaker's node
     // would silently take away a fader other nodes still feed. Outputs made
     // by hand never share a node's name, so they are never removed this way.
+    // With levels, its own outputs on the other levels too (nm-2, ...).
     std::size_t outsGone = 0;
     for (const std::string& nm : names) {
-        const TargetID t = mapping().findTarget(nm);
-        if (t != InvalidTarget && !outputInUse(t)) {
-            map_.removeOutput(t);
-            afterOutputRemoved(t);
-            ++outsGone;
+        std::vector<std::string> own;
+        for (TargetID t = 0; t < mapping().targetCount(); ++t) {
+            if (owns(nm, mapping().targetName(t))) {
+                own.push_back(mapping().targetName(t));
+            }
+        }
+        for (const std::string& on : own) {
+            const TargetID t = mapping().findTarget(on);
+            if (t != InvalidTarget && !outputInUse(t)) {
+                map_.removeOutput(t);
+                afterOutputRemoved(t);
+                ++outsGone;
+            }
         }
     }
     refreshTopology();
@@ -851,8 +894,43 @@ Result Model::newLevel(bool above) {
                        + " would reach the level next to it", 3.0f);
     }
     level_ = at;
-    return changed("new level " + std::to_string(at + 1) + " of "
-                   + std::to_string(n + 1) + ", at " + height(base), 2.5f);
+    std::string msg = "new level " + std::to_string(at + 1) + " of "
+                    + std::to_string(n + 1) + ", at " + height(base);
+
+    // Its own outputs (3A-6d): with auto-output on, each node of the new
+    // level is bound to an output of its own, named after it and the level,
+    // on the next free channel. What it sent to outputs goes to that one and
+    // its silence stays, so its fill carries over. With auto-output off the
+    // level shares the outputs it was copied from.
+    if (autoOutput_) {
+        std::size_t made = 0;
+        for (NodeID id = 0; id < manifold_.nodeCount(); ++id) {
+            const std::string stem = manifold_.node(id).name + "-"
+                                   + std::to_string(at + 1);
+            std::string on = stem;
+            for (int j = 2; mapping().findTarget(on) != InvalidTarget; ++j) {
+                on = stem + "_" + std::to_string(j);
+            }
+            float sent = 0.0f;
+            std::vector<float> silence;
+            {
+                const Mapping& lv = map_.level(at);
+                for (std::size_t i = 0; i < lv.linkCount(id); ++i) {
+                    const Link& l = lv.link(id, i);
+                    if (l.kind == DestKind::Output) sent += l.weight;
+                    else silence.push_back(l.weight);
+                }
+            }
+            const TargetID t = map_.addOutput(on, nextFreeChannel());
+            if (t == InvalidTarget) continue;
+            ++made;
+            map_.clearBindings(at, id);
+            map_.bind(at, id, t, sent > 0.0f ? sent : 1.0f);
+            for (float w : silence) map_.bindSilence(at, id, w);
+        }
+        msg += ", with " + plural(made, " output", " outputs") + " of its own";
+    }
+    return changed(msg, 2.5f);
 }
 
 Result Model::raise(const Selection& sel, int direction, bool fine) {
@@ -1019,9 +1097,36 @@ Result Model::removeLevel() {
     const LevelID n = map_.count();
     if (n == 1) return refusal("a map has at least one level", 2.5f);
     const LevelID gone = level_;
+    std::vector<std::string> used;          // the outputs that level fed
+    {
+        const Mapping& lv = map_.level(gone);
+        for (NodeID id : lv.boundNodes()) {
+            for (std::size_t i = 0; i < lv.linkCount(id); ++i) {
+                const Link& l = lv.link(id, i);
+                if (l.kind == DestKind::Output) used.push_back(lv.targetName(l.id));
+            }
+        }
+    }
     map_.removeLevel(gone);
     level_ = gone > 0 ? gone - 1 : 0;
+
+    // The outputs only that level used go with it (3A-6d), in output order.
+    std::vector<std::string> doomed;
+    for (TargetID t = 0; t < mapping().targetCount(); ++t) {
+        const std::string& nm = mapping().targetName(t);
+        if (std::find(used.begin(), used.end(), nm) != used.end()
+            && !outputInUse(t)) {
+            doomed.push_back(nm);
+        }
+    }
+    for (const std::string& nm : doomed) {
+        const TargetID t = mapping().findTarget(nm);
+        map_.removeOutput(t);
+        afterOutputRemoved(t);
+    }
     return changed("removed level " + std::to_string(gone + 1)
+                   + (doomed.empty() ? std::string()
+                      : " and " + plural(doomed.size(), " output", " outputs"))
                    + "; now on level " + std::to_string(level_ + 1) + " of "
                    + std::to_string(n - 1), 3.0f);
 }

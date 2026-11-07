@@ -206,7 +206,10 @@ across its opposite edge and the move is refused, because the ring would cross
 itself.
 
 A map can have **levels**: the same floor plan at several heights, for a 3D
-map. `n` copies the current level to a new one above, `N` below; ↑ and ↓ move
+map. `n` copies the current level to a new one above, `N` below; with
+auto-output on, each node of the new level gets an output of its own (`N-2`,
+`E-2`), so every level puts out its own numbers -- what they drive is up to
+what they are connected to; ↑ and ↓ move
 between them; `y` and `h` raise and lower the selected nodes on the current
 level (shift for fine steps), refused if a node would reach the next level;
 ⌘⌫ removes a level. A column of dots beside the map shows the levels and
@@ -276,7 +279,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-832 vectors across twelve suites, plus 291 mutation gates that introduce known
+833 vectors across twelve suites, plus 298 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

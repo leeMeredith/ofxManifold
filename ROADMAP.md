@@ -21,9 +21,9 @@ serialization the standard library's own JSON parser against a hand-written one.
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
 | `sources` | 82 | trajectories, real-time replay, velocity, the touring case, paths with height |
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
-| `ofxManifoldEditor` (logic) | 50 scripts, 674 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights |
+| `ofxManifoldEditor` (logic) | 51 scripts, 688 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs |
 
-**832 vectors, 291 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**833 vectors, 298 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 
