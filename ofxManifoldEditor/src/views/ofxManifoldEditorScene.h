@@ -42,6 +42,11 @@ struct Scene {
     float     levelsKeysWidth = 0.0f;
     // A level's dot being dragged (round 3A-6b): which level, and where its
     // start would land if let go now. -1: none.
+    // The typing line (round 3A-7): open while a value is named; what it is
+    // for ("new value", "value") and what has been typed.
+    bool        typing = false;
+    std::string typingPrompt;
+    std::string typingLine;
     int       levelDrag     = -1;
     float     levelDragBase = 0.0f;
     glm::vec2 mouse{-1.0f, -1.0f};       // for hover

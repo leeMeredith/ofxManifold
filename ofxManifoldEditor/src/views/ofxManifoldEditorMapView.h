@@ -37,6 +37,8 @@ void drawLinks(const Scene& s);
 // it is outside them. Both draw nothing for a map with one flat level, so a
 // 2D map looks exactly as it did. drawMap() draws both.
 void drawOffsets(const Scene& s);
+// Each node's current value on the current level, as a number (3A-7).
+void drawValues(const Scene& s);
 void drawLevelColumn(const Scene& s);
 
 } // namespace editor

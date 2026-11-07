@@ -183,6 +183,12 @@ MAP3 forest_nomid NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER
 MAP3 wider NODES square OPS OUT Top 5 1 ; OUT R 2 0.25 ; OUT L 1 1 ; OUT Floor 4 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 1:1
 # a room without Top
 MAP3 narrow NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 1:1
+# bright's range narrowed to 0.3..0.8: every number it holds,
+# and its fallback, brought inside (1 to 0.8, 0.1 to 0.3); dist
+# renamed far, keeping its numbers. Refused: a range upside down
+# or empty, a name already taken, a value not there. A value
+# made and removed leaves nothing behind
+MAP3 forest_values NODES square OPS OUT L 1 1 ; OUT R 2 0.5 ; OUT Top 3 1 ; AFTER sub 9 0.8 linear L:1,R:1 ; TAP tap 8 1 linear 0:1,2:1 ; VALUE bright 0.5 0 1 =0 ; VALUE dist 0 0 1 =1 ; VALUE bright 0.2 0 1 =REFUSED ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 L 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; SILENCE 0 3 1 ; SETV 0 0 bright 0.1 ; SETV 0 2 bright 0.2 ; SETV 0 1 dist 0.3 ; COPY 0 0.5 =1 ; CLEAR 1 2 ; BIND 1 2 Top 1 ; SETV 1 2 bright 0.7 ; COPY 1 1 =2 ; CLEAR 2 0 ; BIND 2 0 Top 1 ; CLEAR 2 1 ; BIND 2 1 Top 1 ; SETV 2 0 bright 1 ; SETV 2 1 bright 1 ; SETV 2 2 bright 1 ; SETV 2 3 bright 1 ; RAISE 1 0.3 2 =OK ; FRACTION 2 3 0.25 =OK ; RANGE bright 0.3 0.8 =OK ; RENAMEVALUE dist far =OK ; RANGE far 1 0 =REFUSED ; RANGE far 0.5 0.5 =REFUSED ; RENAMEVALUE far bright =REFUSED ; RENAMEVALUE gone x =REFUSED ; RANGE gone 0 1 =REFUSED ; VALUE extra 0.25 0 1 =2 ; SETV 1 2 extra 0.75 ; DROPVALUE extra =OK ; DROPVALUE extra =REFUSED
 # the forest on the wider rig: every level moves at once, each
 # keeping its own bindings by name; the tap keeps the forest's
 # own sources; heights and values are untouched
@@ -248,6 +254,10 @@ VAL3 bright_outside ANALYTIC forest W OUTSIDE VALUE bright EXPECT 0.5
 VAL3 bright_onrig ANALYTIC forest_onrig W 0@1=0.125 0@2=0.125 1@1=0.125 1@2=0.125 2@1=0.125 2@2=0.125 3@1=0.125 3@2=0.125 VALUE bright EXPECT 0.725
 VAL3 bright_remap CROSS forest_remap W 0@0=0.2 0@1=0.2 1@0=0.2 1@1=0.2 2@0=0.1 2@1=0.1 VALUE bright EXPECT 0.32
 VAL3 bright_nomid CROSS forest_nomid W 0@0=0.15 0@1=0.15 1@0=0.15 1@1=0.15 2@0=0.1 2@1=0.1 3@0=0.1 3@1=0.1 VALUE bright EXPECT 0.66
+VAL3 ranged_ground ANALYTIC forest_values W 0@0=0.25 1@0=0.25 2@0=0.25 3@0=0.25 VALUE bright EXPECT 0.4
+VAL3 ranged_canopy ANALYTIC forest_values W 0@2=0.25 1@2=0.25 2@2=0.25 3@2=0.25 VALUE bright EXPECT 0.8
+VAL3 ranged_outside ANALYTIC forest_values W OUTSIDE VALUE bright EXPECT 0.5
+VAL3 renamed_far ANALYTIC forest_values W 1@0=1 VALUE far EXPECT 0.3
 
 #--------------------------------------------------------------------
 # FILES FOR THE 3D MAP (round 3A-4c). The usual pair: the map
@@ -278,6 +288,7 @@ FILE3 file3_legacy_two ANALYTIC map3_legacy_two.json map3_legacy_two-outputs.jso
 # BYTE-IDENTICAL to saveManifold and saveMapping (PLAIN).
 SAVE3 save3_forest ANALYTIC forest MAPV 3 OUTV 3
 SAVE3 save3_nomid ANALYTIC forest_nomid MAPV 3 OUTV 3
+SAVE3 save3_values ANALYTIC forest_values MAPV 3 OUTV 3
 # one level, but with values: version 3 for the map file, and
 # the outputs file exactly as a 2D map's -- version 3 here only
 # because its sub is fed after the fader (3A-1)

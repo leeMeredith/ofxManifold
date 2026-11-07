@@ -18,6 +18,8 @@
 #include "ofxManifoldEditorModel.h"
 #include "ofxManifoldEditorSelection.h"
 
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace ofxManifold {
@@ -62,6 +64,13 @@ struct DotColumn {
 
 DotColumn dotColumn(const Model& model, float top, float bottom,
                     bool listening, const Evaluation& floor, float z);
+
+// Every node value at the listening point (round 3A-7), in the order the
+// values were made: read through the 3D weights, so it blends as the point
+// glides between levels; off the map or outside the levels, each value's
+// fallback.
+std::vector<std::pair<std::string, float>>
+valuesAt(const Model& model, const Evaluation& floor, float z);
 
 // Where the column sits in a map viewport: this far in from its top and its
 // bottom, as a fraction of its height; 15 pixels right of it. The view draws

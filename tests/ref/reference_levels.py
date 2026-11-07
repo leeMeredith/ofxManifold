@@ -548,6 +548,37 @@ class Map3:
                 return "REFUSED"
             self.defs.append([w[1], float(w[2]), float(w[3]), float(w[4])])
             return str(len(self.defs) - 1)
+        elif v == "RANGE":
+            # Round 3A-7: a value's range changed after it was made; every
+            # number it holds, and its fallback, brought inside.
+            lo, hi = float(w[2]), float(w[3])
+            d = next((d for d in self.defs if d[0] == w[1]), None)
+            if d is None or not lo < hi:
+                return "REFUSED"
+            clamp = (lambda x: min(hi, max(lo, x)))
+            d[1], d[2], d[3] = clamp(d[1]), lo, hi
+            for vals in self.vals:
+                for key in vals:
+                    if key[0] == w[1]:
+                        vals[key] = clamp(vals[key])
+            return "OK"
+        elif v == "RENAMEVALUE":
+            d = next((d for d in self.defs if d[0] == w[1]), None)
+            if d is None or any(e[0] == w[2] for e in self.defs):
+                return "REFUSED"
+            d[0] = w[2]
+            for k, vals in enumerate(self.vals):
+                self.vals[k] = {((w[2] if nm == w[1] else nm), n): x
+                                for (nm, n), x in vals.items()}
+            return "OK"
+        elif v == "DROPVALUE":
+            if not any(d[0] == w[1] for d in self.defs):
+                return "REFUSED"
+            self.defs = [d for d in self.defs if d[0] != w[1]]
+            for k, vals in enumerate(self.vals):
+                self.vals[k] = {key: x for key, x in vals.items()
+                                if key[0] != w[1]}
+            return "OK"
         elif v == "SETH":
             ok = self.stack.set(int(w[1]), int(w[2]), float(w[3]))
             return "OK" if ok else "REFUSED"
@@ -710,6 +741,18 @@ def build_map3d(out, sq, tris):
                        "AFTER sub 9 0.8 linear L:1,R:1",
                        "TAP tap 8 1 linear 1:1"],
             ["a room without Top"])
+    # Round 3A-7: values renamed, re-ranged and removed after they are made.
+    map_rec("forest_values", base_ops + [
+                "RANGE bright 0.3 0.8", "RENAMEVALUE dist far",
+                "RANGE far 1 0", "RANGE far 0.5 0.5", "RENAMEVALUE far bright",
+                "RENAMEVALUE gone x", "RANGE gone 0 1",
+                "VALUE extra 0.25 0 1", "SETV 1 2 extra 0.75",
+                "DROPVALUE extra", "DROPVALUE extra"],
+            ["bright's range narrowed to 0.3..0.8: every number it holds,",
+             "and its fallback, brought inside (1 to 0.8, 0.1 to 0.3); dist",
+             "renamed far, keeping its numbers. Refused: a range upside down",
+             "or empty, a name already taken, a value not there. A value",
+             "made and removed leaves nothing behind"])
     map_rec("forest_onrig", base_ops + ["USERIG wider"],
             ["the forest on the wider rig: every level moves at once, each",
              "keeping its own bindings by name; the tap keeps the forest's",
@@ -824,7 +867,11 @@ def build_map3d(out, sq, tris):
             ("bright_remap", "CROSS", "forest_remap",
              on(0, {0: 0.4, 1: 0.4, 2: 0.2}, 0.5), "bright"),
             ("bright_nomid", "CROSS", "forest_nomid",
-             on(0, {0: 0.3, 1: 0.3, 2: 0.2, 3: 0.2}, 0.5), "bright")):
+             on(0, {0: 0.3, 1: 0.3, 2: 0.2, 3: 0.2}, 0.5), "bright"),
+            ("ranged_ground", "ANALYTIC", "forest_values", on(0, mid), "bright"),
+            ("ranged_canopy", "ANALYTIC", "forest_values", on(2, mid), "bright"),
+            ("ranged_outside", "ANALYTIC", "forest_values", None, "bright"),
+            ("renamed_far", "ANALYTIC", "forest_values", on(0, {1: 1.0}), "far")):
         m = maps[mname]
         wtxt = ("OUTSIDE" if w3 is None else
                 " ".join(f"{n}@{k}={fmt(w)}" for (n, k), w in sorted(w3.items())))
@@ -956,6 +1003,7 @@ def build_files3(out, sq, tris, maps):
     out.append("# BYTE-IDENTICAL to saveManifold and saveMapping (PLAIN).")
     out.append("SAVE3 save3_forest ANALYTIC forest MAPV 3 OUTV 3")
     out.append("SAVE3 save3_nomid ANALYTIC forest_nomid MAPV 3 OUTV 3")
+    out.append("SAVE3 save3_values ANALYTIC forest_values MAPV 3 OUTV 3")
     out.append("# one level, but with values: version 3 for the map file, and")
     out.append("# the outputs file exactly as a 2D map's -- version 3 here only")
     out.append("# because its sub is fed after the fader (3A-1)")

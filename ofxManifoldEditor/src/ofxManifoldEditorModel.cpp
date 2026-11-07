@@ -8,7 +8,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <set>
+#include <sstream>
 
 namespace ofxManifold {
 namespace editor {
@@ -116,6 +118,7 @@ void Model::loadExample() {
     // plus a derived "sub" fed by N and O, at its own channel.
     map_ = Map3D();
     level_ = 0;
+    currentValue_ = NoValue;
     const TargetID front = map_.addOutput("front", 0);
     const TargetID left  = map_.addOutput("left", 1);
     const TargetID right = map_.addOutput("right", 2);
@@ -143,6 +146,7 @@ void Model::newEmpty() {
     manifold_ = Manifold2D();
     map_ = Map3D();
     level_ = 0;
+    currentValue_ = NoValue;
     selectOnlyOutput(InvalidTarget);
     settleCurrentOutput();
     refreshTopology();
@@ -160,6 +164,7 @@ void Model::adopt(Manifold2D m, Map3D map) {
     manifold_ = std::move(m);
     map_ = std::move(map);
     level_ = 0;
+    currentValue_ = map_.valueSet().empty() ? NoValue : 0;
     selectOnlyOutput(InvalidTarget);
     settleCurrentOutput();
     refreshTopology();
@@ -976,6 +981,142 @@ Result Model::raise(const Selection& sel, int direction, bool fine) {
     }
     const std::string a = offset(lo), b = offset(hi);
     return changed("height " + a + (a == b ? std::string() : " to " + b), 2.0f);
+}
+
+// ---------------------------------------------------------------------------
+// node values (round 3A-7)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// "name" or "name lo hi" -> true, or false with the reason.
+bool parseValueLine(const std::string& line, std::string& name, float& lo,
+                    float& hi, std::string& why) {
+    std::istringstream in(line);
+    std::vector<std::string> words;
+    for (std::string w; in >> w;) words.push_back(w);
+    const std::string form =
+        "type a name, or a name and its range: distance 0 10";
+    if (words.empty()) { why = "a value needs a name"; return false; }
+    name = words[0];
+    if (words.size() == 1) { lo = 0.0f; hi = 1.0f; return true; }
+    if (words.size() != 3) { why = form; return false; }
+    auto number = [](const std::string& w, float& x) {
+        char* end = nullptr;
+        x = std::strtof(w.c_str(), &end);
+        return end && *end == '\0' && end != w.c_str() && std::isfinite(x);
+    };
+    if (!number(words[1], lo) || !number(words[2], hi)) { why = form; return false; }
+    if (!(lo < hi)) { why = "the low end must be below the high end"; return false; }
+    return true;
+}
+
+std::string describeValue(const ValueDef& d) {
+    return d.name + ", " + height(d.lo) + " to " + height(d.hi);
+}
+
+} // namespace
+
+Result Model::newValue(const std::string& line) {
+    std::string name, why;
+    float lo = 0.0f, hi = 1.0f;
+    if (!parseValueLine(line, name, lo, hi, why)) return refusal(why, 3.0f);
+    if (map_.findValue(name) != NoValue) {
+        return refusal("a value named " + name + " already exists", 3.0f);
+    }
+    currentValue_ = map_.addValue(name, lo, lo, hi);
+    return changed("value " + describeValue(map_.valueSet()[currentValue_]),
+                   2.5f);
+}
+
+std::string Model::valueLine() const {
+    if (currentValue_ == NoValue) return "";
+    const ValueDef& d = map_.valueSet()[currentValue_];
+    return d.name + " " + height(d.lo) + " " + height(d.hi);
+}
+
+Result Model::editValue(const std::string& line) {
+    if (currentValue_ == NoValue) {
+        return refusal("no values yet -- g makes one", 2.5f);
+    }
+    std::string name, why;
+    float lo = 0.0f, hi = 1.0f;
+    if (!parseValueLine(line, name, lo, hi, why)) return refusal(why, 3.0f);
+    const ValueDef d = map_.valueSet()[currentValue_];
+    const std::size_t other = map_.findValue(name);
+    if (other != NoValue && other != currentValue_) {
+        return refusal("a value named " + name + " already exists", 3.0f);
+    }
+    if (name == d.name && lo == d.lo && hi == d.hi) {
+        Result r;
+        r.message = "value " + describeValue(d) + ", unchanged";
+        return r;
+    }
+    map_.renameValue(currentValue_, name);
+    map_.setValueRange(currentValue_, lo, hi);
+    return changed("value " + describeValue(map_.valueSet()[currentValue_]),
+                   2.5f);
+}
+
+Result Model::pickValue(int direction) {
+    Result r;
+    r.seconds = 2.0f;
+    const std::size_t n = map_.valueSet().size();
+    if (n == 0) {
+        r.message = "no values yet -- g makes one";
+        return r;
+    }
+    currentValue_ = (currentValue_ + n + (direction < 0 ? n - 1 : 1)) % n;
+    r.message = "current value: " + describeValue(map_.valueSet()[currentValue_]);
+    return r;
+}
+
+Result Model::stepValue(const Selection& sel, int direction, bool fine) {
+    if (currentValue_ == NoValue) {
+        return refusal("no values yet -- g makes one", 2.5f);
+    }
+    if (sel.empty()) return Result{};
+    const ValueDef d = map_.valueSet()[currentValue_];
+    const float unit = (d.hi - d.lo) / (fine ? 100.0f : 20.0f);
+    // The ends are exact: within a millionth of the range is the end itself,
+    // so the vectors' double and this float agree on when the top is reached.
+    const float eps = 1e-6f * (d.hi - d.lo);
+    std::vector<std::pair<NodeID, float>> moves;
+    float lo = 1e30f, hi = -1e30f;
+    for (NodeID n : sel.nodes()) {
+        const float now = map_.value(level_, n, currentValue_);
+        float q = (now - d.lo) / unit;
+        const float qr = std::round(q);
+        if (std::fabs(q - qr) < 1e-3f) q = qr;
+        const float next = (q == qr) ? qr + float(direction)
+                         : (direction > 0 ? std::ceil(q) : std::floor(q));
+        float x = d.lo + next * unit;
+        x = (x >= d.hi - eps) ? d.hi : (x <= d.lo + eps) ? d.lo : x;
+        lo = std::min(lo, x);
+        hi = std::max(hi, x);
+        if (std::fabs(x - now) > eps) moves.emplace_back(n, x);
+    }
+    if (moves.empty()) {
+        Result r;
+        r.message = std::string("already at the ")
+                  + (direction > 0 ? "top" : "bottom") + " of " + d.name
+                  + "'s range";
+        return r;
+    }
+    for (const auto& mv : moves) map_.setValue(level_, mv.first, currentValue_, mv.second);
+    const std::string a = height(lo), b = height(hi);
+    return changed(d.name + " " + a + (a == b ? std::string() : " to " + b), 2.0f);
+}
+
+Result Model::removeValue() {
+    if (currentValue_ == NoValue) {
+        return refusal("no values yet -- g makes one", 2.5f);
+    }
+    const std::string name = map_.valueSet()[currentValue_].name;
+    map_.removeValue(currentValue_);
+    const std::size_t n = map_.valueSet().size();
+    currentValue_ = n == 0 ? NoValue : std::min(currentValue_, n - 1);
+    return changed("removed value " + name, 2.5f);
 }
 
 Result Model::goToLevel(LevelID k) {

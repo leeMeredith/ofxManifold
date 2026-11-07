@@ -61,5 +61,12 @@ const KeyEntry* findKey(const std::vector<KeyGroup>& map, const std::string& id)
 bool keyAvailable(const KeyContext& ctx, const std::string& id,
                   std::string* why = nullptr);
 
+// The typing line (round 3A-7), opened by g and z to name a value. What one
+// key does to it: printable keys add, up to 40 characters; backspace and
+// delete take the last away; return ends it to be made, escape unmade;
+// anything else is ignored.
+enum class Typed { Open, Enter, Escape };
+Typed typeKey(std::string& line, int key);
+
 } // namespace editor
 } // namespace ofxManifold

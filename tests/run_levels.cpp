@@ -554,6 +554,14 @@ int main(int argc, char** argv) {
                                                      std::stof(w[4]));
                     got = i == static_cast<std::size_t>(-1)
                         ? "=REFUSED" : "=" + std::to_string(i);
+                } else if (v == "RANGE") {
+                    got = m.setValueRange(m.findValue(w[1]), std::stof(w[2]),
+                                          std::stof(w[3])) ? "=OK" : "=REFUSED";
+                } else if (v == "RENAMEVALUE") {
+                    got = m.renameValue(m.findValue(w[1]), w[2])
+                        ? "=OK" : "=REFUSED";
+                } else if (v == "DROPVALUE") {
+                    got = m.removeValue(m.findValue(w[1])) ? "=OK" : "=REFUSED";
                 } else if (v == "SETH") {
                     got = m.setHeight(std::stoul(w[1]), std::stoul(w[2]),
                                       std::stof(w[3])) ? "=OK" : "=REFUSED";

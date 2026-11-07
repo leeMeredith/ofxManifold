@@ -217,7 +217,15 @@ which one you are on, and a raised node shows its offset. Click a dot to go to
 that level; drag it to move the whole level, its start and every node on it,
 closer to or further from its neighbours -- or `i` and `k` for the current
 level. `m` gives the selected nodes the height of the one you selected first;
-`M` puts them back at their level's start. Binding, fill and
+`M` puts them back at their level's start.
+
+Each node can also carry **values**: named numbers per node per level, such
+as a distance or a brightness, whose meaning is up to whatever reads them.
+`g` makes one -- type its name, and its range if not 0 to 1, as `distance 0
+10`; `z` renames or re-ranges it; `j` picks which one you are editing; `;` and
+`'` lower and raise the selected nodes' value (shift for fine steps); `G`
+removes it. Each node shows its number, and a line under the status gives
+every value at the listening point, blending as it moves between levels. Binding, fill and
 clear act on the current level; outputs belong to every level. While
 auditioning, ↑ and ↓ move the listening point up and down through the levels
 and past them, so you hear one level crossfade into the next. ⌘3 opens a 3D
@@ -279,7 +287,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-833 vectors across twelve suites, plus 299 mutation gates that introduce known
+842 vectors across twelve suites, plus 314 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

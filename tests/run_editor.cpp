@@ -109,6 +109,30 @@ std::string dump(const Model& md) {
     for (NodeID i = 0; i < m.nodeCount(); ++i) {
         if (lv.bent(0, i)) threeD = true;
     }
+    // Round 3A-7: the values -- the current one, each name, range and
+    // fallback -- and on each level the numbers that differ from the fallback.
+    if (!map.valueSet().empty()) {
+        const auto& defs = map.valueSet();
+        o << " | U ";
+        if (md.currentValue() == Model::NoValue) o << "-";
+        else o << md.currentValue();
+        for (const ValueDef& d : defs) {
+            o << " " << d.name << ":" << num(d.lo) << ":" << num(d.hi) << ":"
+              << num(d.fallback);
+        }
+        for (LevelID k = 0; k < map.count(); ++k) {
+            o << " | X" << k;
+            for (std::size_t v = 0; v < defs.size(); ++v) {
+                for (NodeID i = 0; i < m.nodeCount(); ++i) {
+                    const float x = map.value(k, i, v);
+                    if (x != defs[v].fallback) {
+                        o << " " << defs[v].name << "/" << m.node(i).name << "="
+                          << num(x);
+                    }
+                }
+            }
+        }
+    }
     if (!threeD) return o.str();
     o << " | V " << md.currentLevel();
     for (LevelID k = 0; k < map.count(); ++k) {
@@ -236,7 +260,8 @@ std::string label(const std::string& op) {
         {"newlevel", "new level"}, {"raise", "height"},
         {"removelevel", "remove level"}, {"movelevel", "move level"},
         {"steplevel", "move level"}, {"match", "height"},
-        {"flatten", "height"}};
+        {"flatten", "height"}, {"newvalue", "new value"}, {"editvalue", "value"},
+        {"stepvalue", "value"}, {"removevalue", "remove value"}};
     auto it = L.find(op);
     return it == L.end() ? op : it->second;
 }
@@ -389,6 +414,24 @@ int main(int argc, char** argv) {
             else if (lastOp == "removelevel") op = [](Model& m) { return m.removeLevel(); };
             else if (lastOp == "match") op = [&](Model& m) { return m.matchHeights(sel); };
             else if (lastOp == "flatten") op = [&](Model& m) { return m.flattenHeights(sel); };
+            else if (lastOp == "newvalue" || lastOp == "editvalue") {
+                // the typed line, in quotes
+                std::string rest;
+                std::getline(in, rest);
+                const std::size_t a = rest.find('"'), b = rest.rfind('"');
+                const std::string line = rest.substr(a + 1, b - a - 1);
+                if (lastOp == "newvalue") op = [line](Model& m) { return m.newValue(line); };
+                else                      op = [line](Model& m) { return m.editValue(line); };
+            }
+            else if (lastOp == "pickvalue") {
+                int dir; in >> dir;
+                op = [dir](Model& m) { return m.pickValue(dir); };
+            }
+            else if (lastOp == "stepvalue") {
+                int dir, fine; in >> dir >> fine;
+                op = [&, dir, fine](Model& m) { return m.stepValue(sel, dir, fine != 0); };
+            }
+            else if (lastOp == "removevalue") op = [](Model& m) { return m.removeValue(); };
             else if (lastOp == "golevel") {
                 LevelID k; in >> k;
                 op = [k](Model& m) { return m.goToLevel(k); };
@@ -638,6 +681,55 @@ int main(int argc, char** argv) {
                 ok = false;
                 why << "a click at " << x << "," << y << " hit dot " << got
                     << ", expected " << want;
+            }
+        } else if (kind == "VALUESAT") {
+            const Evaluation floor = readWeights(in, md, "Z");
+            float z; std::string kw;
+            in >> z >> kw;
+            std::string want, tok;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            for (const auto& nv : valuesAt(md, floor, z)) {
+                got += (got.empty() ? "" : " ") + nv.first + "=" + num(nv.second);
+            }
+            if (got.empty()) got = "-";
+            if (ok && !sameState(want, got)) {
+                ok = false;
+                why << "values at the point: want " << want << ", got " << got;
+            }
+        } else if (kind == "VALUELINE") {
+            std::string rest;
+            std::getline(in, rest);
+            const std::size_t a = rest.find('"'), b = rest.rfind('"');
+            const std::string want = rest.substr(a + 1, b - a - 1);
+            if (ok && md.valueLine() != want) {
+                ok = false;
+                why << "z opens the line with \"" << md.valueLine()
+                    << "\", expected \"" << want << "\"";
+            }
+        } else if (kind == "TYPE") {
+            // TYPE "start" k1 k2 ... EXPECT "text" outcome
+            std::string rest;
+            std::getline(in, rest);
+            const std::size_t a = rest.find('"'), b = rest.find('"', a + 1);
+            std::string line = rest.substr(a + 1, b - a - 1);
+            const std::size_t e = rest.find(" EXPECT ");
+            std::istringstream keysIn(rest.substr(b + 1, e - b - 1));
+            Typed t = Typed::Open;
+            for (int k; keysIn >> k;) {
+                t = typeKey(line, k);
+                if (t != Typed::Open) break;
+            }
+            const std::string tail = rest.substr(e + 8);
+            const std::size_t c = tail.find('"'), d = tail.rfind('"');
+            const std::string wantText = tail.substr(c + 1, d - c - 1);
+            const std::string wantOutcome = tail.substr(d + 2);
+            const std::string gotOutcome = t == Typed::Enter ? "enter"
+                                         : t == Typed::Escape ? "escape" : "open";
+            if (ok && (line != wantText || gotOutcome != wantOutcome)) {
+                ok = false;
+                why << "typing gave \"" << line << "\" " << gotOutcome
+                    << ", expected \"" << wantText << "\" " << wantOutcome;
             }
         } else if (kind == "STARTZ") {
             const Evaluation floor = readWeights(in, md, "EXPECT");

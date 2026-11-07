@@ -6,6 +6,7 @@
 #include "ofxManifoldEditorText.h"
 
 #include <cstdio>
+#include <cstring>
 
 namespace ofxManifold {
 namespace editor {
@@ -213,6 +214,27 @@ void drawOffsets(const Scene& s) {
     if (any) ofPopStyle();
 }
 
+// Each node's current value on the current level (3A-7), below-left of it,
+// clear of the height offset above-right. Nothing without a current value.
+void drawValues(const Scene& s) {
+    const Model& model = *s.model;
+    const std::size_t v = model.currentValue();
+    if (v == Model::NoValue) return;
+    const Manifold2D& manifold = model.manifold();
+    const float lh = s.text->lineHeight(), cw = s.text->charWidth();
+    ofPushStyle();
+    ofSetColor(200, 190, 240);
+    for (NodeID i = 0; i < manifold.nodeCount(); ++i) {
+        char b[16];
+        std::snprintf(b, sizeof b, "%.3g",
+                      double(model.map3d().value(model.currentLevel(), i, v)));
+        const glm::vec2 p = s.renderer->toScreen(manifold.node(i).position);
+        s.text->draw(b, p.x - 12.0f - cw * float(std::strlen(b)),
+                     p.y + lh + 4.0f);
+    }
+    ofPopStyle();
+}
+
 void drawLevelColumn(const Scene& s) {
     const Model& model = *s.model;
     const ofRectangle vp = s.renderer->viewport();
@@ -297,6 +319,7 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
         drawNode(s, NodeID(i));
     }
     drawOffsets(s);
+    drawValues(s);
 
     // Nodes feeding the CURRENT output: a green ring, outside the selection
     // ring so both can show at once. With the fader marks below, this is how

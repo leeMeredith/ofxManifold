@@ -266,6 +266,46 @@ public:
         return defs_.size() - 1;
     }
 
+    // A value's range changed after it was made (round 3A-7): every number
+    // it holds on every level, and its fallback, brought inside the new
+    // range. Refused unless lo < hi, or for a value that is not there.
+    bool setValueRange(std::size_t v, float lo, float hi) {
+        if (v >= defs_.size() || !(lo < hi)) return false;
+        auto clamp = [lo, hi](float x) { return std::min(hi, std::max(lo, x)); };
+        defs_[v].lo = lo;
+        defs_[v].hi = hi;
+        defs_[v].fallback = clamp(defs_[v].fallback);
+        for (auto& level : values_) {
+            if (v < level.size()) {
+                for (float& x : level[v]) x = clamp(x);
+            }
+        }
+        return true;
+    }
+
+    // A value renamed, keeping its numbers. Refused for a name another value
+    // has, or a value that is not there.
+    bool renameValue(std::size_t v, const std::string& name) {
+        if (v >= defs_.size()) return false;
+        const std::size_t other = findValue(name);
+        if (other != static_cast<std::size_t>(-1) && other != v) return false;
+        defs_[v].name = name;
+        return true;
+    }
+
+    // A value removed from the map: its declaration and its numbers on every
+    // level. The values after it move down one.
+    bool removeValue(std::size_t v) {
+        if (v >= defs_.size()) return false;
+        defs_.erase(defs_.begin() + static_cast<std::ptrdiff_t>(v));
+        for (auto& level : values_) {
+            if (v < level.size()) {
+                level.erase(level.begin() + static_cast<std::ptrdiff_t>(v));
+            }
+        }
+        return true;
+    }
+
     // One node's value on one level. Not clamped: the range is for editors.
     bool setValue(LevelID k, NodeID n, std::size_t v, float x) {
         if (k >= values_.size() || v >= defs_.size() || n == InvalidNode) {

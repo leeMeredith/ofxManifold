@@ -49,8 +49,13 @@ class Editor:
         # differ from the base), and its own bindings. `links` is the current
         # level's: every operation written before levels reads and writes
         # exactly what it did.
-        self.levels = [dict(base=0.0, heights={}, links={})]
+        self.levels = [dict(base=0.0, heights={}, links={}, values={})]
         self.cur = 0
+        # Node values (round 3A-7): [name, fallback, lo, hi] in order, the
+        # current one's index (None: no values), and on each level
+        # {(name, node name): number} for the numbers set.
+        self.defs = []
+        self.cur_value = None
         self.derived = []        # [name, channel, [source names]]
         self.current = None
         self.out_sel = []        # selected outputs, by name; current among them
@@ -275,6 +280,8 @@ class Editor:
             for lv in self.levels:
                 lv["links"].pop(n, None)
                 lv["heights"].pop(n, None)
+                lv["values"] = {key: x for key, x in lv["values"].items()
+                                if key[1] != n}
         self.derived = [[d[0], d[1], [s for s in d[2] if s not in gone]]
                         + d[3:] for d in self.derived]
         og = 0
@@ -567,7 +574,8 @@ class Editor:
             return (0, 1, f"no room for a new level {where} -- "
                     + (", ".join(blocked) or "a level starts there")
                     + " would reach the level next to it")
-        level = dict(base=base, heights={}, links=copy.deepcopy(self.links))
+        level = dict(base=base, heights={}, links=copy.deepcopy(self.links),
+                     values=copy.deepcopy(self.levels[k]["values"]))
         for nm, h in made.items():
             if h != base:
                 level["heights"][nm] = h
@@ -621,6 +629,145 @@ class Editor:
         offs = [new[nm] - base for nm in sel]
         lo, hi = f"{min(offs):+.3g}", f"{max(offs):+.3g}"
         return (1, 0, f"height {lo}" + ("" if lo == hi else f" to {hi}"))
+
+    # ---- round 3A-7: node values ------------------------------------------
+
+    def value(self, k, n, name):
+        d = next(d for d in self.defs if d[0] == name)
+        return self.levels[k]["values"].get((name, n), d[1])
+
+    @staticmethod
+    def parse_value_line(line):
+        """'name' or 'name lo hi' -> (name, lo, hi), or an error string."""
+        words = line.split()
+        if not words:
+            return "a value needs a name"
+        if len(words) == 1:
+            return (words[0], 0.0, 1.0)
+        if len(words) != 3:
+            return "type a name, or a name and its range: distance 0 10"
+        try:
+            lo, hi = float(words[1]), float(words[2])
+        except ValueError:
+            return "type a name, or a name and its range: distance 0 10"
+        if not math.isfinite(lo) or not math.isfinite(hi):
+            return "type a name, or a name and its range: distance 0 10"
+        if not lo < hi:
+            return "the low end must be below the high end"
+        return (words[0], lo, hi)
+
+    def describe(self, d):
+        return f"{d[0]}, {fmt(d[2])} to {fmt(d[3])}"
+
+    def new_value(self, line):
+        """g, then a typed line: a value for every node on every level,
+        each starting at the bottom of its range. It becomes current."""
+        p = self.parse_value_line(line)
+        if isinstance(p, str):
+            return (0, 1, p)
+        name, lo, hi = p
+        if any(d[0] == name for d in self.defs):
+            return (0, 1, f"a value named {name} already exists")
+        self.defs.append([name, lo, lo, hi])
+        self.cur_value = len(self.defs) - 1
+        return (1, 0, "value " + self.describe(self.defs[-1]))
+
+    def value_line(self):
+        """What z opens the line with: the current value as typed."""
+        if self.cur_value is None:
+            return ""
+        d = self.defs[self.cur_value]
+        return f"{d[0]} {fmt(d[2])} {fmt(d[3])}"
+
+    def edit_value(self, line):
+        """z, then the line: the current value renamed and re-ranged; every
+        number it holds, and its fallback, brought inside the range."""
+        if self.cur_value is None:
+            return (0, 1, "no values yet -- g makes one")
+        p = self.parse_value_line(line)
+        if isinstance(p, str):
+            return (0, 1, p)
+        name, lo, hi = p
+        d = self.defs[self.cur_value]
+        if name != d[0] and any(e[0] == name for e in self.defs):
+            return (0, 1, f"a value named {name} already exists")
+        if name == d[0] and lo == d[2] and hi == d[3]:
+            return (0, 0, f"value {self.describe(d)}, unchanged")
+        old = d[0]
+        clamp = (lambda x: min(hi, max(lo, x)))
+        d[0], d[1], d[2], d[3] = name, clamp(d[1]), lo, hi
+        for lv in self.levels:
+            lv["values"] = {((name if nm == old else nm), n):
+                            (clamp(x) if nm == old else x)
+                            for (nm, n), x in lv["values"].items()}
+        return (1, 0, "value " + self.describe(d))
+
+    def pick_value(self, direction):
+        if not self.defs:
+            return (0, 0, "no values yet -- g makes one")
+        self.cur_value = (self.cur_value + direction) % len(self.defs)
+        return (0, 0, "current value: " + self.describe(self.defs[self.cur_value]))
+
+    def step_value(self, sel, direction, fine):
+        """; and ': the selected nodes' current value, on the current level,
+        by a twentieth of its range (a hundredth fine), landing on the next
+        multiple as fill does, and held inside the range."""
+        if self.cur_value is None:
+            return (0, 1, "no values yet -- g makes one")
+        if not sel:
+            return (0, 0, "")
+        d = self.defs[self.cur_value]
+        name, lo, hi = d[0], d[2], d[3]
+        unit = (hi - lo) / (100.0 if fine else 20.0)
+        k = self.cur
+        new = {}
+        for n in sel:
+            q = (self.value(k, n, name) - lo) / unit
+            qr = round(q)
+            if abs(q - qr) < 1e-3:
+                nxt = qr + direction
+            else:
+                nxt = math.ceil(q) if direction > 0 else math.floor(q)
+            x = lo + nxt * unit
+            # The ends are exact: within a millionth of the range is the end
+            # itself, so float and double agree on when the top is reached.
+            eps = 1e-6 * (hi - lo)
+            new[n] = hi if x >= hi - eps else lo if x <= lo + eps else x
+        eps = 1e-6 * (hi - lo)
+        moved = [n for n in sel if abs(new[n] - self.value(k, n, name)) > eps]
+        if not moved:
+            return (0, 0, f"already at the {'top' if direction > 0 else 'bottom'}"
+                    f" of {name}'s range")
+        for n in moved:
+            self.levels[k]["values"][(name, n)] = new[n]
+        vs = [new[n] for n in sel]
+        a, b = fmt(min(vs)), fmt(max(vs))
+        return (1, 0, f"{name} {a}" + ("" if a == b else f" to {b}"))
+
+    def remove_value(self):
+        if self.cur_value is None:
+            return (0, 1, "no values yet -- g makes one")
+        name = self.defs[self.cur_value][0]
+        del self.defs[self.cur_value]
+        for lv in self.levels:
+            lv["values"] = {key: x for key, x in lv["values"].items()
+                            if key[0] != name}
+        self.cur_value = (None if not self.defs
+                          else min(self.cur_value, len(self.defs) - 1))
+        return (1, 0, f"removed value {name}")
+
+    def values_at(self, weights, z):
+        """Every value at the listening point, through the 3D weights;
+        outside, each value's fallback."""
+        share = self.level_share(weights, z)
+        out = []
+        for d in self.defs:
+            if share is None:
+                out.append((d[0], d[1]))
+            else:
+                out.append((d[0], sum(w * self.value(k, n, d[0])
+                                      for k, n, w in share)))
+        return out
 
     # ---- round 3A-6b: going to a level, moving a whole level -------------
 
@@ -891,16 +1038,20 @@ class Editor:
         current level's bindings -- by an earlier editor or a test."""
         import copy
         levels = self.levels
+        defs = self.defs
         if flat:
-            levels = [dict(base=0.0, heights={}, links=self.links)]
+            levels = [dict(base=0.0, heights={}, links=self.links, values={})]
+            defs = []
         return copy.deepcopy((self.nodes, self.regions, self.outputs,
-                              levels, self.derived))
+                              levels, self.derived, defs))
 
     def restore(self, snap, with_outputs):
         import copy
-        n, r, o, lv, d = copy.deepcopy(snap)
+        n, r, o, lv, d, defs = copy.deepcopy(snap)
         self.nodes, self.regions = n, r
         self.levels, self.cur = lv, 0
+        self.defs = defs
+        self.cur_value = 0 if defs else None
         if with_outputs:
             self.outputs, self.derived = o, d
         else:
@@ -1048,6 +1199,11 @@ class Editor:
             ("movelevel", nd and len(self.levels) > 1),
             ("match", nd and bool(sel)),
             ("removelevel", nd and len(self.levels) > 1), ("view3d", True),
+            # round 3A-7
+            ("newvalue", nd), ("pickvalue", nd and bool(self.defs)),
+            ("stepvalue", nd and bool(self.defs) and bool(sel)),
+            ("editvalue", nd and bool(self.defs)),
+            ("removevalue", nd and bool(self.defs)),
             ("audition", nd), ("lock", nd),
             ("undo", nd and can_undo), ("redo", nd and can_redo),
             ("save", nd), ("saveas", nd), ("open", nd),
@@ -1161,6 +1317,18 @@ class Editor:
                  "C " + (self.current or "-"),
                  "S " + (",".join(self.out_sel) or "-"),
                  "A " + ("1" if self.auto else "0")]
+        if self.defs:
+            # Round 3A-7: the values -- the current one, each name and range
+            # and fallback -- and on each level the numbers that differ from
+            # the fallback.
+            parts.append(f"U {'-' if self.cur_value is None else self.cur_value}"
+                         + "".join(f" {d[0]}:{fmt(d[2])}:{fmt(d[3])}:{fmt(d[1])}"
+                                   for d in self.defs))
+            for k in range(len(self.levels)):
+                parts.append(f"X{k}" + "".join(
+                    f" {d[0]}/{n}={fmt(self.value(k, n, d[0]))}"
+                    for d in self.defs for n in self.names()
+                    if self.value(k, n, d[0]) != d[1]))
         if self.three_d():
             # Round 3A-6: the current level, then every level bottom first:
             # its starting height, its bent nodes' heights, its bindings.
@@ -1194,7 +1362,8 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "newlevel": "new level", "raise": "height",
           "removelevel": "remove level", "movelevel": "move level",
           "steplevel": "move level", "match": "height",
-          "flatten": "height"}
+          "flatten": "height", "newvalue": "new value", "editvalue": "value",
+          "stepvalue": "value", "removevalue": "remove value"}
 
 
 class Script:
@@ -1272,6 +1441,11 @@ class Script:
             "raise":    lambda: e.raise_nodes(s, args[0], args[1]),
             "removelevel": e.remove_level,
             "golevel":  lambda: e.go_level(args[0]),
+            "newvalue": lambda: e.new_value(args[0]),
+            "editvalue": lambda: e.edit_value(args[0]),
+            "pickvalue": lambda: e.pick_value(args[0]),
+            "stepvalue": lambda: e.step_value(s, args[0], args[1]),
+            "removevalue": e.remove_value,
             "match":    lambda: e.match_heights(s, self.ordered),
             "flatten":  lambda: e.flatten_heights(s),
             "movelevel": lambda: e.move_level(args[0], args[1]),
@@ -1286,11 +1460,13 @@ class Script:
             argtxt = f" {fmt(args[0])}"
         elif op in ("pick", "toggleout"):
             argtxt = f" {args[0]}"
-        elif op == "golevel":
+        elif op == "golevel" or op == "pickvalue":
             argtxt = f" {args[0]}"
+        elif op in ("newvalue", "editvalue"):
+            argtxt = " \"" + args[0] + "\""
         elif op == "movelevel":
             argtxt = f" {args[0]} {fmt(args[1])}"
-        elif op in ("fill", "raise", "steplevel"):
+        elif op in ("fill", "raise", "steplevel", "stepvalue"):
             argtxt = f" {args[0]} {1 if args[1] else 0}"
         elif op == "newlevel":
             argtxt = f" {args[0]}"
@@ -1492,6 +1668,37 @@ class Script:
         self.out.append(f"DOTAT {fmt(x)} {fmt(y)} {fmt(top)} {fmt(bottom)} "
                         f"{fmt(cx)} EXPECT {k}")
         return k
+
+    def values_at(self, weights, z):
+        """Round 3A-7: every value at the listening point."""
+        vs = self.ed.values_at(weights, z)
+        self.out.append("VALUESAT " + " ".join(f"{n}={fmt(w)}" for n, w in weights)
+                        + f" Z {fmt(z)} EXPECT "
+                        + (" ".join(f"{n}={fmt(x)}" for n, x in vs) or "-"))
+
+    def value_line(self):
+        """Round 3A-7: what z opens the typing line with."""
+        self.out.append(f"VALUELINE EXPECT \"{self.ed.value_line()}\"")
+
+    def type_keys(self, start, keys):
+        """Round 3A-7: keys pressed on the typing line. Printable keys add
+        (up to 40), backspace or delete take the last away, return ends it
+        to be made, escape ends it unmade, anything else is ignored."""
+        text, outcome = start, "open"
+        for k in keys:
+            if k in (13, 10):
+                outcome = "enter"
+                break
+            if k == 27:
+                outcome = "escape"
+                break
+            if k in (8, 127):
+                text = text[:-1]
+            elif 32 <= k <= 126 and len(text) < 40:
+                text += chr(k)
+        self.out.append(f"TYPE \"{start}\" " + " ".join(map(str, keys))
+                        + f" EXPECT \"{text}\" {outcome}")
+        return text
 
     def start_z(self, weights):
         """Where audition starts: the current level, under the point."""
@@ -2032,6 +2239,7 @@ def build():
     build_levels_b(out)
     build_levels_c(out)
     build_levels_d(out)
+    build_values(out)
     return out
 
 
@@ -2510,6 +2718,130 @@ def build_levels_d(out):
     out.append("# deleting O takes its own outputs on every level, O-2_2 too")
     t.select("O")
     t.do("remove")
+    t.end()
+
+
+
+def build_values(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-7: NODE VALUES")
+    out.append("#")
+    out.append("# A named number each node carries on each level; what it means")
+    out.append("# is up to what reads it. U lists the values (name:lo:hi:fallback),")
+    out.append("# X<k> each level's numbers that differ from the fallback.")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "values_made_and_named",
+               "g makes a value from a typed line -- a name, or a name and its "
+               "range; z renames or re-ranges the current one, bringing every "
+               "number inside; j cycles; G removes. Refused: no name, a name "
+               "taken, a range that is not two numbers low then high")
+    t.do("example")
+    t.keys()
+    t.do("newvalue", "")
+    t.do("newvalue", "reverb")
+    t.keys()
+    t.do("newvalue", "reverb")
+    t.do("newvalue", "distance 0 10")
+    t.do("newvalue", "x 1")
+    t.do("newvalue", "x 5 2")
+    t.do("newvalue", "x a b")
+    t.do("newvalue", "x 0 1 2")
+    out.append("# a range below zero: every node starts at its bottom, -1")
+    t.do("newvalue", "pan -1 1")
+    t.do("pickvalue", 1)
+    t.do("pickvalue", -1)
+    t.do("pickvalue", -1)
+    t.value_line()
+    t.do("editvalue", "distance 0 10")
+    t.select("O", "N")
+    t.do("stepvalue", 1, False)
+    t.do("stepvalue", 1, True)
+    t.select("N")
+    t.do("stepvalue", -1, False)
+    t.do("editvalue", "far 0 4")
+    t.value_line()
+    out.append("# narrowed to 1..2: O at 0.6 and N at 0.5 come up to 1, and so")
+    out.append("# does the fallback every other node reads")
+    t.do("editvalue", "far 1 2")
+    t.do("editvalue", "reverb 0 1")
+    t.do("editvalue", "far 2 1")
+    t.do("removevalue")
+    t.do("undo")
+    t.do("pickvalue", 1)
+    t.do("removevalue")
+    t.do("removevalue")
+    t.keys()
+    t.do("removevalue")
+    t.do("undo"); t.do("undo")
+    t.end()
+
+    t = Script(out, "values_stepped",
+               "; and ' step the selected nodes' current value by a twentieth "
+               "of its range (a hundredth with shift), landing on the next "
+               "multiple, held inside the range")
+    t.do("example")
+    t.do("newvalue", "distance 0 10")
+    t.keys()
+    t.select("O", "N", "E")
+    t.keys()
+    t.do("stepvalue", 1, False)
+    t.select("O")
+    t.do("stepvalue", 1, True)
+    t.select("O", "N", "E")
+    out.append("# O at 0.6, N and E at 0.5: each to its next multiple of 0.5")
+    t.do("stepvalue", 1, False)
+    t.do("stepvalue", -1, False)
+    for _ in range(3):
+        t.do("stepvalue", -1, False)
+    t.select("W")
+    for _ in range(21):
+        t.do("stepvalue", 1, False)
+    out.append("# W at the top, O at the bottom: each a fine step its own way")
+    t.select("O", "W")
+    t.do("stepvalue", -1, True)
+    t.do("stepvalue", 1, True)
+    t.end()
+
+    t = Script(out, "values_levels_and_files",
+               "values are set on the current level; a new level copies them; "
+               "deleting a node takes its numbers; the value at the listening "
+               "point reads them through the 3D weights, and outside the map "
+               "is each value's fallback; a pair saved and opened keeps them")
+    t.do("example")
+    t.do("newvalue", "bright")
+    t.do("newvalue", "far 0 10")
+    t.do("pickvalue", -1)
+    t.select("O", "N")
+    for _ in range(4):
+        t.do("stepvalue", 1, False)
+    t.do("newlevel", 1)
+    t.select("O")
+    for _ in range(10):
+        t.do("stepvalue", 1, False)
+    w = [("O", 0.5), ("N", 0.25), ("E", 0.25)]
+    t.values_at(w, 0.0)
+    t.values_at(w, 0.125)
+    t.values_at(w, 0.25)
+    t.values_at(w, 0.4)
+    t.do("savepair", "lit")
+    t.do("empty")
+    t.do("openpair", "lit.json")
+    t.select("N")
+    t.do("remove")
+    t.end()
+
+    t = Script(out, "values_typing",
+               "what each key does to the typing line: printable keys add, up "
+               "to 40; backspace and delete take the last away; return ends it "
+               "to be made, escape unmade; other keys are ignored")
+    t.type_keys("", [ord(c) for c in "reverb"] + [13])
+    t.type_keys("", [ord(c) for c in "distx"] + [8] + [ord(c) for c in " 0 10"]
+                + [13])
+    t.type_keys("far 0 4", [127, 127, ord("9")])
+    t.type_keys("", [ord("a"), 27, ord("b")])
+    t.type_keys("", [357, 9, ord("q")])
+    t.type_keys("", [ord("x")] * 45)
     t.end()
 
 

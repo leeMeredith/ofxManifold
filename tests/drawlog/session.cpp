@@ -175,6 +175,20 @@ int main() {
     key('i');
     key('K');
     frame("i then shift-k on the middle level");
+    // 3A-7: a value named on the typing line, and set.
+    key('g');
+    for (char c : std::string("bright")) a.keyPressed(c);
+    frame("typing a value's name");
+    a.keyPressed(13);
+    click(sx(0.30f), sy(0.50f));                   // O
+    key('\'');
+    key('\'');
+    key('"');
+    frame("O's bright raised: its number beside it, the readout");
+    key('z');
+    a.keyPressed(127);
+    frame("z: the value's line, to rename or re-range");
+    a.keyPressed(27);
     hold(OF_KEY_COMMAND);
     key('3');
     release(OF_KEY_COMMAND);

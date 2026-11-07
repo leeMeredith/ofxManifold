@@ -15,15 +15,15 @@ serialization the standard library's own JSON parser against a hand-written one.
 |---|---|---|
 | `core` | 31 + 48 | triangle solve, bias, degeneracy, affine invariance, containment, topology, inverse evaluation, node movement, evaluator hint |
 | `core` (regions) | 113 | polygons of N ≥ 3 by mean-value coordinates, non-convex regions, batch moves, removal |
-| `core` (levels) | 93 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point; what it drives: bindings and node values per level, a rig used on every level, a whole level moved; its files, version 1 outputs files included |
+| `core` (levels) | 98 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point; what it drives: bindings and node values per level, a rig used on every level, a whole level moved, values renamed, re-ranged and removed; its files, version 1 outputs files included |
 | `interpretation` | 69 | curves, spread, blend, interpolate, coverage, smoothing, negative weights |
 | `mapping` | 35 + 130 | bindings, aggregators, dense output, blending by name; outputs with channel and trim, silence, fill, derived outputs before or after the fader, rigs, blending any number of maps, the agreement check |
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
 | `sources` | 82 | trajectories, real-time replay, velocity, the touring case, paths with height |
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
-| `ofxManifoldEditor` (logic) | 51 scripts, 688 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs |
+| `ofxManifoldEditor` (logic) | 55 scripts, 772 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line |
 
-**833 vectors, 299 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**842 vectors, 314 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 

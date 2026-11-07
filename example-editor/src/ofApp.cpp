@@ -152,6 +152,9 @@ void ofApp::draw() {
     sc.panelLeft = panelLeft;
     sc.levelsKeysAt = levelsKeysAt;
     sc.levelsKeysWidth = levelsKeysWidth;
+    sc.typing = typing;
+    sc.typingPrompt = typingNew ? "new value" : "value";
+    sc.typingLine = typingLine;
     sc.levelDrag = levelMoved ? levelPress : -1;
     sc.levelDragBase = levelDragBase;
     sc.mouse = mouse;
@@ -510,6 +513,11 @@ std::string ofApp::keyId(int key) const {
     case 'y': case 'Y': case 'h': case 'H':         return "raise";
     case 'i': case 'I': case 'k': case 'K':         return "movelevel";
     case 'm': case 'M':                             return "match";
+    case 'g':                                       return "newvalue";
+    case 'G':                                       return "removevalue";
+    case 'j': case 'J':                             return "pickvalue";
+    case ';': case ':': case '\'': case '"':        return "stepvalue";
+    case 'z':                                       return "editvalue";
     default:                                        return "";
     }
 }
@@ -548,6 +556,24 @@ bool ofApp::allowed(const std::string& id) {
 }
 
 void ofApp::keyPressed(int key) {
+    // The typing line takes every key while it is open (3A-7).
+    if (typing) {
+        const Typed t = typeKey(typingLine, key);
+        if (t == Typed::Enter) {
+            typing = false;
+            const std::string line = typingLine;
+            if (typingNew) {
+                act("new value", [line](Model& m) { return m.newValue(line); });
+            } else {
+                act("value", [line](Model& m) { return m.editValue(line); });
+            }
+        } else if (t == Typed::Escape) {
+            typing = false;
+            message = typingNew ? "no value made" : "value unchanged";
+            messageTime = 2.0f;
+        }
+        return;
+    }
     // Every key asks the key map first: a dim key does not act, it says why.
     const std::string id = keyId(key);
     if (id.empty() || !allowed(id)) return;
@@ -687,6 +713,40 @@ void ofApp::keyPressed(int key) {
             return m.raise(selection, dir, fine); });
         return;
     }
+    // ---- node values (round 3A-7) ----
+    if (id == "newvalue") {
+        typing = true;
+        typingNew = true;
+        typingLine.clear();
+        return;
+    }
+    if (id == "editvalue") {
+        if (model.currentValue() == Model::NoValue) {
+            show(model.editValue(""));       // says there are none yet
+            return;
+        }
+        typing = true;
+        typingNew = false;
+        typingLine = model.valueLine();
+        return;
+    }
+    if (id == "pickvalue") {
+        show(model.pickValue(key == 'J' ? -1 : +1));
+        return;
+    }
+    // ; down, ' up, side by side; shift (: and ") for fine steps.
+    if (id == "stepvalue") {
+        const int  dir  = (key == ';' || key == ':') ? -1 : +1;
+        const bool fine = (key == ':' || key == '"');
+        act("value", [&, dir, fine](Model& m) {
+            return m.stepValue(selection, dir, fine); });
+        return;
+    }
+    if (id == "removevalue") {
+        act("remove value", [](Model& m) { return m.removeValue(); });
+        return;
+    }
+
     // m: the selected nodes to the height of the one selected first; M:
     // back to the level's start.
     if (id == "match") {

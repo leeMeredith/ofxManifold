@@ -1620,3 +1620,81 @@ gate: m and M are listed but not wired to a key
 file: example-editor/src/ofApp.cpp
 find:     case 'm': case 'M':                             return "match";
 replace:     case '\x01':                                    return "match";
+
+# ---- round 3A-7: node values ----
+
+gate: A narrowed range leaves numbers outside it
+file: src/mapping/ofxManifoldMap3D.h
+find:                 for (float& x : level[v]) x = clamp(x);
+replace:                 (void)level;
+
+gate: A narrowed range leaves the fallback outside it
+file: src/mapping/ofxManifoldMap3D.h
+find:         defs_[v].fallback = clamp(defs_[v].fallback);
+replace:         (void)clamp;
+
+gate: A value's range may be empty or upside down
+file: src/mapping/ofxManifoldMap3D.h
+find:         if (v >= defs_.size() || !(lo < hi)) return false;
+replace:         if (v >= defs_.size()) return false;
+
+gate: A value may be renamed to a name another has
+file: src/mapping/ofxManifoldMap3D.h
+find:         if (other != static_cast<std::size_t>(-1) && other != v) return false;
+replace:         (void)other;
+
+gate: A removed value leaves its numbers behind
+file: src/mapping/ofxManifoldMap3D.h
+find:                 level.erase(level.begin() + static_cast<std::ptrdiff_t>(v));
+replace:                 (void)level;
+
+gate: A new value starts at zero, not the bottom of its range
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     currentValue_ = map_.addValue(name, lo, lo, hi);
+replace:     currentValue_ = map_.addValue(name, 0.0f, lo, hi);
+
+gate: A stepped value leaves its range
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         x = (x >= d.hi - eps) ? d.hi : (x <= d.lo + eps) ? d.lo : x;
+replace:         (void)eps;
+
+gate: Values step by whole steps, not to the next multiple
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find: : (direction > 0 ? std::ceil(q) : std::floor(q));\n        float x = d.lo
+replace: : q + float(direction);\n        float x = d.lo
+nl: yes
+
+gate: Fine value steps are coarse
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     const float unit = (d.hi - d.lo) / (fine ? 100.0f : 20.0f);
+replace:     const float unit = (d.hi - d.lo) / 20.0f; (void)fine;
+
+gate: J goes forward
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     currentValue_ = (currentValue_ + n + (direction < 0 ? n - 1 : 1)) % n;
+replace:     currentValue_ = (currentValue_ + n + 1) % n;
+
+gate: A value may be renamed to a name taken
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (other != NoValue && other != currentValue_) {
+replace:     if (false) {
+
+gate: The typing line has no end
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:     } else if (key >= 32 && key <= 126 && line.size() < 40) {
+replace:     } else if (key >= 32 && key <= 126) {
+
+gate: Backspace takes nothing away
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         if (!line.empty()) line.pop_back();
+replace:         (void)line;
+
+gate: Values step with nothing selected
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && values > 0 && !sel.empty(),
+replace:               !drag && values > 0,
+
+gate: g is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case 'g':                                       return "newvalue";
+replace:     case '\x02':                                    return "newvalue";

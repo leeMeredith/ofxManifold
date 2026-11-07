@@ -846,6 +846,53 @@ whatever it is connected to (the boundary of decision B, kept).
   matched -- and the line was put back by hand. After any interrupted gate
   run, run `make workflow` (or `git diff`) before anything else.
 
+#### 3A-7 proposal: setting and showing node values (agreed 2026-11-06; see Done)
+
+A node value is a named number each node carries on each level -- what it
+means is up to what reads it. The kernel has them already (3A-4b): declared
+with a name and a range, set per node per level, read at any point through
+the 3D weights, saved in the map file. The editor has no way to touch them.
+
+**Keys, a new group "values":**
+
+| Key | Does | Undo step |
+|---|---|---|
+| g | new value: a line opens in the panel to type its name, and optionally its range -- `reverb`, or `distance 0 10`. Enter makes it, Esc doesn't. Range 0 to 1 if none is given; a node's value starts at the bottom of the range. It becomes the current value | yes |
+| j J | the next / previous value becomes current | no |
+| ; ' | the selected nodes' current value down / up by a twentieth of its range (shift: a hundredth), landing on the next multiple, as fill does, and held inside the range | yes |
+| G | remove the current value, from every node on every level | yes |
+
+`;` and `'` sit side by side, right of `l`. No names are offered or built in:
+the player, not the editor, knows `distance`, `brightness` and `reverb`.
+
+**What you see:**
+
+- **Beside each node, the current value** on the current level, as a number,
+  when the map has values. Below-left of the node, so it clears the height
+  offset above-right.
+- **The value at the listening point,** every value, on a line under the
+  status: `distance 4.2  reverb 0.35` -- read through the 3D weights, so it
+  blends as the point glides between levels, and outside the map it is each
+  value's starting number.
+- Nothing new on a map without values.
+
+**Other levels:** a new level copies its values with everything else (it
+already does, in the kernel). Values are set on the current level only, like
+bindings.
+
+**Tested by** editor scripts, Python reference first: declaring (with and
+without a range, a name taken twice refused, a malformed range refused),
+cycling, stepping (landing, held in range, fine), removing, undo, values
+carried to a new level and kept per level, a save and open round trip, and
+the value at the listening point checked against the 3D weights directly, on
+a level, between two, and outside. Typing a name is pure too -- what each key
+does to the line -- so it is scripted. `make keys` covers the new keys.
+Mutation gates for each rule.
+
+**Questions:** the keys -- `g` `G` `j` `J` `;` `'`; and whether the typed
+range (`distance 0 10`) is enough, or a value's range should be changeable
+after it is made.
+
 ### Between 3A-6d and 3A-7: m and M were never wired
 
 `m` and `M` (3A-6c) were in the model, tested by script, and listed lit in the
@@ -856,6 +903,42 @@ session never pressed them. Now wired, and `make keys` (part of `make test`,
 returned by `keyId()` and answered by `keyPressed()`; mouse entries are left
 out. It fails on the code as shipped in 3A-6c, naming `match`. One mutation
 gate (299) takes the key away again.
+
+### 3A-7: setting and showing node values
+
+As proposed, with Lee's answers (2026-11-06): the keys as offered, and a
+value's range changeable after it is made -- so `z` reopens the typing line
+on the current value, filled in as `distance 0 10`, to rename it or change
+its range or both.
+
+- **Kernel:** `Map3D::setValueRange` (every number the value holds, and its
+  fallback, brought inside; refused unless low is below high),
+  `renameValue` (refused for a name another value has), `removeValue`. One
+  map of vectors, `forest_values`, four value readings, and a save.
+- **Model:** `newValue`, `editValue` and `valueLine`, `pickValue`,
+  `stepValue`, `removeValue`, and the current value, held through undo. A new
+  value starts every node at the bottom of its range. Steps are a twentieth of
+  the range (a hundredth fine), landing on the next multiple, held inside it;
+  within a millionth of the range is the end itself, so the reference's
+  double and the editor's float agree on when the top is reached.
+- **The typing line** is pure (`typeKey`, in the keys file) and scripted:
+  printable keys add, up to 40; backspace and delete take away; return makes
+  it, escape doesn't; anything else is ignored. While it is open, every key
+  goes to it.
+- **Seen:** each node's number on the current level, below-left of it; a
+  `values` line under the status with every value at the listening point
+  (`valuesAt`, through the 3D weights), the current one marked `>`; the
+  typing line in the message's place. Nothing new on a map without values.
+- **The dump's separator** between a value and its node is `/`, not `.`: the
+  runner reads a lone `.` as the start of a number.
+- 4 editor scripts (55), 84 checked steps (772); 5 vectors in the levels
+  suite (98); 15 mutation gates (314). The drawing session gained three
+  frames: typing a name, a value raised, `z`'s line. `make keys` covers the
+  five new keys (46).
+- In the drawing session's 1024 by 640 window the key panel was already
+  taller than the window before this round (it is one column there); the
+  values group adds five rows to it. On a wider window the panel is two
+  columns.
 
 ---
 

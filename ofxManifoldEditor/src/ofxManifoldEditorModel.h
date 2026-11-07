@@ -74,6 +74,10 @@ public:
     // 3A-6). Output operations reach every level; binding operations, fill
     // and heights reach the current one.
     const Map3D&      map3d() const { return map_; }
+
+    // The value being edited (round 3A-7), or NoValue when the map has none.
+    static constexpr std::size_t NoValue = static_cast<std::size_t>(-1);
+    const std::size_t& currentValue() const { return currentValue_; }
     const LevelID&    currentLevel() const { return level_; }
 
     // The selected outputs: shift-click on faders selects several. The
@@ -211,6 +215,34 @@ public:
     // or nothing, as m.
     Result flattenHeights(const Selection& sel);
 
+    // ---- node values (round 3A-7) --------------------------------------------
+    //
+    // A value is a named number each node carries on each level; what it
+    // means is up to what reads it. No names are built in.
+
+    // g, then a typed line: "name", or "name lo hi" with lo below hi (0 to 1
+    // if no range is given). Every node starts at the bottom of the range.
+    // It becomes the current value. Refused for no name, a name taken, or a
+    // range that is not two numbers low then high.
+    Result newValue(const std::string& line);
+
+    // z, then the line: the current value renamed and re-ranged, every number
+    // it holds -- and its fallback -- brought inside the new range. Refused
+    // as newValue is. What z opens the line with: "name lo hi".
+    Result editValue(const std::string& line);
+    std::string valueLine() const;
+
+    // j and J: the next or previous value becomes current. Not an undo step.
+    Result pickValue(int direction);
+
+    // ; and ': the selected nodes' current value on the current level, by a
+    // twentieth of its range (a hundredth when `fine`), landing on the next
+    // multiple as fill does, and held inside the range.
+    Result stepValue(const Selection& sel, int direction, bool fine);
+
+    // G: the current value goes, from every node on every level.
+    Result removeValue();
+
     // cmd-delete: the current level goes, and the one below becomes current.
     // Refused for the only level.
     Result removeLevel();
@@ -237,6 +269,7 @@ private:
     Manifold2D     manifold_;
     Map3D          map_;
     LevelID        level_ = 0;
+    std::size_t    currentValue_ = NoValue;
     TargetID       currentOutput_ = InvalidTarget;
     std::vector<TargetID> outputSel_;
     bool           autoOutput_ = true;

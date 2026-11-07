@@ -130,6 +130,12 @@ private:
     // ---- state: a level's dot pressed, and maybe dragged (3A-6b) ----------
     // A click goes to the level; a drag moves the whole level, landing where
     // the dot is let go -- one undo step.
+    // ---- state: the typing line (3A-7) ---------------------------------------
+    // g and z open it to name a value; while it is open every key goes to it.
+    bool        typing = false;
+    bool        typingNew = true;     // g: a new value; z: the current one
+    std::string typingLine;
+
     int         levelPress = -1;
     float       levelPressY = 0.0f;
     float       levelDragBase = 0.0f;

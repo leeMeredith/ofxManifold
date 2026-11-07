@@ -1,5 +1,7 @@
 #include "ofxManifoldEditorKeyPanel.h"
 
+#include "ofxManifoldEditorListening.h"
+
 #include "ofxManifoldEditorStyle.h"
 #include "ofxManifoldEditorText.h"
 
@@ -95,8 +97,12 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
     }
     y += 7.0f * step + lh * 0.5f;
 
-    // ---- the message: one line, always here ----
-    if (st.messageShown) {
+    // ---- the message: one line, always here -- or the typing line ----
+    if (s.typing) {
+        ofSetColor(255, 214, 90);
+        text(fit(s.typingPrompt + ": " + s.typingLine
+                 + "_   return makes it, esc cancels"), x, y);
+    } else if (st.messageShown) {
         ofSetColor(st.warning ? ofColor(232, 96, 88)
                                        : ofColor(120, 200, 160));
         text(fit(st.message), x, y);
@@ -142,6 +148,21 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
              + (derived ? ", " + ofToString(derived) + " derived" : std::string())
              + " -- hover a fader for details"), x, y + 2.0f * step);
     y += 3.0f * step + lh * 0.5f;
+
+    // ---- node values at the listening point (3A-7), only if there are any:
+    // every value, the current one marked, blending as the point moves ----
+    const std::vector<std::pair<std::string, float>> vals =
+        valuesAt(model, evaluation, s.listeningZ);
+    if (!vals.empty()) {
+        std::string line = "values";
+        for (std::size_t v = 0; v < vals.size(); ++v) {
+            line += (v == model.currentValue() ? "  >" : "  ") + vals[v].first
+                  + " " + ofToString(vals[v].second, 3);
+        }
+        ofSetColor(200, 190, 240);
+        text(fit(line), x, y);
+        y += step + lh * 0.5f;
+    }
 
     // ---- the keys: always starting here ----
     // Grouped by intention; lit when the key would act, dim when it would

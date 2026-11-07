@@ -153,6 +153,23 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("view3d", "cmd-3", "3D view on or off", true, ""),
     }});
 
+    // Round 3A-7: node values, named numbers each node carries per level.
+    const std::size_t values = m.map3d().valueSet().size();
+    const char* noValues = "no values yet -- g makes one";
+    g.push_back({"values", {
+        entry("newvalue", "g", "new value -- type its name", !drag, dragging),
+        entry("pickvalue", "j J", "next / previous value",
+              !drag && values > 0, unlessDrag(noValues)),
+        entry("stepvalue", "; '", "value down / up 5% (shift 1%)",
+              !drag && values > 0 && !sel.empty(),
+              unlessDrag(values == 0 ? noValues
+                                     : "select the nodes to change")),
+        entry("editvalue", "z", "rename or re-range the value",
+              !drag && values > 0, unlessDrag(noValues)),
+        entry("removevalue", "G", "remove the value",
+              !drag && values > 0, unlessDrag(noValues)),
+    }});
+
     g.push_back({"listen", {
         entry("audition", "space", "hold to audition", !drag, dragging),
         entry("lock", "v", "lock audition on or off", !drag, dragging),
@@ -197,6 +214,17 @@ bool keyAvailable(const KeyContext& ctx, const std::string& id,
     }
     if (!e->available && why) *why = e->why;
     return e->available;
+}
+
+Typed typeKey(std::string& line, int key) {
+    if (key == 13 || key == 10) return Typed::Enter;
+    if (key == 27) return Typed::Escape;
+    if (key == 8 || key == 127) {
+        if (!line.empty()) line.pop_back();
+    } else if (key >= 32 && key <= 126 && line.size() < 40) {
+        line += char(key);
+    }
+    return Typed::Open;
 }
 
 } // namespace editor

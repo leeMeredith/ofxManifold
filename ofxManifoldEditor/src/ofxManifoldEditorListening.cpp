@@ -77,6 +77,18 @@ DotColumn dotColumn(const Model& model, float top, float bottom,
     return c;
 }
 
+std::vector<std::pair<std::string, float>>
+valuesAt(const Model& model, const Evaluation& floor, float z) {
+    const Map3D& map = model.map3d();
+    const Evaluation3D e = floor.inside ? map.levels().evaluate(floor, z)
+                                        : Evaluation3D{};
+    std::vector<std::pair<std::string, float>> out;
+    for (std::size_t v = 0; v < map.valueSet().size(); ++v) {
+        out.emplace_back(map.valueSet()[v].name, map.valueAt(v, e));
+    }
+    return out;
+}
+
 int dotAt(const DotColumn& c, float columnX, float x, float y) {
     if (!c.shown || std::fabs(x - columnX) > 8.0f) return -1;
     int hit = -1;
