@@ -195,6 +195,34 @@ void drawLinks(const Scene& s) {
     ofPopStyle();
 }
 
+void drawLayoutPreview(const Scene& s) {
+    if (!s.layoutPreview || !s.layoutPreview->ok) return;
+    const LayoutPlan& plan = *s.layoutPreview;
+    const ofxManifoldRenderer* renderer = s.renderer;
+    ofPushStyle();
+    ofNoFill();
+    ofSetLineWidth(1.0f);
+    ofSetColor(120, 200, 255, 110);
+    for (const auto& r : plan.regions) {
+        ofBeginShape();
+        for (std::size_t i : r) {
+            const glm::vec2 q = renderer->toScreen(plan.points[i]);
+            ofVertex(q.x, q.y);
+        }
+        ofEndShape(true);
+    }
+    ofSetColor(120, 200, 255, 200);
+    for (std::size_t i = 0; i < plan.points.size(); ++i) {
+        const glm::vec2 q = renderer->toScreen(plan.points[i]);
+        ofDrawCircle(q.x, q.y, 5.0f);
+        // Numbered while there are few enough to read.
+        if (plan.points.size() <= 16) {
+            s.text->draw(std::to_string(i + 1), q.x + 6.0f, q.y - 6.0f);
+        }
+    }
+    ofPopStyle();
+}
+
 void drawOffsets(const Scene& s) {
     const Model& model = *s.model;
     const Manifold2D& manifold = model.manifold();
@@ -320,6 +348,7 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
     }
     drawOffsets(s);
     drawValues(s);
+    drawLayoutPreview(s);
 
     // Nodes feeding the CURRENT output: a green ring, outside the selection
     // ring so both can show at once. With the fader marks below, this is how

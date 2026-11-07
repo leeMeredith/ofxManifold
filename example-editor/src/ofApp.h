@@ -164,7 +164,14 @@ private:
     float    spacing  = 0.05f;
     float    rotation = 0.0f;           // radians
     int      spokes   = 8;
-    int      blockSize = 3;             // l on a square or triangular grid
+    // What l lays out on each grid (3A-9), set with [ ]: rings deep on the
+    // polar grid, the block's size on the square one, the triangle's stage
+    // on the triangular one (1 to editor::kTriangleStages; 3 is 6 nodes).
+    int      ringDepth = 1;
+    int      blockSize = 3;
+    int      triStage  = 3;
+    int  layoutSize() const;
+    bool previewLayout = false;         // after [ or ], until l or another key
     float    deadZone = 0.25f;          // fraction of grid spacing
 
     // ---- state: an in-progress drag or press -------------------------------

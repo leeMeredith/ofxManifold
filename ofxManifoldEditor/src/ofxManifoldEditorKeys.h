@@ -37,8 +37,10 @@ struct KeyContext {
     bool      auditioning = false;
     GridShape grid        = GridShape::Lattice;
     bool      triangles   = false;   // the lattice is the triangular one
-    int       spokes      = 8;       // l on the polar grid: a ring of this many
-    int       blockSize   = 3;       // l on a lattice: a block this many across
+    int       spokes      = 8;       // the polar grid's spokes
+    int       layoutSize  = 1;       // what l lays out on this grid (3A-9):
+                                     // rings deep, block across, or the
+                                     // triangle's stage
 };
 
 struct KeyEntry {

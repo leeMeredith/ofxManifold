@@ -64,6 +64,9 @@ struct ofRectangle {
     float getHeight() const { return height; }
     float getRight() const { return x + width; }
     float getBottom() const { return y + height; }
+    bool inside(float px, float py) const {
+        return px > x && py > y && px < x + width && py < y + height;
+    }
 };
 struct ofBuffer {
     std::string t;

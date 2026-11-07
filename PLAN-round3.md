@@ -975,6 +975,55 @@ too.
   The drawing session gained four frames: a ring, a 4 x 4 block, a block in
   triangles, `l` refused with the grid off. `make keys` covers `l` (47).
 
+### 3A-9: curves on every level, one key for the layout's size, triangles that grow as triangles
+
+From Lee trying 3A-8 (2026-11-07): the curves vanished on a new level and
+never appeared when binding on one; `[ ]` meant spokes on one grid and size
+on another; and the triangular block should grow as triangles -- "the
+first is three, add another point that would make a diamond, then add two
+more points that would make a triangle made up of three upright triangles
+and one pointing down". All as proposed, agreed the same day ("ok go").
+
+- **A new level keeps the links between nodes.** It copies them as a
+  pattern: a link to node M's own output becomes a link to M's own output on
+  the new level, same weight -- A to B is A to B-2. What a node sent to any
+  other output still goes to its own (3A-6d), and a node that sent to none
+  sends to its own. 3A-6d had folded everything into the node's own output,
+  losing A to B.
+- **The curves are drawn on every level.** A curve went to the node NAMED
+  like the output, and on level 2 there is no node called B-2. It now goes
+  to the node the output belongs to (`Model::ownerOf`: the node of that
+  name, else the node it is named after).
+- **`[ ]` set the size of what `l` lays out, on every grid; `{ }` set the
+  polar spokes.** Each grid keeps its own size: rings deep on the polar
+  grid (1 to 8, from 1), the block on the square grid (2 to 8, from 3), the
+  triangle's stage on the triangular grid (1 to 13, from 3).
+- **Rings deep:** from the ring pointed at inward, outermost first, joined as
+  four-sided pieces between rings and the innermost ring whole. Reaching
+  the centre, the centre comes last, joined to the innermost ring as
+  triangles. Refused past the centre: "the rings would pass the centre --
+  point further out".
+- **The triangle** on the triangular grid is upright, point toward the
+  front, numbered row by row from its point, joined as small triangles. Its
+  stages fill each new row's inner points first, then its two corners: 3,
+  4 (a diamond), 6, 8, 10, 13, 15, 19, 21, 26, 28, 34, 36 nodes. Placed so
+  its middle is nearest the mouse. It replaces 3A-8's rhombus.
+- **The preview:** after `[` or `]` (or `{ }` on the polar grid) the shape
+  `l` would lay out is drawn faintly at the mouse -- its pieces outlined,
+  its nodes as rings, numbered when there are 16 or fewer -- until `l`,
+  another key or a click. `planLayout` works it out; `layout` does exactly
+  the plan, so the preview cannot disagree with the result. The message
+  says what `l` will make: "l lays out 2 rings of 8".
+- **Found on the way:** the drawing session wrote its log with `fputs`,
+  which stops at a NUL byte, so a dangling string cut the log short without
+  failing. It writes the whole buffer now, and the dangling string (a key
+  entry read from a key map already gone) is fixed.
+- 2 editor scripts (62), 31 checked steps (821); 18 new mutation gates, and
+  3A-8's 18 rewritten for the new code as 15, the other three now covered
+  by new ones (347). The drawing session's
+  layout frames now include two previews. `make keys` covers `[ ]` and
+  `{ }` (48).
+
 ---
 
 ## Answered
@@ -1006,6 +1055,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-6** | Editor: levels (new, switch, remove), raise and lower, the 3D view | editor scripts, judged on screen |
 | **3A-7** | Editor: setting and showing node values | editor scripts, judged on screen |
 | **3A-8** | Editor: ring and grid layout | editor scripts, drawlog session extended |
+| **3A-9** | Editor: curves on every level, layout size and preview, growing triangles | editor scripts, drawlog session extended |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

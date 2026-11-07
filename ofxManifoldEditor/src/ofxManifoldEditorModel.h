@@ -41,6 +41,21 @@ struct Result {
 // it before the key is pressed. bind() does not use it -- bind() builds its
 // message from what it actually changed -- so the tests can check, for every
 // b in every script, that the plan foretold exactly what happened.
+// What l would lay out, worked out without doing it (3A-9): the preview
+// draws it, and layout() does exactly it.
+struct LayoutPlan {
+    bool                                  ok = false;
+    std::string                           message;   // what it is, or why not
+    std::vector<glm::vec2>                points;    // in numbering order
+    std::vector<std::vector<std::size_t>> regions;   // indices into points
+};
+
+// The triangular grid's layout sizes, 1 to kTriangleStages: an upright
+// triangle of side k, and between sides k and k + 1 the next row's inner
+// points -- 3, 4 (a diamond), 6, 8, 10, 13, 15 ... 36 nodes.
+constexpr int kTriangleStages = 13;
+int triangleStageNodes(int stage);
+
 struct BindPlan {
     bool        possible = false;   // false: b would do nothing
     std::string why;                // why not, when it is not possible
@@ -109,15 +124,22 @@ public:
     // Place a node at p, snapped by `grid`. `placed` receives its id.
     Result place(glm::vec2 p, const Grid& grid, NodeID* placed = nullptr);
 
-    // l (round 3A-8): many nodes in one step, from the grid point nearest p.
-    // On the polar grid, a ring: one node per spoke on that ring, numbered
-    // clockwise from the spoke nearest the front (up), joined as one region.
-    // On a lattice, a size x size block centred there, numbered row by row
-    // from the front-left, joined as squares -- or, `triangles`, each square
-    // split across its short diagonal. Each node placed as a click places it,
-    // its outputs taking one run of channels per level. All or nothing:
-    // refused on the free grid, at the polar centre, off the map, or on a
-    // node. `placed` receives the new nodes, in their order.
+    // l (rounds 3A-8, 3A-9): many nodes in one step, from the grid point
+    // nearest p. On the polar grid, `size` rings from the one nearest p
+    // inward: one node per spoke on each, numbered clockwise from the spoke
+    // nearest the front (up), outermost first; joined as four-sided pieces
+    // between rings and the innermost ring whole -- or, when they reach it,
+    // the centre last, joined to the innermost ring as triangles. On the
+    // square grid a size x size block centred there, numbered row by row
+    // from the front-left, joined as squares. With `triangles` (the
+    // triangular grid) an upright triangle of stage `size`, placed so its
+    // middle is nearest p, numbered row by row from its point. Each node
+    // placed as a click places it, its outputs taking one run of channels
+    // per level. All or nothing: refused on the free grid, at the polar
+    // centre, past it, off the map, or on a node. `placed` receives the new
+    // nodes, in their order.
+    LayoutPlan planLayout(glm::vec2 p, const Grid& grid, int size,
+                          bool triangles) const;
     Result layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
                   std::vector<NodeID>* placed = nullptr);
 
@@ -196,6 +218,11 @@ public:
     // the map beyond the end one. It becomes current. Refused, naming the
     // nodes, if any copy would reach a level next to it.
     Result newLevel(bool above);
+
+    // The node whose own output this is: the node of that name, else the
+    // node it is named after (P for P-2, P-3_2), else InvalidNode. Link lines
+    // land on it, and a new level redirects links to it (3A-9).
+    NodeID ownerOf(const std::string& output) const;
 
     // y and h: each selected node's height on the current level steps by
     // 0.05, or 0.01 when `fine`, landing on the next multiple of the step

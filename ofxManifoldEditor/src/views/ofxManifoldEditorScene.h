@@ -50,6 +50,9 @@ struct Scene {
     int       levelDrag     = -1;
     float     levelDragBase = 0.0f;
     glm::vec2 mouse{-1.0f, -1.0f};       // for hover
+    // What l would lay out at the mouse (round 3A-9), shown faintly after
+    // [ or ] until l or another key. nullptr: nothing shown.
+    const LayoutPlan* layoutPreview = nullptr;
 };
 
 // The snapping grid, as it is drawn. A preference of the editing session,

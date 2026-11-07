@@ -199,23 +199,48 @@ class Editor:
 
     # ---- round 3A-8: a ring or a block in one step ------------------------
 
-    def layout(self, p, grid, size, triangles):
-        """l: on the polar grid, a ring -- one node per spoke on the ring
-        nearest the point, numbered clockwise from the spoke nearest the
-        front (up), joined as one region. On a lattice, a size x size block
-        centred on the grid point nearest the point, numbered row by row
-        from the front-left, joined as squares -- or triangles, each square
-        split across its short diagonal. Each node placed as a click places
-        it. All or nothing: refused if any would land off the map or on a
-        node."""
+    # The triangle's sizes, in order (3A-9): an upright triangle of side k
+    # points, and between side k and k + 1 the next row's inner points --
+    # 3, 4 (a diamond), 6, 8, 10, 13, 15 ... 36. Each is joined whole.
+    TRI_STAGES = [(k, mid) for k in range(2, 9) for mid in (False, True)
+                  if not (mid and k == 8)]
+
+    @staticmethod
+    def tri_shape(stage):
+        """(rows, regions) for triangle stage 1..13: rows of (r, c), apex
+        first, left to right; regions as triples of (r, c)."""
+        k, mid = Editor.TRI_STAGES[stage - 1]
+        pts = [(r, c) for r in range(k) for c in range(r + 1)]
+        if mid:
+            pts += [(k, c) for c in range(1, k)]
+        regs = []
+        for r in range(k - 1):
+            for c in range(r + 1):
+                regs.append(((r, c), (r + 1, c), (r + 1, c + 1)))
+                if c < r:
+                    regs.append(((r, c), (r + 1, c + 1), (r, c + 1)))
+        if mid:
+            for c in range(k - 1):
+                regs.append(((k - 1, c), (k, c + 1), (k - 1, c + 1)))
+                if c >= 1:
+                    regs.append(((k - 1, c), (k, c), (k, c + 1)))
+        return pts, regs
+
+    def plan_layout(self, p, grid, size, triangles):
+        """What l would lay out, without doing it: (ok, message, points,
+        addresses, regions as index tuples). l and its preview share it."""
         if isinstance(grid, G.Free):
-            return (0, 1, "pick a square, triangular or polar grid first "
-                    "(2, 3 or 4)")
+            return (False, "pick a square, triangular or polar grid first "
+                    "(2, 3 or 4)", [], [], [])
         q, addr = grid.snap(p)
+        regs = []
         if isinstance(grid, G.Polar):
             ring = addr[0]
             if ring == 0:
-                return (0, 1, "point at a ring, not the centre")
+                return (False, "point at a ring, not the centre", [], [], [])
+            if size > ring + 1:
+                return (False, "refused: the rings would pass the centre -- "
+                        "point further out", [], [], [])
             S = grid.spokes
             best = None
             for b in range(S):
@@ -226,12 +251,59 @@ class Editor:
                         (abs(d - best[0]) <= 1e-5 and cw < best[1]):
                     best = (d, cw, b)
             b0 = best[2]
-            addrs = [(ring, (b0 - i) % S) for i in range(S)]
+            # Outermost ring first, each clockwise from the front; the centre
+            # last when the rings reach it.
+            rings = [ring - k for k in range(size) if ring - k >= 1]
+            centre = ring - size + 1 == 0
+            addrs = [(r, (b0 - i) % S) for r in rings for i in range(S)]
+            if centre:
+                addrs.append((0, 0))
+            at = {a: n for n, a in enumerate(addrs)}
+            def sp(i):
+                return (b0 - i) % S
+            for r in rings[:-1]:
+                for i in range(S):
+                    regs.append((at[(r, sp(i))], at[(r, sp(i + 1))],
+                                 at[(r - 1, sp(i + 1))], at[(r - 1, sp(i))]))
+            last = rings[-1]
+            if centre:
+                for i in range(S):
+                    regs.append((at[(0, 0)], at[(last, sp(i))],
+                                 at[(last, sp(i + 1))]))
+            else:
+                regs.append(tuple(at[(last, sp(i))] for i in range(S)))
+            if size == 1:
+                msg = f"ring of {len(addrs)} nodes"
+            else:
+                msg = (f"{len(rings)} ring" + ("" if len(rings) == 1 else "s")
+                       + (" and the centre" if centre else "")
+                       + f", {len(addrs)} nodes")
             what = "ring"
+        elif triangles:
+            shape, tris = self.tri_shape(size)
+            # Placed so its middle is nearest the point.
+            o = grid.point((0, 0))
+            ox = sum(grid.point((c, -r))[0] - o[0] for r, c in shape) / len(shape)
+            oy = sum(grid.point((c, -r))[1] - o[1] for r, c in shape) / len(shape)
+            _, (ia, ja) = grid.snap((p[0] - ox, p[1] - oy))
+            addrs = [(ia + c, ja - r) for r, c in shape]
+            at = {rc: n for n, rc in enumerate(shape)}
+            regs = [tuple(at[v] for v in t) for t in tris]
+            k, mid = self.TRI_STAGES[size - 1]
+            msg = ("diamond of 4 nodes" if size == 2
+                   else f"{len(addrs)} nodes in {len(regs)} triangles" if mid
+                   else f"triangle of {len(addrs)} nodes")
+            what = "triangle"
         else:
             i0, j0 = addr[0] - (size - 1) // 2, addr[1] - (size - 1) // 2
             addrs = [(i0 + i, j0 + j) for j in reversed(range(size))
                      for i in range(size)]
+            at = {a: n for n, a in enumerate(addrs)}
+            for j in range(j0, j0 + size - 1):
+                for i in range(i0, i0 + size - 1):
+                    regs.append((at[(i, j)], at[(i + 1, j)],
+                                 at[(i + 1, j + 1)], at[(i, j + 1)]))
+            msg = f"{size} x {size} block, {size * size} nodes"
             what = "block"
         # On the map within a hair (the editor's grid spacing is a float,
         # so a ring touching the edge can land a few 1e-9 outside it), and
@@ -240,28 +312,33 @@ class Editor:
         tol = 1e-5
         if any(not (-tol <= x <= 1.0 + tol and -tol <= y <= 1.0 + tol)
                for x, y in pts):
-            return (0, 1, f"refused: the {what} would run off the map")
+            return (False, f"refused: the {what} would run off the map",
+                    [], [], [])
         pts = [(min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0)) for x, y in pts]
         if any(self.occupied(pt, a, grid) for pt, a in zip(pts, addrs)):
-            return (0, 1, "refused: a node is already in the way")
+            return (False, "refused: a node is already in the way", [], [], [])
+        return (True, msg, pts, addrs, regs)
+
+    def layout(self, p, grid, size, triangles):
+        """l: on the polar grid, `size` rings from the one nearest the point
+        inward -- one node per spoke on each, numbered clockwise from the
+        spoke nearest the front, outermost first, the centre last if they
+        reach it; joined as four-sided pieces between rings, the innermost
+        ring whole (or as triangles to the centre). On the square grid a
+        size x size block, numbered row by row from the front-left, joined
+        as squares. On the triangular grid an upright triangle of stage
+        `size`, numbered row by row from its point. Each node placed as a
+        click places it. All or nothing."""
+        ok, msg, pts, addrs, regs = self.plan_layout(p, grid, size, triangles)
+        if not ok:
+            return (0, 1, msg)
         # The nodes first, then their outputs level by level, so each level's
         # take one run of channels: a ring of 8 on two levels is 0-7, 8-15.
-        names = {a: self.place_at(pt, outputs=False) for a, pt in zip(addrs, pts)}
-        self.give_outputs([names[a] for a in addrs])
-        if what == "ring":
-            self.regions.append(tuple(names[a] for a in addrs))
-            return (1, 0, f"ring of {len(addrs)} nodes")
-        for j in range(j0, j0 + size - 1):
-            for i in range(i0, i0 + size - 1):
-                a, b = names[(i, j)], names[(i + 1, j)]
-                c, d = names[(i + 1, j + 1)], names[(i, j + 1)]
-                if triangles:
-                    self.regions.append((a, b, d))
-                    self.regions.append((b, c, d))
-                else:
-                    self.regions.append((a, b, c, d))
-        return (1, 0, f"{size} x {size} block, {size * size} nodes"
-                + (" in triangles" if triangles else ""))
+        names = [self.place_at(pt, outputs=False) for pt in pts]
+        self.give_outputs(names)
+        for r in regs:
+            self.regions.append(tuple(names[i] for i in r))
+        return (1, 0, msg)
 
     def place_at(self, q, outputs=True):
         """A node at q, exactly; its own outputs as a click gives it."""
@@ -305,6 +382,17 @@ class Editor:
         with a _<n> made to keep it unique?"""
         return out == nm or re.fullmatch(re.escape(nm) + r"-\d+(_\d+)?",
                                          out) is not None
+
+    def owner(self, out):
+        """The node whose own output `out` is: the node of that name, or
+        else the node it is named after (P for P-2, P-3_2), or None."""
+        names = self.names()
+        if out in names:
+            return out
+        for nm in names:
+            if self.owns(nm, out):
+                return nm
+        return None
 
     def move(self, name, p):
         # Single-node moves only in these scripts, and only valid ones.
@@ -665,17 +753,38 @@ class Editor:
             # an output of its own, named after it and the level, on the next
             # free channel; what it sent to outputs goes to that one, its
             # silence stays, so its fill carries over.
+            # The links between nodes are copied as a pattern (3A-9): a
+            # link to node M's own output becomes a link to M's own output on
+            # the new level, same weight -- A to B is A to B-2. What a node
+            # sent to any other output goes to its own (3A-6d), and a node
+            # that sent to no output sends to its own.
             made = 0
+            own = {}
             for nm in self.names():
                 stem = f"{nm}-{at + 1}"
                 on, j = stem, 2
                 while on in self.out_names():
                     on, j = f"{stem}_{j}", j + 1
                 self.outputs.append([on, self.next_channel(), 1.0])
+                own[nm] = on
                 made += 1
+            for nm in self.names():
                 ls = level["links"].get(nm, [])
-                w = sum(l[2] for l in ls if l[0] == "out")
-                level["links"][nm] = ([("out", on, w if w > 0 else 1.0)]
+                outs = []
+                for l in ls:
+                    if l[0] != "out":
+                        continue
+                    m = self.owner(l[1])
+                    to = own[m] if m is not None else own[nm]
+                    for o in outs:
+                        if o[1] == to:
+                            o[2] += l[2]
+                            break
+                    else:
+                        outs.append(["out", to, l[2]])
+                if not outs:
+                    outs = [["out", own[nm], 1.0]]
+                level["links"][nm] = ([tuple(o) for o in outs]
                                       + [l for l in ls if l[0] != "out"])
             msg += (f", with {made} output" + ("" if made == 1 else "s")
                     + " of its own")
@@ -1146,11 +1255,14 @@ class Editor:
             ls = self.links.get(n, [])
             total = sum(l[2] for l in ls)
             for l in ls:
-                if l[0] != "out" or l[1] not in names or l[1] == n:
+                # To the node the output belongs to: on a level past the
+                # first, B's output is B-2 (3A-9).
+                to = self.owner(l[1]) if l[0] == "out" else None
+                if to is None or to == n:
                     continue
-                if n not in sel and l[1] not in sel:
+                if n not in sel and to not in sel:
                     continue
-                lines.append([n, l[1], l[2] / total if total > 0 else 0.0,
+                lines.append([n, to, l[2] / total if total > 0 else 0.0,
                               n in sel, 0])
         for a in lines:
             if any(b[0] == a[1] and b[1] == a[0] for b in lines):
@@ -1261,8 +1373,9 @@ class Editor:
             ("join", nd and len(sel) >= 3), ("unjoin", nd and region_sel),
             ("remove", nd and bool(sel)),
             ("gridkind", nd), ("rotate", nd and grid_on),
-            ("spacing", nd and grid_on), ("spokes", nd and grid_on),
-            ("deadzone", nd and grid_on), ("layout", nd and grid_on),
+            ("spacing", nd and grid_on), ("spokes", nd and grid == "polar"),
+            ("deadzone", nd and grid_on), ("layoutsize", nd and grid_on),
+            ("layout", nd and grid_on),
             ("newoutput", nd), ("pickoutput", nd and outs > 0),
             ("addoutput", nd and outs >= 2), ("nextoutput", nd and outs >= 2),
             ("bind", nd and possible), ("bindall", nd and outs > 0 and bool(sel)),
@@ -2324,6 +2437,7 @@ def build():
     build_levels_d(out)
     build_values(out)
     build_layout(out)
+    build_curves(out)
     return out
 
 
@@ -2944,15 +3058,15 @@ def build_layout(out):
                grid=polar, spec=polar.spec())
     t.keys(grid="polar")
     t.do("newlevel", 1)
-    t.do("layout", (0.52, 0.79), 3, False)
-    t.do("layout", (0.5, 0.82), 3, False)
-    t.do("layout", (0.51, 0.49), 3, False)
-    t.do("layout", (0.5, 0.95), 3, False)
+    t.do("layout", (0.52, 0.79), 1, False)
+    t.do("layout", (0.5, 0.82), 1, False)
+    t.do("layout", (0.51, 0.49), 1, False)
+    t.do("layout", (0.5, 0.95), 1, False)
     out.append("# the outermost ring that fits: radius 0.5 touches the edges")
-    t.do("layout", (0.5, 1.0), 3, False)
+    t.do("layout", (0.5, 1.0), 1, False)
     t.do("undo")
-    t.do("layout", (0.5, 1.08), 3, False)
-    t.do("layout", (0.62, 0.5), 3, False)
+    t.do("layout", (0.5, 1.08), 1, False)
+    t.do("layout", (0.62, 0.5), 1, False)
     t.end()
 
     tilted = G.Polar((0.5, 0.5), 0.1, 8, math.pi / 8)
@@ -2960,7 +3074,7 @@ def build_layout(out):
                "with the spokes tilted so two are equally near the front, the "
                "ring starts at the one just right of it",
                grid=tilted, spec=tilted.spec())
-    t.do("layout", (0.5, 0.7), 3, False)
+    t.do("layout", (0.5, 0.7), 1, False)
     t.end()
 
     square = G.Lattice((0.1, 0.0), (0.0, 0.1))
@@ -2978,12 +3092,43 @@ def build_layout(out):
     t.do("layout", (0.8, 0.8), 2, False)
     t.end()
 
+    out.append("# 3A-9: [ ] set how many rings deep, from the one pointed at")
+    out.append("# inward; reaching the centre, it is joined to the centre")
+    t = Script(out, "layout_rings",
+               "l on the polar grid with a depth: that many rings from the one "
+               "nearest the point inward, outermost first, joined as four-sided "
+               "pieces between rings and the innermost ring whole -- or, when "
+               "they reach it, the centre last, joined to the innermost ring "
+               "as triangles. Refused past the centre",
+               grid=polar, spec=polar.spec())
+    t.do("layout", (0.5, 0.8), 2, False)
+    t.do("undo")
+    t.do("layout", (0.5, 0.71), 3, False)
+    t.do("undo")
+    t.do("layout", (0.5, 0.8), 4, False)
+    t.do("undo")
+    t.do("layout", (0.5, 0.8), 5, False)
+    t.do("layout", (0.62, 0.5), 3, False)
+    t.do("layout", (0.62, 0.5), 2, False)
+    t.end()
+
     tri = G.Lattice((0.1, 0.0), (0.05, 0.08660254))
     t = Script(out, "layout_triangles",
-               "on the triangular grid the block is a rhombus of n x n points, "
-               "each cell split into two triangles across its short diagonal",
+               "3A-9: on the triangular grid an upright triangle that grows "
+               "as triangles -- 3 nodes, then a diamond of 4, then 6, then the "
+               "next row's inner points (8), then its corners (10), and on to "
+               "36 -- placed so its middle is nearest the point, numbered row "
+               "by row from its point, joined as small triangles",
                grid=tri, spec=tri.spec())
-    t.do("layout", (0.4, 0.4), 3, True)
+    t.do("layout", (0.22, 0.83), 1, True)
+    t.do("layout", (0.52, 0.81), 2, True)
+    t.do("layout", (0.8, 0.8), 3, True)
+    t.do("layout", (0.25, 0.37), 4, True)
+    t.do("layout", (0.7, 0.33), 5, True)
+    t.do("undo"); t.do("undo"); t.do("undo"); t.do("undo"); t.do("undo")
+    t.do("layout", (0.49, 0.47), 13, True)
+    t.do("undo")
+    t.do("layout", (0.2, 0.2), 13, True)
     t.end()
 
     t = Script(out, "layout_free",
@@ -3004,6 +3149,43 @@ def main():
     print(f"  {scripts} scripts, {steps} checked steps")
     return 0
 
+
+
+def build_curves(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-9: THE CURVES ON EVERY LEVEL")
+    out.append("#")
+    out.append("# A new level copies the links between nodes as a pattern: A to")
+    out.append("# B's output is A to B-2 on level 2. A line is drawn to the node")
+    out.append("# an output belongs to, so B-2's line lands on B.")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "curves_on_levels",
+               "a new level keeps the links between nodes, pointed at the "
+               "level's own outputs, weights kept; the curves are drawn on "
+               "every level, to the node whose output it is")
+    t.do("empty")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.select("n0")
+    t.do("pick", "n1")
+    t.do("bind")
+    t.lines()
+    out.append("# level 2: n0 sends to n0-2 and n1-2, as it sent to n0 and n1")
+    t.do("newlevel", 1)
+    t.lines()
+    out.append("# a node placed on level 2, bound on level 2 to n0-2: its line")
+    out.append("# lands on n0; on level 1 it has none")
+    t.do("place", (0.5, 0.8))
+    t.select("n2")
+    t.do("pick", "n0-2")
+    t.do("bind")
+    t.lines()
+    t.select("n0")
+    t.lines()
+    t.do("leveldown")
+    t.select("n2")
+    t.lines()
+    t.end()
 
 if __name__ == "__main__":
     sys.exit(main())

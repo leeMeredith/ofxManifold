@@ -3,6 +3,27 @@
 namespace ofxManifold {
 namespace editor {
 
+namespace {
+
+// What l would lay out, in the panel's words.
+std::string layoutAction(const KeyContext& ctx) {
+    const int n = ctx.layoutSize;
+    if (ctx.grid == GridShape::Polar) {
+        return n == 1 ? "lay out a ring of " + std::to_string(ctx.spokes)
+                      : "lay out " + std::to_string(n) + " rings of "
+                            + std::to_string(ctx.spokes);
+    }
+    if (ctx.triangles) {
+        return n == 2 ? std::string("lay out a diamond of 4")
+                      : "lay out " + std::to_string(triangleStageNodes(n))
+                            + " in triangles";
+    }
+    return "lay out a " + std::to_string(n) + " x " + std::to_string(n)
+         + " block";
+}
+
+} // namespace
+
 std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
     const Model& m = *ctx.model;
     const Selection& sel = *ctx.selection;
@@ -88,20 +109,16 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("the grid is off (1)")),
         entry("spacing", "- =", "grid spacing", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
-        // [ ] sets what l lays out: the spokes on the polar grid, the
-        // block's size on a lattice (round 3A-8).
-        entry("spokes", "[ ]",
-              ctx.grid == GridShape::Polar ? "polar spokes" : "block size",
-              !drag && gridOn, unlessDrag("the grid is off (1)")),
+        entry("spokes", "{ }", "polar spokes",
+              !drag && ctx.grid == GridShape::Polar,
+              unlessDrag("polar grid only (4)")),
         entry("deadzone", ", .", "snap dead zone", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
-        entry("layout", "l",
-              ctx.grid == GridShape::Polar
-                  ? "lay out a ring of " + std::to_string(ctx.spokes)
-                  : "lay out a " + std::to_string(ctx.blockSize) + " x "
-                        + std::to_string(ctx.blockSize) + " block"
-                        + (ctx.triangles ? " in triangles" : ""),
-              !drag && gridOn, unlessDrag("the grid is off (1)")),
+        // [ ] set the size of what l lays out, on every grid (3A-9).
+        entry("layoutsize", "[ ]", "layout size", !drag && gridOn,
+              unlessDrag("the grid is off (1)")),
+        entry("layout", "l", layoutAction(ctx), !drag && gridOn,
+              unlessDrag("the grid is off (1)")),
     }});
 
     g.push_back({"outputs", {

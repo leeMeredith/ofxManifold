@@ -97,7 +97,7 @@ int main() {
 
     key('4');
     frame("polar grid");
-    key(']');
+    key('}');
     key('r');
     frame("more spokes, rotated");
     key('3');
@@ -204,30 +204,33 @@ int main() {
     release(OF_KEY_COMMAND);
     frame("the middle level removed");
 
-    // round 3A-8: l lays out a ring or a block where the mouse points.
+    // rounds 3A-8 and 3A-9: [ ] set what l lays out, shown at the mouse;
+    // l lays it out where the mouse points.
     hold(OF_KEY_COMMAND);
     key('3');
     release(OF_KEY_COMMAND);
     key('x');
     key('4');
     a.mouseMoved(sx(0.52f), sy(0.79f));
+    key(']');
+    frame("] on the polar grid: 2 rings shown at the mouse, numbered");
     key('l');
-    frame("l on the polar grid: a ring, one node per spoke, selected");
+    frame("l: 2 rings laid out, selected, on both levels");
     key('2');
     key(']');
     a.mouseMoved(sx(0.2f), sy(0.2f));
     key('l');
     frame("] then l on the square grid: a 4 x 4 block");
     key('3');
-    key('[');
-    key('[');
-    a.mouseMoved(sx(0.8f), sy(0.25f));
+    a.mouseMoved(sx(0.75f), sy(0.3f));
+    key(']');
+    frame("] on the triangular grid: 8 nodes in triangles, previewed");
     key('l');
-    frame("l on the triangular grid: a 2 x 2 block in triangles");
+    frame("l: the 8 laid out");
     key('1');
     key('l');
     frame("l with the grid off: the key panel says why");
 
-    std::fputs(drawlog().c_str(), stdout);
+    std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;
 }

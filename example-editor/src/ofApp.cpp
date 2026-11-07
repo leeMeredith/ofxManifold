@@ -158,6 +158,14 @@ void ofApp::draw() {
     sc.levelDrag = levelMoved ? levelPress : -1;
     sc.levelDragBase = levelDragBase;
     sc.mouse = mouse;
+    // The layout l would make, after [ or ], while the mouse is on the map.
+    LayoutPlan preview;
+    const ofRectangle mapArea = renderer->viewport();
+    if (previewLayout && mapArea.inside(mouse.x, mouse.y)) {
+        preview = model.planLayout(renderer->toManifold(mouse), grid,
+                                   layoutSize(), kind == GridKind::Triangular);
+        sc.layoutPreview = &preview;
+    }
 
     GridLook look;
     look.kind = kind;
@@ -267,6 +275,7 @@ NodeID ofApp::nodeAt(glm::vec2 screen) const {
 
 void ofApp::mousePressed(int x, int y, int) {
     const glm::vec2 screen(x, y);
+    previewLayout = false;
 
     // The 3D view's area belongs to its camera: a press there turns the view
     // and never reaches the map.
@@ -486,7 +495,8 @@ std::string ofApp::keyId(int key) const {
     case '1': case '2': case '3': case '4':        return "gridkind";
     case 'r': case 'R': case '0':                   return "rotate";
     case '-': case '=': case '+':                   return "spacing";
-    case '[': case ']':                             return "spokes";
+    case '{': case '}':                             return "spokes";
+    case '[': case ']':                             return "layoutsize";
     case ',': case '.':                             return "deadzone";
     case 'l':                                       return "layout";
     case 'a':                                       return "all";
@@ -535,6 +545,12 @@ float ofApp::columnX() const {
     return renderer->viewport().getRight() + kColumnOffset;
 }
 
+int ofApp::layoutSize() const {
+    return kind == GridKind::Polar      ? ringDepth
+         : kind == GridKind::Triangular ? triStage
+         : blockSize;
+}
+
 KeyContext ofApp::keyContext() const {
     KeyContext ctx;
     ctx.model = &model;
@@ -548,7 +564,7 @@ KeyContext ofApp::keyContext() const {
              : GridShape::Lattice;
     ctx.triangles = kind == GridKind::Triangular;
     ctx.spokes = spokes;
-    ctx.blockSize = blockSize;
+    ctx.layoutSize = layoutSize();
     return ctx;
 }
 
@@ -580,6 +596,12 @@ void ofApp::keyPressed(int key) {
     }
     // Every key asks the key map first: a dim key does not act, it says why.
     const std::string id = keyId(key);
+    // The layout preview shows after [ or ] (or { } on the polar grid, which
+    // change the ring) and goes at any other key.
+    if (!id.empty()) {
+        previewLayout = id == "layoutsize"
+                     || (id == "spokes" && kind == GridKind::Polar);
+    }
     if (id.empty() || !allowed(id)) return;
 
     // ---- window ----
@@ -628,20 +650,25 @@ void ofApp::keyPressed(int key) {
         else if (key == '0') rotation = 0.0f;
         else if (key == '-') spacing = std::max(0.02f, spacing * 0.8f);
         else if (key == '=' || key == '+') spacing = std::min(0.25f, spacing * 1.25f);
-        else if (key == '[' || key == ']') {
-            // [ ] set what l lays out (3A-8): the spokes of the polar grid,
-            // the size of a block on a square or triangular one.
-            const int d = key == '[' ? -1 : 1;
-            if (kind == GridKind::Polar) {
-                spokes = std::min(24, std::max(3, spokes + d));
-            } else {
-                blockSize = std::min(8, std::max(2, blockSize + d));
-                const std::string n = std::to_string(blockSize);
-                show(Result{false, false, "l lays out a " + n + " x " + n
-                            + " block", 2.0f});
-            }
-        }
+        else if (key == '{') spokes = std::max(3, spokes - 1);
+        else if (key == '}') spokes = std::min(24, spokes + 1);
         rebuildGrid();
+        return;
+    }
+    // [ ] set the size of what l lays out, on every grid (3A-9). The panel
+    // names it; the message says it too.
+    if (id == "layoutsize") {
+        const int d = key == '[' ? -1 : 1;
+        if (kind == GridKind::Polar) {
+            ringDepth = std::min(8, std::max(1, ringDepth + d));
+        } else if (kind == GridKind::Triangular) {
+            triStage = std::min(kTriangleStages, std::max(1, triStage + d));
+        } else {
+            blockSize = std::min(8, std::max(2, blockSize + d));
+        }
+        const std::vector<KeyGroup> keys = keyMap(keyContext());
+        const KeyEntry* e = findKey(keys, "layout");
+        if (e) show(Result{false, false, "l lays " + e->action.substr(4), 2.0f});
         return;
     }
     // l: a ring or a block in one step, at the grid point nearest the mouse.
@@ -650,7 +677,7 @@ void ofApp::keyPressed(int key) {
     if (id == "layout") {
         std::vector<NodeID> placed;
         const glm::vec2 p = renderer->toManifold(mouse);
-        const int size = kind == GridKind::Polar ? spokes : blockSize;
+        const int size = layoutSize();
         const bool tri = kind == GridKind::Triangular;
         act("lay out", [&](Model& m) {
             return m.layout(p, grid, size, tri, &placed);

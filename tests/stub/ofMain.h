@@ -26,6 +26,7 @@ struct ofRectangle {
     float getWidth() const {return 1;} float getHeight() const {return 1;}
     float getRight() const {return 1;}
     float getBottom() const {return 1;}
+    bool inside(float,float) const {return false;}
 };
 struct ofBuffer { ofBuffer(){} void set(const std::string&){}
                   std::string getText() const {return "";} };

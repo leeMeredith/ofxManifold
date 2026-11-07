@@ -6,6 +6,7 @@
 #include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -79,6 +80,15 @@ std::string offset(float d) {
 }
 
 } // namespace
+
+NodeID Model::ownerOf(const std::string& output) const {
+    const NodeID exact = manifold_.findNode(output);
+    if (exact != InvalidNode) return exact;
+    for (NodeID n = 0; n < manifold_.nodeCount(); ++n) {
+        if (owns(manifold_.node(n).name, output)) return n;
+    }
+    return InvalidNode;
+}
 
 // ---------------------------------------------------------------------------
 // whole maps
@@ -339,19 +349,80 @@ void Model::giveOutputs(const std::vector<NodeID>& ids) {
     }
 }
 
-Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
-                     std::vector<NodeID>* placed) {
-    if (placed) placed->clear();
+namespace {
+
+struct TriStage { int k; bool mid; };
+
+TriStage triStage(int stage) {
+    // (2), (2 mid), (3), (3 mid) ... (7 mid), (8)
+    const int i = std::min(std::max(stage, 1), kTriangleStages) - 1;
+    return {2 + i / 2, (i % 2) == 1};
+}
+
+// The triangle's points as (row, column), apex first, left to right, and its
+// small triangles, each counter-clockwise.
+void triShape(int stage, std::vector<std::pair<int, int>>& pts,
+              std::vector<std::array<std::pair<int, int>, 3>>& tris) {
+    const TriStage st = triStage(stage);
+    const int k = st.k;
+    pts.clear();
+    tris.clear();
+    for (int r = 0; r < k; ++r) {
+        for (int c = 0; c <= r; ++c) pts.push_back({r, c});
+    }
+    if (st.mid) {
+        for (int c = 1; c < k; ++c) pts.push_back({k, c});
+    }
+    for (int r = 0; r + 1 < k; ++r) {
+        for (int c = 0; c <= r; ++c) {
+            tris.push_back({{{r, c}, {r + 1, c}, {r + 1, c + 1}}});
+            if (c < r) tris.push_back({{{r, c}, {r + 1, c + 1}, {r, c + 1}}});
+        }
+    }
+    if (st.mid) {
+        for (int c = 0; c + 1 < k; ++c) {
+            tris.push_back({{{k - 1, c}, {k, c + 1}, {k - 1, c + 1}}});
+            if (c >= 1) tris.push_back({{{k - 1, c}, {k, c}, {k, c + 1}}});
+        }
+    }
+}
+
+LayoutPlan notLaidOut(const std::string& why) {
+    LayoutPlan p;
+    p.message = why;
+    return p;
+}
+
+} // namespace
+
+int triangleStageNodes(int stage) {
+    const TriStage st = triStage(stage);
+    return st.k * (st.k + 1) / 2 + (st.mid ? st.k - 1 : 0);
+}
+
+LayoutPlan Model::planLayout(glm::vec2 p, const Grid& grid, int size,
+                             bool triangles) const {
     if (grid.mode() == GridMode::Free) {
-        return refusal("pick a square, triangular or polar grid first "
-                       "(2, 3 or 4)", 2.5f);
+        return notLaidOut("pick a square, triangular or polar grid first "
+                          "(2, 3 or 4)");
     }
     const SnapResult snap = grid.snap(p);
     std::vector<GridAddress> addrs;
-    std::string what;
+    std::vector<std::vector<std::size_t>> regions;
+    std::string what, msg;
+    auto address = [](int a, int b) {
+        GridAddress g;
+        g.a = a; g.b = b; g.valid = true;
+        return g;
+    };
+
     if (grid.mode() == GridMode::Polar) {
         const int ring = snap.address.a;
-        if (ring == 0) return refusal("point at a ring, not the centre", 2.0f);
+        if (ring == 0) return notLaidOut("point at a ring, not the centre");
+        if (size > ring + 1) {
+            return notLaidOut("refused: the rings would pass the centre -- "
+                              "point further out");
+        }
         // The spoke nearest the front; of two equally near, the one just
         // right of it. Then clockwise -- with up as +y, clockwise is falling
         // angle, so falling spoke number.
@@ -368,26 +439,103 @@ Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
                 bestD = d; bestCw = cw; b0 = b;
             }
         }
-        for (int i = 0; i < S; ++i) {
-            GridAddress a;
-            a.a = ring;
-            a.b = ((b0 - i) % S + S) % S;
-            a.valid = true;
-            addrs.push_back(a);
+        auto sp = [&](int i) { return ((b0 - i) % S + S) % S; };
+        // Outermost ring first, the centre last when the rings reach it.
+        std::vector<int> rings;
+        for (int k = 0; k < size; ++k) {
+            if (ring - k >= 1) rings.push_back(ring - k);
+        }
+        const bool centre = ring - size + 1 == 0;
+        for (int r : rings) {
+            for (int i = 0; i < S; ++i) addrs.push_back(address(r, sp(i)));
+        }
+        if (centre) addrs.push_back(address(0, 0));
+        // Ring r's node on spoke sp(i) is rings-index * S + i.
+        auto at = [&](std::size_t ri, int i) {
+            return ri * std::size_t(S) + std::size_t(((i % S) + S) % S);
+        };
+        for (std::size_t ri = 0; ri + 1 < rings.size(); ++ri) {
+            for (int i = 0; i < S; ++i) {
+                regions.push_back({at(ri, i), at(ri, i + 1),
+                                   at(ri + 1, i + 1), at(ri + 1, i)});
+            }
+        }
+        const std::size_t last = rings.size() - 1;
+        if (centre) {
+            const std::size_t c = addrs.size() - 1;
+            for (int i = 0; i < S; ++i) {
+                regions.push_back({c, at(last, i), at(last, i + 1)});
+            }
+        } else {
+            std::vector<std::size_t> whole;
+            for (int i = 0; i < S; ++i) whole.push_back(at(last, i));
+            regions.push_back(whole);
+        }
+        if (size == 1) {
+            msg = "ring of " + std::to_string(addrs.size()) + " nodes";
+        } else {
+            msg = std::to_string(rings.size())
+                + (rings.size() == 1 ? " ring" : " rings")
+                + (centre ? " and the centre" : "")
+                + ", " + std::to_string(addrs.size()) + " nodes";
         }
         what = "ring";
+    } else if (triangles) {
+        std::vector<std::pair<int, int>> shape;
+        std::vector<std::array<std::pair<int, int>, 3>> tris;
+        triShape(size, shape, tris);
+        // Placed so its middle is nearest the point.
+        const glm::vec2 o = grid.point(address(0, 0));
+        double ox = 0.0, oy = 0.0;
+        for (const auto& rc : shape) {
+            const glm::vec2 q = grid.point(address(rc.second, -rc.first));
+            ox += double(q.x) - double(o.x);
+            oy += double(q.y) - double(o.y);
+        }
+        ox /= double(shape.size());
+        oy /= double(shape.size());
+        const GridAddress apex =
+            grid.snap({float(p.x - ox), float(p.y - oy)}).address;
+        for (const auto& rc : shape) {
+            addrs.push_back(address(apex.a + rc.second, apex.b - rc.first));
+        }
+        auto index = [&](std::pair<int, int> rc) {
+            return std::size_t(std::find(shape.begin(), shape.end(), rc)
+                               - shape.begin());
+        };
+        for (const auto& t : tris) {
+            regions.push_back({index(t[0]), index(t[1]), index(t[2])});
+        }
+        const bool mid = triStage(size).mid;
+        if (size == 2) {
+            msg = "diamond of 4 nodes";
+        } else if (mid) {
+            msg = std::to_string(addrs.size()) + " nodes in "
+                + std::to_string(regions.size()) + " triangles";
+        } else {
+            msg = "triangle of " + std::to_string(addrs.size()) + " nodes";
+        }
+        what = "triangle";
     } else {
         const int i0 = snap.address.a - (size - 1) / 2;
         const int j0 = snap.address.b - (size - 1) / 2;
         for (int j = size - 1; j >= 0; --j) {
             for (int i = 0; i < size; ++i) {
-                GridAddress a;
-                a.a = i0 + i;
-                a.b = j0 + j;
-                a.valid = true;
-                addrs.push_back(a);
+                addrs.push_back(address(i0 + i, j0 + j));
             }
         }
+        // Rows from the front: (i, j) is at (size - 1 - j) * size + i.
+        auto at = [&](int i, int j) {
+            return std::size_t((size - 1 - j) * size + i);
+        };
+        for (int j = 0; j + 1 < size; ++j) {
+            for (int i = 0; i + 1 < size; ++i) {
+                regions.push_back({at(i, j), at(i + 1, j),
+                                   at(i + 1, j + 1), at(i, j + 1)});
+            }
+        }
+        msg = std::to_string(size) + " x " + std::to_string(size) + " block, "
+            + std::to_string(size * size) + " nodes";
         what = "block";
     }
 
@@ -395,56 +543,44 @@ Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
     // hair -- the spacing is a float, so a ring touching the edge (radius
     // 0.5 = 5 x 0.1f) lands a few 1e-9 outside it -- and then held on it.
     const float tol = 1e-5f;
-    std::vector<glm::vec2> pts;
-    for (const GridAddress& a : addrs) pts.push_back(grid.point(a));
-    for (glm::vec2& q : pts) {
+    LayoutPlan plan;
+    for (const GridAddress& a : addrs) plan.points.push_back(grid.point(a));
+    for (glm::vec2& q : plan.points) {
         if (q.x < -tol || q.x > 1.0f + tol || q.y < -tol || q.y > 1.0f + tol) {
-            return refusal("refused: the " + what + " would run off the map",
-                           2.5f);
+            return notLaidOut("refused: the " + what + " would run off the map");
         }
         q = glm::clamp(q, glm::vec2(0.0f), glm::vec2(1.0f));
     }
-    for (std::size_t i = 0; i < pts.size(); ++i) {
-        if (occupied(pts[i], addrs[i], grid)) {
-            return refusal("refused: a node is already in the way", 2.5f);
+    for (std::size_t i = 0; i < addrs.size(); ++i) {
+        if (occupied(plan.points[i], addrs[i], grid)) {
+            return notLaidOut("refused: a node is already in the way");
         }
     }
+    plan.ok = true;
+    plan.message = msg;
+    plan.regions = regions;
+    return plan;
+}
 
-    // The nodes first, then their outputs level by level.
+Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
+                     std::vector<NodeID>* placed) {
+    if (placed) placed->clear();
+    const LayoutPlan plan = planLayout(p, grid, size, triangles);
+    if (!plan.ok) return refusal(plan.message, 2.5f);
+
+    // The nodes first, then their outputs level by level, so each level's
+    // take one run of channels: a ring of 8 on two levels is 0-7, 8-15.
     std::vector<NodeID> ids;
-    for (const glm::vec2& q : pts) ids.push_back(placeAt(q));
+    for (const glm::vec2& q : plan.points) ids.push_back(placeAt(q));
     giveOutputs(ids);
-    if (placed) *placed = ids;
-
-    std::string msg;
-    if (what == "ring") {
-        manifold_.addRegion(ids);
-        msg = "ring of " + std::to_string(ids.size()) + " nodes";
-    } else {
-        // ids are row by row from the front: row r (0 = front) holds
-        // j = j0 + size - 1 - r. The node at (i, j) is ids[r * size + i].
-        auto at = [&](int i, int j) {
-            const int r = size - 1 - j;
-            return ids[std::size_t(r * size + i)];
-        };
-        for (int j = 0; j + 1 < size; ++j) {
-            for (int i = 0; i + 1 < size; ++i) {
-                const NodeID a = at(i, j), b = at(i + 1, j);
-                const NodeID c = at(i + 1, j + 1), d = at(i, j + 1);
-                if (triangles) {
-                    manifold_.addRegion({a, b, d});
-                    manifold_.addRegion({b, c, d});
-                } else {
-                    manifold_.addRegion({a, b, c, d});
-                }
-            }
-        }
-        msg = std::to_string(size) + " x " + std::to_string(size) + " block, "
-            + std::to_string(size * size) + " nodes"
-            + (triangles ? " in triangles" : "");
+    for (const auto& r : plan.regions) {
+        std::vector<NodeID> region;
+        for (std::size_t i : r) region.push_back(ids[i]);
+        manifold_.addRegion(region);
     }
+    if (placed) *placed = ids;
     refreshTopology();
-    return changed(msg, 2.5f);
+    return changed(plan.message, 2.5f);
 }
 
 // One operation, all or nothing, checked against FINAL shapes. On refusal
@@ -1024,7 +1160,13 @@ Result Model::newLevel(bool above) {
     // its silence stays, so its fill carries over. With auto-output off the
     // level shares the outputs it was copied from.
     if (autoOutput_) {
+        // The links between nodes are copied as a pattern (3A-9): a link to
+        // node M's own output becomes a link to M's own output on the new
+        // level, same weight -- A to B is A to B-2. What a node sent to any
+        // other output goes to its own, and a node that sent to no output
+        // sends to its own.
         std::size_t made = 0;
+        std::vector<TargetID> own(manifold_.nodeCount(), InvalidTarget);
         for (NodeID id = 0; id < manifold_.nodeCount(); ++id) {
             const std::string stem = manifold_.node(id).name + "-"
                                    + std::to_string(at + 1);
@@ -1032,21 +1174,33 @@ Result Model::newLevel(bool above) {
             for (int j = 2; mapping().findTarget(on) != InvalidTarget; ++j) {
                 on = stem + "_" + std::to_string(j);
             }
-            float sent = 0.0f;
+            own[id] = map_.addOutput(on, nextFreeChannel());
+            if (own[id] != InvalidTarget) ++made;
+        }
+        for (NodeID id = 0; id < manifold_.nodeCount(); ++id) {
+            if (own[id] == InvalidTarget) continue;
+            std::vector<std::pair<TargetID, float>> sends;
             std::vector<float> silence;
             {
                 const Mapping& lv = map_.level(at);
                 for (std::size_t i = 0; i < lv.linkCount(id); ++i) {
                     const Link& l = lv.link(id, i);
-                    if (l.kind == DestKind::Output) sent += l.weight;
-                    else silence.push_back(l.weight);
+                    if (l.kind != DestKind::Output) {
+                        silence.push_back(l.weight);
+                        continue;
+                    }
+                    const NodeID m = ownerOf(lv.targetName(l.id));
+                    const TargetID to = (m != InvalidNode
+                                         && own[m] != InvalidTarget)
+                                      ? own[m] : own[id];
+                    sends.emplace_back(to, l.weight);
                 }
             }
-            const TargetID t = map_.addOutput(on, nextFreeChannel());
-            if (t == InvalidTarget) continue;
-            ++made;
+            if (sends.empty()) sends.emplace_back(own[id], 1.0f);
             map_.clearBindings(at, id);
-            map_.bind(at, id, t, sent > 0.0f ? sent : 1.0f);
+            // bind adds to a target already bound, so two links that land
+            // on one output merge.
+            for (const auto& sw : sends) map_.bind(at, id, sw.first, sw.second);
             for (float w : silence) map_.bindSilence(at, id, w);
         }
         msg += ", with " + plural(made, " output", " outputs") + " of its own";
@@ -1439,7 +1593,9 @@ std::vector<LinkLine> linkLines(const Model& model, const Selection& sel) {
         for (std::size_t k = 0; k < mp.linkCount(n); ++k) {
             const Link& l = mp.link(n, k);
             if (l.kind != DestKind::Output) continue;
-            const NodeID to = m.findNode(mp.targetName(l.id));
+            // To the node the output belongs to: on a level past the first,
+            // B's output is B-2 (3A-9).
+            const NodeID to = model.ownerOf(mp.targetName(l.id));
             if (to == InvalidNode || to == n) continue;   // no node, or itself
             const bool out = sel.contains(n), in = sel.contains(to);
             if (!out && !in) continue;
