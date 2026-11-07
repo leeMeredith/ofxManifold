@@ -235,7 +235,8 @@ std::string label(const std::string& op) {
         {"empty", "new map"}, {"move", "move"}, {"openpair", "open"},
         {"newlevel", "new level"}, {"raise", "height"},
         {"removelevel", "remove level"}, {"movelevel", "move level"},
-        {"steplevel", "move level"}};
+        {"steplevel", "move level"}, {"match", "height"},
+        {"flatten", "height"}};
     auto it = L.find(op);
     return it == L.end() ? op : it->second;
 }
@@ -386,6 +387,8 @@ int main(int argc, char** argv) {
                     return m.raise(sel, dir, fine != 0); };
             }
             else if (lastOp == "removelevel") op = [](Model& m) { return m.removeLevel(); };
+            else if (lastOp == "match") op = [&](Model& m) { return m.matchHeights(sel); };
+            else if (lastOp == "flatten") op = [&](Model& m) { return m.flattenHeights(sel); };
             else if (lastOp == "golevel") {
                 LevelID k; in >> k;
                 op = [k](Model& m) { return m.goToLevel(k); };

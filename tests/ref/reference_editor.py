@@ -654,6 +654,50 @@ class Editor:
             nb = base - down + 0.01
         return nb
 
+    # ---- round 3A-6c: heights matched to the first node, or flattened ----
+
+    def match_heights(self, sel, ordered):
+        """m: the selected nodes take the height, on the current level, of
+        the one selected FIRST. A box has no first. All or nothing."""
+        if len(sel) < 2:
+            return (0, 1, "select the node to match first, then the others")
+        if not ordered:
+            return (0, 1, "a box has no first node -- click the one to "
+                    "match first, then the others")
+        k, first = self.cur, sel[0]
+        h0 = self.height(k, first)
+        others = sel[1:]
+        bad = [n for n in others if not self.fits(k, n, h0)]
+        if bad:
+            return (0, 1, ", ".join(bad) + " cannot be at " + first
+                    + "'s height -- it would reach a level next to it")
+        moved = [n for n in others if self.height(k, n) != h0]
+        if not moved:
+            return (0, 0, f"already at the height of {first}")
+        for n in moved:
+            self.set_height(k, n, h0)
+        off = f"{h0 - self.levels[k]['base']:+.3g}"
+        return (1, 0, f"{len(moved)} {'node' if len(moved) == 1 else 'nodes'} to the height of "
+                f"{first} ({off})")
+
+    def flatten_heights(self, sel):
+        """M: the selected nodes back to the current level's start."""
+        if not sel:
+            return (0, 0, "")
+        k = self.cur
+        base = self.levels[k]["base"]
+        bad = [n for n in sel if not self.fits(k, n, base)]
+        if bad:
+            return (0, 1, ", ".join(bad) + " cannot go back to the level's "
+                    "start -- it would reach a level next to it")
+        moved = [n for n in sel if self.height(k, n) != base]
+        if not moved:
+            return (0, 0, "already at the level's start")
+        for n in moved:
+            self.set_height(k, n, base)
+        return (1, 0, f"{len(moved)} {'node' if len(moved) == 1 else 'nodes'} back to the "
+                "level's start")
+
     def remove_level(self):
         n = len(self.levels)
         if n == 1:
@@ -951,6 +995,7 @@ class Editor:
             ("levelswitch", nd and (aud or len(self.levels) > 1)),
             ("newlevel", nd), ("raise", nd and bool(sel)),
             ("movelevel", nd and len(self.levels) > 1),
+            ("match", nd and bool(sel)),
             ("removelevel", nd and len(self.levels) > 1), ("view3d", True),
             ("audition", nd), ("lock", nd),
             ("undo", nd and can_undo), ("redo", nd and can_redo),
@@ -1097,7 +1142,8 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "derivedafter": "derived output", "userig": "use rig",
           "newlevel": "new level", "raise": "height",
           "removelevel": "remove level", "movelevel": "move level",
-          "steplevel": "move level"}
+          "steplevel": "move level", "match": "height",
+          "flatten": "height"}
 
 
 class Script:
@@ -1175,6 +1221,8 @@ class Script:
             "raise":    lambda: e.raise_nodes(s, args[0], args[1]),
             "removelevel": e.remove_level,
             "golevel":  lambda: e.go_level(args[0]),
+            "match":    lambda: e.match_heights(s, self.ordered),
+            "flatten":  lambda: e.flatten_heights(s),
             "movelevel": lambda: e.move_level(args[0], args[1]),
             "steplevel": lambda: e.step_level(args[0], args[1]),
             "example":  lambda: (e.example(), (1, 0, ""))[1],
@@ -1931,6 +1979,7 @@ def build():
     build_round3(out)
     build_levels(out)
     build_levels_b(out)
+    build_levels_c(out)
     return out
 
 
@@ -2314,6 +2363,60 @@ def build_levels_b(out):
     t.dot_at(500.0, 80.0, 10.0, 100.0, 500.0)
     t.end()
 
+
+
+def build_levels_c(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-6c: HEIGHTS MATCHED TO THE FIRST NODE, OR FLATTENED")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "levels_match",
+               "m gives the selected nodes the height, on the current level, "
+               "of the node selected FIRST; M puts them back at the level's "
+               "start. All or nothing, refused where a node would reach a "
+               "level next to it. A box has no first node")
+    t.do("example")
+    t.do("newlevel", 1); t.do("newlevel", 1)
+    t.do("leveldown")
+    t.select("O")
+    t.keys()
+    t.do("match")
+    for _ in range(3):
+        t.do("raise", 1, False)
+    t.select("N"); t.do("raise", -1, False)
+    out.append("# on the middle level (0.25): O at 0.4, N at 0.2")
+    t.select("N", "O", "E")
+    t.keys()
+    t.do("match")
+    t.do("match")
+    t.do("undo")
+    t.select("O", "N", "E")
+    t.do("match")
+    t.box("O", "S")
+    t.do("match")
+    t.do("flatten")
+    t.do("flatten")
+    out.append("# N and E at 0.4 on the middle; the top's N lowered to 0.45, and")
+    out.append("# E raised to 0.45 here: N matched to E would touch the top's N")
+    t.do("levelup")
+    t.select("N"); t.do("raise", -1, False)
+    t.do("leveldown")
+    t.select("E"); t.do("raise", 1, False)
+    t.select("E", "N")
+    t.do("match")
+    t.select("N")
+    t.do("flatten")
+    out.append("# the top's W down to 0.2, the middle's W down to 0.1: back to")
+    out.append("# the middle's start (0.25) would pass the top's W")
+    t.select("W")
+    for _ in range(3):
+        t.do("raise", -1, False)
+    t.do("levelup")
+    for _ in range(6):
+        t.do("raise", -1, False)
+    t.do("leveldown")
+    t.do("flatten")
+    t.end()
 
 def main():
     out = build()

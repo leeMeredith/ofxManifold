@@ -6,51 +6,8 @@
 namespace ofxManifold {
 namespace editor {
 
-// ---------------------------------------------------------------------------
-// key columns beneath the views (round 3A-6b)
-// ---------------------------------------------------------------------------
-
-namespace {
-float groupHeight(const KeyGroup& g, float lh) {
+float keyGroupHeight(const KeyGroup& g, float lh) {
     return (1.0f + float(g.entries.size())) * (lh + 1.0f) + lh * 0.5f;
-}
-constexpr float kColumnChars = 33.0f;
-} // namespace
-
-std::vector<glm::vec2> flowKeyGroups(const std::vector<KeyGroup>& groups,
-                                     float cw, float lh, float x0, float y0,
-                                     float height) {
-    std::vector<glm::vec2> at;
-    float x = x0, y = y0;
-    for (const KeyGroup& g : groups) {
-        const float h = groupHeight(g, lh);
-        if (y > y0 && y + h > y0 + height) {   // a new column, never empty
-            x += kColumnChars * cw;
-            y = y0;
-        }
-        at.emplace_back(x, y);
-        y += h;
-    }
-    return at;
-}
-
-float keyColumnsWidth(const std::vector<KeyGroup>& groups, float cw, float lh,
-                      float height) {
-    const std::vector<glm::vec2> at = flowKeyGroups(groups, cw, lh, 0.0f, 0.0f,
-                                                    height);
-    return at.empty() ? 0.0f : at.back().x + kColumnChars * cw;
-}
-
-float panelBelowHeight(const std::vector<KeyGroup>& groups, float cw, float lh,
-                       float width, bool withStatus) {
-    const float step = lh + 2.0f;
-    float h = withStatus ? 12.0f * step + lh     // the status block
-                         : 4.0f * (lh + 1.0f);
-    const float keysWidth = width - (withStatus ? kStatusChars * cw : 0.0f);
-    while (keyColumnsWidth(groups, cw, lh, h) > keysWidth && h < 4000.0f) {
-        h += lh + 1.0f;
-    }
-    return h;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,13 +40,9 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
 
     // Beside the map, or -- with the 3D view open -- beneath the views, the
     // status in a block on the left and the keys across in columns.
-    const bool below = s.panelTop >= 0.0f;
-    const bool beside = !below || s.statusBeside;
-    const float x = !beside ? 24.0f
-                  : s.panelLeft >= 0.0f ? s.panelLeft
+    const float x = s.panelLeft >= 0.0f ? s.panelLeft
                                         : renderer->viewport().getRight() + 30.0f;
-    const float room = !beside ? (kStatusChars - 2.0f) * cw
-                               : float(ofGetWidth()) - x - 16.0f;
+    const float room = float(ofGetWidth()) - x - 16.0f;
     const std::size_t width = std::size_t(std::max(12.0f, room / cw));
     // Any line longer than the panel is shortened rather than run off it.
     auto fit = [width](std::string s) {
@@ -97,7 +50,7 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
         return s;
     };
     const float step = lh + 2.0f;
-    float y = (beside ? 24.0f : s.panelTop) + lh;
+    float y = 24.0f + lh;
     static const char* names[] = {"free", "square", "triangular", "polar"};
 
     // ---- status: seven lines, each always in its place ----
@@ -195,29 +148,31 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
     // not -- drawn from the same key map that keyPressed() asks, so lit and
     // working cannot drift apart. b's line says what it WOULD do now.
     const KeyContext& ctx = keys;
-    const std::vector<KeyGroup> groups = keyMap(ctx);
-    if (below) {
-        const float y0 = s.panelTop + lh;
-        const float x0 = s.statusBeside ? 24.0f : 24.0f + kStatusChars * cw;
-        const std::vector<glm::vec2> at =
-            flowKeyGroups(groups, cw, lh, x0, y0, s.panelBottom - y0);
+    std::vector<KeyGroup> groups = keyMap(ctx);
+
+    // With the 3D view open, the levels keys go beneath it, the rest here.
+    if (s.levelsKeysAt.x >= 0.0f) {
         for (std::size_t i = 0; i < groups.size(); ++i) {
-            float yy = at[i].y;
+            if (groups[i].title != "levels") continue;
+            const std::size_t chars =
+                std::size_t(std::max(12.0f, s.levelsKeysWidth / cw));
+            float yy = s.levelsKeysAt.y;
             ofSetColor(235, 238, 245);
-            text(groups[i].title, at[i].x, yy);
+            text(groups[i].title, s.levelsKeysAt.x, yy);
             yy += lh + 1.0f;
             for (const KeyEntry& e : groups[i].entries) {
                 std::string k = e.keys;
                 if (k.size() < 12) k.resize(12, ' ');
                 std::string t = k + " " + e.action;
-                if (t.size() > 31) t = t.substr(0, 28) + "...";
+                if (t.size() > chars) t = t.substr(0, chars - 3) + "...";
                 ofSetColor(e.available ? ofColor(200, 205, 215)
                                        : ofColor(82, 88, 100));
-                text(t, at[i].x, yy);
+                text(t, s.levelsKeysAt.x, yy);
                 yy += lh + 1.0f;
             }
+            groups.erase(groups.begin() + std::ptrdiff_t(i));
+            break;
         }
-        return;
     }
     const bool twoColumns = room >= 64.0f * cw;
     const std::size_t colChars = twoColumns ? 31 : width;

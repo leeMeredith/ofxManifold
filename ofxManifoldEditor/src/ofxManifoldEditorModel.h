@@ -201,6 +201,16 @@ public:
     // `fine`, landing on the next multiple as heights do; every node with it.
     Result stepLevel(int direction, bool fine);
 
+    // m (round 3A-6c): the selected nodes take the height, on the current
+    // level, of the node selected FIRST -- so click the one to match, then
+    // the others. A box has no first node and is refused. All or nothing:
+    // refused, naming them, if any would reach a level next to it.
+    Result matchHeights(const Selection& sel);
+
+    // M: the selected nodes back to the current level's start, unbent. All
+    // or nothing, as m.
+    Result flattenHeights(const Selection& sel);
+
     // cmd-delete: the current level goes, and the one below becomes current.
     // Refused for the only level.
     Result removeLevel();

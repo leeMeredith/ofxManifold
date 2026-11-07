@@ -68,36 +68,20 @@ void ofApp::update() {
     // follows both. A flat map with the view off is laid out as it always
     // was.
     //
-    // With the view open the key panel moves BENEATH the two views (3A-6b),
-    // spread across in columns, so nothing runs off the window: the views
-    // give up as much height as the panel needs at this width.
+    // With the view open the levels keys sit beneath it and the rest of the
+    // panel stays beside, as always (3A-6c): the views are sized so the
+    // panel keeps room for its two columns and the levels keys fit between
+    // the 3D view and the faders.
     const float column = model.map3d().count() > 1 ? 64.0f : 0.0f;
     float plan = side;
-    float panelH = 0.0f;
+    float levelsH = 0.0f;
     if (show3D) {
-        // The status block goes beside the views if it fits in the space
-        // they leave, the keys alone beneath; otherwise both beneath.
-        const auto groups = keyMap(keyContext());
-        const float cw = text.charWidth(), lh = text.lineHeight();
-        const float across = (ofGetWidth() - 48.0f - column - 16.0f) * 0.5f;
-        auto planFor = [&](float h) {
-            // A window too small for all of the panel keeps the views at
-            // their least and gives the panel the rest; its last columns then
-            // run on to the right rather than over the faders.
-            h = std::min(h, side - 160.0f - 16.0f);
-            return std::make_pair(
-                std::max(160.0f, std::min(side - h - 16.0f, across)), h);
-        };
-        auto fit = planFor(panelBelowHeight(groups, cw, lh,
-                                            ofGetWidth() - 40.0f, false));
-        statusBeside = 24.0f + 2.0f * fit.first + column + 16.0f + 30.0f
-                     + kStatusChars * cw <= ofGetWidth();
-        if (!statusBeside) {
-            fit = planFor(panelBelowHeight(groups, cw, lh,
-                                           ofGetWidth() - 40.0f, true));
+        for (const KeyGroup& g : keyMap(keyContext())) {
+            if (g.title == "levels") levelsH = keyGroupHeight(g, text.lineHeight());
         }
-        plan = fit.first;
-        panelH = fit.second;
+        const float across = (ofGetWidth() - 48.0f - column - 16.0f - 30.0f
+                              - kPanelChars * text.charWidth()) * 0.5f;
+        plan = std::max(160.0f, std::min(side - levelsH - 16.0f, across));
     }
     renderer->setViewport(ofRectangle(24, 24, plan, plan));
     float right = 24.0f + plan + column;
@@ -106,10 +90,11 @@ void ofApp::update() {
         right = view3D.getRight();
         if (!aimed) { aimLevelView(cam, view3D); aimed = true; }
         cam.setControlArea(view3D);
-        panelTop = 24.0f + plan + 16.0f;
-        panelBottom = panelTop + panelH;
+        levelsKeysAt = glm::vec2(view3D.getX(),
+                                 view3D.getBottom() + 16.0f + text.lineHeight());
+        levelsKeysWidth = plan;
     } else {
-        panelTop = panelBottom = -1.0f;
+        levelsKeysAt = glm::vec2(-1.0f, -1.0f);
     }
     panelLeft = right + 30.0f;
     chartTop = 24.0f + side + 16.0f;
@@ -165,9 +150,8 @@ void ofApp::draw() {
     sc.listeningZ = auditionZ;
     sc.auditioning = auditioning();
     sc.panelLeft = panelLeft;
-    sc.panelTop = panelTop;
-    sc.panelBottom = panelBottom;
-    sc.statusBeside = statusBeside;
+    sc.levelsKeysAt = levelsKeysAt;
+    sc.levelsKeysWidth = levelsKeysWidth;
     sc.levelDrag = levelMoved ? levelPress : -1;
     sc.levelDragBase = levelDragBase;
     sc.mouse = mouse;

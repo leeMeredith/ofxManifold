@@ -1541,3 +1541,33 @@ file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 find:               !drag && levels > 1,\n              unlessDrag("one level -- nothing to move it toward")),
 replace:               !drag,\n              unlessDrag("one level -- nothing to move it toward")),
 nl: yes
+
+# ---- round 3A-6c: heights matched to the first node, or flattened ----
+
+gate: Matching takes the last node's height
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     const NodeID first = sel.nodes().front();
+replace:     const NodeID first = sel.nodes().back();
+
+gate: A box has a first node to match
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!sel.ordered()) {\n        return refusal("a box has no first node
+replace:     if (false) {\n        return refusal("a box has no first node
+nl: yes
+
+gate: Matching heights is not all or nothing
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!blocked.empty()) {\n        return refusal(blocked + " cannot be at "
+replace:     if (false) {\n        return refusal(blocked + " cannot be at "
+nl: yes
+
+gate: Flattening leaves the nodes where they are
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     for (NodeID n : moved) map_.setHeight(level_, n, base);
+replace:     (void)moved;
+
+gate: m and M work with nothing selected
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && !sel.empty(),\n              unlessDrag("select the node to match, then the others")),
+replace:               !drag,\n              unlessDrag("select the node to match, then the others")),
+nl: yes

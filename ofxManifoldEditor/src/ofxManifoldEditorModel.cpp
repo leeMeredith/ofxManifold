@@ -944,6 +944,77 @@ Result Model::stepLevel(int direction, bool fine) {
     return moveLevel(level_, next * unit);
 }
 
+Result Model::matchHeights(const Selection& sel) {
+    if (sel.size() < 2) {
+        return refusal("select the node to match first, then the others", 2.5f);
+    }
+    if (!sel.ordered()) {
+        return refusal("a box has no first node -- click the one to match "
+                       "first, then the others", 3.0f);
+    }
+    const Levels& lv = map_.levels();
+    const NodeID first = sel.nodes().front();
+    const float h0 = lv.height(level_, first);
+    // Fits strictly between the same node on the levels either side.
+    auto fits = [&](NodeID n, float h) {
+        return (level_ == 0 || h > lv.height(level_ - 1, n))
+            && (level_ + 1 >= lv.count() || h < lv.height(level_ + 1, n));
+    };
+    std::string blocked;
+    std::vector<NodeID> moved;
+    for (std::size_t i = 1; i < sel.nodes().size(); ++i) {
+        const NodeID n = sel.nodes()[i];
+        if (!fits(n, h0)) {
+            blocked += (blocked.empty() ? "" : ", ") + manifold_.node(n).name;
+        } else if (lv.height(level_, n) != h0) {
+            moved.push_back(n);
+        }
+    }
+    const std::string name = manifold_.node(first).name;
+    if (!blocked.empty()) {
+        return refusal(blocked + " cannot be at " + name + "'s height -- it "
+                       "would reach a level next to it", 3.0f);
+    }
+    if (moved.empty()) {
+        Result r;
+        r.message = "already at the height of " + name;
+        return r;
+    }
+    for (NodeID n : moved) map_.setHeight(level_, n, h0);
+    return changed(plural(moved.size(), " node", " nodes") + " to the height of "
+                   + name + " (" + offset(h0 - lv.base(level_)) + ")", 2.5f);
+}
+
+Result Model::flattenHeights(const Selection& sel) {
+    if (sel.empty()) return Result{};
+    const Levels& lv = map_.levels();
+    const float base = lv.base(level_);
+    std::string blocked;
+    std::vector<NodeID> moved;
+    for (NodeID n : sel.nodes()) {
+        const bool fits = (level_ == 0 || base > lv.height(level_ - 1, n))
+                       && (level_ + 1 >= lv.count()
+                           || base < lv.height(level_ + 1, n));
+        if (!fits) {
+            blocked += (blocked.empty() ? "" : ", ") + manifold_.node(n).name;
+        } else if (lv.height(level_, n) != base) {
+            moved.push_back(n);
+        }
+    }
+    if (!blocked.empty()) {
+        return refusal(blocked + " cannot go back to the level's start -- it "
+                       "would reach a level next to it", 3.0f);
+    }
+    if (moved.empty()) {
+        Result r;
+        r.message = "already at the level's start";
+        return r;
+    }
+    for (NodeID n : moved) map_.setHeight(level_, n, base);
+    return changed(plural(moved.size(), " node", " nodes")
+                   + " back to the level's start", 2.5f);
+}
+
 Result Model::removeLevel() {
     const LevelID n = map_.count();
     if (n == 1) return refusal("a map has at least one level", 2.5f);

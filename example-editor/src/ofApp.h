@@ -124,9 +124,8 @@ private:
     ofRectangle view3D;
     bool        pressIn3D = false;
     float       panelLeft = 0.0f;     // pushed right by the dots and the view
-    float       panelTop = -1.0f;     // with the view open: the panel beneath
-    float       panelBottom = -1.0f;
-    bool        statusBeside = false; // ...and the status beside the views
+    glm::vec2   levelsKeysAt{-1.0f, -1.0f};  // the view open: its keys beneath
+    float       levelsKeysWidth = 0.0f;
 
     // ---- state: a level's dot pressed, and maybe dragged (3A-6b) ----------
     // A click goes to the level; a drag moves the whole level, landing where

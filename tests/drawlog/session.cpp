@@ -178,7 +178,13 @@ int main() {
     hold(OF_KEY_COMMAND);
     key('3');
     release(OF_KEY_COMMAND);
-    frame("the 3D view, the keys beneath the views");
+    frame("the 3D view, its levels keys beneath it, the rest beside");
+    a.keyPressed(' ');
+    a.keyPressed(OF_KEY_UP);
+    for (int i = 0; i < 30; ++i) a.update();
+    a.keyReleased(OF_KEY_UP);
+    frame("auditioning between levels in the 3D view: the nodes heard glow");
+    a.keyReleased(' ');
     hold(OF_KEY_COMMAND);
     key(OF_KEY_DEL);
     release(OF_KEY_COMMAND);

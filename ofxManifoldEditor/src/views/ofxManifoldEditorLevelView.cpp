@@ -3,6 +3,7 @@
 #include "ofxManifoldEditorListening.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ofxManifold {
 namespace editor {
@@ -79,18 +80,46 @@ void drawLevelView(const Scene& s, ofEasyCam& cam, const ofRectangle& area) {
         }
     }
 
-    // The nodes of the current level; the selected ones in the selection's
-    // yellow.
+    // The glow (3A-6c): each node's live share on each level it is heard on,
+    // as the 2D map's halos -- area in proportion to the share, a grey rim
+    // for what goes to silence and a green core for what reaches outputs --
+    // so the nodes being heard light up as the listening point moves between
+    // and through the levels. Behind the nodes.
     ofFill();
-    for (NodeID i = 0; i < m.nodeCount(); ++i) {
-        if (s.selection->contains(i)) ofSetColor(255, 214, 90);
-        else                          ofSetColor(190, 200, 220);
-        ofDrawSphere(nodeAt(cur, i), S * 0.008f);
+    const Evaluation& heard = *s.evaluation;
+    if (heard.inside) {
+        const Evaluation3D e3 = lv.evaluate(heard, s.listeningZ);
+        const float r = S * 0.008f;
+        const float K = (S * 0.06f) * (S * 0.06f) - r * r;   // full share
+        for (const LevelWeight& w : e3.weights) {
+            if (w.weight <= 0.0f || w.node >= m.nodeCount()) continue;
+            const float frac = model.map3d().level(w.level)
+                                    .outputFraction(w.node);
+            const glm::vec3 p = nodeAt(w.level, w.node);
+            ofSetColor(120, 126, 140, 70);
+            ofDrawSphere(p, std::sqrt(r * r + K * w.weight));
+            if (frac > 0.0f) {
+                ofSetColor(120, 200, 160, 95);
+                ofDrawSphere(p, std::sqrt(r * r + K * w.weight * frac));
+            }
+        }
+    }
+
+    // The nodes of EVERY level: each level is a copy of the floor plan, so
+    // each has its own nodes. The current level's brighter and larger, its
+    // selected ones in the selection's yellow.
+    for (LevelID k = 0; k < n; ++k) {
+        for (NodeID i = 0; i < m.nodeCount(); ++i) {
+            if (k == cur && s.selection->contains(i)) ofSetColor(255, 214, 90);
+            else if (k == cur) ofSetColor(190, 200, 220);
+            else               ofSetColor(130, 136, 152, 200);
+            ofDrawSphere(nodeAt(k, i), S * (k == cur ? 0.008f : 0.006f));
+        }
     }
 
     // The listening point, and a line dropped to the level below it: green
     // among the levels, grey outside them.
-    const Evaluation& ev = *s.evaluation;
+    const Evaluation& ev = heard;
     if (ev.inside) {
         const Evaluation3D e = lv.evaluate(ev, s.listeningZ);
         const glm::vec3 p = at(s.listeningPoint, s.listeningZ);

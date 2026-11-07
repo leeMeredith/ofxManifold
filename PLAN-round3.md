@@ -776,6 +776,37 @@ The 3D view itself stays where it is.
   suite (93); 11 mutation gates (286). The drawing session gained four
   frames: a dot clicked, a dot dragged, let go, `i` then shift-`k`.
 
+### 3A-6c: keys split, every level's nodes glowing, heights matched
+
+Lee, on screen (2026-11-06): the keys beneath the views still ran off to the
+side; split them -- the usual ones where they always are, the 3D ones beneath
+the 3D view. A glow around the nodes being heard in 3D, as the 2D map has.
+A way to bring nodes to the same height: select the one to match first, then
+the others. And every level's nodes made when it is copied, so moving through
+3D space they light up as a connected group.
+
+- **The keys, split.** With the 3D view open, the levels group sits beneath
+  the 3D view and the rest of the panel stays beside the views, as always.
+  The views are sized so the panel keeps room for its two columns and the
+  levels keys fit between the 3D view and the faders. The beneath-the-views
+  layout of 3A-6b is gone.
+- **Every level's nodes in the 3D view,** the current level's brighter and
+  larger, its selected ones yellow. Each level is a copy of the floor plan, so
+  each has its own nodes -- they were always there in the map; the view drew
+  only the current level's.
+- **The glow,** as the 2D halos: each node's live share on each level it is
+  heard on, area in proportion to the share, a grey rim for silence and a
+  green core for what reaches outputs, from the 3D weights at the listening
+  point. Judged on screen.
+- **`m`** gives the selected nodes the height, on the current level, of the
+  node selected FIRST; a box has no first node and is refused. **`M`** puts
+  them back at the level's start. Both all or nothing, refused where a node
+  would reach a level next to it (`Model::matchHeights`,
+  `Model::flattenHeights`).
+- 1 editor script (50), 34 checked steps (674); 5 mutation gates (291). The
+  drawing session gained a frame auditioning between levels with the view
+  open.
+
 ---
 
 ## Answered
