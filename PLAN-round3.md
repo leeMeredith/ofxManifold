@@ -846,6 +846,17 @@ whatever it is connected to (the boundary of decision B, kept).
   matched -- and the line was put back by hand. After any interrupted gate
   run, run `make workflow` (or `git diff`) before anything else.
 
+### Between 3A-6d and 3A-7: m and M were never wired
+
+`m` and `M` (3A-6c) were in the model, tested by script, and listed lit in the
+key panel -- and pressing them did nothing: `ofApp::keyId` had no case for
+them. The editor scripts test the model, not the app's keys, and the drawing
+session never pressed them. Now wired, and `make keys` (part of `make test`,
+`tests/check_keys.py`) checks that every keyboard entry in the panel is
+returned by `keyId()` and answered by `keyPressed()`; mouse entries are left
+out. It fails on the code as shipped in 3A-6c, naming `match`. One mutation
+gate (299) takes the key away again.
+
 ---
 
 ## Answered

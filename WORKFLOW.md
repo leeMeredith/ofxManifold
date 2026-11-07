@@ -102,6 +102,7 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make headers` | assert every header compiles standalone |
 | `make workflow` | assert the CI workflow is still valid |
 | `make door` | nothing outside `editor::Model` can change a map; snippets that must fail to compile |
+| `make keys` | every key listed in the editor's key panel reaches the app: returned by `keyId()`, answered by `keyPressed()` |
 | `make drawlog` | records every drawing call of a scripted editing session; record before and after a change meant to leave the screen alone, and `cmp` |
 | `make reproducible` | every reference produces the same file twice; part of `make test` |
 | `make bench` | measure mesh scaling; asserts nothing |

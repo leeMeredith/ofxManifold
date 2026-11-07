@@ -1613,3 +1613,10 @@ gate: An own output kept unique with _2 is not the node's
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 find:     return digits() && i == out.size();
 replace:     return false;
+
+# ---- a key in the panel that the app never answers (found 3A-7) ----
+
+gate: m and M are listed but not wired to a key
+file: example-editor/src/ofApp.cpp
+find:     case 'm': case 'M':                             return "match";
+replace:     case '\x01':                                    return "match";

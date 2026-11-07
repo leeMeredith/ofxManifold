@@ -90,13 +90,13 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
+.PHONY: keys fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: reproducible door headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
+test: reproducible door keys headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
       test-levels
 	@echo ""
@@ -369,6 +369,11 @@ fma:
 
 door:
 	@CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" python3 tests/check_door.py
+
+# Every key in the editor's key panel reaches the app: returned by keyId(),
+# answered by keyPressed(). See tests/check_keys.py.
+keys:
+	@python3 tests/check_keys.py
 
 bench: $(BENCH)
 	@./$(BENCH)

@@ -509,6 +509,7 @@ std::string ofApp::keyId(int key) const {
     case 'n': case 'N':                             return "newlevel";
     case 'y': case 'Y': case 'h': case 'H':         return "raise";
     case 'i': case 'I': case 'k': case 'K':         return "movelevel";
+    case 'm': case 'M':                             return "match";
     default:                                        return "";
     }
 }
@@ -684,6 +685,16 @@ void ofApp::keyPressed(int key) {
         const bool fine = (key == 'Y' || key == 'H');
         act("height", [&, dir, fine](Model& m) {
             return m.raise(selection, dir, fine); });
+        return;
+    }
+    // m: the selected nodes to the height of the one selected first; M:
+    // back to the level's start.
+    if (id == "match") {
+        if (key == 'm') {
+            act("height", [&](Model& m) { return m.matchHeights(selection); });
+        } else {
+            act("height", [&](Model& m) { return m.flattenHeights(selection); });
+        }
         return;
     }
     // i up, k down, for the whole level: i sits above k. Shift for fine.
