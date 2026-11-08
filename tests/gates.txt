@@ -1870,3 +1870,92 @@ gate: { is listed but not wired
 file: example-editor/src/ofApp.cpp
 find:     case '{': case '}':                             return "spokes";
 replace:     case '}':                                       return "spokes";
+
+# ---- round 3A-10: c and C; the key panel flows from the top right ----
+
+gate: c takes an output the node feeds on another level
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                 if (!elsewhere) { own = t; break; }
+replace:                 { own = t; break; }
+
+gate: c makes outputs with auto-output off
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             if (!autoOutput_) { without.push_back(nm); continue; }
+replace:             if (false) { without.push_back(nm); continue; }
+
+gate: c keeps the node's other bindings
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         map_.clearBindings(level_, id);\n        map_.bind(level_, id, own);
+replace:         map_.bind(level_, id, own);
+nl: yes
+
+gate: C silences nothing
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     for (NodeID id : sel.nodes()) map_.clearBindings(level_, id);\n    if (sel.empty()) return Result{};\n    const std::string who
+replace:     if (sel.empty()) return Result{};\n    const std::string who
+nl: yes
+
+gate: c only for a node that has bindings
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("clear", "c", "back to its own output", !drag && !sel.empty(),
+replace:         entry("clear", "c", "back to its own output", !drag && anyBound,
+
+gate: C lit for a node already silent
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("silence", "C", "silent", !drag && anyBound,
+replace:         entry("silence", "C", "silent", !drag && !sel.empty(),
+
+gate: C is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case 'C':                                       return "silence";
+replace:     case '\x03':                                    return "silence";
+
+gate: ? is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case '?':                                       return "keysheet";
+replace:     case '\x04':                                    return "keysheet";
+
+gate: The right-hand columns start under the status, not at the top
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         y = top;
+replace:         y = keysTop;
+
+gate: Key lines run below the panel's bottom
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:                 : std::size_t((bottom + 0.5f - y) / row);
+replace:                 : std::size_t((bottom + 2.5f * row - y) / row);
+
+gate: The keys take one column however wide the panel
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         1, std::size_t(room / (kKeyColumnChars * cw)));
+replace:         1, std::size_t(1));
+
+gate: Dim keys left out without being counted
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:             if (litOnly && !grp.entries[e].available) { ++f.dimLeftOut; continue; }
+replace:             if (litOnly && !grp.entries[e].available) { continue; }
+
+gate: Keys left out with no note of it
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:     if (f.hidden > 0 || f.dimLeftOut > 0) {
+replace:     if (false) {
+
+gate: Outputs never starts a column of its own
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         if (outputsOnTop && grp.title == "outputs" && col == 0
+replace:         if (false && grp.title == "outputs" && col == 0
+
+gate: The panel never runs down beside the faders
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         L.panelBottom = narrow ? height - 16.0f : L.chartTop - 10.0f;
+replace:         L.panelBottom = L.chartTop - 10.0f;
+
+gate: The faders stay full width under a panel run down beside them
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         L.chartRight = narrow ? right() : width - 24.0f;
+replace:         L.chartRight = width - 24.0f;
+
+gate: The views shrink past half
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:     const float smallest = std::max(160.0f, L.plan * 0.5f);
+replace:     const float smallest = std::max(60.0f, L.plan * 0.2f);

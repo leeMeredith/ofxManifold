@@ -592,7 +592,7 @@ class Editor:
         if silenced:
             who = silenced[0] if len(silenced) == 1 \
                 else f"{len(silenced)} nodes"
-            return (1, 1, msg + f" -- {who} now silent; cmd-z undoes")
+            return (1, 1, msg + f" -- {who} now silent; c gives back its own output")
         return (1, 0, msg)
 
     def fraction(self, node):
@@ -655,12 +655,66 @@ class Editor:
         return (1, 0, f"bound {k} node" + ("" if k == 1 else "s")
                 + f" to every output ({len(self.outputs)})")
 
-    def clear(self, sel):
+    def silence(self, sel):
+        """C (3A-10): the selected nodes silent on this level, on purpose --
+        every binding gone. c gives them back their own output."""
         for n in sel:
             self.links.pop(n, None)
         if not sel:
             return (0, 0, "")
-        return (1, 0, f"cleared bindings on {len(sel)}")
+        who = sel[0] if len(sel) == 1 else f"{len(sel)} nodes"
+        return (1, 0, f"{who} now silent -- c gives back its own output")
+
+    def own_output(self, nm):
+        """Node nm's own output on this level, or None: the one named for
+        this level (P, P-2 ...); else one named after nm that nm feeds on no
+        other level."""
+        names = self.out_names()
+        on = self.level_output(nm, self.cur)
+        if on in names and self.owner(on) == nm:
+            return on
+        elsewhere = {l[1] for k, lv in enumerate(self.levels) if k != self.cur
+                     for l in lv["links"].get(nm, []) if l[0] == "out"}
+        for o in names:
+            if self.owner(o) == nm and o not in elsewhere:
+                return o
+        return None
+
+    def clear(self, sel):
+        """c (3A-10): the selected nodes back to their own output on this
+        level -- every other binding gone, fill 100%, as when placed. With
+        none, one is made (auto-output on) or the node is left as it was
+        and named (off)."""
+        if not sel:
+            return (0, 0, "")
+        made, done, without = 0, [], []
+        for n in sel:
+            on = self.own_output(n)
+            if on is None:
+                if not self.auto:
+                    without.append(n)
+                    continue
+                stem = self.level_output(n, self.cur)
+                on, j = stem, 2
+                while on in self.out_names():
+                    on, j = f"{stem}_{j}", j + 1
+                self.outputs.append([on, self.next_channel(), 1.0])
+                made += 1
+            self.links[n] = [("out", on, 1.0)]
+            done.append(n)
+        if not done:
+            who = without[0] if len(without) == 1 else f"{len(without)} nodes"
+            return (0, 1, f"{who}: no output of its own -- p turns "
+                          "auto-output on, or pick a fader and press b")
+        msg = (f"{done[0]} back to its own output" if len(done) == 1
+               else f"{len(done)} nodes back to their own outputs")
+        if made:
+            msg += f", {made} output{'s' if made > 1 else ''} made"
+        if without:
+            msg += (f" -- {without[0] if len(without) == 1 else str(len(without)) + ' nodes'}"
+                    " left: no output of its own, p turns auto-output on")
+            return (1, 1, msg)
+        return (1, 0, msg)
 
     def cycle(self):
         if not self.outputs:
@@ -1379,7 +1433,8 @@ class Editor:
             ("newoutput", nd), ("pickoutput", nd and outs > 0),
             ("addoutput", nd and outs >= 2), ("nextoutput", nd and outs >= 2),
             ("bind", nd and possible), ("bindall", nd and outs > 0 and bool(sel)),
-            ("fill", nd and any_out), ("clear", nd and bool(any_bound)),
+            ("fill", nd and any_out), ("clear", nd and bool(sel)),
+            ("silence", nd and bool(any_bound)),
             ("derivedafter", nd and picked > 0),
             ("derived", nd and bool(sel)), ("trim", nd and picked > 0),
             ("removeoutput", nd and picked == 1), ("autooutput", nd),
@@ -1400,6 +1455,7 @@ class Editor:
             ("save", nd), ("saveas", nd), ("open", nd),
             ("userig", nd), ("saverig", nd and outs > 0), ("empty", nd),
             ("example", nd), ("fullscreen", True), ("textsize", True),
+            ("keysheet", True),
         ]
         return rules, preview
 
@@ -1546,7 +1602,7 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "remove": "delete", "newoutput": "new output",
           "derived": "derived output", "bind": "binding",
           "bindall": "bind to every output", "fill": "fill",
-          "clear": "clear bindings", "trim": "trim",
+          "clear": "back to own output", "silence": "silence", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
           "empty": "new map", "move": "move", "openpair": "open",
           "derivedafter": "derived output", "userig": "use rig",
@@ -1624,6 +1680,7 @@ class Script:
             "maponly":  lambda: self.write_as(args[0], None),
             "badoutputs": lambda: self.write_as(args[0], "bad"),
             "clear":    lambda: e.clear(s), "cycle": e.cycle,
+            "silence":  lambda: e.silence(s),
             "trim":     lambda: e.trim(args[0]),
             "pick":     lambda: e.pick(args[0]),
             "toggleout": lambda: e.toggle_output(args[0]),
@@ -2073,7 +2130,7 @@ def build():
     t.do("newoutput"); t.select("n0", "n1"); t.do("bind")
     t.select("n0"); t.do("fill", -1, False); t.do("fill", -1, False)
     t.do("fill", -1, True); t.do("fill", +1, True); t.do("fill", +1, False)
-    t.select("n1"); t.do("clear"); t.do("fill", -1, False)
+    t.select("n1"); t.do("silence"); t.do("fill", -1, False)
     t.clear_sel(); t.do("derived")          # nothing selected: refused
     t.select("n0", "n1"); t.do("derived")
     t.do("cycle"); t.do("trim", -1.0); t.do("trim", 20.0)
@@ -2438,6 +2495,7 @@ def build():
     build_values(out)
     build_layout(out)
     build_curves(out)
+    build_own(out)
     return out
 
 
@@ -2573,7 +2631,7 @@ def build_levels(out):
     t.lines()
     t.marks()
     t.do("leveldown"); t.do("leveldown")
-    t.select("O"); t.do("clear")
+    t.select("O"); t.do("silence")
     t.keys()
     t.do("bindall")
     t.end()
@@ -3185,6 +3243,53 @@ def build_curves(out):
     t.do("leveldown")
     t.select("n2")
     t.lines()
+    t.end()
+
+
+def build_own(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-10: c GIVES A NODE BACK ITS OWN OUTPUT, C SILENCES IT")
+    out.append("#")
+    out.append("# c: every binding on this level gone but the node's own output,")
+    out.append("# at full fill, as when placed -- made if it has none and")
+    out.append("# auto-output is on. C: silent on purpose.")
+    out.append("#" + "-" * 68)
+
+    t = Script(out, "own_output_and_silence",
+               "c puts the selected nodes back to their own output on this "
+               "level, fill 100%, links to other nodes dropped; C makes them "
+               "silent; c brings a silent node back; on a level past the "
+               "first its own output is P-2")
+    t.do("empty")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2))
+    t.select("n0")
+    t.do("pick", "n1"); t.do("bind")
+    t.do("fill", -1, False)
+    t.keys()
+    t.do("clear")
+    t.do("silence")
+    t.keys()
+    t.do("clear")
+    out.append("# level 2: its own output there is n0-2")
+    t.do("newlevel", 1)
+    t.do("silence")
+    t.do("clear")
+    out.append("# its own output removed: c makes it again")
+    t.do("pick", "n0-2"); t.do("removeoutput")
+    t.do("clear")
+    out.append("# auto-output off: c makes nothing; a node without one is named")
+    t.do("pick", "n1-2"); t.do("removeoutput")
+    t.do("auto")
+    t.select("n1")
+    t.do("clear")
+    t.select("n0", "n1")
+    t.do("silence")
+    t.do("clear")
+    out.append("# level 1 still has n1's own output")
+    t.do("leveldown")
+    t.select("n1")
+    t.do("silence")
+    t.do("clear")
     t.end()
 
 if __name__ == "__main__":

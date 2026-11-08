@@ -33,11 +33,13 @@ struct PanelStatus {
 void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
                const KeyContext& keys);
 
-// How tall a group of keys is drawn, title and rows: for an app placing one.
-float keyGroupHeight(const KeyGroup& g, float lh);
+// ? (3A-10): every key over the whole window, in columns, at the same text
+// size -- for when the panel has had to leave some out. Any key or click
+// closes it.
+void drawKeySheet(const Scene& s, const KeyContext& keys);
 
-// The key panel's width, at most, when it may use two columns.
-constexpr float kPanelChars = 66.0f;
+// keyGroupHeight, panelTop, panelKeysTop and the window's layout are in
+// ofxManifoldEditorKeys.h: arithmetic, checked without openFrameworks.
 
 } // namespace editor
 } // namespace ofxManifold

@@ -191,7 +191,16 @@ public:
 
     // Bind each selected node to EVERY output, equally, keeping its fill.
     Result bindAll(const Selection& sel);
+
+    // c (round 3A-10): the selected nodes back to their own output on this
+    // level -- every other binding gone, fill 100%, as when placed. Its own
+    // output is the one named for this level (P, P-2 ...), else one named
+    // after it that it feeds on no other level. With none, one is made if
+    // auto-output is on; if it is off the node is left as it was, and named.
     Result clear(const Selection& sel);
+
+    // C (round 3A-10): the selected nodes silent on this level, on purpose.
+    Result silence(const Selection& sel);
     Result cycleOutput();
 
     // Make `t` the current output, as clicking its fader does. Through the

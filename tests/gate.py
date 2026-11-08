@@ -51,6 +51,8 @@ SUITES = {
     "test-outputs":        ("run_outputs",        ["tests/run_outputs.cpp"]),
     "test-editor":         ("run_editor",         ["tests/run_editor.cpp"] + EDITOR_CPP),
     "test-levels":         ("run_levels",         ["tests/run_levels.cpp"]),
+    # the editor window's layout (3A-10), not a vector suite
+    "panel":               ("check_panel",        ["tests/check_panel.cpp"] + EDITOR_CPP),
 }
 INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src"]
 

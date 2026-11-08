@@ -53,6 +53,9 @@ struct Scene {
     // What l would lay out at the mouse (round 3A-9), shown faintly after
     // [ or ] until l or another key. nullptr: nothing shown.
     const LayoutPlan* layoutPreview = nullptr;
+    // The panel's bottom: no line of it below this (3A-10). < 0: the
+    // window's bottom.
+    float panelBottom = -1.0f;
 };
 
 // The snapping grid, as it is drawn. A preference of the editing session,

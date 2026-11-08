@@ -254,7 +254,8 @@ std::string label(const std::string& op) {
         {"derived", "derived output"}, {"bind", "binding"},
         {"derivedafter", "derived output"}, {"userig", "use rig"},
         {"bindall", "bind to every output"}, {"fill", "fill"},
-        {"clear", "clear bindings"}, {"trim", "trim"},
+        {"clear", "back to own output"}, {"silence", "silence"},
+        {"trim", "trim"},
         {"removeoutput", "remove output"}, {"example", "example map"},
         {"empty", "new map"}, {"move", "move"}, {"openpair", "open"},
         {"newlevel", "new level"}, {"raise", "height"},
@@ -360,6 +361,7 @@ int main(int argc, char** argv) {
                     return m.stepFill(sel, dir, fine != 0); };
             }
             else if (lastOp == "clear")   op = [&](Model& m) { return m.clear(sel); };
+            else if (lastOp == "silence") op = [&](Model& m) { return m.silence(sel); };
             else if (lastOp == "cycle")   op = [&](Model& m) { return m.cycleOutput(); };
             else if (lastOp == "trim") {
                 float db; in >> db;

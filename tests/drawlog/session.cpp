@@ -3,9 +3,10 @@
 // it writes every drawing call of every frame to stdout. Two versions of the
 // editor that should look identical must produce identical output.
 //
-// The window is 1024 x 640, so the map is the square at (24, 24), 462 wide,
-// y flipped: a node at (x, y) is on screen at (24 + 462x, 24 + 462(1 - y)).
-// The faders start at y 502.
+// The window starts 1024 x 640. Where the map and the faders are is read
+// from the app as it lays itself out (3A-10: the views give way to the key
+// panel when it needs the room), so the script clicks the same things at
+// any window or text size.
 
 #include "ofApp.h"
 
@@ -22,14 +23,39 @@ void frame(const char* what) {
     app->draw();
 }
 
-// Screen position of a map point.
-int sx(float x) { return int(std::lround(24.0f + 462.0f * x)); }
-int sy(float y) { return int(std::lround(24.0f + 462.0f * (1.0f - y))); }
+// Screen position of a map point, from the map's place now.
+int sx(float x) {
+    app->update();
+    const ofRectangle v = app->mapArea();
+    return int(std::lround(v.x + v.width * x));
+}
+int sy(float y) {
+    app->update();
+    const ofRectangle v = app->mapArea();
+    return int(std::lround(v.y + v.height * (1.0f - y)));
+}
+// A point in the faders, given as it was on the 1024 x 640 window -- the
+// band from x 24, 976 wide, y 502 down -- and placed in the band as it is.
+int fx(int x) {
+    app->update();
+    return int(std::lround(app->faders().x0 + (x - 24) * app->faders().width / 976.0f));
+}
+int fy(int y) {
+    app->update();
+    return int(std::lround(app->faders().top + (y - 502)));
+}
 
 void click(int x, int y) { app->mousePressed(x, y, 0); app->mouseReleased(x, y, 0); }
 void key(int k) { app->keyPressed(k); app->keyReleased(k); }
 void hold(int k) { drawlogHeld().insert(k); }
 void release(int k) { drawlogHeld().erase(k); }
+// cmd-+ or cmd-- until the text is this size, from `from`.
+void textSize(int from, int to) {
+    hold(OF_KEY_COMMAND);
+    for (; from < to; ++from) key('=');
+    for (; from > to; --from) key('-');
+    release(OF_KEY_COMMAND);
+}
 
 } // namespace
 
@@ -39,7 +65,7 @@ int main() {
     a.setup();
     frame("the example map");
 
-    a.mouseMoved(60, 560);
+    a.mouseMoved(fx(60), fy(560));
     frame("hover over the first fader");
 
     click(sx(0.30f), sy(0.50f));                   // O
@@ -83,10 +109,10 @@ int main() {
     frame("audition locked");
     key('v');
 
-    click(60, 560);
+    click(fx(60), fy(560));
     frame("fader clicked");
     hold(OF_KEY_SHIFT);
-    click(120, 560);
+    click(fx(120), fy(560));
     release(OF_KEY_SHIFT);
     frame("second fader shift-clicked");
 
@@ -111,7 +137,7 @@ int main() {
     key('p');
     for (int i = 0; i < 30; ++i) key('o');
     frame("thirty more outputs");
-    a.mouseMoved(400, 560);
+    a.mouseMoved(fx(400), fy(560));
     frame("hover among narrow faders");
 
     key(OF_KEY_ESC);
@@ -230,6 +256,38 @@ int main() {
     key('1');
     key('l');
     frame("l with the grid off: the key panel says why");
+
+    // round 3A-10: c gives a silent node back its own output, C silences.
+    key('e');
+    click(sx(0.3f), sy(0.8f));
+    hold(OF_KEY_SHIFT); key('C'); release(OF_KEY_SHIFT);
+    frame("C: the selected node silent, the panel says c brings it back");
+    key('c');
+    frame("c: back to its own output");
+
+    // round 3A-10: the panel at other window and text sizes -- the status
+    // top left, the keys flowing into columns from the top right; when they
+    // do not fit, the faders keep under the views and the panel runs to the
+    // bottom, then the views give way.
+    drawlogFonts() = true;
+    drawlogWidth() = 1360; drawlogHeight() = 884;
+    textSize(12, 13);
+    textSize(13, 12);
+    frame("1360 x 884, text 12: every key, in columns from the top right");
+    textSize(12, 16);
+    frame("text 16: the panel runs to the bottom beside the faders");
+    textSize(16, 20);
+    frame("text 20: the views give way; what still does not fit is counted");
+    key('?');
+    frame("?: every key over the whole window");
+    key('x');
+    frame("any key closes it, and does nothing else");
+    hold(OF_KEY_COMMAND); key('3'); release(OF_KEY_COMMAND);
+    textSize(20, 14);
+    frame("text 14 with the 3D view open");
+    drawlogWidth() = 1024; drawlogHeight() = 640;
+    drawlogFonts() = false;
+    textSize(14, 12);
 
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;

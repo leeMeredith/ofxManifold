@@ -90,13 +90,13 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
 
 all: test
 
 # Both suites must pass. They are run as separate targets rather than one
 # binary so a failure names which layer broke: the solve, or the manifold.
-test: reproducible door keys headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
+test: reproducible door keys panel headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
       test-levels
 	@echo ""
@@ -374,6 +374,16 @@ door:
 # answered by keyPressed(). See tests/check_keys.py.
 keys:
 	@python3 tests/check_keys.py
+
+# The editor window's layout at many window and text sizes: the key panel
+# inside its room, nothing on top of anything, every key shown or counted.
+# See tests/check_panel.cpp.
+panel: $(BUILD)/check_panel
+	@./$(BUILD)/check_panel
+
+$(BUILD)/check_panel: tests/check_panel.cpp $(EDITOR_H) $(EDITOR_CPP) $(CORE)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Ilibs -Isrc -IofxManifoldEditor/src -o $@ tests/check_panel.cpp $(EDITOR_CPP)
 
 bench: $(BENCH)
 	@./$(BENCH)

@@ -109,8 +109,12 @@ inline void ofSetWindowTitle(const std::string& s) { drawlogRecord("title", {}, 
 inline void ofSetFrameRate(int) {}
 inline float ofGetElapsedTimef() { return 0.f; }
 inline void ofEnableAlphaBlending() {}
-inline int ofGetWidth() { return 1024; }
-inline int ofGetHeight() { return 640; }
+// The window's size, which a session may change (3A-10: the layout at
+// several sizes).
+inline int& drawlogWidth()  { static int w = 1024; return w; }
+inline int& drawlogHeight() { static int h = 640;  return h; }
+inline int ofGetWidth() { return drawlogWidth(); }
+inline int ofGetHeight() { return drawlogHeight(); }
 inline int ofGetScreenWidth() { return 1440; }
 inline int ofGetScreenHeight() { return 900; }
 inline void ofSetWindowShape(int, int) {}
@@ -132,14 +136,24 @@ inline float ofRadToDeg(float r) { return r * 57.2957795f; }
 // The font never loads here, so text goes through ofDrawBitmapString and is
 // recorded with its words.
 #define OF_TTF_MONO "mono"
+// Fails to load, so the editor falls back on the bitmap font's 8 x 13, as
+// the session has always been recorded -- until a session turns fonts on;
+// then it loads at any size, measured as Menlo is at 72 dpi (0.602 of the
+// size across, 1.17 down), so the layout at big text sizes can be recorded.
+inline bool& drawlogFonts() { static bool on = false; return on; }
 class ofTrueTypeFont {
 public:
-    bool load(const std::string&, int, bool = true, bool = true,
-              bool = false, float = 0.3f, int = 0) { return false; }
-    bool isLoaded() const { return false; }
+    bool load(const std::string&, int size, bool = true, bool = true,
+              bool = false, float = 0.3f, int = 0) {
+        size_ = drawlogFonts() ? size : 0;
+        return size_ > 0;
+    }
+    bool isLoaded() const { return size_ > 0; }
     void drawString(const std::string& s, float x, float y) const { drawlogRecord("ttf", {x, y}, s); }
-    float stringWidth(const std::string&) const { return 0.0f; }
-    float getLineHeight() const { return 0.0f; }
+    float stringWidth(const std::string& s) const { return 0.602f * size_ * float(s.size()); }
+    float getLineHeight() const { return 1.17f * size_; }
+private:
+    int size_ = 0;
 };
 inline float ofClamp(float v, float a, float b) { return v < a ? a : (v > b ? b : v); }
 inline float ofRandom(float a, float b) { return (a + b) * 0.5f; }

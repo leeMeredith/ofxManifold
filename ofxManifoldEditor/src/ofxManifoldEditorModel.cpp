@@ -842,7 +842,7 @@ std::string BindPlan::outcome() const {
                   + std::to_string(count) + (unbind ? " from " : " to ")
                   + outputs;
     if (!silenced.empty()) {
-        t += " -- " + silencedNames(silenced) + " now silent; cmd-z undoes";
+        t += " -- " + silencedNames(silenced) + " now silent; c gives back its own output";
     }
     return t;
 }
@@ -901,7 +901,7 @@ Result Model::bind(const Selection& sel) {
                    + (silenced.size() == 1 ? silenced[0]
                                            : plural(silenced.size(), " node",
                                                     " nodes"))
-                   + " now silent; cmd-z undoes";
+                   + " now silent; c gives back its own output";
         r.refused = true;
         r.seconds = 3.5f;
     }
@@ -970,10 +970,81 @@ Result Model::bindAll(const Selection& sel) {
                    + ")", 2.5f);
 }
 
-Result Model::clear(const Selection& sel) {
+Result Model::silence(const Selection& sel) {
     for (NodeID id : sel.nodes()) map_.clearBindings(level_, id);
     if (sel.empty()) return Result{};
-    return changed("cleared bindings on " + std::to_string(sel.size()), 2.0f);
+    const std::string who = sel.size() == 1
+        ? manifold_.node(sel.nodes().front()).name
+        : plural(sel.size(), " node", " nodes");
+    return changed(who + " now silent -- c gives back its own output", 2.5f);
+}
+
+Result Model::clear(const Selection& sel) {
+    if (sel.empty()) return Result{};
+    std::size_t made = 0;
+    std::vector<std::string> done, without;
+    for (NodeID id : sel.nodes()) {
+        const std::string nm = manifold_.node(id).name;
+        // Its own output on this level: the one named for the level ...
+        TargetID own = InvalidTarget;
+        const std::string named = levelOutput(nm, level_);
+        const TargetID t0 = mapping().findTarget(named);
+        if (t0 != InvalidTarget && ownerOf(named) == id) own = t0;
+        // ... else one named after it that it feeds on no other level.
+        if (own == InvalidTarget) {
+            for (TargetID t = 0; t < mapping().targetCount(); ++t) {
+                const std::string on = mapping().targetName(t);
+                if (ownerOf(on) != id) continue;
+                bool elsewhere = false;
+                for (LevelID k = 0; k < map_.count() && !elsewhere; ++k) {
+                    if (k == level_) continue;
+                    const Mapping& lv = map_.level(k);
+                    for (std::size_t i = 0; i < lv.linkCount(id); ++i) {
+                        const Link& l = lv.link(id, i);
+                        if (l.kind == DestKind::Output
+                            && lv.targetName(l.id) == on) {
+                            elsewhere = true;
+                            break;
+                        }
+                    }
+                }
+                if (!elsewhere) { own = t; break; }
+            }
+        }
+        if (own == InvalidTarget) {
+            if (!autoOutput_) { without.push_back(nm); continue; }
+            std::string on = named;
+            int j = 2;
+            while (mapping().findTarget(on) != InvalidTarget) {
+                on = named + "_" + std::to_string(j++);
+            }
+            own = map_.addOutput(on, nextFreeChannel());
+            if (own == InvalidTarget) { without.push_back(nm); continue; }
+            ++made;
+        }
+        map_.clearBindings(level_, id);
+        map_.bind(level_, id, own);
+        done.push_back(nm);
+    }
+    auto who = [](const std::vector<std::string>& v) {
+        return v.size() == 1 ? v[0] : plural(v.size(), " node", " nodes");
+    };
+    if (done.empty()) {
+        return refusal(who(without) + ": no output of its own -- p turns "
+                       "auto-output on, or pick a fader and press b", 3.5f);
+    }
+    std::string msg = done.size() == 1
+        ? done[0] + " back to its own output"
+        : std::to_string(done.size()) + " nodes back to their own outputs";
+    if (made) msg += ", " + plural(made, " output", " outputs") + " made";
+    Result r = changed(msg, 2.5f);
+    if (!without.empty()) {
+        r.message += " -- " + who(without)
+                   + " left: no output of its own, p turns auto-output on";
+        r.refused = true;
+        r.seconds = 3.5f;
+    }
+    return r;
 }
 
 Result Model::cycleOutput() {

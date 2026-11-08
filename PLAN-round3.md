@@ -1024,6 +1024,51 @@ and one pointing down". All as proposed, agreed the same day ("ok go").
   layout frames now include two previews. `make keys` covers `[ ]` and
   `{ }` (48).
 
+### 3A-10: c and C, and a key panel that fits
+
+From Lee (2026-11-07): `c` cleared a node's bindings and left it silent
+with "no way to make them unsilent"; and the key list ran off the screen
+again, worse at the text size he needs -- "can we also utilize the right
+top of the screen for the outputs column".
+
+- **`c` puts the selected nodes back to their own output** on this level:
+  every other binding gone, fill 100%, as when placed. Its own output is
+  the one named for this level (P, P-2 ...), else one named after it that
+  it feeds on no other level. With none, one is made on the next free
+  channel if auto-output is on; if it is off the node is left as it was and
+  named: "no output of its own -- p turns auto-output on, or pick a fader
+  and press b". **`C` makes them silent** on purpose, which is what `c` did.
+  The panel's fill line says how many selected are silent, and the bind
+  warning now points at `c`.
+- **The key panel flows.** The status sits at the top of the first column;
+  the keys run down it and on into the next columns, which start at the top
+  of the window -- outputs at the top right, when it all fits that way.
+  Columns are at least 32 characters, as many as the room holds. A group
+  that does not fit is split, "(more)" on its continuation.
+- **When the keys do not fit**, in order: the faders keep to the width under
+  the views and the panel runs down to the window's bottom; the keys are
+  packed tight; the views give up width, down to half their size; the keys
+  that would not act now are left out; and what still does not fit is
+  counted on the last line, "+ N more -- ? shows every key".
+- **`?` shows every key over the whole window**, at the same text size. Any
+  key or click closes it and does nothing else.
+- **The window's layout is one function**, `layoutEditor` (with `flowKeys`),
+  without openFrameworks; the app draws from it. `make panel` checks it at
+  576 window and text sizes (eight windows from 1024 x 640 to 2304 x 1296,
+  text 8 to 24 and the bitmap font, 3D view on and off, two grids): every
+  line in its room, none on another, every key once and in order or
+  counted, each column starting at its top, the levels keys under the 3D
+  view above the faders, the views never under half, every key shown at
+  1280 x 800 and up with text up to 14. It prints what is left out at each
+  size; at 1360 x 884, every key shows up to 14 point, all but 1 at 16, 5
+  at 18, 12 at 20 -- `?` shows the rest.
+- The drawing session reads where the map and faders are from the app, so
+  it clicks the same things whatever the layout; it records `C` and `c`,
+  and the panel at 1360 x 884 with text 12, 16 and 20, the key sheet, and
+  the 3D view at 14. Its stand-in font can now be measured at any size.
+- 1 editor script (63), 24 checked steps (845); 17 mutation gates (364).
+  `make keys` covers `C` and `?` (50).
+
 ---
 
 ## Answered
@@ -1056,6 +1101,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-7** | Editor: setting and showing node values | editor scripts, judged on screen |
 | **3A-8** | Editor: ring and grid layout | editor scripts, drawlog session extended |
 | **3A-9** | Editor: curves on every level, layout size and preview, growing triangles | editor scripts, drawlog session extended |
+| **3A-10** | Editor: c and C; the key panel flows into columns and fits | editor scripts, `make panel`, drawlog session extended |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

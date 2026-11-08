@@ -59,49 +59,33 @@ void ofApp::setup() {
 
 void ofApp::update() {
     text.fit();
-    // The map keeps a square; the band under it holds the output chart,
-    // taller on a taller window, and never too short for its two label rows.
-    const float chartH = std::max(130.0f, ofGetHeight() * 0.2f);
-    const float side = std::max(160.0f, ofGetHeight() - 48.0f - chartH);
-    // With levels, a column of dots right of the map; with the 3D view on,
-    // the map and the view share the width, side by side, and the panel
-    // follows both. A flat map with the view off is laid out as it always
-    // was.
-    //
-    // With the view open the levels keys sit beneath it and the rest of the
-    // panel stays beside, as always (3A-6c): the views are sized so the
-    // panel keeps room for its two columns and the levels keys fit between
-    // the 3D view and the faders.
-    const float column = model.map3d().count() > 1 ? 64.0f : 0.0f;
-    float plan = side;
-    float levelsH = 0.0f;
-    if (show3D) {
-        for (const KeyGroup& g : keyMap(keyContext())) {
-            if (g.title == "levels") levelsH = keyGroupHeight(g, text.lineHeight());
-        }
-        const float across = (ofGetWidth() - 48.0f - column - 16.0f - 30.0f
-                              - kPanelChars * text.charWidth()) * 0.5f;
-        plan = std::max(160.0f, std::min(side - levelsH - 16.0f, across));
-    }
+    // The window laid out by the package (3A-10): the map, the level dots,
+    // the 3D view, the panel above the faders. If the keys do not fit, the
+    // views give up width to the panel.
+    const EditorLayout L = layoutEditor(ofGetWidth(), ofGetHeight(),
+                                        text.charWidth(), text.lineHeight(),
+                                        model.map3d().count() > 1, show3D,
+                                        !model.map3d().valueSet().empty(),
+                                        keyMap(keyContext()));
+    const float plan = L.plan;
     renderer->setViewport(ofRectangle(24, 24, plan, plan));
-    float right = 24.0f + plan + column;
     if (show3D) {
-        view3D = ofRectangle(right + 16.0f, 24.0f, plan, plan);
-        right = view3D.getRight();
+        view3D = ofRectangle(L.view3DX, 24.0f, plan, plan);
         if (!aimed) { aimLevelView(cam, view3D); aimed = true; }
         cam.setControlArea(view3D);
-        levelsKeysAt = glm::vec2(view3D.getX(),
-                                 view3D.getBottom() + 16.0f + text.lineHeight());
-        levelsKeysWidth = plan;
+        levelsKeysAt = glm::vec2(L.levelsKeysX, L.levelsKeysY);
+        levelsKeysWidth = L.levelsKeysWidth;
     } else {
         levelsKeysAt = glm::vec2(-1.0f, -1.0f);
     }
-    panelLeft = right + 30.0f;
-    chartTop = 24.0f + side + 16.0f;
+    panelLeft = L.panelLeft;
+    panelBottom = L.panelBottom;
+    chartTop = L.chartTop;
+    chartRight = L.chartRight;
 
     // The faders' geometry, laid out by the package from the model. Drawing
     // and clicking both read this one layout, so they cannot disagree.
-    chart = layoutChart(model.mapping(), 24.0f, chartTop, ofGetWidth() - 48.0f,
+    chart = layoutChart(model.mapping(), 24.0f, chartTop, chartRight - 24.0f,
                         ofGetHeight() - chartTop - 20.0f, ChartText{text.charWidth(), text.lineHeight()});
 
     // The listening point is permanent, so the levels are always live: an
@@ -150,6 +134,7 @@ void ofApp::draw() {
     sc.listeningZ = auditionZ;
     sc.auditioning = auditioning();
     sc.panelLeft = panelLeft;
+    sc.panelBottom = panelBottom;
     sc.levelsKeysAt = levelsKeysAt;
     sc.levelsKeysWidth = levelsKeysWidth;
     sc.typing = typing;
@@ -195,6 +180,7 @@ void ofApp::draw() {
     // one level exactly the 2D reading.
     drawChart(sc, chart, chartLevels3D(model, selection, evaluation, auditionZ));
     drawPanel(sc, look, st, keyContext());
+    if (keySheet) drawKeySheet(sc, keyContext());
 }
 
 // ===========================================================================
@@ -276,6 +262,9 @@ NodeID ofApp::nodeAt(glm::vec2 screen) const {
 void ofApp::mousePressed(int x, int y, int) {
     const glm::vec2 screen(x, y);
     previewLayout = false;
+    // A click that closes the key sheet does nothing else, nor do its drag
+    // and release.
+    if (keySheet) { keySheet = false; sheetClick = true; return; }
 
     // The 3D view's area belongs to its camera: a press there turns the view
     // and never reaches the map.
@@ -293,7 +282,7 @@ void ofApp::mousePressed(int x, int y, int) {
     }
 
     // A click on the chart picks an output. It never edits the map.
-    pressInChart = (y >= chartTop);
+    pressInChart = (y >= chartTop && x <= chartRight);
     if (pressInChart) {
         // Click picks one output; shift-click adds or removes one, as with
         // nodes.
@@ -357,6 +346,7 @@ void ofApp::mousePressed(int x, int y, int) {
 void ofApp::mouseDragged(int x, int y, int) {
     const glm::vec2 screen(x, y);
     mouse = screen;
+    if (sheetClick) return;
     if (pressIn3D) return;
     if (levelPress >= 0) {
         const DotColumn c = columnNow();
@@ -416,6 +406,7 @@ void ofApp::mouseDragged(int x, int y, int) {
 
 void ofApp::mouseReleased(int x, int y, int) {
     const glm::vec2 screen(x, y);
+    if (sheetClick) { sheetClick = false; return; }
     if (pressIn3D) { pressIn3D = false; return; }
     if (levelPress >= 0) {
         const LevelID k = LevelID(levelPress);
@@ -513,6 +504,7 @@ std::string ofApp::keyId(int key) const {
     case 'B':                                       return "bindall";
     case 'q': case 'Q': case 'w': case 'W':         return "fill";
     case 'c':                                       return "clear";
+    case 'C':                                       return "silence";
     case OF_KEY_TAB:                                return "nextoutput";
     case 't': case 'T':                             return "trim";
     case 'O':                                       return "removeoutput";
@@ -529,6 +521,7 @@ std::string ofApp::keyId(int key) const {
     case 'j': case 'J':                             return "pickvalue";
     case ';': case ':': case '\'': case '"':        return "stepvalue";
     case 'z':                                       return "editvalue";
+    case '?':                                       return "keysheet";
     default:                                        return "";
     }
 }
@@ -594,6 +587,11 @@ void ofApp::keyPressed(int key) {
         }
         return;
     }
+    // The key sheet (3A-10): any key closes it, and does nothing else.
+    if (keySheet) {
+        if (key != OF_KEY_SHIFT && key != OF_KEY_COMMAND) keySheet = false;
+        return;
+    }
     // Every key asks the key map first: a dim key does not act, it says why.
     const std::string id = keyId(key);
     // The layout preview shows after [ or ] (or { } on the polar grid, which
@@ -606,6 +604,7 @@ void ofApp::keyPressed(int key) {
 
     // ---- window ----
     if (id == "fullscreen") { ofToggleFullscreen(); return; }
+    if (id == "keysheet") { keySheet = true; return; }
     if (id == "textsize") {
         setTextSize(text.size() + ((key == '-' || key == '_') ? -1 : 1));
         return;
@@ -734,7 +733,11 @@ void ofApp::keyPressed(int key) {
         return;
     }
     if (id == "clear") {
-        act("clear bindings", [&](Model& m) { return m.clear(selection); });
+        act("back to own output", [&](Model& m) { return m.clear(selection); });
+        return;
+    }
+    if (id == "silence") {
+        act("silence", [&](Model& m) { return m.silence(selection); });
         return;
     }
     if (id == "nextoutput") { show(model.cycleOutput()); return; }

@@ -42,6 +42,10 @@ public:
     void keyPressed(int key) override;
     void keyReleased(int key) override;
 
+    // ---- where things are, as last laid out (for the recorded session) ----
+    ofRectangle mapArea() const { return renderer->viewport(); }
+    const ofxManifold::editor::ChartLayout& faders() const { return chart; }
+
 private:
     // ---- controller -------------------------------------------------------
     void show(const ofxManifold::editor::Result& r);  // a Result on screen
@@ -114,6 +118,8 @@ private:
     ofxManifold::Evaluation                 evaluation;
     ofxManifold::editor::ChartLayout        chart;
     float chartTop = 0.0f;
+    float panelBottom = 0.0f;           // the panel's bottom
+    float chartRight = 0.0f;            // the faders' right edge
 
     // ---- state: the 3D view and the column of dots (round 3A-6) -----------
     // The view is for looking only; its camera is dragged within its own
@@ -171,7 +177,9 @@ private:
     int      blockSize = 3;
     int      triStage  = 3;
     int  layoutSize() const;
-    bool previewLayout = false;         // after [ or ], until l or another key
+    bool previewLayout = false;
+    bool keySheet = false;              // ? shows every key (3A-10)
+    bool sheetClick = false;            // the press that closed it         // after [ or ], until l or another key
     float    deadZone = 0.25f;          // fraction of grid spacing
 
     // ---- state: an in-progress drag or press -------------------------------
