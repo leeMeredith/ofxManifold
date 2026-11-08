@@ -1937,8 +1937,9 @@ replace:             if (litOnly && !grp.entries[e].available) { continue; }
 
 gate: Keys left out with no note of it
 file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
-find:     if (f.hidden > 0 || f.dimLeftOut > 0) {
-replace:     if (false) {
+find:     if (f.hidden > 0) {\n        // The last line becomes the note
+replace:     if (false) {\n        // The last line becomes the note
+nl: yes
 
 gate: Outputs never starts a column of its own
 file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
@@ -2052,3 +2053,15 @@ gate: 9 and 0 are listed but not wired
 file: example-editor/src/ofApp.cpp
 find:     case '9': case '(': case '0': case ')':         return "trim";
 replace:     case '\x07':                                    return "trim";
+
+# ---- round 3A-12: the panel shows what can be done ----
+
+gate: The panel shows the keys that cannot act
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:                     panelKeysTop(lh, values), bottom, cw, lh, true, true);
+replace:                     panelKeysTop(lh, values), bottom, cw, lh, true, false);
+
+gate: The views resize as keys light and darken
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:                         tight).hidden == 0;
+replace:                         tight, true).hidden == 0;

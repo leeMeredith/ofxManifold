@@ -1,7 +1,5 @@
 #include "ofxManifoldEditorMapView.h"
 
-#include <set>
-
 #include "ofxManifoldEditorListening.h"
 #include "ofxManifoldEditorNodeGlyph.h"
 #include "ofxManifoldEditorStyle.h"
@@ -41,21 +39,24 @@ void drawGrid(const Scene& s, const GridLook& look) {
     const ofxManifoldRenderer* renderer = s.renderer;
     const GridKind kind = look.kind;
     const Grid& grid = *look.grid;
+    const float spacing = look.spacing;
     const float rotation = look.rotation;
     const int spokes = look.spokes;
     if (kind == GridKind::Free) return;
     ofPushStyle();
     ofSetLineWidth(1.0f);
-    const ofColor faint(70, 76, 92, 70), bright(150, 200, 255, 170);
-    auto key = [](const GridAddress& a) { return std::make_pair(a.a, a.b); };
 
+    // Faint lines, run to the map's edge and cut there (3A-12: no gaps). The
+    // app spaces the square and triangular grids so that, straight, they fit
+    // the map exactly. Then the lines through where a node is going, a
+    // shade brighter -- a hint, not a highlight (3A-11, softened in 3A-12).
+    const ofColor faint(70, 76, 92, 70), hint(120, 132, 160, 120);
     if (kind == GridKind::Polar) {
-        // The whole rings only, and the spokes out to the last of them
-        // (3A-11): nothing cut off at the map's edge.
         const glm::vec2 c = grid.point({0, 0, true});
+        const int rings = int(0.75f / spacing) + 1;
         const int steps = 96;
         auto ring = [&](int r) {
-            const float rr = float(r) * look.spacing;
+            const float rr = float(r) * spacing;
             for (int k = 0; k < steps; ++k) {
                 const float a0 = rotation + k * TWO_PI / steps;
                 const float a1 = rotation + (k + 1) * TWO_PI / steps;
@@ -64,73 +65,64 @@ void drawGrid(const Scene& s, const GridLook& look) {
             }
         };
         ofSetColor(faint);
-        for (int r = 1; r <= look.rings; ++r) ring(r);
-        for (int k = 0; k < spokes && look.rings > 0; ++k) {
-            drawSegment(renderer, c, grid.point({look.rings, k, true}));
+        for (int r = 1; r <= rings; ++r) ring(r);
+        for (int k = 0; k < spokes; ++k) {
+            drawSegment(renderer, c, grid.point({rings, k, true}));
         }
-        if (look.lineOn && look.rings > 0) {
-            ofSetColor(bright);
-            ofSetLineWidth(2.0f);
-            if (look.lineAt.a >= 1 && look.lineAt.a <= look.rings) ring(look.lineAt.a);
-            if (look.lineAt.a >= 1) {
-                drawSegment(renderer, c, grid.point({look.rings, look.lineAt.b, true}));
-            }
-            ofSetLineWidth(1.0f);
+        if (look.lineOn && look.lineAt.a >= 1) {
+            ofSetColor(hint);
+            ring(look.lineAt.a);
+            drawSegment(renderer, c, grid.point({rings, look.lineAt.b, true}));
         }
-        ofFill();
-        ofSetColor(90, 96, 112, 140);
-        auto dot = [&](glm::vec2 p) {
-            const glm::vec2 q = renderer->toScreen(p);
-            ofDrawCircle(q.x, q.y, 1.6f);
+    } else {
+        // One family along each basis direction, and for a triangular grid a
+        // third along their difference, which makes the triangles visible.
+        const int n = int(1.6f / spacing) + 2;
+        auto family = [&](int i) {
+            drawSegment(renderer, grid.point({i, -n, true}), grid.point({i, n, true}));
         };
-        if (look.rings > 0) dot(c);
-        for (int r = 1; r <= look.rings; ++r) {
-            for (int k = 0; k < spokes; ++k) dot(grid.point({r, k, true}));
+        auto other = [&](int j) {
+            drawSegment(renderer, grid.point({-n, j, true}), grid.point({n, j, true}));
+        };
+        auto third = [&](int c) {         // the points (c - t, t)
+            drawSegment(renderer, grid.point({c + n, -n, true}),
+                        grid.point({c - n, n, true}));
+        };
+        ofSetColor(faint);
+        for (int i = -n; i <= n; ++i) {
+            family(i);
+            other(i);
+            if (kind == GridKind::Triangular) third(i);
         }
-        ofPopStyle();
-        return;
+        if (look.lineOn) {
+            ofSetColor(hint);
+            family(look.lineAt.a);
+            other(look.lineAt.b);
+            if (kind == GridKind::Triangular) third(look.lineAt.a + look.lineAt.b);
+        }
     }
 
-    // Lattice: the edges of the whole cells, each once, then their corners.
-    std::set<std::pair<std::pair<int, int>, std::pair<int, int>>> edges;
-    std::set<std::pair<int, int>> corners;
-    if (look.cells) {
-        for (const auto& cell : *look.cells) {
-            for (std::size_t i = 0; i < cell.size(); ++i) {
-                auto a = key(cell[i]), b = key(cell[(i + 1) % cell.size()]);
-                if (b < a) std::swap(a, b);
-                edges.insert({a, b});
-                corners.insert(key(cell[i]));
-            }
-        }
-    }
-    auto pt = [&](std::pair<int, int> k) { return grid.point({k.first, k.second, true}); };
-    ofSetColor(faint);
-    for (const auto& e : edges) drawSegment(renderer, pt(e.first), pt(e.second));
-    // The lines through the point a node is going to, brighter: its row and
-    // column, and on the triangular grid the third direction -- each edge of
-    // a whole cell that lies on one of them.
-    if (look.lineOn) {
-        ofSetColor(bright);
-        ofSetLineWidth(2.0f);
-        const GridAddress& at = look.lineAt;
-        for (const auto& e : edges) {
-            const auto& a = e.first;
-            const auto& b = e.second;
-            const bool row = a.second == at.b && b.second == at.b;
-            const bool col = a.first == at.a && b.first == at.a;
-            const bool third = kind == GridKind::Triangular
-                && a.first + a.second == at.a + at.b
-                && b.first + b.second == at.a + at.b;
-            if (row || col || third) drawSegment(renderer, pt(a), pt(b));
-        }
-        ofSetLineWidth(1.0f);
-    }
+    // Points.
     ofFill();
     ofSetColor(90, 96, 112, 140);
-    for (const auto& k : corners) {
-        const glm::vec2 q = renderer->toScreen(pt(k));
+    auto dot = [&](glm::vec2 p) {
+        if (p.x < -0.001f || p.x > 1.001f || p.y < -0.001f || p.y > 1.001f) {
+            return;
+        }
+        const glm::vec2 q = renderer->toScreen(p);
         ofDrawCircle(q.x, q.y, 1.6f);
+    };
+    if (kind == GridKind::Polar) {
+        dot(grid.point({0, 0, true}));
+        const int rings = int(0.75f / spacing) + 1;
+        for (int ring = 1; ring <= rings; ++ring) {
+            for (int k = 0; k < spokes; ++k) dot(grid.point({ring, k, true}));
+        }
+    } else {
+        const int n = int(1.6f / spacing) + 2;
+        for (int i = -n; i <= n; ++i) {
+            for (int j = -n; j <= n; ++j) dot(grid.point({i, j, true}));
+        }
     }
     ofPopStyle();
 }
@@ -139,11 +131,11 @@ void drawLinedUp(const Scene& s, const GridLook& look) {
     if (!look.lineOn || look.lined.empty()) return;
     ofPushStyle();
     ofNoFill();
-    ofSetLineWidth(2.0f);
-    ofSetColor(150, 200, 255, 220);
+    ofSetLineWidth(1.0f);
+    ofSetColor(140, 156, 190, 130);
     for (NodeID n : look.lined) {
         const glm::vec2 q = s.renderer->toScreen(s.model->manifold().node(n).position);
-        ofDrawCircle(q.x, q.y, 11.0f);
+        ofDrawCircle(q.x, q.y, 10.0f);
     }
     ofPopStyle();
 }

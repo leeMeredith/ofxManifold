@@ -1119,6 +1119,39 @@ about to go on, highlighted, to see what it lines up with.
   18 mutation gates (382). The drawing session records `L`, `F`, the lines,
   the grid at 23 across, the triangular and polar grids. `make keys` (52).
 
+### 3A-12: softer hints, a grid without gaps, a panel of what can be done
+
+From Lee trying 3A-11 (2026-11-07): the guide lines were "too dark -- I
+just wanted an indication"; drawing only whole cells left gaps ("is it an
+either or?"), the polar grid was fine as it was, and the triangular grid
+showed "chunks of missing triangles"; the key panel should show only what
+can be done, what each key does a little bolder than the key, and each
+group's keys in its own colour.
+
+- **The hints are a shade:** the lines through where a node is going are a
+  little brighter than the grid, one pixel wide; the nodes on them get a
+  thin, faint ring.
+- **The grid is drawn to the map's edge again,** lines cut there, so there
+  are no gaps -- and straight, it fits: the square grid at 1 / across meets
+  every edge in whole tiles; **the triangular grid now fits exactly too**:
+  its rows are 1 / rows apart, rows the whole number nearest across / 0.866
+  (so its triangles are within a few hundredths of equilateral -- 0.4% at
+  20 across), every other row half a step in, so the sides cut only through
+  whole half-triangles in a regular zigzag and the top and bottom rows lie
+  on the edges. A turned grid is cut at the edges, as any would be. The
+  polar grid is drawn as it was before 3A-11. Whole cells still decide what
+  `F` joins.
+- **The panel shows only the keys that would act now.** The views are sized
+  for every key, lit or not, so they keep their size as keys light and
+  darken. `?` still shows every key, dim ones dim. A pure `panelKeys` gives
+  the panel's keys to both the drawn panel and `layoutEditor`.
+- **Each group has its colour** -- its title and its keys in it -- and what
+  a key does is near-white, a hair bolder. Each column's keys are as wide as
+  its longest key, so none is cut and the actions line up.
+- `make panel` now also checks that the panel shows no key that cannot act
+  and that the views keep their size with nothing selected. 2 mutation
+  gates (384).
+
 ---
 
 ## Answered
@@ -1153,6 +1186,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-9** | Editor: curves on every level, layout size and preview, growing triangles | editor scripts, drawlog session extended |
 | **3A-10** | Editor: c and C; the key panel flows into columns and fits | editor scripts, `make panel`, drawlog session extended |
 | **3A-11** | Editor: keys tidied; L and F; a grid that fits; the lines highlighted | editor scripts, drawlog session extended |
+| **3A-12** | Editor: softer hints, a grid without gaps, a panel of what can be done | `make panel`, drawlog session |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

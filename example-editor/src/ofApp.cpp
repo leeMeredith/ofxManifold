@@ -158,8 +158,6 @@ void ofApp::draw() {
     look.spacing = spacing;
     look.rotation = rotation;
     look.spokes = spokes;
-    look.cells = &cells;
-    look.rings = rings;
     // The lines through where a node is going: the grid point under the
     // mouse while placing, or the moved node's while dragging (3A-11).
     if (kind != GridKind::Free && !auditioning()) {
@@ -946,11 +944,13 @@ void ofApp::keyReleased(int key) {
 // grid tool -- a preference of the session, never saved into a map
 // ===========================================================================
 
-// Round 3A-11: the grid fits the map. The spacing is 1 / across, so a
-// square grid's tiles meet the edges exactly; it turns about the grid point
-// nearest the middle. The triangular grid's rows are centred, the bands
-// left above and below even; every other row starts at the left edge. The
-// polar grid's rings step out from the centre. Only whole cells are drawn.
+// Rounds 3A-11, 3A-12: the grid fits the map. The spacing is 1 / across, so
+// a square grid's tiles meet the edges exactly. The triangular grid's rows
+// are 1 / rows apart, rows the whole number nearest across / 0.866 -- so its
+// triangles are within a few hundredths of equilateral -- and every other
+// row starts half a step in: straight, the grid meets every edge, the sides
+// cutting only through whole half-triangles. A grid turns about its point
+// nearest the middle. The polar grid's rings step out from the centre.
 void ofApp::rebuildGrid() {
     const float s = 1.0f / float(across);
     spacing = s;
@@ -963,21 +963,20 @@ void ofApp::rebuildGrid() {
         grid = Grid::lattice({s, 0.0f}, {0.0f, s}, {mid, mid}, rotation);
         break;
     case GridKind::Triangular: {
-        const float h = s * 0.8660254f;
-        const int bands = int(1.0f / h + 1e-4f);
-        const float margin = 0.5f * (1.0f - float(bands) * h);
-        const int jc = bands / 2;                // the row the grid turns on
-        const float ox = mid + ((jc % 2) ? 0.5f * s : 0.0f);
+        const int rows = std::max(1, int(std::lround(float(across) / 0.8660254f)));
+        const float h = 1.0f / float(rows);
+        const int jc = rows / 2;                 // the row the grid turns on
+        // Row j's points are at i / across + j / (2 across).
+        const int i0 = (across - jc) / 2;
+        const float ox = float(i0) * s + float(jc) * 0.5f * s;
         grid = Grid::lattice({s, 0.0f}, {s * 0.5f, h},
-                             {ox, margin + float(jc) * h}, rotation);
+                             {ox, float(jc) * h}, rotation);
         break;
     }
     case GridKind::Polar:
         grid = Grid::polar({0.5f, 0.5f}, s, spokes, rotation);
         break;
     }
-    cells = gridCells(grid, kind == GridKind::Triangular);
-    rings = wholeRings(grid);
 }
 
 // ===========================================================================

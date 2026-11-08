@@ -93,8 +93,7 @@ void checkFlow(const std::string& where, const std::vector<KeyGroup>& groups,
              + std::to_string(f.dimLeftOut) + " != "
              + std::to_string(entryCount(groups)));
     }
-    if ((f.hidden > 0 || f.dimLeftOut > 0)
-        && (f.moreY < 0.0f || f.moreY > bottom + 0.5f)) {
+    if (f.hidden > 0 && (f.moreY < 0.0f || f.moreY > bottom + 0.5f)) {
         fail(where, "keys left out, and no note of it in the panel");
     }
 }
@@ -123,7 +122,8 @@ int main() {
     fonts.push_back({0.0f, 8.0f, 13.0f});
 
     std::size_t configs = 0;
-    std::printf("  keys left out (lit + dim) -- views at least half their size:\n");
+    std::printf("  lit keys the panel leaves out / keys the ? sheet leaves out,\n"
+                "  a busy editor, views at least half their size:\n");
     std::printf("  %-11s", "window");
     for (int s : {12, 14, 16, 18, 20, 22, 24}) std::printf("  %4dpt", s);
     std::printf("\n");
@@ -149,6 +149,29 @@ int main() {
                               panelTop(f.lh), panelKeysTop(f.lh, true),
                               L.panelBottom, f.cw, f.lh);
                     ++configs;
+                    // The views keep their size whatever is lit (3A-12): the
+                    // same window with nothing selected lays out the same.
+                    {
+                        Selection none;
+                        KeyContext quiet = ctx;
+                        quiet.selection = &none;
+                        quiet.canUndo = false;
+                        const EditorLayout Q = layoutEditor(w.w, w.h, f.cw, f.lh,
+                            true, view == 1, true, keyMap(quiet));
+                        if (std::fabs(Q.plan - L.plan) > 0.01f
+                            || std::fabs(Q.panelLeft - L.panelLeft) > 0.01f
+                            || std::fabs(Q.chartRight - L.chartRight) > 0.01f) {
+                            fail(where, "the views change size as keys light");
+                        }
+                    }
+                    // The panel shows only what can be done now (3A-12).
+                    for (const KeyLine& l : L.keys.lines) {
+                        if (l.entry >= 0
+                            && !shown[l.group].entries[std::size_t(l.entry)].available) {
+                            fail(where, "the panel shows a key that cannot act");
+                            break;
+                        }
+                    }
                     // The status column above the faders.
                     if (panelKeysTop(f.lh, true) - f.lh > L.panelBottom + 0.5f
                         && w.h >= 800 && f.size <= 18) {
@@ -178,17 +201,17 @@ int main() {
                         fail(where, "the map shrank past half");
                     }
                     // At the sizes an editor is used at, every key shows.
-                    const bool everything = L.keys.hidden == 0 && L.keys.dimLeftOut == 0;
+                    // The panel shows the lit keys (3A-12): all of them.
+                    const bool everything = L.keys.hidden == 0;
                     if (!everything && w.w >= 1280 && w.h >= 800 && f.size > 0
                         && f.size <= 14) {
-                        fail(where, "keys left out: " + std::to_string(L.keys.hidden)
-                             + " lit, " + std::to_string(L.keys.dimLeftOut) + " dim");
+                        fail(where, "lit keys left out: " + std::to_string(L.keys.hidden));
                     }
                     // Lee's ask: the outputs keys in the right-hand columns,
                     // which start at the top, when everything fits that way.
                     const KeyFlow onTop = flowKeys(shown, L.panelLeft,
                         w.w - 16.0f, panelTop(f.lh), panelKeysTop(f.lh, true),
-                        L.panelBottom, f.cw, f.lh, false);
+                        L.panelBottom, f.cw, f.lh, false, true);
                     if (onTop.hidden == 0 && onTop.columns > 1) {
                         bool top = false;
                         for (const KeyLine& l : L.keys.lines) {
@@ -211,16 +234,15 @@ int main() {
                                                    first, w.h - 16.0f, f.cw, f.lh);
                     checkFlow(where + " sheet", all, sheet, 24.0f, w.w - 24.0f,
                               first, first, w.h - 16.0f, f.cw, f.lh);
-                    if (sheet.hidden + sheet.dimLeftOut > 0 && w.w >= 1280
+                    if (sheet.hidden > 0 && w.w >= 1280
                         && w.h >= 800 && f.size > 0 && f.size <= 20) {
                         fail(where + " sheet", "the key sheet leaves keys out");
                     }
                     if (view == 0 && gs == GridShape::Lattice && f.size > 0
                         && int(f.size) % 2 == 0 && f.size >= 12) {
                         char cell[16];
-                        std::snprintf(cell, sizeof cell, " %2zu+%zu/%-2zu",
-                                      L.keys.hidden, L.keys.dimLeftOut,
-                                      sheet.hidden + sheet.dimLeftOut);
+                        std::snprintf(cell, sizeof cell, "  %3zu/%-3zu",
+                                      L.keys.hidden, sheet.hidden);
                         row += cell;
                     }
                 }

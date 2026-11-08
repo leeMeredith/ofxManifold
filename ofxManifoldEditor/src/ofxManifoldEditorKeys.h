@@ -75,10 +75,9 @@ bool keyAvailable(const KeyContext& ctx, const std::string& id,
 // so the top right is used. The groups go in order, down a column and on to
 // the next; outputs starts a new column when the first holds everything
 // before it. A group that does not fit is split, the rest under its title
-// with "(more)". If everything still does not fit, the keys that would not
-// act now are left out, and if the lit ones do not fit either, the rest are
-// counted; either way the last line says so, and ? shows every key over the
-// whole window. No openFrameworks: checked by tests/check_panel.cpp at many
+// with "(more)". The panel shows only the keys that would act now (3A-12);
+// what still does not fit is counted on the last line, and ? shows every
+// key over the whole window. No openFrameworks: checked by tests/check_panel.cpp at many
 // window and text sizes.
 constexpr float kKeyColumnChars = 32.0f;
 
@@ -104,11 +103,18 @@ struct KeyFlow {
 // after the first; keysTop: in the first, under the status. bottom: no
 // line's baseline below it. cw, lh: the text's character width and line
 // height.
-// `tight` false: only the first way -- every key, outputs at the top of a
-// column -- whatever it leaves out.
+// `tight` false: only the first way -- outputs at the top of a column --
+// whatever it leaves out. `litOnly` (the panel, 3A-12): only the keys that
+// would act now; the others are counted in dimLeftOut, not shown.
 KeyFlow flowKeys(const std::vector<KeyGroup>& groups, float x, float right,
                  float top, float keysTop, float bottom, float cw, float lh,
-                 bool tight = true);
+                 bool tight = true, bool litOnly = false);
+
+// The panel's keys (3A-12): the lit ones, flowed from x to right, the first
+// column under the status, down to bottom. layoutEditor and the drawn panel
+// both take them from here.
+KeyFlow panelKeys(const std::vector<KeyGroup>& groups, float x, float right,
+                  bool values, float bottom, float cw, float lh);
 
 // How tall a group of keys is drawn, title and rows: for an app placing one.
 float keyGroupHeight(const KeyGroup& g, float lh);

@@ -172,13 +172,11 @@ private:
     // A preference of the editing session, never written into a map file.
     ofxManifold::Grid grid;
     ofxManifold::editor::GridKind kind = ofxManifold::editor::GridKind::Square;
-    // Round 3A-11: the spacing is 1 / across, so the square grid's tiles fit
-    // the map exactly; the triangular grid is centred with even bands; the
-    // polar grid's rings step out from the centre by it. - and = step it.
+    // Rounds 3A-11, 3A-12: the spacing is 1 / across, so a straight square
+    // grid's tiles fit the map exactly, and the triangular grid's rows and
+    // half-steps fit it too. - and = step it.
     int      across   = 20;
     float    spacing  = 0.05f;              // 1 / across
-    std::vector<std::vector<ofxManifold::GridAddress>> cells;   // whole cells
-    int      rings    = 0;                  // the polar grid's whole rings
     float    rotation = 0.0f;           // radians
     int      spokes   = 8;
     // What l lays out on each grid (3A-9), set with [ ]: rings deep on the

@@ -334,8 +334,8 @@ KeyFlow flowPass(const std::vector<KeyGroup>& groups, float x, float right,
         if (full) f.hidden += shown.size() - e;
         y += lh * 0.5f;
     }
-    if (f.hidden > 0 || f.dimLeftOut > 0) {
-        // The last line becomes the note of what is not shown: the entry it
+    if (f.hidden > 0) {
+        // The last line becomes the note of what did not fit: the entry it
         // held is counted.
         while (!f.lines.empty()) {
             const KeyLine last = f.lines.back();
@@ -353,23 +353,19 @@ KeyFlow flowPass(const std::vector<KeyGroup>& groups, float x, float right,
 
 KeyFlow flowKeys(const std::vector<KeyGroup>& groups, float x, float right,
                  float top, float keysTop, float bottom, float cw, float lh,
-                 bool tight) {
-    if (!tight) {
-        return flowPass(groups, x, right, top, keysTop, bottom, cw, lh, false,
-                        true);
-    }
-    // Everything, outputs at the top of a column, if that fits; then
-    // everything packed tight; then the keys that would act now, the same
-    // two ways.
-    for (const bool lit : {false, true}) {
-        for (const bool onTop : {true, false}) {
-            KeyFlow f = flowPass(groups, x, right, top, keysTop, bottom, cw, lh,
-                                 lit, onTop);
-            if (f.hidden == 0) return f;
-            if (lit && !onTop) return f;
-        }
-    }
-    return KeyFlow{};
+                 bool tight, bool litOnly) {
+    // Outputs at the top of a column if that fits; then packed tight.
+    KeyFlow f = flowPass(groups, x, right, top, keysTop, bottom, cw, lh,
+                         litOnly, true);
+    if (f.hidden == 0 || !tight) return f;
+    return flowPass(groups, x, right, top, keysTop, bottom, cw, lh, litOnly,
+                    false);
+}
+
+KeyFlow panelKeys(const std::vector<KeyGroup>& groups, float x, float right,
+                  bool values, float bottom, float cw, float lh) {
+    return flowKeys(groups, x, right, panelTop(lh),
+                    panelKeysTop(lh, values), bottom, cw, lh, true, true);
 }
 
 float keyGroupHeight(const KeyGroup& g, float lh) {
@@ -428,14 +424,16 @@ EditorLayout layoutEditor(float width, float height, float cw, float lh,
     };
     // The faders across the window, the panel above them; or the faders
     // under the views only, the panel down to the bottom.
+    // The room is sized for every key, lit or not, so the views keep their
+    // size as keys light and darken; the panel then shows the lit ones
+    // (3A-12).
     auto flow = [&](bool narrow, bool tight) {
         L.panelLeft = right() + 30.0f;
         L.panelBottom = narrow ? height - 16.0f : L.chartTop - 10.0f;
         L.chartRight = narrow ? right() : width - 24.0f;
-        L.keys = flowKeys(shown, L.panelLeft, width - 16.0f, panelTop(lh),
-                          panelKeysTop(lh, values), L.panelBottom, cw, lh,
-                          tight);
-        return L.keys.hidden == 0 && L.keys.dimLeftOut == 0;
+        return flowKeys(shown, L.panelLeft, width - 16.0f, panelTop(lh),
+                        panelKeysTop(lh, values), L.panelBottom, cw, lh,
+                        tight).hidden == 0;
     };
     if (!flow(false, false) && !flow(true, false) && !flow(true, true)) {
         while (L.plan > smallest) {
@@ -443,6 +441,8 @@ EditorLayout layoutEditor(float width, float height, float cw, float lh,
             if (flow(true, false) || flow(true, true)) break;
         }
     }
+    L.keys = panelKeys(shown, L.panelLeft, width - 16.0f, values,
+                       L.panelBottom, cw, lh);
     if (show3D) {
         L.view3DX = 24.0f + L.plan + L.column + 16.0f;
         L.levelsKeysX = L.view3DX;
