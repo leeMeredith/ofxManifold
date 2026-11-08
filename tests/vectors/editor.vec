@@ -766,7 +766,7 @@ ENDEDIT
 # which keys are lit: the same rule an editor asks before acting, so a lit key acts and a dim one does not. While a node is dragged only free-hand and the window keys; while auditioning only the mouse editing dims. b's action is what it WOULD do -- worked out here by doing it on a copy, in the C++ by predicting
 EDIT keys_lit_when_they_act ANALYTIC
 GRID FREE
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO place 0.2 0.2
 EXPECT 1 0 ""
 STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | S n0 | A 1
@@ -776,32 +776,32 @@ STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | 
 DO place 0.5 0.8
 EXPECT 1 0 ""
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 SEL only n0
 SEL toggle n1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n0
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n0
 SEL only n0
 SEL toggle n1
 SEL toggle n2
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
 DO join
 EXPECT 1 0 "joined 3 nodes in click order"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
-KEYS drag=1 aud=0 grid=lattice EXPECT place:0 box:0 toggle:0 all:0 none:0 move:0 freehand:1 join:0 unjoin:0 remove:0 gridkind:0 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 newoutput:0 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:0 levelswitch:0 newlevel:0 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:0 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:0 lock:0 undo:0 redo:0 save:0 saveas:0 open:0 userig:0 saverig:0 empty:0 example:0 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
-KEYS drag=1 aud=0 grid=free EXPECT place:0 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 unjoin:0 remove:0 gridkind:0 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 newoutput:0 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:0 levelswitch:0 newlevel:0 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:0 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:0 lock:0 undo:0 redo:0 save:0 saveas:0 open:0 userig:0 saverig:0 empty:0 example:0 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
-KEYS drag=0 aud=0 grid=polar EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:1 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
-KEYS drag=0 aud=0 grid=free EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 unjoin:1 remove:1 gridkind:1 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
-KEYS drag=0 aud=1 grid=lattice EXPECT place:0 box:0 toggle:0 all:1 none:1 move:0 freehand:0 join:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=1 aud=0 grid=lattice EXPECT place:0 box:0 toggle:0 all:0 none:0 move:0 freehand:1 join:0 joincells:0 unjoin:0 remove:0 gridkind:0 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 layoutnodes:0 newoutput:0 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:0 levelswitch:0 newlevel:0 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:0 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:0 lock:0 undo:0 redo:0 save:0 saveas:0 open:0 userig:0 saverig:0 empty:0 example:0 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=1 aud=0 grid=free EXPECT place:0 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:0 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 layoutnodes:0 newoutput:0 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:0 levelswitch:0 newlevel:0 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:0 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:0 lock:0 undo:0 redo:0 save:0 saveas:0 open:0 userig:0 saverig:0 empty:0 example:0 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=0 aud=0 grid=polar EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:1 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=0 aud=0 grid=free EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:0 unjoin:1 remove:1 gridkind:1 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 layoutnodes:0 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=0 aud=1 grid=lattice EXPECT place:0 box:0 toggle:0 all:1 none:1 move:0 freehand:0 join:1 joincells:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
 DO pick n2
 EXPECT 0 0 "current output: n2"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | S n2 | A 1
 SEL only n2
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from n2 -- n2 goes silent
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from n2 -- n2 goes silent
 DO toggleout n1
 EXPECT 0 0 "outputs: n2, n1"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n1 | S n2,n1 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n2, n1
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n2, n1
 SEL only n0
 SEL toggle n1
 SEL toggle n2
@@ -825,16 +825,16 @@ STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 |
 DO toggleout n2
 EXPECT 0 0 "outputs: n0, n1, n2"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n0:1 n1>n1:1 n1>n2:1 n2>n0:1 n2>n1:1 n2>n2:1 | D  | C n2 | S n0,n1,n2 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 2 from n0, n1, n2 -- 2 nodes go silent
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 2 from n0, n1, n2 -- 2 nodes go silent
 DO undo
 EXPECT 1 0 "undid bind to every output"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n1>n0:1 n2>n2:1 n2>n0:1 | D  | C n0 | S n0 | A 1
 DO undo
 EXPECT 1 0 "undid binding"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R n0,n1,n2 | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:1 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:1 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
 SEL clear
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:1 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:1 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 ENDEDIT
 
 # a selected node that a derived output reads from is marked on that fader: a tap, a copy the node loses nothing to
@@ -1701,7 +1701,7 @@ STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | 
 DO place 0.5 0.8
 EXPECT 1 0 ""
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO pick n0
 EXPECT 0 0 "current output: n0"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
@@ -1715,7 +1715,7 @@ SEL only n2
 DO derived
 EXPECT 1 0 "derived sum4 on channel 4, sum of 1"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D sum3:3:>n0,>n1 sum4:4:n2 | C n1 | S n0,n1 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n0, n1
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n0, n1
 TAPS sum4
 CONTRIB n0=0.5 n2=0.5 EXPECT 0 0 0.5 0 0
 # n1 removed with its node: the after-fed sum loses that
@@ -1739,7 +1739,7 @@ GRID FREE
 DO empty
 EXPECT 1 0 ""
 STATE N  | R  | O  | L  | D  | C - | S - | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO derivedafter
 EXPECT 0 1 "no output yet -- press o to make one"
 STATE N  | R  | O  | L  | D  | C - | S - | A 1
@@ -1806,7 +1806,7 @@ STATE N n0@0.5,0.8 n1@0.2,0.2 | R  | O n0:0:0.707946 n1:1:1 | L n0>n0:1 n1>n1:1 
 DO userig room
 EXPECT 1 0 "using rig room: 3 outputs"
 STATE N n0@0.5,0.8 n1@0.2,0.2 | R  | O n0:0:1 n1:1:0.501187 n2:2:1 | L n0>n0:1 n1>n1:1 | D sum3:3:>n0,>n1 | C n1 | S n0,n1 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO undo
 EXPECT 1 0 "undid use rig"
 STATE N n0@0.5,0.8 n1@0.2,0.2 | R  | O n0:0:0.707946 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | S n0,n1 | A 1
@@ -1894,11 +1894,11 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 DO levelup
 EXPECT 0 0 "one level -- n makes another"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newlevel 1
 EXPECT 1 0 "new level 2 of 2, at 0.25, with 9 outputs of its own"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 | L O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 1 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:1 match:0 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:1 match:0 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newlevel 1
 EXPECT 1 0 "new level 3 of 3, at 0.5, with 9 outputs of its own"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 2 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
@@ -1975,7 +1975,7 @@ SEL only O
 DO silence
 EXPECT 1 0 "O now silent -- c gives back its own output"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C rear | S rear | A 1 | V 0 | Z0 0 K N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 N>rear:1 N>~:0.105263 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:0 clear:1 silence:0 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:0 clear:1 silence:0 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
 DO bindall
 EXPECT 1 0 "bound 1 node to every output (22)"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 O>O-2:1 O>N-2:1 O>E-2:1 O>S-2:1 O>W-2:1 O>A-2:1 O>B-2:1 O>C-2:1 O>D-2:1 O>O-3:1 O>N-3:1 O>E-3:1 O>S-3:1 O>W-3:1 O>A-3:1 O>B-3:1 O>C-3:1 O>D-3:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C rear | S rear | A 1 | V 0 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 O>O-2:1 O>N-2:1 O>E-2:1 O>S-2:1 O>W-2:1 O>A-2:1 O>B-2:1 O>C-2:1 O>D-2:1 O>O-3:1 O>N-3:1 O>E-3:1 O>S-3:1 O>W-3:1 O>A-3:1 O>B-3:1 O>C-3:1 O>D-3:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 N>rear:1 N>~:0.105263 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
@@ -1988,7 +1988,7 @@ DO example
 EXPECT 1 0 ""
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
 SEL only O
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from front
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from front
 DO raise 1 0
 EXPECT 1 0 "height +0.05"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 0 | Z0 0 O=0.05 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333
@@ -2127,14 +2127,14 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 DO removelevel
 EXPECT 1 0 "removed level 2 and 9 outputs; now on level 1 of 2"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C rear | S rear | A 1 | V 0 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.5 K O>O-3:4 N>N-3:1 N>rear:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
 DO leveldown
 EXPECT 0 0 "already the bottom level"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C rear | S rear | A 1 | V 0 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.5 K O>O-3:4 N>N-3:1 N>rear:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
 DO removelevel
 EXPECT 1 0 "removed level 1 and 3 outputs; now on level 1 of 1"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O rear:3:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>O-3:4 N>N-3:1 N>rear:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333 | D sub:4:N,O | C rear | S rear | A 1 | V 0 | Z0 0.5 K O>O-3:4 N>N-3:1 N>rear:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from rear
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from rear
 DO undo
 EXPECT 1 0 "undid remove level"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C rear | S rear | A 1 | V 0 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.5 K O>O-3:4 N>N-3:1 N>rear:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
@@ -2343,7 +2343,7 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 # one level: z changes nothing, and there are no dots
 HEAR O=0.5 N=0.25 E=0.25 Z 0 COL 0 90 1 EXPECT 1 ROUTED 0.375 0.125 0.375 0.125 0.75 SILENCE 0 SEL - DOTS NONE
 HEAR O=0.5 N=0.25 E=0.25 Z 3 COL 0 90 1 EXPECT 1 ROUTED 0.375 0.125 0.375 0.125 0.75 SILENCE 0 SEL - DOTS NONE
-KEYS drag=0 aud=1 grid=lattice EXPECT place:0 box:0 toggle:0 all:1 none:0 move:0 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=1 grid=lattice EXPECT place:0 box:0 toggle:0 all:1 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newlevel 1
 EXPECT 1 0 "new level 2 of 2, at 0.25, with 9 outputs of its own"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 | L O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 1 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333
@@ -2395,8 +2395,8 @@ SEL only N
 SEL toggle O
 HEAR O=0.5 N=0.25 E=0.25 Z 0.3 COL 0 90 1 EXPECT 1 ROUTED 0 0 0 0.0972222 0.75 0.388889 0.0972222 0.194444 0 0 0 0 0 0 0.111111 0.0555556 0.0555556 0 0 0 0 0 0 SILENCE 0 SEL 0 0 0 0.0972222 0 0.388889 0.0972222 0 0 0 0 0 0 0 0.111111 0.0555556 0 0 0 0 0 0 0 DOTS 90 45 0 CUR 1 MARK 35 0
 HEAR A=0.25 B=0.25 C=0.25 D=0.25 Z 0.4 COL 10 130 1 EXPECT 1 ROUTED 0 0 0 0 0 0 0 0 0 0 0.1 0.05 0.1 0.075 0 0 0 0 0 0.15 0.075 0.15 0.1125 SILENCE 0.1875 SEL 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 DOTS 130 70 10 CUR 1 MARK 34 0
-KEYS drag=0 aud=1 grid=lattice EXPECT place:0 box:0 toggle:0 all:1 none:1 move:0 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
+KEYS drag=0 aud=1 grid=lattice EXPECT place:0 box:0 toggle:0 all:1 none:1 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to rear
 GLIDE 0.6 -1 1 2 EXPECT 0.5
 # on the top level O is lowered: audition starts under the point,
 # on the level as bent, not at its starting height
@@ -2415,14 +2415,14 @@ GRID FREE
 DO example
 EXPECT 1 0 ""
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newlevel 1
 EXPECT 1 0 "new level 2 of 2, at 0.25, with 9 outputs of its own"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 | L O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 1 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333
 DO newlevel 1
 EXPECT 1 0 "new level 3 of 3, at 0.5, with 9 outputs of its own"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 2 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:1 match:0 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:1 match:0 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO golevel 0
 EXPECT 0 0 "level 1 of 3, at 0"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 0 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
@@ -2584,7 +2584,7 @@ DO leveldown
 EXPECT 0 0 "level 2 of 3, at 0.25"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 1 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
 SEL only O
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to front
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to front
 DO match
 EXPECT 0 1 "select the node to match first, then the others"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 1 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
@@ -2605,7 +2605,7 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 SEL only N
 SEL toggle O
 SEL toggle E
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 3 to front
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:1 movelevel:1 match:1 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 3 to front
 DO match
 EXPECT 1 0 "2 nodes to the height of N (-0.05)"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 O-2:5:1 N-2:6:1 E-2:7:1 S-2:8:1 W-2:9:1 A-2:10:1 B-2:11:1 C-2:12:1 D-2:13:1 O-3:14:1 N-3:15:1 E-3:16:1 S-3:17:1 W-3:18:1 A-3:19:1 B-3:20:1 C-3:21:1 D-3:22:1 | L O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | V 1 | Z0 0 K O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | Z1 0.25 O=0.2 N=0.2 E=0.2 K O>O-2:4 N>N-2:1 E>E-2:1 S>S-2:1 W>W-2:1 A>A-2:1 B>B-2:1 B>~:1 C>C-2:2 D>D-2:1 D>~:0.333333 | Z2 0.5 K O>O-3:4 N>N-3:1 E>E-3:1 S>S-3:1 W>W-3:1 A>A-3:1 B>B-3:1 B>~:1 C>C-3:2 D>D-3:1 D>~:0.333333
@@ -2759,14 +2759,14 @@ GRID FREE
 DO example
 EXPECT 1 0 ""
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newvalue ""
 EXPECT 0 1 "a value needs a name"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
 DO newvalue "reverb"
 EXPECT 1 0 "value reverb, 0 to 1"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | U 0 reverb:0:1:0 | X0
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:0 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:0 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newvalue "reverb"
 EXPECT 0 1 "a value named reverb already exists"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | U 0 reverb:0:1:0 | X0
@@ -2844,7 +2844,7 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 DO removevalue
 EXPECT 1 0 "removed value far"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | U 0 reverb:0:1:0 | X0
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:1 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from front -- N goes silent
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:1 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from front -- N goes silent
 DO removevalue
 EXPECT 1 0 "removed value reverb"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1
@@ -2865,11 +2865,11 @@ STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35
 DO newvalue "distance 0 10"
 EXPECT 1 0 "value distance, 0 to 10"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | U 0 distance:0:10:0 | X0
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:0 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:0 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 SEL only O
 SEL toggle N
 SEL toggle E
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:1 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to front
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:1 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:1 stepvalue:1 editvalue:1 removevalue:1 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to front
 DO stepvalue 1 0
 EXPECT 1 0 "distance 0.5"
 STATE N O@0.3,0.5 N@0.3,0.8 E@0.5,0.5 S@0.3,0.2 W@0.1,0.5 A@0.65,0.35 B@0.9,0.35 C@0.9,0.65 D@0.65,0.65 | R O,N,E O,E,S O,S,W O,W,N A,B,C,D | O front:0:1 left:1:1 right:2:1 rear:3:1 | L O>front:1 O>left:1 O>right:1 O>rear:1 N>front:1 E>right:1 S>rear:1 W>left:1 B>right:1 B>~:1 C>left:1 C>right:1 D>rear:1 D>~:0.333333 | D sub:4:N,O | C front | S front | A 1 | U 0 distance:0:10:0 | X0 distance/O=0.5 distance/N=0.5 distance/E=0.5
@@ -3071,7 +3071,7 @@ ENDEDIT
 # l on the polar grid: a ring on the ring nearest the point, one node per spoke, numbered clockwise from the spoke nearest the front, joined as one region, each with its own outputs -- on every level. Refused at the centre, off the map, or on a node
 EDIT layout_ring ANALYTIC
 GRID POLAR 0.5 0.5 0.1 8 0
-KEYS drag=0 aud=0 grid=polar EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:1 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=polar EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:1 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO newlevel 1
 EXPECT 1 0 "new level 2 of 2, at 0.25, with 0 outputs of its own"
 STATE N  | R  | O  | L  | D  | C - | S - | A 1 | V 1 | Z0 0 K | Z1 0.25 K
@@ -3214,7 +3214,7 @@ ENDEDIT
 # on the free grid there is nothing to lay out on
 EDIT layout_free ANALYTIC
 GRID FREE
-KEYS drag=0 aud=0 grid=free EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 unjoin:0 remove:0 gridkind:1 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+KEYS drag=0 aud=0 grid=free EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:0 spacing:0 spokes:0 deadzone:0 layoutsize:0 layout:0 layoutnodes:0 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
 DO layout 0.5 0.5 3 0
 EXPECT 0 1 "pick a square, triangular or polar grid first (2, 3 or 4)"
 STATE N  | R  | O  | L  | D  | C - | S - | A 1
@@ -3303,14 +3303,14 @@ STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n0>n1:1 n1>n1:1
 DO fill -1 0
 EXPECT 1 0 "fill 95%"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n0>n1:1 n0>~:0.105263 n1>n1:1 | D  | C n1 | S n1 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from n1
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND unbind 1 from n1
 DO clear
 EXPECT 1 0 "n0 back to its own output"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | S n1 | A 1
 DO silence
 EXPECT 1 0 "n0 now silent -- c gives back its own output"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n1>n1:1 | D  | C n1 | S n1 | A 1
-KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:0 clear:1 silence:0 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n1
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:0 clear:1 silence:0 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 1 to n1
 DO clear
 EXPECT 1 0 "n0 back to its own output"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n1 | S n1 | A 1
@@ -3367,5 +3367,199 @@ STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 n0-2:2:1 | L n0>n0:1 | D  |
 DO clear
 EXPECT 1 0 "n1 back to its own output"
 STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 n0-2:2:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | S n0 | A 0 | V 0 | Z0 0 K n0>n0:1 n1>n1:1 | Z1 0.25 K n0>n0-2:1
+ENDEDIT
+
+#--------------------------------------------------------------------
+# ROUND 3A-11: L LAYS OUT THE NODES ONLY, F JOINS THE GRID'S CELLS,
+# THE NODES IN LINE, SHIFT-TAB
+#--------------------------------------------------------------------
+# L lays out a block of nodes, not joined; thin it out, then F joins every whole square whose corners are all selected and on the grid; cells already joined are skipped. LINED: the nodes on the row and column through the grid point nearest a point
+EDIT cells_square ANALYTIC
+GRID LATTICE 0.1 0 0 0.1 0 0 0
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:0 toggle:0 all:0 none:0 move:0 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:0 addoutput:0 nextoutput:0 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:0 derived:0 trim:0 removeoutput:0 autooutput:1 levelswitch:0 newlevel:1 raise:0 movelevel:0 match:0 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:0 redo:0 save:1 saveas:1 open:1 userig:1 saverig:0 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+CELLS 0 100
+DO layoutnodes 0.5 0.5 3 0
+EXPECT 1 0 "9 nodes laid out, not joined -- F joins the grid's cells"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n2@0.6,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+LINED 0.5 0.71 0 n1 n4 n7
+LINED 0.42 0.38 0 n0 n3 n6 n7 n8
+LINED 0.9 0.9 0 NONE
+SEL only n2
+DO remove
+EXPECT 1 0 "removed 1 node, and 1 output"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R  | O n0:0:1 n1:1:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+SEL clear
+SEL only n0
+SEL toggle n1
+SEL toggle n3
+SEL toggle n4
+SEL toggle n5
+SEL toggle n6
+SEL toggle n7
+SEL toggle n8
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 7 to n0
+DO joincells 0
+EXPECT 1 0 "joined 3 grid cells"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R n6,n7,n4,n3 n7,n8,n5,n4 n3,n4,n1,n0 | O n0:0:1 n1:1:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+DO joincells 0
+EXPECT 0 1 "those cells are joined already"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R n6,n7,n4,n3 n7,n8,n5,n4 n3,n4,n1,n0 | O n0:0:1 n1:1:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+SEL toggle n1
+DO joincells 0
+EXPECT 0 1 "no whole cell among the selected -- each needs every corner selected and on the grid"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R n6,n7,n4,n3 n7,n8,n5,n4 n3,n4,n1,n0 | O n0:0:1 n1:1:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+# three corners of a square are not a cell
+DO undo
+EXPECT 1 0 "undid join the grid cells"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R  | O n0:0:1 n1:1:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+DO undo
+EXPECT 1 0 "undid delete"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n2@0.6,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+SEL only n3
+SEL toggle n4
+SEL toggle n1
+DO joincells 0
+EXPECT 0 1 "no whole cell among the selected -- each needs every corner selected and on the grid"
+STATE N n0@0.4,0.6 n1@0.5,0.6 n2@0.6,0.6 n3@0.4,0.5 n4@0.5,0.5 n5@0.6,0.5 n6@0.4,0.4 n7@0.5,0.4 n8@0.6,0.4 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 | D  | C n0 | S n0 | A 1
+ENDEDIT
+
+# on the triangular grid F joins whole triangles, up and down; L then F gives what l gives; LINED takes the third direction too
+EDIT cells_triangles ANALYTIC
+GRID LATTICE 0.1 0 0.05 0.08660254 0 0 0
+CELLS 1 209
+DO layoutnodes 0.5 0.5 3 1
+EXPECT 1 0 "6 nodes laid out, not joined -- F joins the grid's cells"
+STATE N n0@0.45,0.606218 n1@0.4,0.519615 n2@0.5,0.519615 n3@0.35,0.433013 n4@0.45,0.433013 n5@0.55,0.433013 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+SEL toggle n3
+SEL toggle n4
+SEL toggle n5
+DO joincells 1
+EXPECT 1 0 "joined 4 grid cells"
+STATE N n0@0.45,0.606218 n1@0.4,0.519615 n2@0.5,0.519615 n3@0.35,0.433013 n4@0.45,0.433013 n5@0.55,0.433013 | R n3,n4,n1 n4,n2,n1 n4,n5,n2 n1,n2,n0 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 | D  | C n0 | S n0 | A 1
+LINED 0.5 0.5 1 n0 n1 n2 n4 n5
+LINED 0.5 0.5 0 n1 n2 n4
+DO undo
+EXPECT 1 0 "undid join the grid cells"
+STATE N n0@0.45,0.606218 n1@0.4,0.519615 n2@0.5,0.519615 n3@0.35,0.433013 n4@0.45,0.433013 n5@0.55,0.433013 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+SEL toggle n3
+SEL toggle n5
+DO joincells 1
+EXPECT 1 0 "joined 1 grid cell"
+STATE N n0@0.45,0.606218 n1@0.4,0.519615 n2@0.5,0.519615 n3@0.35,0.433013 n4@0.45,0.433013 n5@0.55,0.433013 | R n1,n2,n0 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 | D  | C n0 | S n0 | A 1
+ENDEDIT
+
+# on the polar grid F joins the pieces between two rings, the centre's triangles, and a ring all of whose spokes are selected with nothing joined inside it, whole; LINED: the nodes on the ring and the spoke
+EDIT cells_polar ANALYTIC
+GRID POLAR 0.5 0.5 0.1 8 0
+CELLS 0 40
+DO layoutnodes 0.5 0.8 2 0
+EXPECT 1 0 "16 nodes laid out, not joined -- F joins the grid's cells"
+STATE N n0@0.5,0.8 n1@0.712132,0.712132 n2@0.8,0.5 n3@0.712132,0.287868 n4@0.5,0.2 n5@0.287868,0.287868 n6@0.2,0.5 n7@0.287868,0.712132 n8@0.5,0.7 n9@0.641421,0.641421 n10@0.7,0.5 n11@0.641421,0.358579 n12@0.5,0.3 n13@0.358579,0.358579 n14@0.3,0.5 n15@0.358579,0.641421 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 n10:10:1 n11:11:1 n12:12:1 n13:13:1 n14:14:1 n15:15:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 n10>n10:1 n11>n11:1 n12>n12:1 n13>n13:1 n14>n14:1 n15>n15:1 | D  | C n0 | S n0 | A 1
+LINED 0.5 0.8 0 n0 n1 n2 n3 n4 n5 n6 n7 n8
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+SEL toggle n3
+SEL toggle n4
+SEL toggle n5
+SEL toggle n6
+SEL toggle n7
+SEL toggle n8
+SEL toggle n9
+SEL toggle n10
+SEL toggle n11
+SEL toggle n12
+SEL toggle n13
+SEL toggle n14
+SEL toggle n15
+DO joincells 0
+EXPECT 1 0 "joined 9 grid cells"
+STATE N n0@0.5,0.8 n1@0.712132,0.712132 n2@0.8,0.5 n3@0.712132,0.287868 n4@0.5,0.2 n5@0.287868,0.287868 n6@0.2,0.5 n7@0.287868,0.712132 n8@0.5,0.7 n9@0.641421,0.641421 n10@0.7,0.5 n11@0.641421,0.358579 n12@0.5,0.3 n13@0.358579,0.358579 n14@0.3,0.5 n15@0.358579,0.641421 | R n10,n9,n1,n2 n9,n8,n0,n1 n8,n15,n7,n0 n15,n14,n6,n7 n14,n13,n5,n6 n13,n12,n4,n5 n12,n11,n3,n4 n11,n10,n2,n3 n10,n9,n8,n15,n14,n13,n12,n11 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 n10:10:1 n11:11:1 n12:12:1 n13:13:1 n14:14:1 n15:15:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 n10>n10:1 n11>n11:1 n12>n12:1 n13>n13:1 n14>n14:1 n15>n15:1 | D  | C n0 | S n0 | A 1
+DO undo
+EXPECT 1 0 "undid join the grid cells"
+STATE N n0@0.5,0.8 n1@0.712132,0.712132 n2@0.8,0.5 n3@0.712132,0.287868 n4@0.5,0.2 n5@0.287868,0.287868 n6@0.2,0.5 n7@0.287868,0.712132 n8@0.5,0.7 n9@0.641421,0.641421 n10@0.7,0.5 n11@0.641421,0.358579 n12@0.5,0.3 n13@0.358579,0.358579 n14@0.3,0.5 n15@0.358579,0.641421 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 n10:10:1 n11:11:1 n12:12:1 n13:13:1 n14:14:1 n15:15:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 n10>n10:1 n11>n11:1 n12>n12:1 n13>n13:1 n14>n14:1 n15>n15:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+SEL toggle n3
+SEL toggle n4
+SEL toggle n5
+SEL toggle n6
+SEL toggle n7
+DO joincells 0
+EXPECT 1 0 "joined 1 grid cell"
+STATE N n0@0.5,0.8 n1@0.712132,0.712132 n2@0.8,0.5 n3@0.712132,0.287868 n4@0.5,0.2 n5@0.287868,0.287868 n6@0.2,0.5 n7@0.287868,0.712132 n8@0.5,0.7 n9@0.641421,0.641421 n10@0.7,0.5 n11@0.641421,0.358579 n12@0.5,0.3 n13@0.358579,0.358579 n14@0.3,0.5 n15@0.358579,0.641421 | R n2,n1,n0,n7,n6,n5,n4,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 n10:10:1 n11:11:1 n12:12:1 n13:13:1 n14:14:1 n15:15:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 n10>n10:1 n11>n11:1 n12>n12:1 n13>n13:1 n14>n14:1 n15>n15:1 | D  | C n0 | S n0 | A 1
+# rings that reach the centre: its triangles
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | S - | A 1
+DO layoutnodes 0.5 0.71 3 0
+EXPECT 1 0 "17 nodes laid out, not joined -- F joins the grid's cells"
+STATE N n0@0.5,0.7 n1@0.641421,0.641421 n2@0.7,0.5 n3@0.641421,0.358579 n4@0.5,0.3 n5@0.358579,0.358579 n6@0.3,0.5 n7@0.358579,0.641421 n8@0.5,0.6 n9@0.570711,0.570711 n10@0.6,0.5 n11@0.570711,0.429289 n12@0.5,0.4 n13@0.429289,0.429289 n14@0.4,0.5 n15@0.429289,0.570711 n16@0.5,0.5 | R  | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 n10:10:1 n11:11:1 n12:12:1 n13:13:1 n14:14:1 n15:15:1 n16:16:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 n10>n10:1 n11>n11:1 n12>n12:1 n13>n13:1 n14>n14:1 n15>n15:1 n16>n16:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+SEL toggle n3
+SEL toggle n4
+SEL toggle n5
+SEL toggle n6
+SEL toggle n7
+SEL toggle n8
+SEL toggle n9
+SEL toggle n10
+SEL toggle n11
+SEL toggle n12
+SEL toggle n13
+SEL toggle n14
+SEL toggle n15
+SEL toggle n16
+DO joincells 0
+EXPECT 1 0 "joined 16 grid cells"
+STATE N n0@0.5,0.7 n1@0.641421,0.641421 n2@0.7,0.5 n3@0.641421,0.358579 n4@0.5,0.3 n5@0.358579,0.358579 n6@0.3,0.5 n7@0.358579,0.641421 n8@0.5,0.6 n9@0.570711,0.570711 n10@0.6,0.5 n11@0.570711,0.429289 n12@0.5,0.4 n13@0.429289,0.429289 n14@0.4,0.5 n15@0.429289,0.570711 n16@0.5,0.5 | R n16,n10,n9 n16,n9,n8 n16,n8,n15 n16,n15,n14 n16,n14,n13 n16,n13,n12 n16,n12,n11 n16,n11,n10 n10,n9,n1,n2 n9,n8,n0,n1 n8,n15,n7,n0 n15,n14,n6,n7 n14,n13,n5,n6 n13,n12,n4,n5 n12,n11,n3,n4 n11,n10,n2,n3 | O n0:0:1 n1:1:1 n2:2:1 n3:3:1 n4:4:1 n5:5:1 n6:6:1 n7:7:1 n8:8:1 n9:9:1 n10:10:1 n11:11:1 n12:12:1 n13:13:1 n14:14:1 n15:15:1 n16:16:1 | L n0>n0:1 n1>n1:1 n2>n2:1 n3>n3:1 n4>n4:1 n5>n5:1 n6>n6:1 n7>n7:1 n8>n8:1 n9>n9:1 n10>n10:1 n11>n11:1 n12>n12:1 n13>n13:1 n14>n14:1 n15>n15:1 n16>n16:1 | D  | C n0 | S n0 | A 1
+LINED 0.5 0.5 0 n0 n1 n10 n11 n12 n13 n14 n15 n16 n2 n3 n4 n5 n6 n7 n8 n9
+LINED 0.6 0.5 0 n10 n11 n12 n13 n14 n15 n16 n2 n8 n9
+ENDEDIT
+
+# F is refused on the free grid and where no whole cell is selected; shift-tab picks the output before, tab the one after
+EDIT cells_refused_and_shift_tab ANALYTIC
+GRID FREE
+DO empty
+EXPECT 1 0 ""
+STATE N  | R  | O  | L  | D  | C - | S - | A 1
+DO place 0.2 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 | R  | O n0:0:1 | L n0>n0:1 | D  | C n0 | S n0 | A 1
+DO place 0.8 0.2
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 | R  | O n0:0:1 n1:1:1 | L n0>n0:1 n1>n1:1 | D  | C n0 | S n0 | A 1
+DO place 0.5 0.8
+EXPECT 1 0 ""
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
+SEL only n0
+SEL toggle n1
+SEL toggle n2
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:1 move:1 freehand:0 join:1 joincells:1 unjoin:0 remove:1 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:1 bindall:1 fill:1 clear:1 silence:1 derivedafter:1 derived:1 trim:1 removeoutput:1 autooutput:1 levelswitch:0 newlevel:1 raise:1 movelevel:0 match:1 removelevel:0 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind 2 to n0
+DO joincells 0
+EXPECT 0 1 "pick a square, triangular or polar grid first (2, 3 or 4)"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
+DO cycle
+EXPECT 0 0 "current output: n1"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n1 | S n1 | A 1
+DO cycleback
+EXPECT 0 0 "current output: n0"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
+DO cycleback
+EXPECT 0 0 "current output: n2"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n2 | S n2 | A 1
+DO cycle
+EXPECT 0 0 "current output: n0"
+STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
 ENDEDIT
 

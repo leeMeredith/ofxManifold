@@ -1759,8 +1759,8 @@ replace:         if (false) {
 
 gate: A layout's outputs interleave the levels
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     giveOutputs(ids);\n    for (const auto& r : plan.regions) {
-replace:     for (NodeID n : ids) giveOutputs({n});\n    for (const auto& r : plan.regions) {
+find:     giveOutputs(ids);\n    if (!join) {
+replace:     for (NodeID n : ids) giveOutputs({n});\n    if (!join) {
 nl: yes
 
 gate: Placing a node gives it no outputs
@@ -1959,3 +1959,96 @@ gate: The views shrink past half
 file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 find:     const float smallest = std::max(160.0f, L.plan * 0.5f);
 replace:     const float smallest = std::max(60.0f, L.plan * 0.2f);
+
+# ---- round 3A-11: L and F, whole cells, nodes in line, keys moved ----
+
+gate: F joins on the free grid
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (grid.mode() == GridMode::Free) {\n        return refusal("pick a square, triangular or polar grid first "\n                       "(2, 3 or 4)", 2.5f);\n    }\n    const bool polar
+replace:     if (false) {\n        return refusal("pick a square, triangular or polar grid first "\n                       "(2, 3 or 4)", 2.5f);\n    }\n    const bool polar
+nl: yes
+
+gate: F joins a cell twice
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (have.count(key)) { ++skipped; return; }
+replace:         if (false) { ++skipped; return; }
+
+gate: F joins a cell with corners missing
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (ring.size() == c.size()) add(ring);
+replace:         if (ring.size() >= 3) add(ring);
+
+gate: F joins a ring whole with its inside selected too
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             if (!full(r) || inner) continue;
+replace:             if (!full(r)) continue;
+
+gate: Squares cut off at the map's edge count as whole
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                 if (whole(sq)) cells.push_back(sq);
+replace:                 cells.push_back(sq);
+
+gate: The downward triangles are left out
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                 if (whole(down)) cells.push_back(down);
+replace:                 (void)down;
+
+gate: Every polar ring counts as whole
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             all = onMap(grid.point(addr(r + 1, b)));
+replace:             all = r < 9;
+
+gate: In line on the triangular grid, two directions only
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:                || (triangles && a.a + a.b == at.a + at.b);
+replace:                ;
+
+gate: The polar centre is not on every spoke
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             hit = at.a == 0 || a.a == 0 || a.a == at.a || a.b == at.b;
+replace:             hit = a.a == at.a || a.b == at.b;
+
+gate: The nodes in line come in id order
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         return manifold_.node(x).name < manifold_.node(y).name;
+replace:         return x < y;
+
+gate: L joins the nodes after all
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (!join) {
+replace:     if (false) {
+
+gate: shift-tab goes forward
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     selectOnlyOutput(TargetID(((at + step) % n + n) % n));
+replace:     selectOnlyOutput(TargetID(((at + 1) % n + n) % n));
+
+gate: F lit with the grid off
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               !drag && gridOn && sel.size() >= 3,
+replace:               !drag && sel.size() >= 3,
+
+gate: L lit with the grid off
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         entry("layoutnodes", "L", "the nodes only (then F)", !drag && gridOn,
+replace:         entry("layoutnodes", "L", "the nodes only (then F)", !drag,
+
+gate: L is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case 'L':                                       return "layoutnodes";
+replace:     case '\x05':                                    return "layoutnodes";
+
+gate: F is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case 'F':                                       return "joincells";
+replace:     case '\x06':                                    return "joincells";
+
+gate: cmd-n is listed but not wired
+file: example-editor/src/ofApp.cpp
+find:         if (key == 'n' || key == 'N' || key == 14) return "empty";
+replace:         if (key == 1) return "nothing";
+
+gate: 9 and 0 are listed but not wired
+file: example-editor/src/ofApp.cpp
+find:     case '9': case '(': case '0': case ')':         return "trim";
+replace:     case '\x07':                                    return "trim";

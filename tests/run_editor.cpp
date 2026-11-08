@@ -249,7 +249,9 @@ bool writeText(const std::string& path, const std::string& text) {
 // uses, so an undo message naming the wrong action fails a vector.
 std::string label(const std::string& op) {
     static const std::map<std::string, std::string> L = {
-        {"place", "place"}, {"layout", "lay out"}, {"join", "join"}, {"unjoin", "unjoin"},
+        {"place", "place"}, {"layout", "lay out"},
+        {"layoutnodes", "lay out the nodes"}, {"joincells", "join the grid cells"},
+        {"join", "join"}, {"unjoin", "unjoin"},
         {"remove", "delete"}, {"newoutput", "new output"},
         {"derived", "derived output"}, {"bind", "binding"},
         {"derivedafter", "derived output"}, {"userig", "use rig"},
@@ -333,11 +335,16 @@ int main(int argc, char** argv) {
                 float x, y; in >> x >> y;
                 op = [&, x, y](Model& m) { return m.place({x, y}, grid); };
             }
-            else if (lastOp == "layout") {
+            else if (lastOp == "layout" || lastOp == "layoutnodes") {
                 float x, y; int size, tri; in >> x >> y >> size >> tri;
-                op = [&, x, y, size, tri](Model& m) {
-                    return m.layout({x, y}, grid, size, tri != 0);
+                const bool join = lastOp == "layout";
+                op = [&, x, y, size, tri, join](Model& m) {
+                    return m.layout({x, y}, grid, size, tri != 0, nullptr, join);
                 };
+            }
+            else if (lastOp == "joincells") {
+                int tri; in >> tri;
+                op = [&, tri](Model& m) { return m.joinCells(sel, grid, tri != 0); };
             }
             else if (lastOp == "join")    op = [&](Model& m) { return m.join(sel); };
             else if (lastOp == "unjoin")  op = [&](Model& m) { return m.unjoin(sel); };
@@ -363,6 +370,7 @@ int main(int argc, char** argv) {
             else if (lastOp == "clear")   op = [&](Model& m) { return m.clear(sel); };
             else if (lastOp == "silence") op = [&](Model& m) { return m.silence(sel); };
             else if (lastOp == "cycle")   op = [&](Model& m) { return m.cycleOutput(); };
+            else if (lastOp == "cycleback") op = [&](Model& m) { return m.cycleOutput(-1); };
             else if (lastOp == "trim") {
                 float db; in >> db;
                 op = [&, db](Model& m) { return m.trimCurrent(db); };
@@ -704,6 +712,30 @@ int main(int argc, char** argv) {
             if (ok && !sameState(want, got)) {
                 ok = false;
                 why << "values at the point: want " << want << ", got " << got;
+            }
+        } else if (kind == "CELLS") {
+            int tri; std::size_t want;
+            in >> tri >> want;
+            const std::size_t got = gridCells(grid, tri != 0).size();
+            if (ok && got != want) {
+                ok = false;
+                why << "whole cells: want " << want << ", got " << got;
+            }
+        } else if (kind == "LINED") {
+            // LINED x y tri name... | NONE (3A-11)
+            float x, y; int tri;
+            in >> x >> y >> tri;
+            std::string want, tok;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            for (NodeID n : md.linedUp({x, y}, grid, tri != 0)) {
+                got += (got.empty() ? "" : " ") + md.manifold().node(n).name;
+            }
+            if (got.empty()) got = "NONE";
+            if (ok && got != want) {
+                ok = false;
+                why << "nodes in line with " << x << "," << y << ": want "
+                    << want << ", got " << got;
             }
         } else if (kind == "VALUELINE") {
             std::string rest;

@@ -68,6 +68,16 @@ struct GridLook {
     float       spacing  = 0.05f;
     float       rotation = 0.0f;          // radians
     int         spokes   = 8;
+    // Round 3A-11: the grid is drawn as its whole cells only, so no cut-off
+    // tile shows at the map's edge -- gridCells(), kept by the app as the
+    // grid changes; and on the polar grid its whole rings.
+    const std::vector<std::vector<GridAddress>>* cells = nullptr;
+    int         rings    = 0;
+    // The grid lines through this point, brighter, and the nodes on them
+    // ringed: where a node being placed or moved lines up (3A-11).
+    bool                lineOn = false;
+    GridAddress         lineAt;
+    std::vector<NodeID> lined;
 };
 
 } // namespace editor

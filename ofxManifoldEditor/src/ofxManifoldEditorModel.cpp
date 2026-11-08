@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -563,7 +564,7 @@ LayoutPlan Model::planLayout(glm::vec2 p, const Grid& grid, int size,
 }
 
 Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
-                     std::vector<NodeID>* placed) {
+                     std::vector<NodeID>* placed, bool join) {
     if (placed) placed->clear();
     const LayoutPlan plan = planLayout(p, grid, size, triangles);
     if (!plan.ok) return refusal(plan.message, 2.5f);
@@ -573,6 +574,12 @@ Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
     std::vector<NodeID> ids;
     for (const glm::vec2& q : plan.points) ids.push_back(placeAt(q));
     giveOutputs(ids);
+    if (!join) {
+        if (placed) *placed = ids;
+        refreshTopology();
+        return changed(std::to_string(ids.size()) + " nodes laid out, not "
+                       "joined -- F joins the grid's cells", 3.0f);
+    }
     for (const auto& r : plan.regions) {
         std::vector<NodeID> region;
         for (std::size_t i : r) region.push_back(ids[i]);
@@ -581,6 +588,175 @@ Result Model::layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
     if (placed) *placed = ids;
     refreshTopology();
     return changed(plan.message, 2.5f);
+}
+
+namespace {
+
+bool onMap(glm::vec2 q) {
+    const float hair = 1e-5f;
+    return q.x >= -hair && q.x <= 1.0f + hair && q.y >= -hair && q.y <= 1.0f + hair;
+}
+
+GridAddress addr(int a, int b) {
+    GridAddress g;
+    g.a = a; g.b = b; g.valid = true;
+    return g;
+}
+
+} // namespace
+
+int wholeRings(const Grid& grid) {
+    if (grid.mode() != GridMode::Polar) return 0;
+    int r = 0;
+    while (r < 1000) {
+        bool all = true;
+        for (int b = 0; b < grid.spokes() && all; ++b) {
+            all = onMap(grid.point(addr(r + 1, b)));
+        }
+        if (!all) break;
+        ++r;
+    }
+    return r;
+}
+
+std::vector<std::vector<GridAddress>> gridCells(const Grid& grid,
+                                                bool triangles) {
+    std::vector<std::vector<GridAddress>> cells;
+    if (grid.mode() == GridMode::Free) return cells;
+    if (grid.mode() == GridMode::Polar) {
+        const int S = grid.spokes(), R = wholeRings(grid);
+        if (R >= 1) {
+            for (int b = 0; b < S; ++b) {
+                cells.push_back({addr(0, 0), addr(1, b), addr(1, (b + 1) % S)});
+            }
+        }
+        for (int r = 1; r < R; ++r) {
+            for (int b = 0; b < S; ++b) {
+                cells.push_back({addr(r, b), addr(r, (b + 1) % S),
+                                 addr(r + 1, (b + 1) % S), addr(r + 1, b)});
+            }
+        }
+        return cells;
+    }
+    const int n = int(1.6 / grid.spacing()) + 2;
+    auto whole = [&](const std::vector<GridAddress>& c) {
+        for (const GridAddress& a : c) {
+            if (!onMap(grid.point(a))) return false;
+        }
+        return true;
+    };
+    for (int j = -n; j <= n; ++j) {
+        for (int i = -n; i <= n; ++i) {
+            if (triangles) {
+                std::vector<GridAddress> up{addr(i, j), addr(i + 1, j), addr(i, j + 1)};
+                std::vector<GridAddress> down{addr(i + 1, j), addr(i + 1, j + 1),
+                                              addr(i, j + 1)};
+                if (whole(up)) cells.push_back(up);
+                if (whole(down)) cells.push_back(down);
+            } else {
+                std::vector<GridAddress> sq{addr(i, j), addr(i + 1, j),
+                                            addr(i + 1, j + 1), addr(i, j + 1)};
+                if (whole(sq)) cells.push_back(sq);
+            }
+        }
+    }
+    return cells;
+}
+
+Result Model::joinCells(const Selection& sel, const Grid& grid,
+                        bool triangles) {
+    if (grid.mode() == GridMode::Free) {
+        return refusal("pick a square, triangular or polar grid first "
+                       "(2, 3 or 4)", 2.5f);
+    }
+    const bool polar = grid.mode() == GridMode::Polar;
+    // Each selected node on a grid point, by its address; the centre is one
+    // point whatever its spoke.
+    std::map<std::pair<int, int>, NodeID> at;
+    for (NodeID id : sel.nodes()) {
+        const glm::vec2 q = manifold_.node(id).position;
+        const SnapResult sr = grid.snap(q);
+        if (!sr.address.valid
+            || glm::distance(grid.point(sr.address), q) >= 1e-4f) continue;
+        std::pair<int, int> k{sr.address.a, sr.address.b};
+        if (polar && k.first == 0) k.second = 0;
+        at[k] = id;
+    }
+    std::set<std::vector<NodeID>> have;
+    for (std::size_t r = 0; r < manifold_.regionCount(); ++r) {
+        std::vector<NodeID> ids = manifold_.region(RegionID(r)).ids();
+        std::sort(ids.begin(), ids.end());
+        have.insert(ids);
+    }
+    std::size_t made = 0, skipped = 0;
+    auto add = [&](const std::vector<NodeID>& ring) {
+        std::vector<NodeID> key = ring;
+        std::sort(key.begin(), key.end());
+        if (have.count(key)) { ++skipped; return; }
+        if (manifold_.addRegion(ring) == InvalidRegion) return;
+        have.insert(key);
+        ++made;
+    };
+    for (const auto& c : gridCells(grid, triangles)) {
+        std::vector<NodeID> ring;
+        for (const GridAddress& a : c) {
+            const auto it = at.find({a.a, a.b});
+            if (it == at.end()) break;
+            ring.push_back(it->second);
+        }
+        if (ring.size() == c.size()) add(ring);
+    }
+    if (polar) {
+        const int S = grid.spokes();
+        auto full = [&](int r) {
+            for (int b = 0; b < S; ++b) {
+                if (!at.count({r, b})) return false;
+            }
+            return true;
+        };
+        for (int r = 1; r <= wholeRings(grid); ++r) {
+            const bool inner = r == 1 ? at.count({0, 0}) > 0 : full(r - 1);
+            if (!full(r) || inner) continue;
+            std::vector<NodeID> ring;
+            for (int b = 0; b < S; ++b) ring.push_back(at[{r, b}]);
+            add(ring);
+        }
+    }
+    if (made == 0) {
+        return refusal(skipped ? "those cells are joined already"
+                               : "no whole cell among the selected -- each "
+                                 "needs every corner selected and on the grid",
+                       3.0f);
+    }
+    refreshTopology();
+    std::string msg = "joined " + plural(made, " grid cell", " grid cells");
+    if (skipped) msg += ", " + std::to_string(skipped) + " joined already";
+    return changed(msg, 2.5f);
+}
+
+std::vector<NodeID> Model::linedUp(glm::vec2 p, const Grid& grid,
+                                   bool triangles) const {
+    std::vector<NodeID> out;
+    if (grid.mode() == GridMode::Free) return out;
+    const GridAddress at = grid.snap(p).address;
+    const bool polar = grid.mode() == GridMode::Polar;
+    for (NodeID id = 0; id < manifold_.nodeCount(); ++id) {
+        const glm::vec2 q = manifold_.node(id).position;
+        const GridAddress a = grid.snap(q).address;
+        if (!a.valid || glm::distance(grid.point(a), q) >= 1e-4f) continue;
+        bool hit;
+        if (polar) {
+            hit = at.a == 0 || a.a == 0 || a.a == at.a || a.b == at.b;
+        } else {
+            hit = a.a == at.a || a.b == at.b
+               || (triangles && a.a + a.b == at.a + at.b);
+        }
+        if (hit) out.push_back(id);
+    }
+    std::sort(out.begin(), out.end(), [this](NodeID x, NodeID y) {
+        return manifold_.node(x).name < manifold_.node(y).name;
+    });
+    return out;
 }
 
 // One operation, all or nothing, checked against FINAL shapes. On refusal
@@ -1047,10 +1223,12 @@ Result Model::clear(const Selection& sel) {
     return r;
 }
 
-Result Model::cycleOutput() {
-    if (mapping().targetCount() == 0) return Result{};
-    selectOnlyOutput((currentOutput_ == InvalidTarget)
-                     ? 0 : (currentOutput_ + 1) % mapping().targetCount());
+Result Model::cycleOutput(int step) {
+    const long n = long(mapping().targetCount());
+    if (n == 0) return Result{};
+    const long at = currentOutput_ == InvalidTarget
+        ? (step > 0 ? -1 : 0) : long(currentOutput_);
+    selectOnlyOutput(TargetID(((at + step) % n + n) % n));
     Result r;
     r.message = "current output: " + mapping().targetName(currentOutput_);
     r.seconds = 2.0f;

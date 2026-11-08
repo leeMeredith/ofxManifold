@@ -134,7 +134,8 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
              + (st.unsaved ? "   (unsaved)" : "")), x, y + step);
     std::string g = std::string("grid ") + names[int(kind)];
     if (kind != GridKind::Free) {
-        g += "  " + ofToString(spacing, 3) + "  "
+        g += "  " + ofToString(int(std::lround(1.0f / spacing)))
+           + (kind == GridKind::Polar ? " to a side" : " across") + "  "
            + ofToString(ofRadToDeg(rotation), 0) + " deg";
         if (kind == GridKind::Polar) g += "  " + ofToString(spokes) + " spokes";
     }

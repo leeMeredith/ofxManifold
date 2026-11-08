@@ -319,7 +319,7 @@ class Editor:
             return (False, "refused: a node is already in the way", [], [], [])
         return (True, msg, pts, addrs, regs)
 
-    def layout(self, p, grid, size, triangles):
+    def layout(self, p, grid, size, triangles, join=True):
         """l: on the polar grid, `size` rings from the one nearest the point
         inward -- one node per spoke on each, numbered clockwise from the
         spoke nearest the front, outermost first, the centre last if they
@@ -336,6 +336,10 @@ class Editor:
         # take one run of channels: a ring of 8 on two levels is 0-7, 8-15.
         names = [self.place_at(pt, outputs=False) for pt in pts]
         self.give_outputs(names)
+        if not join:
+            # L (3A-11): the nodes only, to thin out; F joins what is left.
+            return (1, 0, f"{len(names)} nodes laid out, not joined -- "
+                          "F joins the grid's cells")
         for r in regs:
             self.regions.append(tuple(names[i] for i in r))
         return (1, 0, msg)
@@ -393,6 +397,133 @@ class Editor:
             if self.owns(nm, out):
                 return nm
         return None
+
+    # ---- the grid's whole cells (3A-11) ----
+
+    @staticmethod
+    def on_map(q, tol=1e-5):
+        return -tol <= q[0] <= 1.0 + tol and -tol <= q[1] <= 1.0 + tol
+
+    @staticmethod
+    def whole_rings(grid):
+        """The polar grid's rings that lie wholly on the map."""
+        r = 0
+        while all(Editor.on_map(grid.point((r + 1, b)))
+                  for b in range(grid.spokes)):
+            r += 1
+            if r > 1000:
+                break
+        return r
+
+    @staticmethod
+    def grid_cells(grid, triangles):
+        """Every cell of the grid that lies wholly on the map, as tuples of
+        addresses, counter-clockwise: squares, or triangles up then down,
+        row by row from the bottom; on the polar grid the centre's
+        triangles, then the four-sided pieces ring by ring outward."""
+        cells = []
+        if isinstance(grid, G.Polar):
+            S, R = grid.spokes, Editor.whole_rings(grid)
+            if R >= 1:
+                for b in range(S):
+                    cells.append(((0, 0), (1, b), (1, (b + 1) % S)))
+            for r in range(1, R):
+                for b in range(S):
+                    cells.append(((r, b), (r, (b + 1) % S),
+                                  (r + 1, (b + 1) % S), (r + 1, b)))
+            return cells
+        n = int(1.6 / grid.spacing()) + 2
+        for j in range(-n, n + 1):
+            for i in range(-n, n + 1):
+                if triangles:
+                    shapes = [((i, j), (i + 1, j), (i, j + 1)),
+                              ((i + 1, j), (i + 1, j + 1), (i, j + 1))]
+                else:
+                    shapes = [((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))]
+                for c in shapes:
+                    if all(Editor.on_map(grid.point(a)) for a in c):
+                        cells.append(c)
+        return cells
+
+    def grid_addr(self, q, grid):
+        """The grid point a node sits on, or None."""
+        addr = grid.snap(q)[1]
+        if addr is None or math.dist(grid.point(addr), q) >= 1e-4:
+            return None
+        return addr
+
+    def join_cells(self, sel, grid, triangles):
+        """F (3A-11): join the grid's whole cells among the selected nodes --
+        every cell whose corners are all selected nodes on the grid. On the
+        polar grid a ring whose every spoke is selected, with nothing joined
+        inside it, is joined whole. Cells already a region are skipped."""
+        if isinstance(grid, G.Free):
+            return (0, 1, "pick a square, triangular or polar grid first "
+                          "(2, 3 or 4)")
+        at = {}
+        for nm in sel:
+            a = self.grid_addr(dict(self.nodes)[nm], grid)
+            if a is not None:
+                at[a] = nm
+        if isinstance(grid, G.Polar):
+            # The centre is one point whatever its spoke.
+            at = {((0, 0) if a[0] == 0 else a): nm for a, nm in at.items()}
+        made, skipped = [], 0
+        have = {frozenset(r) for r in self.regions}
+        def add(names):
+            nonlocal skipped
+            if frozenset(names) in have:
+                skipped += 1
+                return
+            self.regions.append(tuple(names))
+            have.add(frozenset(names))
+            made.append(names)
+        cells = self.grid_cells(grid, triangles)
+        for c in cells:
+            if all(a in at for a in c):
+                add(tuple(at[a] for a in c))
+        if isinstance(grid, G.Polar):
+            S = grid.spokes
+            for r in range(1, self.whole_rings(grid) + 1):
+                full = all((r, b) in at for b in range(S))
+                inner_full = (r == 1 and (0, 0) in at) or \
+                    (r > 1 and all((r - 1, b) in at for b in range(S)))
+                if full and not inner_full:
+                    add(tuple(at[(r, b)] for b in range(S)))
+        if not made:
+            if skipped:
+                return (0, 1, "those cells are joined already")
+            return (0, 1, "no whole cell among the selected -- each needs "
+                          "every corner selected and on the grid")
+        msg = f"joined {len(made)} grid cell{'s' if len(made) > 1 else ''}"
+        if skipped:
+            msg += f", {skipped} joined already"
+        return (1, 0, msg)
+
+    def lined(self, p, grid, triangles):
+        """The nodes on the grid lines through the grid point nearest p
+        (3A-11): on a lattice its row and column -- and on the triangular
+        grid the third direction -- on the polar grid its ring and spoke.
+        What the map highlights while placing or moving a node."""
+        if isinstance(grid, G.Free):
+            return []
+        _q, addr = grid.snap(p)
+        out = []
+        for nm, q in self.nodes:
+            a = self.grid_addr(q, grid)
+            if a is None:
+                continue
+            if isinstance(grid, G.Polar):
+                if addr[0] == 0:
+                    hit = True                       # every spoke meets there
+                else:
+                    hit = (a[0] == addr[0]) or a[0] == 0 or a[1] == addr[1]
+            else:
+                hit = a[0] == addr[0] or a[1] == addr[1] or \
+                    (triangles and a[0] + a[1] == addr[0] + addr[1])
+            if hit:
+                out.append(nm)
+        return sorted(out)
 
     def move(self, name, p):
         # Single-node moves only in these scripts, and only valid ones.
@@ -716,12 +847,14 @@ class Editor:
             return (1, 1, msg)
         return (1, 0, msg)
 
-    def cycle(self):
+    def cycle(self, step=1):
+        """tab: the next output; shift-tab (3A-11): the one before."""
         if not self.outputs:
             return (0, 0, "")
         names = self.out_names()
-        i = -1 if self.current is None else names.index(self.current)
-        self.select_only(names[(i + 1) % len(names)])
+        i = (-1 if step > 0 else 0) if self.current is None \
+            else names.index(self.current)
+        self.select_only(names[(i + step) % len(names)])
         return (0, 0, f"current output: {self.current}")
 
     def pick(self, name):
@@ -1424,12 +1557,14 @@ class Editor:
             ("toggle", mouse and nodes > 0), ("all", nd and nodes > 0),
             ("none", nd and bool(sel)),
             ("move", mouse and nodes > 0), ("freehand", drag and grid_on),
-            ("join", nd and len(sel) >= 3), ("unjoin", nd and region_sel),
+            ("join", nd and len(sel) >= 3),
+            ("joincells", nd and grid_on and len(sel) >= 3),
+            ("unjoin", nd and region_sel),
             ("remove", nd and bool(sel)),
             ("gridkind", nd), ("rotate", nd and grid_on),
             ("spacing", nd and grid_on), ("spokes", nd and grid == "polar"),
             ("deadzone", nd and grid_on), ("layoutsize", nd and grid_on),
-            ("layout", nd and grid_on),
+            ("layout", nd and grid_on), ("layoutnodes", nd and grid_on),
             ("newoutput", nd), ("pickoutput", nd and outs > 0),
             ("addoutput", nd and outs >= 2), ("nextoutput", nd and outs >= 2),
             ("bind", nd and possible), ("bindall", nd and outs > 0 and bool(sel)),
@@ -1610,7 +1745,8 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "removelevel": "remove level", "movelevel": "move level",
           "steplevel": "move level", "match": "height",
           "flatten": "height", "newvalue": "new value", "editvalue": "value",
-          "layout": "lay out",
+          "layout": "lay out", "layoutnodes": "lay out the nodes",
+          "joincells": "join the grid cells",
           "stepvalue": "value", "removevalue": "remove value"}
 
 
@@ -1663,6 +1799,10 @@ class Script:
         res = {
             "place":    lambda: e.place(args[0], self.grid),
             "layout":   lambda: e.layout(args[0], self.grid, args[1], args[2]),
+            "layoutnodes": lambda: e.layout(args[0], self.grid, args[1],
+                                            args[2], join=False),
+            "joincells": lambda: e.join_cells(s, self.grid, args[0]),
+            "cycleback": lambda: e.cycle(-1),
             "join":     lambda: e.join(s, self.ordered),
             "unjoin":   lambda: e.unjoin(s),
             "remove":   lambda: e.remove(s),
@@ -1706,9 +1846,11 @@ class Script:
         argtxt = ""
         if op == "place":
             argtxt = f" {fmt(args[0][0])} {fmt(args[0][1])}"
-        elif op == "layout":
+        elif op in ("layout", "layoutnodes"):
             argtxt = (f" {fmt(args[0][0])} {fmt(args[0][1])} {args[1]} "
                       f"{1 if args[2] else 0}")
+        elif op == "joincells":
+            argtxt = f" {1 if args[0] else 0}"
         elif op == "trim":
             argtxt = f" {fmt(args[0])}"
         elif op in ("pick", "toggleout"):
@@ -1864,6 +2006,19 @@ class Script:
         self.out.append(f"KEYS drag={int(drag)} aud={int(aud)} grid={grid} "
                         "EXPECT " + " ".join(f"{i}:{int(a)}" for i, a in rules)
                         + " BIND " + preview)
+
+    def cells(self, triangles=False):
+        """CELLS tri n: how many of the grid's cells lie wholly on the map
+        (3A-11) -- what the map draws."""
+        n = len(self.ed.grid_cells(self.grid, triangles))
+        self.out.append(f"CELLS {1 if triangles else 0} {n}")
+
+    def lined(self, p, triangles=False):
+        """LINED x y tri -> the nodes on the grid lines through the grid
+        point nearest (x, y) (3A-11)."""
+        ns = self.ed.lined(p, self.grid, triangles)
+        self.out.append(f"LINED {fmt(p[0])} {fmt(p[1])} {1 if triangles else 0} "
+                        + (" ".join(ns) or "NONE"))
 
     def lines(self):
         ls = self.ed.link_lines(self.sel)
@@ -2496,6 +2651,7 @@ def build():
     build_layout(out)
     build_curves(out)
     build_own(out)
+    build_cells(out)
     return out
 
 
@@ -3290,6 +3446,89 @@ def build_own(out):
     t.select("n1")
     t.do("silence")
     t.do("clear")
+    t.end()
+
+
+def build_cells(out):
+    out.append("#" + "-" * 68)
+    out.append("# ROUND 3A-11: L LAYS OUT THE NODES ONLY, F JOINS THE GRID'S CELLS,")
+    out.append("# THE NODES IN LINE, SHIFT-TAB")
+    out.append("#" + "-" * 68)
+
+    sq = G.Lattice((0.1, 0.0), (0.0, 0.1))
+    t = Script(out, "cells_square",
+               "L lays out a block of nodes, not joined; thin it out, then F "
+               "joins every whole square whose corners are all selected and on "
+               "the grid; cells already joined are skipped. LINED: the nodes "
+               "on the row and column through the grid point nearest a point",
+               grid=sq, spec=sq.spec())
+    t.keys()
+    t.cells()
+    t.do("layoutnodes", (0.5, 0.5), 3, False)
+    t.lined((0.5, 0.71))
+    t.lined((0.42, 0.38))
+    t.lined((0.9, 0.9))
+    t.select("n2"); t.do("remove")
+    t.select("n0", "n1", "n3", "n4", "n5", "n6", "n7", "n8")
+    t.keys()
+    t.do("joincells", False)
+    t.do("joincells", False)
+    t.select("n0", "n1")
+    t.do("joincells", False)
+    out.append("# three corners of a square are not a cell")
+    t.do("undo"); t.do("undo")
+    t.select("n3", "n4", "n1")
+    t.do("joincells", False)
+    t.end()
+
+    tri = G.Lattice((0.1, 0.0), (0.05, 0.08660254))
+    t = Script(out, "cells_triangles",
+               "on the triangular grid F joins whole triangles, up and down; L "
+               "then F gives what l gives; LINED takes the third direction "
+               "too", grid=tri, spec=tri.spec())
+    t.cells(True)
+    t.do("layoutnodes", (0.5, 0.5), 3, True)
+    t.select("n0", "n1", "n2", "n3", "n4", "n5")
+    t.do("joincells", True)
+    t.lined((0.5, 0.5), True)
+    t.lined((0.5, 0.5), False)
+    t.do("undo")
+    t.select("n0", "n1", "n2", "n3", "n5")
+    t.do("joincells", True)
+    t.end()
+
+    polar = G.Polar((0.5, 0.5), 0.1, 8, 0.0)
+    t = Script(out, "cells_polar",
+               "on the polar grid F joins the pieces between two rings, the "
+               "centre's triangles, and a ring all of whose spokes are "
+               "selected with nothing joined inside it, whole; LINED: the "
+               "nodes on the ring and the spoke", grid=polar, spec=polar.spec())
+    t.cells()
+    t.do("layoutnodes", (0.5, 0.8), 2, False)
+    t.lined((0.5, 0.8))
+    t.select(*[f"n{i}" for i in range(16)])
+    t.do("joincells", False)
+    t.do("undo")
+    t.select(*[f"n{i}" for i in range(8)])
+    t.do("joincells", False)
+    out.append("# rings that reach the centre: its triangles")
+    t.do("empty")
+    t.do("layoutnodes", (0.5, 0.71), 3, False)
+    t.select(*[f"n{i}" for i in range(17)])
+    t.do("joincells", False)
+    t.lined((0.5, 0.5))
+    t.lined((0.6, 0.5))
+    t.end()
+
+    t = Script(out, "cells_refused_and_shift_tab",
+               "F is refused on the free grid and where no whole cell is "
+               "selected; shift-tab picks the output before, tab the one after")
+    t.do("empty")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2)); t.do("place", (0.5, 0.8))
+    t.select("n0", "n1", "n2")
+    t.keys()
+    t.do("joincells", False)
+    t.do("cycle"); t.do("cycleback"); t.do("cycleback"); t.do("cycle")
     t.end()
 
 if __name__ == "__main__":

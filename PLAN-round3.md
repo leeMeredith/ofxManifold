@@ -1069,6 +1069,56 @@ top of the screen for the outputs column".
 - 1 editor script (63), 24 checked steps (845); 17 mutation gates (364).
   `make keys` covers `C` and `?` (50).
 
+### 3A-11: the keys tidied; L and F; a grid that fits; the lines you line up on
+
+Lee asked to look over the key bindings for crossover and redundancy
+(2026-11-07); the review found shift meaning four things, trim the one
+down/up control without a pair, no way back through the outputs, and two
+unmodified keys that replace the whole map. Agreed: "do all recommended",
+and three more -- lay out a group of nodes without joining it, thin it,
+then join it ("it can be a little tedious to go around putting them in
+place"); a grid with no cut-off tiles at the edges; and the line a node is
+about to go on, highlighted, to see what it lines up with.
+
+- **The rules the keys follow now:** two keys side by side are down and up,
+  shift a finer step (`q w`, `y h`, `i k`, `; '`, `9 0`, `e r`); one key
+  steps on, shift steps back (`tab`, `j`); lowercase makes, uppercase
+  removes (`o O`, `g G`); lowercase does it, uppercase the bigger version
+  (`b B`, `c C`, `d D`, `f F`, `l L`, `m M`, `n N`).
+- **`cmd-n` new empty map, `cmd-e` the example** -- no longer `x` and `e`,
+  one stray key from losing the map. Undoing either gives the map back its
+  file name (it used to come back untitled, so `cmd-s` asked where).
+- **`shift-tab`** picks the output before.
+- **Trim on `9 0`**, a dB down and up, a tenth with shift.
+- **Rotation on `e r`**, 5 degrees back and on, 1 with shift; pressing the
+  grid's number again straightens it. (The review had proposed moving the
+  reset to shift-r -- but `R` already turned the grid back, so it went to
+  the grid's number instead.) `t T` and `0` are free.
+- **`L` lays out the nodes only**, the same shape `l` would, not joined:
+  delete what is not wanted, select the rest, and **`F` joins the grid's
+  whole cells among them** -- each square, triangle, or polar piece whose
+  corners are all selected and on the grid; on the polar grid a ring whose
+  every spoke is selected, with nothing joined inside it, whole. Cells
+  already joined are skipped. `F` works on any nodes on the grid, not only
+  laid-out ones.
+- **The grid fits the map.** `- =` step how many cells across (4 to 50,
+  20 to start), so the spacing is always 1 / n: the square grid's tiles meet
+  every edge; the triangular grid's rows are centred with even bands above
+  and below; the polar grid's rings step out from the centre. Only whole
+  cells are drawn -- no quarter tiles -- and a turned grid turns about the
+  grid point nearest the middle. The panel says "20 across". Nodes placed
+  on the old triangular grid, which started at the bottom corner, may sit
+  off the new one.
+- **The lines a node is going to** -- its row and column, the triangular
+  grid's third direction, the polar grid's ring and spoke -- are drawn
+  brighter while placing (under the mouse) or moving (through the moved
+  node), and the nodes already on them are ringed. `Model::linedUp`.
+- `gridCells`, `wholeRings`, `joinCells`, `linedUp` are in the model,
+  checked by the reference: 4 editor scripts (67), 28 checked steps (873),
+  with a count of the whole cells (`CELLS`) and the nodes in line (`LINED`);
+  18 mutation gates (382). The drawing session records `L`, `F`, the lines,
+  the grid at 23 across, the triangular and polar grids. `make keys` (52).
+
 ---
 
 ## Answered
@@ -1102,6 +1152,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-8** | Editor: ring and grid layout | editor scripts, drawlog session extended |
 | **3A-9** | Editor: curves on every level, layout size and preview, growing triangles | editor scripts, drawlog session extended |
 | **3A-10** | Editor: c and C; the key panel flows into columns and fits | editor scripts, `make panel`, drawlog session extended |
+| **3A-11** | Editor: keys tidied; L and F; a grid that fits; the lines highlighted | editor scripts, drawlog session extended |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

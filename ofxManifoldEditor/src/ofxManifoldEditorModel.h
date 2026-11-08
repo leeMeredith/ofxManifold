@@ -56,6 +56,17 @@ struct LayoutPlan {
 constexpr int kTriangleStages = 13;
 int triangleStageNodes(int stage);
 
+// The grid's cells that lie wholly on the map (round 3A-11), each its
+// corners counter-clockwise: squares; or triangles, up then down; row by row
+// from the bottom. On the polar grid the centre's triangles, then the
+// four-sided pieces between rings, outward, up to the last whole ring. The
+// map draws these and only these, and F joins them.
+std::vector<std::vector<GridAddress>> gridCells(const Grid& grid,
+                                                bool triangles);
+
+// The polar grid's rings that lie wholly on the map.
+int wholeRings(const Grid& grid);
+
 struct BindPlan {
     bool        possible = false;   // false: b would do nothing
     std::string why;                // why not, when it is not possible
@@ -140,8 +151,23 @@ public:
     // nodes, in their order.
     LayoutPlan planLayout(glm::vec2 p, const Grid& grid, int size,
                           bool triangles) const;
+    // `join` false (L, round 3A-11): the nodes only, to thin out before F.
     Result layout(glm::vec2 p, const Grid& grid, int size, bool triangles,
-                  std::vector<NodeID>* placed = nullptr);
+                  std::vector<NodeID>* placed = nullptr, bool join = true);
+
+    // F (round 3A-11): join the grid's whole cells among the selected nodes
+    // -- every cell (gridCells) whose corners are all selected nodes on the
+    // grid. On the polar grid, a ring whose every spoke is selected, with
+    // nothing selected wholly inside it, is joined whole. Cells already a
+    // region are skipped.
+    Result joinCells(const Selection& sel, const Grid& grid, bool triangles);
+
+    // The nodes on the grid lines through the grid point nearest p, by name
+    // (round 3A-11): on a lattice its row and column, and on the triangular
+    // grid the third direction; on the polar grid its ring and its spoke.
+    // The map highlights them while a node is being placed or moved.
+    std::vector<NodeID> linedUp(glm::vec2 p, const Grid& grid,
+                                bool triangles) const;
 
     // Move nodes as ONE operation, all or nothing (setNodePositions).
     Result move(const std::vector<std::pair<NodeID, glm::vec2>>& moves);
@@ -201,7 +227,8 @@ public:
 
     // C (round 3A-10): the selected nodes silent on this level, on purpose.
     Result silence(const Selection& sel);
-    Result cycleOutput();
+    // tab: the next output; shift-tab (3A-11): `step` -1, the one before.
+    Result cycleOutput(int step = 1);
 
     // Make `t` the current output, as clicking its fader does. Through the
     // model like every other change, so nothing edits its state from outside.

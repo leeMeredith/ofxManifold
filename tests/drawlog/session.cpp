@@ -49,6 +49,12 @@ void click(int x, int y) { app->mousePressed(x, y, 0); app->mouseReleased(x, y, 
 void key(int k) { app->keyPressed(k); app->keyReleased(k); }
 void hold(int k) { drawlogHeld().insert(k); }
 void release(int k) { drawlogHeld().erase(k); }
+// A key with command held.
+void cmdKey(int k) {
+    hold(OF_KEY_COMMAND);
+    key(k);
+    release(OF_KEY_COMMAND);
+}
 // cmd-+ or cmd-- until the text is this size, from `from`.
 void textSize(int from, int to) {
     hold(OF_KEY_COMMAND);
@@ -119,7 +125,7 @@ int main() {
     key('B');
     frame("B: every output");
     key('c');
-    frame("c: cleared");
+    frame("c: back to its own output");
 
     key('4');
     frame("polar grid");
@@ -141,7 +147,7 @@ int main() {
     frame("hover among narrow faders");
 
     key(OF_KEY_ESC);
-    key('x');
+    cmdKey('n');
     frame("empty map");
     key('p');
     click(sx(0.2f), sy(0.2f));
@@ -162,7 +168,7 @@ int main() {
     frame("delete");
 
     // Round 3A-6: levels. Appended, so every frame above is as it was.
-    key('e');
+    cmdKey('e');
     key('n');
     key('n');
     key(OF_KEY_DOWN);
@@ -235,7 +241,7 @@ int main() {
     hold(OF_KEY_COMMAND);
     key('3');
     release(OF_KEY_COMMAND);
-    key('x');
+    cmdKey('n');
     key('4');
     a.mouseMoved(sx(0.52f), sy(0.79f));
     key(']');
@@ -258,7 +264,7 @@ int main() {
     frame("l with the grid off: the key panel says why");
 
     // round 3A-10: c gives a silent node back its own output, C silences.
-    key('e');
+    cmdKey('e');
     click(sx(0.3f), sy(0.8f));
     hold(OF_KEY_SHIFT); key('C'); release(OF_KEY_SHIFT);
     frame("C: the selected node silent, the panel says c brings it back");
@@ -288,6 +294,34 @@ int main() {
     drawlogWidth() = 1024; drawlogHeight() = 640;
     drawlogFonts() = false;
     textSize(14, 12);
+
+    // round 3A-11: the grid fits the map; the lines a node is going to are
+    // brighter, the nodes on them ringed; L lays out nodes only, F joins
+    // the whole cells left.
+    cmdKey('n');
+    key('2');
+    a.mouseMoved(sx(0.5f), sy(0.5f));
+    key('L');
+    frame("L: a block of nodes, not joined, the lines through the mouse");
+    key(OF_KEY_ESC);
+    click(sx(0.6f), sy(0.6f));
+    key(OF_KEY_DEL);
+    key('a');
+    hold(OF_KEY_SHIFT); key('F'); release(OF_KEY_SHIFT);
+    frame("a corner removed, F: the three whole squares joined");
+    key(OF_KEY_ESC);
+    a.mouseMoved(sx(0.4f), sy(0.81f));
+    frame("hovering: the row and column through the grid point, nodes on them ringed");
+    key('-'); key('-'); key('-');
+    frame("- three times: 23 across, the tiles still fit");
+    key('3');
+    frame("the triangular grid, centred, whole triangles only");
+    key('r'); key('r');
+    frame("r r: turned 10 degrees about the middle");
+    key('3');
+    frame("3 again: straight");
+    key('4');
+    frame("the polar grid: whole rings only");
 
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;

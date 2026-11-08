@@ -28,6 +28,9 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o);
 
 // The pieces, for an app that draws a map its own way.
 void drawGrid(const Scene& s, const GridLook& look);
+
+// The nodes in line with the point a node is going to, ringed (3A-11).
+void drawLinedUp(const Scene& s, const GridLook& look);
 void drawLinks(const Scene& s);
 
 // Round 3A-6. Each bent node's offset from its level's start, beside it, on

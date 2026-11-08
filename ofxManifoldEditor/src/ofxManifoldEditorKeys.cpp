@@ -98,6 +98,11 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               !drag ? "while dragging a node" : "the grid is off (1)"),
         entry("join", "f", "join into a region", !drag && sel.size() >= 3,
               unlessDrag("select at least three nodes to join")),
+        // F (3A-11): the grid's whole cells among the selected nodes.
+        entry("joincells", "F", "join the grid's cells",
+              !drag && gridOn && sel.size() >= 3,
+              unlessDrag(!gridOn ? "the grid is off (1)"
+                                 : "select the nodes to join")),
         entry("unjoin", "u", "unjoin regions", !drag && regionAllSelected,
               unlessDrag("no region is made only of selected nodes")),
         entry("remove", "delete", "remove nodes", !drag && !sel.empty(),
@@ -105,9 +110,9 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
     }});
 
     g.push_back({"grid", {
-        entry("gridkind", "1 2 3 4", "free square triangle polar", !drag,
-              dragging),
-        entry("rotate", "r R 0", "rotate the grid", !drag && gridOn,
+        entry("gridkind", "1 2 3 4", "free square triangle polar (again: straight)",
+              !drag, dragging),
+        entry("rotate", "e r", "rotate -/+ 5 deg (shift 1)", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
         entry("spacing", "- =", "grid spacing", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
@@ -121,6 +126,8 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("the grid is off (1)")),
         entry("layout", "l", layoutAction(ctx), !drag && gridOn,
               unlessDrag("the grid is off (1)")),
+        entry("layoutnodes", "L", "the nodes only (then F)", !drag && gridOn,
+              unlessDrag("the grid is off (1)")),
     }});
 
     g.push_back({"outputs", {
@@ -129,7 +136,8 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               !drag && outputs > 0, unlessDrag("no outputs yet")),
         entry("addoutput", "shift-click", "pick several faders",
               !drag && outputs >= 2, unlessDrag("only one output")),
-        entry("nextoutput", "tab", "next output", !drag && outputs >= 2,
+        entry("nextoutput", "tab shift-tab", "next / previous output",
+              !drag && outputs >= 2,
               unlessDrag(outputs == 0 ? "no outputs yet" : "only one output")),
         entry("bind", "b", plan.preview(), !drag && plan.possible,
               unlessDrag(plan.why)),
@@ -150,7 +158,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("derived", "D", "derived output from the selected nodes",
               !drag && !sel.empty(),
               unlessDrag("select the nodes a derived output should sum")),
-        entry("trim", "t T", "trim -/+ 1 dB", !drag && picked > 0,
+        entry("trim", "9 0", "trim -/+ 1 dB (shift 0.1)", !drag && picked > 0,
               unlessDrag("no outputs yet")),
         entry("removeoutput", "O", "remove the output",
               !drag && picked == 1,
@@ -217,8 +225,8 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("userig", "cmd-r", "use a rig", !drag, dragging),
         entry("saverig", "shift-cmd-r", "save the outputs as a rig",
               !drag && outputs > 0, unlessDrag("no outputs yet")),
-        entry("empty", "x", "new empty map", !drag, dragging),
-        entry("example", "e", "the example map", !drag, dragging),
+        entry("empty", "cmd-n", "new empty map", !drag, dragging),
+        entry("example", "cmd-e", "the example map", !drag, dragging),
         entry("fullscreen", "ctrl-cmd-f", "full screen", true, ""),
         entry("textsize", "cmd-+ cmd--", "text size", true, ""),
         entry("keysheet", "?", "every key, over the whole window", true, ""),

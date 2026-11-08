@@ -93,6 +93,11 @@ private:
     void remember() const;              // the pair to reopen next launch
     void markChanged(const ofxManifold::editor::Result& r);
     std::string currentPath;            // the open pair's map; empty: untitled
+    // cmd-n and cmd-e start a map with no name; their undo gives it back
+    // (3A-11). Each mark: the undo depth just after the step, and the name
+    // before it.
+    struct PathMark { std::size_t depth; std::string before; };
+    std::vector<PathMark> pathMarks;
     bool        unsaved = false;
     std::string shownTitle;
 
@@ -167,7 +172,13 @@ private:
     // A preference of the editing session, never written into a map file.
     ofxManifold::Grid grid;
     ofxManifold::editor::GridKind kind = ofxManifold::editor::GridKind::Square;
-    float    spacing  = 0.05f;
+    // Round 3A-11: the spacing is 1 / across, so the square grid's tiles fit
+    // the map exactly; the triangular grid is centred with even bands; the
+    // polar grid's rings step out from the centre by it. - and = step it.
+    int      across   = 20;
+    float    spacing  = 0.05f;              // 1 / across
+    std::vector<std::vector<ofxManifold::GridAddress>> cells;   // whole cells
+    int      rings    = 0;                  // the polar grid's whole rings
     float    rotation = 0.0f;           // radians
     int      spokes   = 8;
     // What l lays out on each grid (3A-9), set with [ ]: rings deep on the

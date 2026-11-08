@@ -158,6 +158,27 @@ void ofApp::draw() {
     look.spacing = spacing;
     look.rotation = rotation;
     look.spokes = spokes;
+    look.cells = &cells;
+    look.rings = rings;
+    // The lines through where a node is going: the grid point under the
+    // mouse while placing, or the moved node's while dragging (3A-11).
+    if (kind != GridKind::Free && !auditioning()) {
+        glm::vec2 at(-1.0f, -1.0f);
+        if (dragging && anchor != InvalidNode) {
+            at = model.manifold().node(anchor).position;
+        } else if (renderer->viewport().inside(mouse.x, mouse.y)
+                   && !pressingEmpty) {
+            at = renderer->toManifold(mouse);
+        }
+        if (at.x >= 0.0f) {
+            look.lineOn = true;
+            look.lineAt = grid.snap(at).address;
+            for (NodeID n : model.linedUp(at, grid, kind == GridKind::Triangular)) {
+                if (dragging && selection.contains(n)) continue;
+                look.lined.push_back(n);
+            }
+        }
+    }
 
     MapOverlay over;
     over.refused = refusedFlash > 0.0f;
@@ -202,7 +223,19 @@ void ofApp::show(const Result& r) {
 
 void ofApp::act(const std::string& label,
                 const std::function<Result(Model&)>& op) {
+    const std::size_t depth = history.undoCount();
     const Result r = history.apply(model, label, op);
+    if (r.changed) {
+        // A new step ends the redo branch, and its name marks with it; and
+        // when the history is full its oldest step went, so the marks shift.
+        if (history.undoCount() == depth) {
+            for (PathMark& pm : pathMarks) --pm.depth;
+        }
+        pathMarks.erase(std::remove_if(pathMarks.begin(), pathMarks.end(),
+            [&](const PathMark& pm) {
+                return pm.depth == 0 || pm.depth >= history.undoCount();
+            }), pathMarks.end());
+    }
     markChanged(r);
     show(r);
 }
@@ -211,7 +244,14 @@ void ofApp::act(const std::string& label,
 // different nodes afterwards, so it clears, as after a delete; any drag in
 // progress is dropped.
 void ofApp::undo() {
+    const std::size_t depth = history.undoCount();
     const Result r = history.undo(model);
+    // Undoing cmd-n or cmd-e gives the map back its name (3A-11).
+    if (r.changed) {
+        for (const PathMark& pm : pathMarks) {
+            if (pm.depth == depth) currentPath = pm.before;
+        }
+    }
     markChanged(r);
     show(r);
     selection.clear();
@@ -221,6 +261,11 @@ void ofApp::undo() {
 
 void ofApp::redo() {
     const Result r = history.redo(model);
+    if (r.changed) {
+        for (const PathMark& pm : pathMarks) {
+            if (pm.depth == history.undoCount()) currentPath.clear();
+        }
+    }
     markChanged(r);
     show(r);
     selection.clear();
@@ -478,25 +523,27 @@ std::string ofApp::keyId(int key) const {
             return (key == 'R' || shift) ? "saverig" : "userig";
         }
         if (key == 'o' || key == 'O' || key == 15) return "open";
+        if (key == 'n' || key == 'N' || key == 14) return "empty";
+        if (key == 'e' || key == 'E' || key == 5)  return "example";
         if (key == '3' || key == '#') return "view3d";
         if (key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) return "removelevel";
         return "";
     }
     switch (key) {
     case '1': case '2': case '3': case '4':        return "gridkind";
-    case 'r': case 'R': case '0':                   return "rotate";
-    case '-': case '=': case '+':                   return "spacing";
+    case 'e': case 'E': case 'r': case 'R':         return "rotate";
+    case '-': case '_': case '=': case '+':         return "spacing";
     case '{': case '}':                             return "spokes";
     case '[': case ']':                             return "layoutsize";
     case ',': case '.':                             return "deadzone";
     case 'l':                                       return "layout";
+    case 'L':                                       return "layoutnodes";
     case 'a':                                       return "all";
     case OF_KEY_ESC:                                return "none";
-    case 'x':                                       return "empty";
-    case 'e':                                       return "example";
     case OF_KEY_BACKSPACE: case OF_KEY_DEL:         return "remove";
     case 'u':                                       return "unjoin";
     case 'f':                                       return "join";
+    case 'F':                                       return "joincells";
     case 'o':                                       return "newoutput";
     case 'd':                                       return "derivedafter";
     case 'D':                                       return "derived";
@@ -506,7 +553,7 @@ std::string ofApp::keyId(int key) const {
     case 'c':                                       return "clear";
     case 'C':                                       return "silence";
     case OF_KEY_TAB:                                return "nextoutput";
-    case 't': case 'T':                             return "trim";
+    case '9': case '(': case '0': case ')':         return "trim";
     case 'O':                                       return "removeoutput";
     case 'p':                                       return "autooutput";
     case ' ':                                       return "audition";
@@ -619,36 +666,49 @@ void ofApp::keyPressed(int key) {
     if (id == "userig") { useRig(); return; }
     if (id == "saverig") { saveRig(); return; }
     if (id == "empty") {
-        currentPath.clear();
+        const std::string before = currentPath;
         act("new map", [](Model& m) {
             m.newEmpty();
             return Result{true, false,
                           "new empty map -- click to place nodes", 3.0f};
         });
+        pathMarks.push_back({history.undoCount(), before});
+        currentPath.clear();
         adopt();
         return;
     }
     if (id == "example") {
-        currentPath.clear();
+        const std::string before = currentPath;
         act("example map", [](Model& m) {
             m.loadExample();
             return Result{true, false, "", 0.0f};
         });
+        pathMarks.push_back({history.undoCount(), before});
+        currentPath.clear();
         adopt();
         return;
     }
 
     // ---- grid tool ----
     if (id == "gridkind" || id == "rotate" || id == "spacing" || id == "spokes") {
+        // The grid's number again straightens it (3A-11).
+        const GridKind was = kind;
         if      (key == '1') kind = GridKind::Free;
         else if (key == '2') kind = GridKind::Square;
         else if (key == '3') kind = GridKind::Triangular;
         else if (key == '4') kind = GridKind::Polar;
+        if (key >= '1' && key <= '4' && kind == was && rotation != 0.0f) {
+            rotation = 0.0f;
+            show(Result{false, false, "grid straightened", 1.5f});
+        }
+        // e r: rotate back and on, 5 degrees, 1 with shift (3A-11).
+        if (key == 'e') rotation -= ofDegToRad(5.0f);
         else if (key == 'r') rotation += ofDegToRad(5.0f);
-        else if (key == 'R') rotation -= ofDegToRad(5.0f);
-        else if (key == '0') rotation = 0.0f;
-        else if (key == '-') spacing = std::max(0.02f, spacing * 0.8f);
-        else if (key == '=' || key == '+') spacing = std::min(0.25f, spacing * 1.25f);
+        else if (key == 'E') rotation -= ofDegToRad(1.0f);
+        else if (key == 'R') rotation += ofDegToRad(1.0f);
+        // - and =: one more or one fewer across, so the tiles always fit.
+        else if (key == '-' || key == '_') across = std::min(50, across + 1);
+        else if (key == '=' || key == '+') across = std::max(4, across - 1);
         else if (key == '{') spokes = std::max(3, spokes - 1);
         else if (key == '}') spokes = std::min(24, spokes + 1);
         rebuildGrid();
@@ -687,6 +747,21 @@ void ofApp::keyPressed(int key) {
         }
         return;
     }
+    // L (3A-11): the same nodes, not joined -- thin them out, then F.
+    if (id == "layoutnodes") {
+        std::vector<NodeID> placed;
+        const glm::vec2 p = renderer->toManifold(mouse);
+        const int size = layoutSize();
+        const bool tri = kind == GridKind::Triangular;
+        act("lay out the nodes", [&](Model& m) {
+            return m.layout(p, grid, size, tri, &placed, false);
+        });
+        if (!placed.empty()) {
+            selection.clear();
+            for (NodeID n : placed) selection.toggle(n);
+        }
+        return;
+    }
     // Dead zone for drag hysteresis, as a fraction of grid spacing.
     if (id == "deadzone") {
         if (key == ',') deadZone = std::max(0.0f, deadZone - 0.05f);
@@ -707,6 +782,12 @@ void ofApp::keyPressed(int key) {
     }
     if (id == "unjoin") { act("unjoin", [&](Model& m) { return m.unjoin(selection); }); return; }
     if (id == "join")   { act("join", [&](Model& m) { return m.join(selection); }); return; }
+    if (id == "joincells") {
+        act("join the grid cells", [&](Model& m) {
+            return m.joinCells(selection, grid, kind == GridKind::Triangular);
+        });
+        return;
+    }
 
     // ---- outputs ----
     if (id == "newoutput") { act("new output", [](Model& m) { return m.newOutput(); }); return; }
@@ -740,9 +821,14 @@ void ofApp::keyPressed(int key) {
         act("silence", [&](Model& m) { return m.silence(selection); });
         return;
     }
-    if (id == "nextoutput") { show(model.cycleOutput()); return; }
+    if (id == "nextoutput") {
+        show(model.cycleOutput(ofGetKeyPressed(OF_KEY_SHIFT) ? -1 : 1));
+        return;
+    }
     if (id == "trim") {
-        const float dB = (key == 'T') ? +1.0f : -1.0f;
+        // 9 0: down and up a dB; with shift, ( and ), a tenth (3A-11).
+        const float dB = key == '9' ? -1.0f : key == '0' ? +1.0f
+                       : key == '(' ? -0.1f : +0.1f;
         act("trim", [dB](Model& m) { return m.trimCurrent(dB); });
         return;
     }
@@ -860,23 +946,38 @@ void ofApp::keyReleased(int key) {
 // grid tool -- a preference of the session, never saved into a map
 // ===========================================================================
 
+// Round 3A-11: the grid fits the map. The spacing is 1 / across, so a
+// square grid's tiles meet the edges exactly; it turns about the grid point
+// nearest the middle. The triangular grid's rows are centred, the bands
+// left above and below even; every other row starts at the left edge. The
+// polar grid's rings step out from the centre. Only whole cells are drawn.
 void ofApp::rebuildGrid() {
-    const float s = spacing;
+    const float s = 1.0f / float(across);
+    spacing = s;
+    const float mid = float(across / 2) * s;     // a grid point near 0.5
     switch (kind) {
     case GridKind::Free:
         grid = Grid::free();
         break;
     case GridKind::Square:
-        grid = Grid::lattice({s, 0.0f}, {0.0f, s}, {0.0f, 0.0f}, rotation);
+        grid = Grid::lattice({s, 0.0f}, {0.0f, s}, {mid, mid}, rotation);
         break;
-    case GridKind::Triangular:
-        grid = Grid::lattice({s, 0.0f}, {s * 0.5f, s * 0.8660254f},
-                             {0.0f, 0.0f}, rotation);
+    case GridKind::Triangular: {
+        const float h = s * 0.8660254f;
+        const int bands = int(1.0f / h + 1e-4f);
+        const float margin = 0.5f * (1.0f - float(bands) * h);
+        const int jc = bands / 2;                // the row the grid turns on
+        const float ox = mid + ((jc % 2) ? 0.5f * s : 0.0f);
+        grid = Grid::lattice({s, 0.0f}, {s * 0.5f, h},
+                             {ox, margin + float(jc) * h}, rotation);
         break;
+    }
     case GridKind::Polar:
         grid = Grid::polar({0.5f, 0.5f}, s, spokes, rotation);
         break;
     }
+    cells = gridCells(grid, kind == GridKind::Triangular);
+    rings = wholeRings(grid);
 }
 
 // ===========================================================================
