@@ -12,6 +12,8 @@ constexpr std::size_t kOscPanelChars = 44;
 constexpr float       kOscPanelWidth = kOscPanelChars * 8.0f;
 // Room for the column of level dots and its label, right of the map.
 constexpr float       kColumnRoom = 70.0f;
+// The half-lives - and = step through, in seconds.
+constexpr float kHalfLives[] = {0.01f, 0.02f, 0.05f, 0.1f, 0.2f, 0.5f, 1.0f, 2.0f};
 
 std::string describe(const OscMessage& m) {
     std::string t = m.address;
@@ -61,6 +63,7 @@ void ofApp::setup() {
     ofSetFrameRate(120);              // the sender keeps its own rate
     ofBackground(30, 30, 34);
     text.setSize(12);
+    applySmoothing();
     model.loadRoom();
     adopt();
     cam.enableMouseInput();
@@ -75,6 +78,27 @@ void ofApp::adopt() {
     evaluation = evaluator->evaluate(point);
     z = listenStart(model, evaluation);
     osc.reset();                      // the new map's outputs, described at once
+    levelSmoother.reset();            // another map: taken at once, not glided into
+    valueSmoother.reset();
+}
+
+void ofApp::applySmoothing() {
+    const float h = smoothOn ? halfLife : 0.0f;
+    levelSmoother.setHalfLife(h);
+    valueSmoother.setHalfLife(h);
+}
+
+// The frame's levels and values, smoothed: each a list in the frame's own
+// order, which stays put while the map does.
+void ofApp::smooth(OscFrame& f, float dt) {
+    std::vector<float> v;
+    for (const OscOutput& o : f.outputs) v.push_back(o.level);
+    const std::vector<float>& lv = levelSmoother.update(v, dt);
+    for (std::size_t k = 0; k < f.outputs.size(); ++k) f.outputs[k].level = lv[k];
+    v.clear();
+    for (const OscValue& o : f.values) v.push_back(o.value);
+    const std::vector<float>& vv = valueSmoother.update(v, dt);
+    for (std::size_t k = 0; k < f.values.size(); ++k) f.values[k].value = vv[k];
 }
 
 // The map at the left, the column of level dots right of it (only with two
@@ -167,8 +191,12 @@ void ofApp::update() {
         if (fromOfx(in, m)) osc.receive(now, m);
     }
 
+    // Smoothed every frame, sent or not, so the glide keeps time with the
+    // clock rather than with the send rate.
+    OscFrame frame = frameNow();
+    smooth(frame, float(ofGetLastFrameTime()));
     if (!paused) {
-        const auto msgs = osc.frame(now, frameNow());
+        const auto msgs = osc.frame(now, frame);
         if (!msgs.empty()) lastSent.clear();
         for (const OscMessage& m : msgs) {
             // One message per packet, no bundle (OSC.md); false is ofxOsc's
@@ -213,6 +241,13 @@ void ofApp::draw() {
          + (osc.perOutput() ? "on" : "off") + " (i)", plain);
     line(ofToString(sentLog.size()) + " messages, " + ofToString(bytes) + " bytes a second",
          plain);
+    if (smoothOn) {
+        const bool settling = !levelSmoother.settled() || !valueSmoother.settled();
+        line("smoothing " + ofToString(halfLife, 2) + " s (s, - =)"
+             + (settling ? "  settling" : ""), plain);
+    } else {
+        line("smoothing off (s)", plain);
+    }
     if (osc.connected(now)) {
         line("answered by " + (osc.peer().empty() ? std::string("a receiver") : osc.peer()),
              ofColor(120, 200, 160));
@@ -250,6 +285,23 @@ void ofApp::keyPressed(int key) {
     else if (key == '[') osc.setRate(osc.rate() >= 20.0 ? osc.rate() - 10.0 : osc.rate() / 2.0);
     else if (key == ']') osc.setRate(osc.rate() >= 10.0 ? osc.rate() + 10.0 : osc.rate() * 2.0);
     else if (key == ' ') paused = !paused;
+    else if (key == 's') {
+        smoothOn = !smoothOn;
+        applySmoothing();
+        say(smoothOn ? "smoothing on, half-life " + ofToString(halfLife, 2) + " s"
+                     : "smoothing off: every jump steps");
+    }
+    else if (key == '-' || key == '=') {
+        const std::size_t n = sizeof kHalfLives / sizeof kHalfLives[0];
+        std::size_t at = 0;
+        while (at + 1 < n && kHalfLives[at] < halfLife - 1e-6f) ++at;
+        if (key == '-' && at > 0) --at;
+        if (key == '=' && at + 1 < n && kHalfLives[at] <= halfLife + 1e-6f) ++at;
+        halfLife = kHalfLives[at];
+        smoothOn = true;
+        applySmoothing();
+        say("smoothing half-life " + ofToString(halfLife, 2) + " s");
+    }
     else if (key == '3' || key == '#') {
         show3D = !show3D;
         if (show3D) cam.enableMouseInput();

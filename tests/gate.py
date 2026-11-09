@@ -57,6 +57,8 @@ SUITES = {
     # ofxManifoldPlayer's OSC out (3B-1): the vectors, and over a socket
     "test-osc":            ("run_osc",            ["tests/run_osc.cpp"] + PLAYER_CPP),
     "osc-live":            ("osc_udp",            ["tests/osc_udp.cpp"] + PLAYER_CPP),
+    # ofxManifoldPlayer's output smoother (3B-1)
+    "test-smooth":         ("run_smooth",         ["tests/run_smooth.cpp"] + PLAYER_CPP),
 }
 INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src", "-IofxManifoldPlayer/src"]
 

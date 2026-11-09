@@ -182,7 +182,10 @@ outputs -- with the editor's column of level dots and its 3D view beside the
 map. Drag the point, hold ↑ or ↓ to move it through the levels; `3` shows or
 hides the 3D view (drag in it to turn it); `e` the room again, `E` the
 editor's flat example, `o` a map of your own; `p` and `i` switch packed and
-per-output messages, `[` `]` the rate. With it a SuperCollider patch
+per-output messages, `[` `]` the rate. What it sends is smoothed -- one
+number per output, a list the map fixes, so a click across the room or the
+point leaving the map glides instead of stepping; `s` turns it off to
+compare, `-` `=` change the half-life. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
@@ -303,7 +306,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-890 vectors across thirteen suites, plus 407 mutation gates that introduce known
+906 vectors across fourteen suites, plus 415 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

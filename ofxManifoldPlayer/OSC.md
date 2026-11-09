@@ -63,7 +63,10 @@ against an independent OSC library (python-osc) in the tests.
 2. On `/manifold/outputs`, if the list differs from the one you have, rebuild:
    one voice, light, parameter or channel per output.
 3. On `/manifold/levels`, set each from its argument, in order. Smoothing over
-   about 20 ms hides the steps between sends.
+   about 20 ms hides the steps between sends. The sender smooths jumps
+   itself -- a click across the map, the point leaving it -- so a receiver
+   needs no more than that (`OutputSmoother`, half-life 0.05 s in
+   example-osc).
 4. Optionally say `/manifold/hello` once a second.
 
 The SuperCollider patch beside `example-osc` is exactly this, in fifty

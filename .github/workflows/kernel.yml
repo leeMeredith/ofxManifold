@@ -75,11 +75,11 @@ jobs:
       # suite would keep passing against stale expected values.
       - name: Vectors are reproducible from the references
         run: |
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor levels osc; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor levels osc smooth; do
             cp tests/vectors/$v.vec /tmp/committed_$v.vec
           done
           make vectors
-          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor levels osc; do
+          for v in triangle manifold interpretation mapping serialize trajectory smoother regions grids outputs editor levels osc smooth; do
             if ! diff -u /tmp/committed_$v.vec tests/vectors/$v.vec; then
               echo "::error::$v.vec does not match a fresh run of its reference"
               exit 1

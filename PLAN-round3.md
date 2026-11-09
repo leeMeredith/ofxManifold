@@ -1259,6 +1259,26 @@ Added before the app was first built (2026-11-09):
   level at the point's height either way. It opens on the room; `e` is the
   room, `E` the editor's flat example. The window starts at 1280 x 720; the
   map and the 3D view shrink together to leave the panel 44 characters.
+- **Smoothing what is sent**, `OutputSmoother` in ofxManifoldPlayer. The
+  kernel's WeightSmoother smooths node weights: its state is every node lately
+  near the point, so it grows with speed and with how fine the map is, is
+  matched up by search every frame (the square of its length), is paid again
+  per moving object, and knows only the floor plan. A player sends one level
+  per output, and the map fixes how many, so the player smooths those: a
+  fixed list, one per output and one per node value, never growing, no
+  pruning, no search -- objects x outputs, a plain loop. Same step as the
+  kernel's (half-life, then an optional speed limit); within 1e-4 of its
+  target a number is its target, so a still point stops sending in
+  per-output mode instead of trickling changes for a second; a list of
+  another length, or after reset(), is taken at once, not glided into.
+  `tests/ref/reference_smooth.py` writes 16 sequence vectors (8 ANALYTIC,
+  5 CROSS, 3 SPEC); `make test-smooth` checks them and runs the kernel's
+  WeightSmoother alongside on one number, agreeing within 1e-6 until the
+  player's first arrives. 8 gates (415). In example-osc both lists are
+  smoothed every frame, sent or not; `s` on or off, `-` `=` the half-life
+  (0.01 to 2 s, 0.05 to start); a map change resets them. For the master
+  player: one per moving object, made when it appears and dropped when it
+  goes, under a cap.
 
 ---
 

@@ -23,6 +23,7 @@ OUT_RUN  := $(BUILD)/run_outputs
 EDI_RUN  := $(BUILD)/run_editor
 LVL_RUN  := $(BUILD)/run_levels
 OSC_RUN  := $(BUILD)/run_osc
+SMOOTH_RUN := $(BUILD)/run_smooth
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -37,6 +38,7 @@ OUT_VEC  := tests/vectors/outputs.vec
 EDI_VEC  := tests/vectors/editor.vec
 LVL_VEC  := tests/vectors/levels.vec
 OSC_VEC  := tests/vectors/osc.vec
+SMOOTH_VEC := tests/vectors/smooth.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -92,7 +94,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live headers workflow wrapper vectors clean
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth headers workflow wrapper vectors clean
 
 all: test
 
@@ -100,7 +102,7 @@ all: test
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible door keys panel headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
-      test-levels test-osc osc-live
+      test-levels test-osc osc-live test-smooth
 	@echo ""
 	@echo "all suites green"
 
@@ -245,6 +247,18 @@ $(OSC_RUN): tests/run_osc.cpp $(PLAYER_CPP) $(PLAYER_H)
 $(OSC_VEC): tests/ref/reference_osc.py
 	@python3 tests/ref/reference_osc.py
 
+# ofxManifoldPlayer's output smoother (3B-1): sequences, like test-smoother,
+# and alongside the kernel's WeightSmoother on the same numbers.
+test-smooth: $(SMOOTH_RUN) $(SMOOTH_VEC)
+	@./$(SMOOTH_RUN) $(SMOOTH_VEC)
+
+$(SMOOTH_RUN): tests/run_smooth.cpp $(PLAYER_CPP) $(PLAYER_H) $(INTERP)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/run_smooth.cpp $(PLAYER_CPP)
+
+$(SMOOTH_VEC): tests/ref/reference_smooth.py
+	@python3 tests/ref/reference_smooth.py
+
 osc-live: $(BUILD)/osc_udp
 	@python3 tests/check_osc_udp.py
 
@@ -269,6 +283,7 @@ vectors:
 	@python3 tests/ref/reference_editor.py
 	@python3 tests/ref/reference_levels.py
 	@python3 tests/ref/reference_osc.py
+	@python3 tests/ref/reference_smooth.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)

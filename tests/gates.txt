@@ -2190,3 +2190,45 @@ gate: The room's outputs share a channel
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 find:         const TargetID t = map_.addOutput(manifold_.node(id).name, ch++);
 replace:         const TargetID t = map_.addOutput(manifold_.node(id).name, ch);
+
+gate: The output smoother never quite arrives
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:         if (std::fabs(to - v) < kArrived) v = to;
+replace:         (void)kArrived;
+
+gate: The output smoother's half-life is per tick, not per second
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find: 1.0f - std::pow(0.5f, dt / halfLife_)
+replace: 1.0f - std::pow(0.5f, 1.0f / 60.0f / halfLife_)
+
+gate: The output smoother ignores its speed limit
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:             if (d > maxStep)  v = from + maxStep;\n            if (d < -maxStep) v = from - maxStep;
+replace:             (void)d;
+nl: yes
+
+gate: The output smoother glides into another map's outputs
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:     if (target.size() != state_.size() || !enabled()) {
+replace:     if (!enabled()) {
+
+gate: The output smoother is always settled
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:         if (v != to) settled_ = false;
+replace:         (void)to;
+
+gate: The output smoother says settled when no time has passed
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:         settled_ = state_ == target;
+replace:         settled_ = true;
+
+gate: Reset keeps the output smoother where it was
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:     state_.clear();
+replace:     settled_ = true;
+
+gate: The speed limit is applied before the half-life
+file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
+find:         float v = from + (to - from) * alpha;\n        if (maxStep > 0.0f) {\n            const float d = v - from;
+replace:         float v = to;\n        if (maxStep > 0.0f) {\n            const float d = v - from;\n            v = from + std::max(-maxStep, std::min(maxStep, d));\n            v = from + (v - from) * alpha;
+nl: yes

@@ -11,6 +11,11 @@
 // to the level below; the level it is on or above is the brighter one. What
 // goes out, and whether anyone answered, is on the right.
 //
+// What is sent is smoothed (OutputSmoother): one number per output and per
+// node value, a fixed list, so a click across the map, a level crossed or the
+// point leaving the map glides over the half-life instead of stepping. Click
+// far from the point to hear it; s to compare without.
+//
 // The receiver need not know how many outputs there are: the app describes
 // them (/manifold/outputs) on the first send, when they change, when asked,
 // and every two seconds. See ofxManifoldPlayer/OSC.md for the protocol, and
@@ -26,6 +31,8 @@
 //   p               packed messages on or off
 //   i               per-output messages on or off
 //   [ ]             send rate down / up
+//   s               smoothing on or off
+//   - =             smoothing's half-life shorter / longer
 //   space           pause sending
 //   3               the 3D view on or off (drag in it to turn it)
 //   o               open a map pair (map + outputs)
@@ -67,6 +74,8 @@ private:
     void followLevel();                 // the point's level is current
     ofxManifold::editor::Scene scene() const;
     ofxManifold::player::OscFrame frameNow() const;
+    void smooth(ofxManifold::player::OscFrame& f, float dt);
+    void applySmoothing();              // smoothOn and halfLife to both
 
     ofxManifold::editor::Model                    model;
     std::unique_ptr<ofxManifold::Evaluator>       evaluator;
@@ -86,6 +95,12 @@ private:
     glm::vec2 point{0.5f, 0.5f};
     float     z = 0.0f;
     int       glideDir = 0;             // -1, 0, +1 while down / up is held
+
+    // Smoothing what is sent: the outputs' levels and the node values, each
+    // a list as long as the map makes it. Reset when the map changes.
+    ofxManifold::player::OutputSmoother levelSmoother, valueSmoother;
+    bool  smoothOn = true;
+    float halfLife = 0.05f;
 
     ofxManifold::player::OscOut osc;
     ofxOscSender                sender;
