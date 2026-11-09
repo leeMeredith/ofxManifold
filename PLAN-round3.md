@@ -1214,8 +1214,12 @@ first player, `example-osc`.
 
 - **`ofxManifoldPlayer`** is a new addon beside `ofxManifoldEditor`, no
   openFrameworks: `OscMessage`, `encode`, `decode`, `oscName` and `OscOut`,
-  which says what to send each frame. The app sends the bytes `encode` makes
-  through ofxNetwork, so the code the tests check is the code that sends.
+  which says what to send each frame. The app sends through openFrameworks'
+  own ofxOsc (the same addon Lee's other OSC work uses), turning each
+  `OscMessage` into an `ofxOscMessage`, unbundled; `encode` and `decode`
+  stay as the tests' encoder, checked byte for byte against python-osc, and
+  for counting the bytes on the panel. (First built on ofxNetwork, sending
+  `encode`'s bytes; changed before the app was first generated.)
 - **`tests/ref/reference_osc.py`** writes 35 vectors: 16 encodings, each
   built by python-osc as well and identical byte for byte (CROSS) -- the
   file is the same without python-osc, which CI does not install; 3 packets

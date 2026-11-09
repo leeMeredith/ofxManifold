@@ -183,7 +183,7 @@ per-output messages, `[` `]` the rate. With it a SuperCollider patch
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
 (beside `src/`, copied into `addons/` like the editor's), `ofxManifoldEditor`
-for opening maps, and openFrameworks' own `ofxNetwork`.
+for opening maps, and openFrameworks' own `ofxOsc`.
 
 **`example-editor`** needs a second addon, **`ofxManifoldEditor`**, which lives
 in this repository beside `src/`: copy it into your `addons/` folder next to

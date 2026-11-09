@@ -14,9 +14,9 @@
 // supercollider/manifold-receive.scd and receive.py beside this file for two
 // receivers.
 //
-// Everything that decides what to send is in ofxManifoldPlayer (OscOut,
-// encode, decode), tested without openFrameworks; this file owns the
-// window, the sockets and the keys.
+// Everything that decides what to send is in ofxManifoldPlayer (OscOut),
+// tested without openFrameworks; this file owns the window, the keys and the
+// two ofxOsc ends, and turns OscOut's messages into ofxOscMessages and back.
 //
 //   drag            move the point
 //   up / down       hold: move it through the levels (shift: slowly)
@@ -31,7 +31,7 @@
 #include "ofxManifold.h"
 #include "ofxManifoldEditor.h"
 #include "ofxManifoldPlayer.h"
-#include "ofxNetwork.h"
+#include "ofxOsc.h"
 
 #include <deque>
 #include <memory>
@@ -70,7 +70,8 @@ private:
     int       glideDir = 0;             // -1, 0, +1 while down / up is held
 
     ofxManifold::player::OscOut osc;
-    ofxUDPManager               sender, listener;
+    ofxOscSender                sender;
+    ofxOscReceiver              listener;
     bool                        paused = false;
 
     // What went out in the last second, for the panel.

@@ -1,4 +1,4 @@
 ofxManifold
 ofxManifoldEditor
 ofxManifoldPlayer
-ofxNetwork
+ofxOsc

@@ -17,6 +17,37 @@ std::string describe(const OscMessage& m) {
     return t;
 }
 
+// OscOut's messages as ofxOsc's, and back. Only i, f and s go out.
+ofxOscMessage toOfx(const OscMessage& m) {
+    ofxOscMessage o;
+    o.setAddress(m.address);
+    for (const OscArg& a : m.args) {
+        if (a.type == 'i') o.addIntArg(a.i);
+        else if (a.type == 'f') o.addFloatArg(a.f);
+        else o.addStringArg(a.s);
+    }
+    return o;
+}
+
+// What comes back (describe, hello) in OscOut's terms. A receiver may send a
+// symbol for a string or a double for a float; both are read as ours. A
+// message with any other kind of argument is not one of ours: false.
+bool fromOfx(const ofxOscMessage& o, OscMessage& m) {
+    m = OscMessage{};
+    m.address = o.getAddress();
+    for (std::size_t k = 0; k < o.getNumArgs(); ++k) {
+        switch (o.getArgType(k)) {
+        case OFXOSC_TYPE_INT32:  m.args.push_back(OscArg::integer(o.getArgAsInt32(k))); break;
+        case OFXOSC_TYPE_FLOAT:
+        case OFXOSC_TYPE_DOUBLE: m.args.push_back(OscArg::number(o.getArgAsFloat(k))); break;
+        case OFXOSC_TYPE_STRING:
+        case OFXOSC_TYPE_SYMBOL: m.args.push_back(OscArg::text(o.getArgAsString(k))); break;
+        default: return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 void ofApp::setup() {
@@ -25,12 +56,8 @@ void ofApp::setup() {
     model.loadExample();
     adopt();
 
-    sender.Create();
-    sender.Connect(host.c_str(), static_cast<unsigned short>(sendPort));
-    sender.SetNonBlocking(true);
-    listener.Create();
-    listener.Bind(static_cast<unsigned short>(listenPort));
-    listener.SetNonBlocking(true);
+    sender.setup(host, sendPort);
+    listener.setup(listenPort);
 }
 
 void ofApp::adopt() {
@@ -80,23 +107,21 @@ void ofApp::update() {
     evaluation = evaluator->evaluate(point);
 
     // Answers: describe, hello.
-    char buf[1536];
-    for (int k = 0; k < 64; ++k) {
-        const int n = listener.Receive(buf, sizeof buf);
-        if (n <= 0) break;
+    for (int k = 0; k < 64 && listener.hasWaitingMessages(); ++k) {
+        ofxOscMessage in;
+        if (!listener.getNextMessage(in)) break;
         OscMessage m;
-        if (decode(reinterpret_cast<const std::uint8_t*>(buf), std::size_t(n), m)) {
-            osc.receive(now, m);
-        }
+        if (fromOfx(in, m)) osc.receive(now, m);
     }
 
     if (!paused) {
         const auto msgs = osc.frame(now, frameNow());
         if (!msgs.empty()) lastSent.clear();
         for (const OscMessage& m : msgs) {
-            const auto bytes = encode(m);
-            sender.Send(reinterpret_cast<const char*>(bytes.data()), int(bytes.size()));
-            sentLog.emplace_back(now, bytes.size());
+            // One message per packet, no bundle (OSC.md); false is ofxOsc's
+            // default in 0.12.1, said here so it stays so.
+            sender.sendMessage(toOfx(m), false);
+            sentLog.emplace_back(now, encode(m).size());   // the bytes on the wire
             lastSent.push_back(describe(m));
         }
     }

@@ -3,7 +3,7 @@
 // Run by tests/check_osc_udp.py, which listens on SEND_PORT: this sends ten
 // frames of a fixed run to it as UDP packets, the bytes encode() makes, then
 // waits for a hello on LISTEN_PORT and says whether the sender counts it.
-// POSIX sockets, test-only; the example app sends through ofxNetwork.
+// POSIX sockets, test-only; the example app sends through ofxOsc.
 
 #include "../ofxManifoldPlayer/src/ofxManifoldOsc.h"
 
