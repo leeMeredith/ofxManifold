@@ -6,6 +6,13 @@ using namespace ofxManifold::player;
 
 namespace {
 
+// The panel's lines are cut to this many characters (8 pixels each in the
+// bitmap font), so the panel needs this much room.
+constexpr std::size_t kOscPanelChars = 44;
+constexpr float       kOscPanelWidth = kOscPanelChars * 8.0f;
+// Room for the column of level dots and its label, right of the map.
+constexpr float       kColumnRoom = 70.0f;
+
 std::string describe(const OscMessage& m) {
     std::string t = m.address;
     for (const OscArg& a : m.args) {
@@ -53,8 +60,10 @@ bool fromOfx(const ofxOscMessage& o, OscMessage& m) {
 void ofApp::setup() {
     ofSetFrameRate(120);              // the sender keeps its own rate
     ofBackground(30, 30, 34);
-    model.loadExample();
+    text.setSize(12);
+    model.loadRoom();
     adopt();
+    cam.enableMouseInput();
 
     sender.setup(host, sendPort);
     listener.setup(listenPort);
@@ -66,6 +75,48 @@ void ofApp::adopt() {
     evaluation = evaluator->evaluate(point);
     z = listenStart(model, evaluation);
     osc.reset();                      // the new map's outputs, described at once
+}
+
+// The map at the left, the column of level dots right of it (only with two
+// or more levels), the 3D view the same size beside that, the panel after.
+// The map and the view shrink together to leave the panel its room.
+void ofApp::layoutWindow() {
+    const float W = float(ofGetWidth()), H = float(ofGetHeight());
+    const float column = model.map3d().count() > 1 ? kColumnRoom : 0.0f;
+    float side = H - 48.0f;
+    const float room = W - 24.0f - column - 24.0f - kOscPanelWidth;
+    side = std::min(side, show3D ? (room - 24.0f) / 2.0f : room);
+    side = std::max(side, 160.0f);
+    mapArea = ofRectangle(24.0f, 24.0f, side, side);
+    view3D = show3D ? ofRectangle(mapArea.getRight() + column, 24.0f, side, side)
+                    : ofRectangle();
+    panelX = (show3D ? view3D.getRight() : mapArea.getRight() + column) + 24.0f;
+    if (renderer) renderer->setViewport(mapArea);
+}
+
+// The level the point is on or above becomes the current one, so the 3D
+// view brightens it and the column fills its dot. Only for showing: what is
+// sent is worked out from every level at the point's height either way.
+void ofApp::followLevel() {
+    const Levels& lv = model.map3d().levels();
+    LevelID k = 0;
+    for (LevelID j = 0; j < lv.count(); ++j) {
+        if (lv.base(j) <= z) k = j;
+    }
+    if (k != model.currentLevel()) model.goToLevel(k);
+}
+
+Scene ofApp::scene() const {
+    Scene s;
+    s.model = &model;
+    s.selection = &none;
+    s.renderer = renderer.get();
+    s.evaluation = &evaluation;
+    s.text = &text;
+    s.listeningPoint = point;
+    s.listeningZ = z;
+    s.auditioning = true;             // the point is always heard here
+    return s;
 }
 
 // The map's outputs in channel order with their levels at the point, the
@@ -104,6 +155,8 @@ void ofApp::update() {
     if (glideDir != 0) {
         z = glide(z, glideDir, ofGetKeyPressed(OF_KEY_SHIFT), float(ofGetLastFrameTime()));
     }
+    followLevel();
+    layoutWindow();
     evaluation = evaluator->evaluate(point);
 
     // Answers: describe, hello.
@@ -129,28 +182,36 @@ void ofApp::update() {
 }
 
 void ofApp::draw() {
-    const float side = ofGetHeight() - 48.0f;
-    renderer->setViewport(ofRectangle(24, 24, side, side));
+    layoutWindow();
     renderer->draw(evaluation.regionID);
     renderer->drawEvaluation(evaluation, point);
+    text.fit();
+    const Scene sc = scene();
+    drawLevelColumn(sc);              // nothing with one level
+    if (show3D) {
+        if (!aimed) { aimLevelView(cam, view3D); aimed = true; }
+        cam.setControlArea(view3D);
+        drawLevelView(sc, cam, view3D);
+    }
 
     const double now = ofGetElapsedTimef();
     std::size_t bytes = 0;
     for (const auto& e : sentLog) bytes += e.second;
-    float x = renderer->viewport().getRight() + 30.0f, y = 40.0f;
-    auto line = [&](const std::string& t, const ofColor& c) {
+    float x = panelX, y = 40.0f;
+    auto line = [&](std::string t, const ofColor& c) {
+        if (t.size() > kOscPanelChars) t = t.substr(0, kOscPanelChars - 3) + "...";
         ofSetColor(c);
         ofDrawBitmapString(t, x, y);
         y += 16.0f;
     };
     const ofColor plain(200, 205, 215), dim(130, 136, 150);
-    line("OSC to " + host + ":" + ofToString(sendPort)
-         + "   answers on " + ofToString(listenPort), ofColor(235, 238, 245));
+    line("OSC to " + host + ":" + ofToString(sendPort), ofColor(235, 238, 245));
+    line("answers on " + ofToString(listenPort), plain);
     line("prefix " + osc.prefix() + "   " + ofToString(osc.rate(), 0) + " a second"
-         + (paused ? "   PAUSED (space)" : ""), plain);
-    line(std::string("packed ") + (osc.packed() ? "on" : "off") + " (p)   per output "
+         + (paused ? "   PAUSED" : ""), plain);
+    line(std::string("packed ") + (osc.packed() ? "on" : "off") + " (p)  per output "
          + (osc.perOutput() ? "on" : "off") + " (i)", plain);
-    line(ofToString(sentLog.size()) + " messages, " + ofToString(bytes) + " bytes in the last second",
+    line(ofToString(sentLog.size()) + " messages, " + ofToString(bytes) + " bytes a second",
          plain);
     if (osc.connected(now)) {
         line("answered by " + (osc.peer().empty() ? std::string("a receiver") : osc.peer()),
@@ -158,15 +219,13 @@ void ofApp::draw() {
     } else {
         line("no answer yet -- fine: nothing waits for one", dim);
     }
-    line("point " + ofToString(point.x, 3) + " " + ofToString(point.y, 3)
-         + "   height " + ofToString(z, 3) + " (up / down)", plain);
+    line("point " + ofToString(point.x, 3) + " " + ofToString(point.y, 3), plain);
+    line("height " + ofToString(z, 3) + " (up / down)   level "
+         + ofToString(model.currentLevel() + 1) + " of " + ofToString(model.map3d().count()),
+         plain);
     y += 8.0f;
     line("last send:", ofColor(235, 238, 245));
-    for (std::size_t k = 0; k < lastSent.size() && k < 24; ++k) {
-        std::string t = lastSent[k];
-        if (t.size() > 60) t = t.substr(0, 57) + "...";
-        line(t, dim);
-    }
+    for (std::size_t k = 0; k < lastSent.size() && k < 24; ++k) line(lastSent[k], dim);
     if (!message.empty() && ofGetElapsedTimef() < messageUntil) {
         y += 8.0f;
         line(message, ofColor(255, 214, 90));
@@ -191,7 +250,14 @@ void ofApp::keyPressed(int key) {
     else if (key == '[') osc.setRate(osc.rate() >= 20.0 ? osc.rate() - 10.0 : osc.rate() / 2.0);
     else if (key == ']') osc.setRate(osc.rate() >= 10.0 ? osc.rate() + 10.0 : osc.rate() * 2.0);
     else if (key == ' ') paused = !paused;
-    else if (key == 'e') { model.loadExample(); adopt(); say("the example map"); }
+    else if (key == '3' || key == '#') {
+        show3D = !show3D;
+        if (show3D) cam.enableMouseInput();
+        else        cam.disableMouseInput();
+        say(show3D ? "3D view on -- drag in it to turn it" : "3D view off -- 3 to show it");
+    }
+    else if (key == 'e') { model.loadRoom(); adopt(); say("the room: floor, middle and top"); }
+    else if (key == 'E') { model.loadExample(); adopt(); say("the editor's flat example"); }
     else if (key == 'o') open();
 }
 

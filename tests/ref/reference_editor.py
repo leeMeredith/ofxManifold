@@ -1403,6 +1403,25 @@ class Editor:
         self.derived = [["sub", 4, ["N", "O"]]]
         self.select_only("front")
 
+    def room(self):
+        """A room on three levels (3B-1): four corners on the floor, the
+        middle and the top, each level's on outputs of its own."""
+        self.new_empty()
+        for nm, p in [("FL", (0.20, 0.80)), ("FR", (0.80, 0.80)),
+                      ("RL", (0.20, 0.20)), ("RR", (0.80, 0.20))]:
+            self.nodes.append([nm, p])
+        self.regions = [("RL", "RR", "FR", "FL")]
+        for i, nm in enumerate(["FL", "FR", "RL", "RR"]):
+            self.outputs.append([nm, i, 1.0])
+            self.bind_one(nm, nm)
+        was = self.auto
+        self.auto = True
+        self.new_level(True)
+        self.new_level(True)
+        self.auto = was
+        self.go_level(0)
+        self.select_only("FL")
+
     # ---- files -----------------------------------------------------------
     # A pair on "disk" is a snapshot of the map and, depending on the case, of
     # its outputs. The kernel's own suites pin the file FORMATS; this only has
@@ -1739,6 +1758,7 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "bindall": "bind to every output", "fill": "fill",
           "clear": "back to own output", "silence": "silence", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
+          "room": "room example",
           "empty": "new map", "move": "move", "openpair": "open",
           "derivedafter": "derived output", "userig": "use rig",
           "newlevel": "new level", "raise": "height",
@@ -1841,6 +1861,7 @@ class Script:
             "movelevel": lambda: e.move_level(args[0], args[1]),
             "steplevel": lambda: e.step_level(args[0], args[1]),
             "example":  lambda: (e.example(), (1, 0, ""))[1],
+            "room":     lambda: (e.room(), (1, 0, ""))[1],
             "empty":    lambda: (e.new_empty(), (1, 0, ""))[1],
         }[op]()
         argtxt = ""
@@ -3529,6 +3550,20 @@ def build_cells(out):
     t.keys()
     t.do("joincells", False)
     t.do("cycle"); t.do("cycleback"); t.do("cycleback"); t.do("cycle")
+    t.end()
+
+    out.append("# ROUND 3B-1: THE ROOM EXAMPLE")
+    t = Script(out, "room_three_levels",
+               "the room: four corners on the floor, the middle and the top, "
+               "each level's on outputs of its own, the floor current; made "
+               "with auto-output on even when it is off, and left as it was")
+    t.do("auto")
+    t.do("room")
+    t.keys()
+    t.do("levelup"); t.do("levelup")
+    out.append("# auto-output is still off: a node placed now starts unbound")
+    t.do("place", (0.5, 0.5))
+    t.do("undo"); t.do("undo"); t.do("redo")
     t.end()
 
 if __name__ == "__main__":

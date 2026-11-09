@@ -259,6 +259,7 @@ std::string label(const std::string& op) {
         {"clear", "back to own output"}, {"silence", "silence"},
         {"trim", "trim"},
         {"removeoutput", "remove output"}, {"example", "example map"},
+        {"room", "room example"},
         {"empty", "new map"}, {"move", "move"}, {"openpair", "open"},
         {"newlevel", "new level"}, {"raise", "height"},
         {"removelevel", "remove level"}, {"movelevel", "move level"},
@@ -462,6 +463,8 @@ int main(int argc, char** argv) {
             }
             else if (lastOp == "example") op = [&](Model& m) {
                 m.loadExample(); Result r; r.changed = true; return r; };
+            else if (lastOp == "room") op = [&](Model& m) {
+                m.loadRoom(); Result r; r.changed = true; return r; };
             else if (lastOp == "empty")   op = [&](Model& m) {
                 m.newEmpty(); Result r; r.changed = true; return r; };
             else { std::cerr << "unknown op " << lastOp << "\n"; return 2; }

@@ -2161,3 +2161,32 @@ file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
 find:         peer_ = (!m.args.empty() && m.args[0].type == 's') ? m.args[0].s\n                                                            : std::string();
 replace:         if (!m.args.empty() && m.args[0].type == 's') peer_ = m.args[0].s;
 nl: yes
+
+gate: The room is made with auto-output as the user left it
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     autoOutput_ = true;\n    newLevel(true);
+replace:     newLevel(true);
+nl: yes
+
+gate: The room leaves auto-output on
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     autoOutput_ = wasAuto;\n    goToLevel(0);
+replace:     goToLevel(0);
+nl: yes
+
+gate: The room opens on the top level
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     goToLevel(0);\n    selectOnlyOutput(first);
+replace:     selectOnlyOutput(first);
+nl: yes
+
+gate: The room has two levels
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     newLevel(true);\n    newLevel(true);\n    autoOutput_ = wasAuto;
+replace:     newLevel(true);\n    autoOutput_ = wasAuto;
+nl: yes
+
+gate: The room's outputs share a channel
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         const TargetID t = map_.addOutput(manifold_.node(id).name, ch++);
+replace:         const TargetID t = map_.addOutput(manifold_.node(id).name, ch);

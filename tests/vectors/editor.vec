@@ -3563,3 +3563,35 @@ EXPECT 0 0 "current output: n0"
 STATE N n0@0.2,0.2 n1@0.8,0.2 n2@0.5,0.8 | R  | O n0:0:1 n1:1:1 n2:2:1 | L n0>n0:1 n1>n1:1 n2>n2:1 | D  | C n0 | S n0 | A 1
 ENDEDIT
 
+# ROUND 3B-1: THE ROOM EXAMPLE
+# the room: four corners on the floor, the middle and the top, each level's on outputs of its own, the floor current; made with auto-output on even when it is off, and left as it was
+EDIT room_three_levels ANALYTIC
+GRID FREE
+DO auto
+EXPECT 0 0 "auto-output off: new nodes start unbound"
+STATE N  | R  | O  | L  | D  | C - | S - | A 0
+DO room
+EXPECT 1 0 ""
+STATE N FL@0.2,0.8 FR@0.8,0.8 RL@0.2,0.2 RR@0.8,0.2 | R RL,RR,FR,FL | O FL:0:1 FR:1:1 RL:2:1 RR:3:1 FL-2:4:1 FR-2:5:1 RL-2:6:1 RR-2:7:1 FL-3:8:1 FR-3:9:1 RL-3:10:1 RR-3:11:1 | L FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | D  | C FL | S FL | A 0 | V 0 | Z0 0 K FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | Z1 0.25 K FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | Z2 0.5 K FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1
+KEYS drag=0 aud=0 grid=lattice EXPECT place:1 box:1 toggle:1 all:1 none:0 move:1 freehand:0 join:0 joincells:0 unjoin:0 remove:0 gridkind:1 rotate:1 spacing:1 spokes:0 deadzone:1 layoutsize:1 layout:1 layoutnodes:1 newoutput:1 pickoutput:1 addoutput:1 nextoutput:1 bind:0 bindall:0 fill:0 clear:0 silence:0 derivedafter:1 derived:0 trim:1 removeoutput:1 autooutput:1 levelswitch:1 newlevel:1 raise:0 movelevel:1 match:0 removelevel:1 view3d:1 newvalue:1 pickvalue:0 stepvalue:0 editvalue:0 removevalue:0 audition:1 lock:1 undo:1 redo:0 save:1 saveas:1 open:1 userig:1 saverig:1 empty:1 example:1 fullscreen:1 textsize:1 keysheet:1 BIND bind or unbind selected
+DO levelup
+EXPECT 0 0 "level 2 of 3, at 0.25"
+STATE N FL@0.2,0.8 FR@0.8,0.8 RL@0.2,0.2 RR@0.8,0.2 | R RL,RR,FR,FL | O FL:0:1 FR:1:1 RL:2:1 RR:3:1 FL-2:4:1 FR-2:5:1 RL-2:6:1 RR-2:7:1 FL-3:8:1 FR-3:9:1 RL-3:10:1 RR-3:11:1 | L FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | D  | C FL | S FL | A 0 | V 1 | Z0 0 K FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | Z1 0.25 K FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | Z2 0.5 K FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1
+DO levelup
+EXPECT 0 0 "level 3 of 3, at 0.5"
+STATE N FL@0.2,0.8 FR@0.8,0.8 RL@0.2,0.2 RR@0.8,0.2 | R RL,RR,FR,FL | O FL:0:1 FR:1:1 RL:2:1 RR:3:1 FL-2:4:1 FR-2:5:1 RL-2:6:1 RR-2:7:1 FL-3:8:1 FR-3:9:1 RL-3:10:1 RR-3:11:1 | L FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1 | D  | C FL | S FL | A 0 | V 2 | Z0 0 K FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | Z1 0.25 K FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | Z2 0.5 K FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1
+# auto-output is still off: a node placed now starts unbound
+DO place 0.5 0.5
+EXPECT 1 0 ""
+STATE N FL@0.2,0.8 FR@0.8,0.8 RL@0.2,0.2 RR@0.8,0.2 n4@0.5,0.5 | R RL,RR,FR,FL | O FL:0:1 FR:1:1 RL:2:1 RR:3:1 FL-2:4:1 FR-2:5:1 RL-2:6:1 RR-2:7:1 FL-3:8:1 FR-3:9:1 RL-3:10:1 RR-3:11:1 | L FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1 | D  | C FL | S FL | A 0 | V 2 | Z0 0 K FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | Z1 0.25 K FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | Z2 0.5 K FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1
+DO undo
+EXPECT 1 0 "undid place"
+STATE N FL@0.2,0.8 FR@0.8,0.8 RL@0.2,0.2 RR@0.8,0.2 | R RL,RR,FR,FL | O FL:0:1 FR:1:1 RL:2:1 RR:3:1 FL-2:4:1 FR-2:5:1 RL-2:6:1 RR-2:7:1 FL-3:8:1 FR-3:9:1 RL-3:10:1 RR-3:11:1 | L FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1 | D  | C FL | S FL | A 0 | V 2 | Z0 0 K FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | Z1 0.25 K FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | Z2 0.5 K FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1
+DO undo
+EXPECT 1 0 "undid room example"
+STATE N  | R  | O  | L  | D  | C - | S - | A 0
+DO redo
+EXPECT 1 0 "redid room example"
+STATE N FL@0.2,0.8 FR@0.8,0.8 RL@0.2,0.2 RR@0.8,0.2 | R RL,RR,FR,FL | O FL:0:1 FR:1:1 RL:2:1 RR:3:1 FL-2:4:1 FR-2:5:1 RL-2:6:1 RR-2:7:1 FL-3:8:1 FR-3:9:1 RL-3:10:1 RR-3:11:1 | L FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1 | D  | C FL | S FL | A 0 | V 2 | Z0 0 K FL>FL:1 FR>FR:1 RL>RL:1 RR>RR:1 | Z1 0.25 K FL>FL-2:1 FR>FR-2:1 RL>RL-2:1 RR>RR-2:1 | Z2 0.5 K FL>FL-3:1 FR>FR-3:1 RL>RL-3:1 RR>RR-3:1
+ENDEDIT
+

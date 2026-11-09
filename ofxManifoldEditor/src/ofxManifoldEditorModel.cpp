@@ -153,6 +153,33 @@ void Model::loadExample() {
     refreshTopology();
 }
 
+void Model::loadRoom() {
+    newEmpty();
+    const auto FL = manifold_.addNode("FL", {0.20f, 0.80f});
+    const auto FR = manifold_.addNode("FR", {0.80f, 0.80f});
+    const auto RL = manifold_.addNode("RL", {0.20f, 0.20f});
+    const auto RR = manifold_.addNode("RR", {0.80f, 0.20f});
+    manifold_.addRegion({RL, RR, FR, FL});
+    TargetID first = InvalidTarget;
+    int ch = 0;
+    for (NodeID id : {FL, FR, RL, RR}) {
+        const TargetID t = map_.addOutput(manifold_.node(id).name, ch++);
+        map_.bind(0, id, t);
+        if (first == InvalidTarget) first = t;
+    }
+    refreshTopology();
+    // The middle and the top, each with its own outputs, whatever the
+    // auto-output setting is; it is left as it was.
+    const bool wasAuto = autoOutput_;
+    autoOutput_ = true;
+    newLevel(true);
+    newLevel(true);
+    autoOutput_ = wasAuto;
+    goToLevel(0);
+    selectOnlyOutput(first);
+    settleCurrentOutput();
+}
+
 void Model::newEmpty() {
     manifold_ = Manifold2D();
     map_ = Map3D();

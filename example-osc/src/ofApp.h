@@ -5,8 +5,11 @@
 // The smallest player: one map, one point, and OSC out that grows and
 // shrinks with the map -- for SuperCollider, Max, Pd, TouchDesigner, a
 // script, whatever is listening. Drag the point; hold up or down to move it
-// through the levels. What goes out, and whether anyone answered, is on the
-// right.
+// through the levels. It starts on the room example: four corners on the
+// floor, the middle and the top. Beside the map, the column of level dots and
+// the editor's 3D view, where the point is a green ball with a line dropped
+// to the level below; the level it is on or above is the brighter one. What
+// goes out, and whether anyone answered, is on the right.
 //
 // The receiver need not know how many outputs there are: the app describes
 // them (/manifold/outputs) on the first send, when they change, when asked,
@@ -24,12 +27,14 @@
 //   i               per-output messages on or off
 //   [ ]             send rate down / up
 //   space           pause sending
+//   3               the 3D view on or off (drag in it to turn it)
 //   o               open a map pair (map + outputs)
-//   e               the example map
+//   e               the room example: three levels
+//   E               the editor's flat example
 
 #include "ofMain.h"
 #include "ofxManifold.h"
-#include "ofxManifoldEditor.h"
+#include "ofxManifoldEditorViews.h"
 #include "ofxManifoldPlayer.h"
 #include "ofxOsc.h"
 
@@ -58,12 +63,25 @@ private:
 
     void adopt();                       // after the map changes
     void open();
+    void layoutWindow();                // the map, the column, the 3D view
+    void followLevel();                 // the point's level is current
+    ofxManifold::editor::Scene scene() const;
     ofxManifold::player::OscFrame frameNow() const;
 
     ofxManifold::editor::Model                    model;
     std::unique_ptr<ofxManifold::Evaluator>       evaluator;
     std::unique_ptr<ofxManifoldRenderer>          renderer;
     ofxManifold::Evaluation                       evaluation;
+
+    // Where things are, from the window's size (layoutWindow): the map, the
+    // 3D view beside it when shown, and the panel's left edge.
+    ofRectangle mapArea, view3D;
+    float       panelX = 0.0f;
+    bool        show3D = true;
+    bool        aimed  = false;          // the camera aimed once, then dragged
+    ofEasyCam   cam;
+    ofxManifold::editor::Text      text; // the column's label
+    ofxManifold::editor::Selection none; // nothing selected: a player
 
     glm::vec2 point{0.5f, 0.5f};
     float     z = 0.0f;

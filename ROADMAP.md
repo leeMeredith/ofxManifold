@@ -25,7 +25,7 @@ serialization the standard library's own JSON parser against a hand-written one.
 
 | `ofxManifoldPlayer` | 35 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
 
-**889 vectors, 402 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**890 vectors, 407 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 

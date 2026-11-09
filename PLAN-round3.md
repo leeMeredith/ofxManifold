@@ -1243,6 +1243,23 @@ first player, `example-osc`.
   keeping its trailing slash -- was because the vectors recorded the prefix
   already cleaned; they record it as given now.
 
+Added before the app was first built (2026-11-09):
+
+- **The room example**, `Model::loadRoom()`: a square of four corners, FL
+  FR RL RR, on the floor at 0, the middle at 0.25 and the top at 0.5, each
+  level's corners on outputs of their own (FL, FL-2, FL-3 ...), twelve in
+  all. Made as a user would make it -- the floor, then a new level above
+  twice -- with auto-output on whatever its setting, and the setting left as
+  it was. One editor vector script (`room_three_levels`), 5 gates (407).
+  It is where the virtual room on headphones (3B-2) starts.
+- **example-osc shows the levels**: the editor's column of level dots right
+  of the map, and its 3D view beside that (`3` shows and hides it). The
+  level the point is on or above becomes current, so it is the brighter
+  one; that is only for showing -- what is sent is worked out from every
+  level at the point's height either way. It opens on the room; `e` is the
+  room, `E` the editor's flat example. The window starts at 1280 x 720; the
+  map and the 3D view shrink together to leave the panel 44 characters.
+
 ---
 
 ## Answered

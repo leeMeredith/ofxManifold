@@ -123,6 +123,12 @@ public:
     // A fan of four triangles and a quad, with outputs chosen so every node
     // shape appears at once.
     void loadExample();
+    // A room on three levels (round 3B-1): a square of four corners, FL FR
+    // RL RR, on the floor at 0, the middle at 0.25 and the top at 0.5, each
+    // level's corners on outputs of their own (FL, FL-2, FL-3 ...), twelve
+    // in all. Made the way an editor user would: the floor, then n twice
+    // with auto-output on. The floor is current.
+    void loadRoom();
     void newEmpty();
 
     // Take over a map and outputs read from files: a 2D pair, as one level,
