@@ -11,10 +11,16 @@
 // to the level below; the level it is on or above is the brighter one. What
 // goes out, and whether anyone answered, is on the right.
 //
-// What is sent is smoothed (OutputSmoother): one number per output and per
+// The map is drawn as the editor draws it, without the editing: node shapes
+// by kind, each node's share as a halo, values, the links of the nodes being
+// heard, and the outputs' faders along the bottom -- so an output that sounds
+// wrong can be seen to be unbound, trimmed or fed from somewhere unexpected.
+//
+// What is sent is smoothed (OutputSmoother): one number per channel and per
 // node value, a fixed list, so a click across the map, a level crossed or the
-// point leaving the map glides over the half-life instead of stepping. Click
-// far from the point to hear it; s to compare without.
+// point leaving the map glides over the half-life instead of stepping. The
+// faders show what is sent, smoothed. Click far from the point to hear it; s
+// to compare without.
 //
 // The receiver need not know how many outputs there are: the app describes
 // them (/manifold/outputs) on the first send, when they change, when asked,
@@ -32,7 +38,11 @@
 //   i               per-output messages on or off
 //   [ ]             send rate down / up
 //   s               smoothing on or off
-//   - =             smoothing's half-life shorter / longer
+//   - =             smoothing's half-life a step shorter / longer
+//   shift - =       a hundredth of a second shorter / longer
+//   l               links: of the nodes heard, of every node, none
+//   tab, shift-tab  the next / last output: its nodes ringed in its colour
+//   click a fader   that output
 //   space           pause sending
 //   3               the 3D view on or off (drag in it to turn it)
 //   o               open a map pair (map + outputs)
@@ -56,6 +66,7 @@ public:
     void draw() override;
 
     void mousePressed(int x, int y, int button) override;
+    void mouseMoved(int x, int y) override;
     void mouseDragged(int x, int y, int button) override;
     void keyPressed(int key) override;
     void keyReleased(int key) override;
@@ -73,8 +84,10 @@ private:
     void layoutWindow();                // the map, the column, the 3D view
     void followLevel();                 // the point's level is current
     ofxManifold::editor::Scene scene() const;
-    ofxManifold::player::OscFrame frameNow() const;
-    void smooth(ofxManifold::player::OscFrame& f, float dt);
+    ofxManifold::player::OscFrame frameNow(const ofxManifold::editor::ChartLevels& lv) const;
+    // The map's levels at the point (routed, after trim, silence) and the
+    // node values, smoothed: what the faders show and what is sent.
+    void smooth(float dt);
     void applySmoothing();              // smoothOn and halfLife to both
 
     ofxManifold::editor::Model                    model;
@@ -85,7 +98,15 @@ private:
     // Where things are, from the window's size (layoutWindow): the map, the
     // 3D view beside it when shown, and the panel's left edge.
     ofRectangle mapArea, view3D;
+    glm::vec2   mouse{-1.0f, -1.0f};     // for the faders' hover labels
     float       panelX = 0.0f;
+    float       chartTop = 0.0f;         // the faders' band, across the bottom
+    ofxManifold::editor::ChartLayout chart;
+    ofxManifold::editor::ChartLevels heard;         // smoothed: shown and sent
+    std::vector<std::pair<std::string, float>> heardValues;
+    // Whose links are drawn: the nodes heard (0), every node (1), none (2).
+    int         links = 0;
+    ofxManifold::editor::Selection linkSet;
     bool        show3D = true;
     bool        aimed  = false;          // the camera aimed once, then dragged
     ofEasyCam   cam;
@@ -96,8 +117,10 @@ private:
     float     z = 0.0f;
     int       glideDir = 0;             // -1, 0, +1 while down / up is held
 
-    // Smoothing what is sent: the outputs' levels and the node values, each
-    // a list as long as the map makes it. Reset when the map changes.
+    // Smoothing what is sent: the levels by channel (routed, after trim, and
+    // silence, so the faders' bars and ticks move together) and the node
+    // values, each a list as long as the map makes it. Reset when the map
+    // changes.
     ofxManifold::player::OutputSmoother levelSmoother, valueSmoother;
     bool  smoothOn = true;
     float halfLife = 0.05f;

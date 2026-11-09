@@ -1279,6 +1279,19 @@ Added before the app was first built (2026-11-09):
   (0.01 to 2 s, 0.05 to start); a map change resets them. For the master
   player: one per moving object, made when it appears and dropped when it
   goes, under a cap.
+- **example-osc shows what the editor shows, without the editing**: the
+  editor's `drawMap` with nothing selected and no grid (node shapes by kind,
+  halos, values, the current output's nodes ringed, the point and its lines,
+  the level dots) and its faders across the bottom (`drawChart`), hover
+  labels included. The faders show what is SENT: the smoothed levels, the
+  smoother now taking routed, after-trim and silence as one list so a bar,
+  its trim tick and the silence bar glide together. Links: the editor draws
+  the selection's; `Scene::linked` (null for the editor) lets a player name
+  whose -- example-osc's `l` cycles the nodes being heard, every node, none.
+  `tab` / shift-`tab` or a click on a fader picks the output. Shift `-` `=`
+  steps the half-life by 0.01 s, between the coarse steps. `drawGrid`
+  returns before reading the grid when there is none. The window starts at
+  1440 x 900.
 
 ---
 

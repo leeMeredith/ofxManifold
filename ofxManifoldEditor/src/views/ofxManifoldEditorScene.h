@@ -50,6 +50,10 @@ struct Scene {
     int       levelDrag     = -1;
     float     levelDragBase = 0.0f;
     glm::vec2 mouse{-1.0f, -1.0f};       // for hover
+    // Whose links (the arcs from a node to the outputs it feeds that other
+    // nodes own) the map draws; null: the selection's, as the editor does. A
+    // player passes the nodes it is hearing, or every node.
+    const Selection* linked = nullptr;
     // What l would lay out at the mouse (round 3A-9), shown faintly after
     // [ or ] until l or another key. nullptr: nothing shown.
     const LayoutPlan* layoutPreview = nullptr;

@@ -185,7 +185,11 @@ editor's flat example, `o` a map of your own; `p` and `i` switch packed and
 per-output messages, `[` `]` the rate. What it sends is smoothed -- one
 number per output, a list the map fixes, so a click across the room or the
 point leaving the map glides instead of stepping; `s` turns it off to
-compare, `-` `=` change the half-life. With it a SuperCollider patch
+compare, `-` `=` change the half-life a step, shift a hundredth of a second.
+The map is drawn as the editor draws it, without the editing -- node shapes,
+halos, values, the links of the nodes being heard (`l`: every node, none) --
+and the editor's faders run along the bottom, showing what is sent; `tab` or
+a click on a fader rings that output's nodes in its colour. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**

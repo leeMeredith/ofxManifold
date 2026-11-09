@@ -36,6 +36,7 @@ static void drawSegment(const ofxManifoldRenderer* renderer,
 }
 
 void drawGrid(const Scene& s, const GridLook& look) {
+    if (look.kind == GridKind::Free || !look.grid) return;   // a player has none
     const ofxManifoldRenderer* renderer = s.renderer;
     const GridKind kind = look.kind;
     const Grid& grid = *look.grid;
@@ -164,7 +165,7 @@ void drawLinks(const Scene& s) {
     (void)model; (void)selection; (void)manifold; (void)mapping;
     (void)evaluation; (void)renderer; (void)cw; (void)lh; (void)text;
 
-    const std::vector<LinkLine> lines = linkLines(model, selection);
+    const std::vector<LinkLine> lines = linkLines(model, s.linked ? *s.linked : selection);
     if (lines.empty()) return;
     ofPushStyle();
     for (const LinkLine& l : lines) {

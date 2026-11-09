@@ -145,13 +145,23 @@ wrapper:
 DRAWLOG_SRC := tests/drawlog/session.cpp example-editor/src/ofApp.cpp \
                src/ofx/ofxManifoldRenderer.cpp $(EDITOR_CPP) \
                $(wildcard ofxManifoldEditor/src/views/*.cpp)
-drawlog: $(DRAWLOG_SRC) tests/drawlog/ofMain.h
+# example-osc the same way (3B-1): the player drawn on the editor's views.
+DRAWLOG_OSC_SRC := tests/drawlog/session_osc.cpp example-osc/src/ofApp.cpp \
+               src/ofx/ofxManifoldRenderer.cpp $(EDITOR_CPP) \
+               $(wildcard ofxManifoldPlayer/src/*.cpp) \
+               $(wildcard ofxManifoldEditor/src/views/*.cpp)
+drawlog: $(DRAWLOG_SRC) $(DRAWLOG_OSC_SRC) tests/drawlog/ofMain.h
 	@mkdir -p $(BUILD)
 	@$(CXX) -std=c++17 -O1 -w -Ilibs -Itests/drawlog -Isrc \
 		-IofxManifoldEditor/src -IofxManifoldEditor/src/views \
 		-Iexample-editor/src -o $(BUILD)/drawlog $(DRAWLOG_SRC)
 	@./$(BUILD)/drawlog > $(BUILD)/drawlog.txt
 	@echo "drawlog: $$(grep -c '^==== frame' $(BUILD)/drawlog.txt) frames, $$(wc -l < $(BUILD)/drawlog.txt) drawing calls recorded in $(BUILD)/drawlog.txt"
+	@$(CXX) -std=c++17 -O1 -w -Ilibs -Itests/drawlog -Itests/stub -Isrc \
+		-IofxManifoldEditor/src -IofxManifoldEditor/src/views -IofxManifoldPlayer/src \
+		-Iexample-osc/src -o $(BUILD)/drawlog_osc $(DRAWLOG_OSC_SRC)
+	@./$(BUILD)/drawlog_osc > $(BUILD)/drawlog_osc.txt
+	@echo "drawlog: $$(grep -c '^==== frame' $(BUILD)/drawlog_osc.txt) frames, $$(wc -l < $(BUILD)/drawlog_osc.txt) drawing calls of example-osc in $(BUILD)/drawlog_osc.txt"
 
 # The CI workflow must stay loadable by GitHub. Cheap, and it catches the
 # YAML 1.1 'on' -> true trap that silently invalidates the whole file.
