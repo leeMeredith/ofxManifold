@@ -173,6 +173,18 @@ a clean fan, a deliberately broken T-junction, two overlapping regions where the
 answer depends on which side you entered from, and a 144-node grid for looking
 at the renderer at density.
 
+**`example-osc`** — the smallest player: one map, one point, and OSC out
+that grows and shrinks with the map, for SuperCollider, Max, Pd,
+TouchDesigner or a script. The receiver needn't know how many outputs there
+are; the app describes them, and again when they change. Drag the point, hold
+↑ or ↓ to move it through the levels; `p` and `i` switch packed and
+per-output messages, `[` `]` the rate. With it a SuperCollider patch
+(`supercollider/manifold-receive.scd`) that builds a voice per output and
+plays it over headphones, and `receive.py`, a receiver with no dependencies.
+The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
+(beside `src/`, copied into `addons/` like the editor's), `ofxManifoldEditor`
+for opening maps, and openFrameworks' own `ofxNetwork`.
+
 **`example-editor`** needs a second addon, **`ofxManifoldEditor`**, which lives
 in this repository beside `src/`: copy it into your `addons/` folder next to
 ofxManifold. It is kept out of ofxManifold's own `src/` on purpose, so projects
@@ -187,7 +199,7 @@ that wants to show a map the way the editor does.
 **`example-editor`** — the first piece of the editor. Click empty space to
 place a node on the active grid, drag a box or shift-click to select, drag the
 selection to move it as one operation, press `f` to join the selection into a
-region, delete to remove nodes, `u` to unjoin, `x` for an empty map, `s` and `l`
+region, delete to remove nodes, `u` to unjoin, ⌘N for an empty map, `s` and `l`
 to save and load. Outputs: `o` makes one, `b` binds the selection to it or unbinds
 it (a toggle), ⇧B to every output, `q` and `w` step a node's fill down and up by 5% (shift for 1%),
 `d` makes a derived output. ⌘Z undoes and ⇧⌘Z redoes, any edit. ⌘S saves the map and its
@@ -287,7 +299,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-854 vectors across twelve suites, plus 384 mutation gates that introduce known
+889 vectors across thirteen suites, plus 402 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

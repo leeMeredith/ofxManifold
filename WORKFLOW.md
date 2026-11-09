@@ -104,6 +104,8 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make door` | nothing outside `editor::Model` can change a map; snippets that must fail to compile |
 | `make keys` | every key listed in the editor's key panel reaches the app: returned by `keyId()`, answered by `keyPressed()` |
 | `make panel` | the editor window's layout at 576 window and text sizes: the key panel inside its room and above or beside the faders, no line on another, every key shown once in order or counted, each column starting at its top, the views never under half their size, every key shown at 1280 x 800 and up with text up to 14 |
+| `make test-osc` | ofxManifoldPlayer's OSC out against `tests/vectors/osc.vec`: each message's bytes, malformed packets refused, the sender frame by frame |
+| `make osc-live` | the same sender over a real UDP socket on this machine, every packet checked against the reference, a hello sent back and counted |
 | `make drawlog` | records every drawing call of a scripted editing session; record before and after a change meant to leave the screen alone, and `cmp` |
 | `make reproducible` | every reference produces the same file twice; part of `make test` |
 | `make bench` | measure mesh scaling; asserts nothing |

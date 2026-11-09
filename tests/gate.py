@@ -38,6 +38,7 @@ import sys
 
 # target -> (binary under build/, sources compiled into it)
 EDITOR_CPP = sorted(glob.glob("ofxManifoldEditor/src/*.cpp"))
+PLAYER_CPP = sorted(glob.glob("ofxManifoldPlayer/src/*.cpp"))
 SUITES = {
     "test-triangle":       ("run_vectors",        ["tests/run_vectors.cpp"]),
     "test-manifold":       ("run_manifold",       ["tests/run_manifold.cpp"]),
@@ -53,15 +54,18 @@ SUITES = {
     "test-levels":         ("run_levels",         ["tests/run_levels.cpp"]),
     # the editor window's layout (3A-10), not a vector suite
     "panel":               ("check_panel",        ["tests/check_panel.cpp"] + EDITOR_CPP),
+    # ofxManifoldPlayer's OSC out (3B-1): the vectors, and over a socket
+    "test-osc":            ("run_osc",            ["tests/run_osc.cpp"] + PLAYER_CPP),
+    "osc-live":            ("osc_udp",            ["tests/osc_udp.cpp"] + PLAYER_CPP),
 }
-INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src"]
+INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src", "-IofxManifoldPlayer/src"]
 
 
 def makefile_suites():
     with open("Makefile") as f:
         text = f.read()
     m = re.search(r"^test:(.*?)\n\t", text, re.S | re.M)
-    return set(re.findall(r"test-[a-z]+", m.group(1)))
+    return set(re.findall(r"test-[a-z]+|osc-live", m.group(1)))
 
 
 def reached_by(source):

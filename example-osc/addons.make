@@ -1,0 +1,4 @@
+ofxManifold
+ofxManifoldEditor
+ofxManifoldPlayer
+ofxNetwork

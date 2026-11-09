@@ -476,6 +476,61 @@ So the player is designed for it now:
 - its starting value names, `distance`, `brightness` and `reverb`, documented
   as the convention it shares with its SuperCollider patch.
 
+### J. 3B in small players -- agreed 2026-11-08
+
+Lee: not one player for every possibility, but several small ones, each
+useful and testable, until they culminate in a master player -- "this isn't
+just a product for me but anyone that's been interested in utilizing this
+interface". The pieces they prove collect in one package, `ofxManifoldPlayer`
+(no openFrameworks, tested like the editor); the apps stay thin.
+
+The order: **OSC out** (3B-1, the smallest piece, for any receiver); a
+**virtual room** on headphones (speakers with positions, rendered binaurally
+in SuperCollider, three levels -- floor, middle, top -- with the panners
+SuperCollider provides to compare against the map); **movement** (paths,
+orbits, wandering, flocking, groups); the **master player**.
+
+#### 3B-1: OSC out that grows and shrinks with the map
+
+Messages for whatever is listening -- SuperCollider, Max, Pd, TouchDesigner,
+a script. The receiver need not know how many outputs there are: the app
+says, and says again when that changes. Agreed with Lee (2026-11-08), every
+recommendation, and a faster refresh than first proposed ("one second sounds
+pretty slow").
+
+    /manifold/outputs   N  name0 ch0  name1 ch1 ...   describe: on the first
+                                                      send, on a change, on
+                                                      request, every 2 s
+    /manifold/levels    f0 f1 ... f(N-1)              packed, in the order
+                                                      described (channel order)
+    /manifold/out/NAME  f                             per output
+    /manifold/values    M  name0 v0  name1 v1 ...     packed
+    /manifold/value/NAME f                            per value
+    /manifold/position  x y z
+    /manifold/describe                                in: send the outputs again
+    /manifold/hello     [name]                        in: a receiver is there
+
+- **Packed and per output**, each switchable; packed on by default.
+- **Packed sends everything at every send.** Per output sends only what
+  changed (by more than 1e-6) at every send, and everything every 0.1 s, so
+  a receiver that joins late or drops a packet catches up within a tenth of
+  a second. Values follow the same two shapes.
+- **Sends at a rate, 60 a second by default**, settable; never two in one
+  rate period, and a late frame does not cause a burst.
+- **The prefix is settable** (`/manifold`), so two apps can run side by
+  side. A name in an address has any of ` #*,/?[]{}` replaced by `_`.
+- **The handshake is optional.** A `hello` marks the receiver connected for
+  three seconds; nothing is held back without one.
+- **OSC 1.0 messages**, one per UDP packet, arguments `i` `f` `s` only --
+  what SuperCollider, Max and Pd all read without a bundle parser. The
+  encoding is the package's own, checked against python-osc, so the code
+  the tests check is the code that sends.
+- **`example-osc`**: one map, a point to drag (with height), what is being
+  sent and whether anyone answered. With it a SuperCollider patch that
+  builds as many channels as `/manifold/outputs` says and pans a test sound
+  by the levels over stereo, smoothing with a 20 ms lag; a Python receiver
+  with no dependencies; and a protocol page for anyone building their own.
+
 ---
 
 ## Done
@@ -1152,6 +1207,38 @@ group's keys in its own colour.
   and that the views keep their size with nothing selected. 2 mutation
   gates (384).
 
+### 3B-1: OSC out that grows and shrinks with the map
+
+As section J, 3B-1 says. The first piece of `ofxManifoldPlayer`, and the
+first player, `example-osc`.
+
+- **`ofxManifoldPlayer`** is a new addon beside `ofxManifoldEditor`, no
+  openFrameworks: `OscMessage`, `encode`, `decode`, `oscName` and `OscOut`,
+  which says what to send each frame. The app sends the bytes `encode` makes
+  through ofxNetwork, so the code the tests check is the code that sends.
+- **`tests/ref/reference_osc.py`** writes 35 vectors: 16 encodings, each
+  built by python-osc as well and identical byte for byte (CROSS) -- the
+  file is the same without python-osc, which CI does not install; 3 packets
+  python-osc built, decoded; 9 malformed ones refused; 7 sender scripts
+  (packed, described again as outputs come and go and on request and every
+  two seconds, per output with its refresh, both shapes with values and the
+  position, the rate and a late frame, a prefix and cleaned names, hello).
+- **`make osc-live`** sends a run of 56 packets over a real UDP socket on
+  the machine; each must be exactly what the reference sends, and python-osc
+  must read each the same; then a hello goes back and must be counted.
+- **`example-osc`**: drag the point, hold up or down for height; `p`, `i`,
+  `[ ]`, space; `o` opens a pair, `e` the example. It shows where it sends,
+  how much went out in the last second, whether anyone answered, and the last
+  send. With it `supercollider/manifold-receive.scd` -- a voice per output,
+  rebuilt as the outputs change, panned left to right, band-passed pink noise
+  so each can be told apart, a 20 ms lag, a hello a second -- and
+  `receive.py`, a receiver with no dependencies (tried against the test
+  sender: it described two outputs, then three, and its hello was counted).
+  The protocol for anyone building a receiver: `ofxManifoldPlayer/OSC.md`.
+- 18 mutation gates (402). The one that first went uncaught -- a prefix
+  keeping its trailing slash -- was because the vectors recorded the prefix
+  already cleaned; they record it as given now.
+
 ---
 
 ## Answered
@@ -1187,6 +1274,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-10** | Editor: c and C; the key panel flows into columns and fits | editor scripts, `make panel`, drawlog session extended |
 | **3A-11** | Editor: keys tidied; L and F; a grid that fits; the lines highlighted | editor scripts, drawlog session extended |
 | **3A-12** | Editor: softer hints, a grid without gaps, a panel of what can be done | `make panel`, drawlog session |
+| **3B-1** | OSC out that grows and shrinks with the map; `ofxManifoldPlayer`; `example-osc` | osc vectors, `make osc-live` |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

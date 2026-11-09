@@ -2065,3 +2065,99 @@ gate: The views resize as keys light and darken
 file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 find:                         tight).hidden == 0;
 replace:                         tight, true).hidden == 0;
+
+# ---- round 3B-1: OSC out ----
+
+gate: Strings are not padded to four bytes
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     while (out.size() % 4 != 0) out.push_back(0);
+replace:     (void)0;
+
+gate: Strings are not null-terminated
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     out.insert(out.end(), s.begin(), s.end());\n    out.push_back(0);
+replace:     out.insert(out.end(), s.begin(), s.end());
+nl: yes
+
+gate: Numbers go out little-endian
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     out.push_back(std::uint8_t(v >> 24));\n    out.push_back(std::uint8_t(v >> 16));\n    out.push_back(std::uint8_t(v >> 8));\n    out.push_back(std::uint8_t(v));
+replace:     out.push_back(std::uint8_t(v));\n    out.push_back(std::uint8_t(v >> 8));\n    out.push_back(std::uint8_t(v >> 16));\n    out.push_back(std::uint8_t(v >> 24));
+nl: yes
+
+gate: Padding that is not zero is read
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         if (data[k] != 0) return false;
+replace:         (void)k;
+
+gate: Bytes after the message are ignored
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (at != size) return false;\n    out = m;
+replace:     out = m;
+nl: yes
+
+gate: An address without a slash is read
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         || address[0] != '/') {
+replace:         ) {
+
+gate: A slash in a name stays in the address
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     static const std::string bad = " #*,/?[]{}";
+replace:     static const std::string bad = " #*,?[]{}";
+
+gate: A prefix keeps its trailing slash
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     while (!q.empty() && q.back() == '/') q.pop_back();
+replace:     (void)q;
+
+gate: Every frame sends, whatever the rate
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (sentYet_ && now < nextSend_ - 1e-9) return msgs;
+replace:     if (false) return msgs;
+
+gate: A late frame is followed by a burst
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (!sentYet_ || now > nextSend_ + period) {
+replace:     if (!sentYet_) {
+
+gate: Outputs added or gone are not described
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (!describedYet_ || layout != described_ || describeAsked_
+replace:     if (!describedYet_ || describeAsked_
+
+gate: A request to describe is ignored
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (!describedYet_ || layout != described_ || describeAsked_
+replace:     if (!describedYet_ || layout != described_
+
+gate: The outputs are never described again unasked
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         || now >= lastDescribe_ + kDescribeEvery - 1e-9) {
+replace:         || now >= lastDescribe_ + 1e9) {
+
+gate: Per output never sends everything again
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:                       || now >= lastRefresh_ + kRefreshEvery - 1e-9;
+replace:                       || now >= lastRefresh_ + 1e9;
+
+gate: Per output sends what has not changed
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         return refresh || it == sent.end() || std::fabs(v - it->second) > kChanged;
+replace:         return refresh || it == sent.end() || std::fabs(v - it->second) >= 0.0f;
+
+gate: Another prefix's describe is answered
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (m.address == prefix_ + "/describe") {
+replace:     if (m.address.size() >= 9 && m.address.compare(m.address.size() - 9, 9, "/describe") == 0) {
+
+gate: A hello lasts for ever
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     return helloYet_ && now - lastHello_ < kHelloLasts;
+replace:     return helloYet_;
+
+gate: A nameless hello keeps the last name
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         peer_ = (!m.args.empty() && m.args[0].type == 's') ? m.args[0].s\n                                                            : std::string();
+replace:         if (!m.args.empty() && m.args[0].type == 's') peer_ = m.args[0].s;
+nl: yes

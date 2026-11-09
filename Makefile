@@ -22,6 +22,7 @@ GRD_RUN  := $(BUILD)/run_grids
 OUT_RUN  := $(BUILD)/run_outputs
 EDI_RUN  := $(BUILD)/run_editor
 LVL_RUN  := $(BUILD)/run_levels
+OSC_RUN  := $(BUILD)/run_osc
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -35,6 +36,7 @@ GRD_VEC  := tests/vectors/grids.vec
 OUT_VEC  := tests/vectors/outputs.vec
 EDI_VEC  := tests/vectors/editor.vec
 LVL_VEC  := tests/vectors/levels.vec
+OSC_VEC  := tests/vectors/osc.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -90,7 +92,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels headers workflow wrapper vectors clean
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live headers workflow wrapper vectors clean
 
 all: test
 
@@ -98,7 +100,7 @@ all: test
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible door keys panel headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
-      test-levels
+      test-levels test-osc osc-live
 	@echo ""
 	@echo "all suites green"
 
@@ -116,9 +118,9 @@ wrapper:
 			-IofxManifoldEditor/src -IofxManifoldEditor/src/views \
 			-fsyntax-only $$f || exit 1; \
 	done
-	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions example-editor; do \
+	@for ex in example-basic example-parameter-morphing example-mapping example-trajectory example-blend example-spread example-smoothing example-regions example-editor example-osc; do \
 		$(CXX) -std=c++17 -Wall -Wextra -Ilibs -Itests/stub -Isrc \
-			-IofxManifoldEditor/src -IofxManifoldEditor/src/views \
+			-IofxManifoldEditor/src -IofxManifoldEditor/src/views -IofxManifoldPlayer/src \
 			-I$$ex/src -fsyntax-only \
 			$$ex/src/ofApp.cpp || exit 1; \
 	done
@@ -161,7 +163,7 @@ workflow:
 # point of src/core is that a stranger can drop it into their own project.
 headers:
 	@mkdir -p $(BUILD)
-	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES) $(AUTHORING) $(EDITOR_H) $(EDITOR_CPP); do \
+	@for f in $(CORE) $(INTERP) $(MAPPING) $(IO) $(SOURCES) $(AUTHORING) $(EDITOR_H) $(EDITOR_CPP) $(PLAYER_H) $(PLAYER_CPP); do \
 		if grep -qE '^[[:space:]]*#[[:space:]]*include.*ofMain\.h' $$f; then \
 			echo "  $$f includes ofMain.h -- src/ofx is the only place that may"; \
 			exit 1; \
@@ -175,6 +177,11 @@ headers:
 	@for h in $(EDITOR_H); do \
 		printf '#include "%s"\nint main(){return 0;}\n' "$$(basename $$h)" > $(BUILD)/solo.cpp; \
 		$(CXX) $(CXXFLAGS) $(EDITOR_INC) -fsyntax-only $(BUILD)/solo.cpp \
+			|| { echo "  $$h does not compile standalone"; exit 1; }; \
+	done
+	@for h in $(PLAYER_H); do \
+		printf '#include "%s"\nint main(){return 0;}\n' "$$(basename $$h)" > $(BUILD)/solo.cpp; \
+		$(CXX) $(CXXFLAGS) -Isrc -IofxManifoldPlayer/src -fsyntax-only $(BUILD)/solo.cpp \
 			|| { echo "  $$h does not compile standalone"; exit 1; }; \
 	done
 	@python3 -c "import os,sys; \
@@ -222,6 +229,29 @@ test-editor: $(EDI_RUN) $(EDI_VEC)
 test-levels: $(LVL_RUN) $(LVL_VEC)
 	@./$(LVL_RUN) $(LVL_VEC)
 
+# ofxManifoldPlayer: OSC out (round 3B-1). The encoder against the reference
+# (itself checked against python-osc where installed), the sender frame by
+# frame, and -- osc-live -- the same over a real UDP socket on this machine.
+PLAYER_CPP := $(wildcard ofxManifoldPlayer/src/*.cpp)
+PLAYER_H   := $(wildcard ofxManifoldPlayer/src/*.h)
+
+test-osc: $(OSC_RUN) $(OSC_VEC)
+	@./$(OSC_RUN) $(OSC_VEC)
+
+$(OSC_RUN): tests/run_osc.cpp $(PLAYER_CPP) $(PLAYER_H)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/run_osc.cpp $(PLAYER_CPP)
+
+$(OSC_VEC): tests/ref/reference_osc.py
+	@python3 tests/ref/reference_osc.py
+
+osc-live: $(BUILD)/osc_udp
+	@python3 tests/check_osc_udp.py
+
+$(BUILD)/osc_udp: tests/osc_udp.cpp $(PLAYER_CPP) $(PLAYER_H)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/osc_udp.cpp $(PLAYER_CPP)
+
 # Regenerate vectors from the Python references. Kept as a separate target so
 # CI can assert the checked-in vectors match a fresh generation — a reference
 # that drifts from its own output is worse than no reference.
@@ -238,6 +268,7 @@ vectors:
 	@python3 tests/ref/reference_outputs.py
 	@python3 tests/ref/reference_editor.py
 	@python3 tests/ref/reference_levels.py
+	@python3 tests/ref/reference_osc.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)
