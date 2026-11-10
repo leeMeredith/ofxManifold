@@ -17,6 +17,7 @@ ENCODE position | /manifold/position | ,fff | 0.300000012 0.800000012 0.55000001
 ENCODE values | /manifold/values | ,isfsf | 2 "brightness" 0.75 "reverb" 0.200000003 | 2f6d616e69666f6c642f76616c756573000000002c69736673660000000000026272696768746e65737300003f40000072657665726200003e4ccccd
 ENCODE hello | /manifold/hello | ,s | "sclang" | 2f6d616e69666f6c642f68656c6c6f002c73000073636c616e670000
 ENCODE describe | /manifold/describe | , |  | 2f6d616e69666f6c642f646573637269626500002c000000
+ENCODE roll_call | /manifold/map | ,siii | "/manifold/room" 57121 12 2 | 2f6d616e69666f6c642f6d61700000002c736969690000002f6d616e69666f6c642f726f6f6d00000000df210000000c00000002
 ENCODE utf8_name | /manifold/out/café | ,f | 0.5 | 2f6d616e69666f6c642f6f75742f636166c3a9002c6600003f000000
 # DECODE name | hex | address | tags | args
 DECODE from_sclang_hello | 2f6d616e69666f6c642f68656c6c6f002c73000073636c616e670000 | /manifold/hello | ,s | "sclang"
@@ -33,105 +34,116 @@ REFUSE trailing | 2f6d00002c6966730000000000000007402000006869000000000000
 REFUSE string_unterminated | 2f6d00002c73000061626364
 REFUSE padding_not_zero | 2f6d00782c000000
 # packed: the outputs described on the first send, then every level at every send, 60 a second; nothing between sends
-SEND packed_every_send prefix=/manifold packed=1 per_output=0 rate=60
-FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 2
-MSG /manifold/outputs ,isisi 2 "front" 0 "left" 1
-MSG /manifold/levels ,ff 0.75 0.25
+SEND packed_every_send prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=60
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 2 2
+MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.005 | front:0:0.75,left:1:0.25 | - | - | 0
 FRAME 0.016666666666666666 | front:0:0.5,left:1:0.5 | - | - | 1
-MSG /manifold/levels ,ff 0.5 0.5
+MSG /manifold/untitled/levels ,ff 0.5 0.5
 FRAME 0.03333333333333333 | front:0:0.5,left:1:0.5 | - | - | 1
-MSG /manifold/levels ,ff 0.5 0.5
+MSG /manifold/untitled/levels ,ff 0.5 0.5
 END
 # described again when an output is added -- the messages grow -- when one goes, when asked, and every two seconds
-SEND described_again prefix=/manifold packed=1 per_output=0 rate=60
-FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 2
-MSG /manifold/outputs ,isisi 2 "front" 0 "left" 1
-MSG /manifold/levels ,ff 0.75 0.25
-FRAME 0.1 | front:0:0.75,left:1:0.25,rear:3:0 | - | - | 2
-MSG /manifold/outputs ,isisisi 3 "front" 0 "left" 1 "rear" 3
-MSG /manifold/levels ,fff 0.75 0.25 0
+SEND described_again prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=60
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 2 2
+MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/untitled/levels ,ff 0.75 0.25
+FRAME 0.1 | front:0:0.75,left:1:0.25,rear:3:0 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 3 2
+MSG /manifold/untitled/outputs ,isisisi 3 "front" 0 "left" 1 "rear" 3
+MSG /manifold/untitled/levels ,fff 0.75 0.25 0
 FRAME 0.2 | front:0:0.75,left:1:0.25,rear:3:0 | - | - | 1
-MSG /manifold/levels ,fff 0.75 0.25 0
-FRAME 0.3 | front:0:1 | - | - | 2
-MSG /manifold/outputs ,isi 1 "front" 0
-MSG /manifold/levels ,f 1
+MSG /manifold/untitled/levels ,fff 0.75 0.25 0
+FRAME 0.3 | front:0:1 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 1 2
+MSG /manifold/untitled/outputs ,isi 1 "front" 0
+MSG /manifold/untitled/levels ,f 1
 RECV 0.31 /manifold/describe ,
-FRAME 0.4 | front:0:1 | - | - | 2
-MSG /manifold/outputs ,isi 1 "front" 0
-MSG /manifold/levels ,f 1
+FRAME 0.4 | front:0:1 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 1 2
+MSG /manifold/untitled/outputs ,isi 1 "front" 0
+MSG /manifold/untitled/levels ,f 1
 FRAME 2.3 | front:0:1 | - | - | 1
-MSG /manifold/levels ,f 1
+MSG /manifold/untitled/levels ,f 1
 FRAME 2.31 | front:0:1 | - | - | 0
-FRAME 4.31 | front:0:1 | - | - | 2
-MSG /manifold/outputs ,isi 1 "front" 0
-MSG /manifold/levels ,f 1
+FRAME 4.31 | front:0:1 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 1 2
+MSG /manifold/untitled/outputs ,isi 1 "front" 0
+MSG /manifold/untitled/levels ,f 1
 END
 # per output: only what changed at each send, everything every tenth of a second
-SEND per_output_changes prefix=/manifold packed=0 per_output=1 rate=60
-FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/outputs ,isisi 2 "front" 0 "left" 1
-MSG /manifold/out/front ,f 0.75
-MSG /manifold/out/left ,f 0.25
+SEND per_output_changes prefix=/manifold map=untitled port=0 packed=0 per_output=1 rate=60
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 4
+MSG /manifold/map ,siii "/manifold/untitled" 0 2 2
+MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/untitled/out/front ,f 0.75
+MSG /manifold/untitled/out/left ,f 0.25
 FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | - | - | 0
 FRAME 0.03333333333333333 | front:0:0.699999988,left:1:0.25 | - | - | 1
-MSG /manifold/out/front ,f 0.699999988
+MSG /manifold/untitled/out/front ,f 0.699999988
 FRAME 0.05 | front:0:0.699999988,left:1:0.25 | - | - | 0
 FRAME 0.1 | front:0:0.699999988,left:1:0.25 | - | - | 2
-MSG /manifold/out/front ,f 0.699999988
-MSG /manifold/out/left ,f 0.25
+MSG /manifold/untitled/out/front ,f 0.699999988
+MSG /manifold/untitled/out/left ,f 0.25
 FRAME 0.11666666666666667 | front:0:0.699999988,left:1:0.250000089 | - | - | 0
 END
 # both shapes at once, values and the position
-SEND both_shapes_and_values prefix=/manifold packed=1 per_output=1 rate=60
-FRAME 0.0 | front:0:0.75,left:1:0.25 | brightness:0.5,reverb:0.100000001 | 0.300000012 0.800000012 0 | 8
-MSG /manifold/outputs ,isisi 2 "front" 0 "left" 1
-MSG /manifold/levels ,ff 0.75 0.25
-MSG /manifold/out/front ,f 0.75
-MSG /manifold/out/left ,f 0.25
-MSG /manifold/values ,isfsf 2 "brightness" 0.5 "reverb" 0.100000001
-MSG /manifold/value/brightness ,f 0.5
-MSG /manifold/value/reverb ,f 0.100000001
-MSG /manifold/position ,fff 0.300000012 0.800000012 0
+SEND both_shapes_and_values prefix=/manifold map=untitled port=0 packed=1 per_output=1 rate=60
+FRAME 0.0 | front:0:0.75,left:1:0.25 | brightness:0.5,reverb:0.100000001 | 0.300000012 0.800000012 0 | 9
+MSG /manifold/map ,siii "/manifold/untitled" 0 2 2
+MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/untitled/levels ,ff 0.75 0.25
+MSG /manifold/untitled/out/front ,f 0.75
+MSG /manifold/untitled/out/left ,f 0.25
+MSG /manifold/untitled/values ,isfsf 2 "brightness" 0.5 "reverb" 0.100000001
+MSG /manifold/untitled/value/brightness ,f 0.5
+MSG /manifold/untitled/value/reverb ,f 0.100000001
+MSG /manifold/untitled/position ,fff 0.300000012 0.800000012 0
 FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | brightness:0.5,reverb:0.200000003 | 0.310000002 0.800000012 0 | 4
-MSG /manifold/levels ,ff 0.75 0.25
-MSG /manifold/values ,isfsf 2 "brightness" 0.5 "reverb" 0.200000003
-MSG /manifold/value/reverb ,f 0.200000003
-MSG /manifold/position ,fff 0.310000002 0.800000012 0
+MSG /manifold/untitled/levels ,ff 0.75 0.25
+MSG /manifold/untitled/values ,isfsf 2 "brightness" 0.5 "reverb" 0.200000003
+MSG /manifold/untitled/value/reverb ,f 0.200000003
+MSG /manifold/untitled/position ,fff 0.310000002 0.800000012 0
 END
 # at 30 a second: frames between sends send nothing; a late frame sends once, then the rate carries on from it -- no burst
-SEND rate_and_late_frames prefix=/manifold packed=1 per_output=0 rate=30
-FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 2
-MSG /manifold/outputs ,isisi 2 "front" 0 "left" 1
-MSG /manifold/levels ,ff 0.75 0.25
+SEND rate_and_late_frames prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=30
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 2 2
+MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.02 | front:0:0.75,left:1:0.25 | - | - | 0
 FRAME 0.03333333333333333 | front:0:0.75,left:1:0.25 | - | - | 1
-MSG /manifold/levels ,ff 0.75 0.25
+MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.5 | front:0:0.75,left:1:0.25 | - | - | 1
-MSG /manifold/levels ,ff 0.75 0.25
+MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.51 | front:0:0.75,left:1:0.25 | - | - | 0
 FRAME 0.5333333333333333 | front:0:0.75,left:1:0.25 | - | - | 1
-MSG /manifold/levels ,ff 0.75 0.25
+MSG /manifold/untitled/levels ,ff 0.75 0.25
 END
 # a prefix of its own; names cleaned for an address
-SEND prefix_and_names prefix=/room2/ packed=0 per_output=1 rate=60
-FRAME 0.0 | front left:0:0.5,sub#1:5:0.5 | hue/a:0.25 | - | 4
-MSG /room2/outputs ,isisi 2 "front left" 0 "sub#1" 5
-MSG /room2/out/front_left ,f 0.5
-MSG /room2/out/sub_1 ,f 0.5
-MSG /room2/value/hue_a ,f 0.25
+SEND prefix_and_names prefix=/room2/ map=untitled port=0 packed=0 per_output=1 rate=60
+FRAME 0.0 | front left:0:0.5,sub#1:5:0.5 | hue/a:0.25 | - | 5
+MSG /room2/map ,siii "/room2/untitled" 0 2 2
+MSG /room2/untitled/outputs ,isisi 2 "front left" 0 "sub#1" 5
+MSG /room2/untitled/out/front_left ,f 0.5
+MSG /room2/untitled/out/sub_1 ,f 0.5
+MSG /room2/untitled/value/hue_a ,f 0.25
 RECV 0.01 /manifold/describe ,
 FRAME 0.1 | front left:0:0.5,sub#1:5:0.5 | - | - | 2
-MSG /room2/out/front_left ,f 0.5
-MSG /room2/out/sub_1 ,f 0.5
+MSG /room2/untitled/out/front_left ,f 0.5
+MSG /room2/untitled/out/sub_1 ,f 0.5
 RECV 0.11 /room2/describe ,
-FRAME 0.2 | front left:0:0.5,sub#1:5:0.5 | - | - | 3
-MSG /room2/outputs ,isisi 2 "front left" 0 "sub#1" 5
-MSG /room2/out/front_left ,f 0.5
-MSG /room2/out/sub_1 ,f 0.5
+FRAME 0.2 | front left:0:0.5,sub#1:5:0.5 | - | - | 4
+MSG /room2/map ,siii "/room2/untitled" 0 2 2
+MSG /room2/untitled/outputs ,isisi 2 "front left" 0 "sub#1" 5
+MSG /room2/untitled/out/front_left ,f 0.5
+MSG /room2/untitled/out/sub_1 ,f 0.5
 END
 # a hello marks the receiver connected for three seconds; the sender sends the same with or without one
-SEND hello prefix=/manifold packed=1 per_output=0 rate=60
+SEND hello prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=60
 CONN 0.0 0 ""
 RECV 0.5 /manifold/hello ,s "sclang"
 CONN 0.6 1 "sclang"
@@ -141,7 +153,51 @@ RECV 4.0 /manifold/hello ,
 CONN 4.1 1 ""
 RECV 4.2 /other/hello ,s "pd"
 CONN 7.1 0 ""
-FRAME 7.2 | - | - | - | 2
-MSG /manifold/outputs ,i 0
-MSG /manifold/levels ,
+FRAME 7.2 | - | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 0 0 2
+MSG /manifold/untitled/outputs ,i 0
+MSG /manifold/untitled/levels ,
+END
+# protocol 2: the map's name in every address; the roll call on root/map leading every description, with the answer port; describe and hello heard on the map's prefix or the root, not another map's; a new name says everything again at once
+SEND maps_named_and_announced prefix=/manifold map=room port=57122 packed=1 per_output=0 rate=60
+FRAME 0.0 | front:0:0.75,left:1:0.25 | brightness:0.5 | - | 4
+MSG /manifold/map ,siii "/manifold/room" 57122 2 2
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/values ,isf 1 "brightness" 0.5
+FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | - | - | 1
+MSG /manifold/room/levels ,ff 0.75 0.25
+RECV 0.02 /manifold/kitchen/describe ,
+FRAME 0.03333333333333333 | front:0:0.75,left:1:0.25 | - | - | 1
+MSG /manifold/room/levels ,ff 0.75 0.25
+RECV 0.04 /manifold/room/describe ,
+FRAME 0.05 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/room" 57122 2 2
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/levels ,ff 0.75 0.25
+RECV 0.06 /manifold/describe ,
+FRAME 0.06666666666666667 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/room" 57122 2 2
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/levels ,ff 0.75 0.25
+RECV 0.07 /manifold/kitchen/hello ,s "pd"
+CONN 0.08 0 ""
+RECV 0.09 /manifold/room/hello ,s "sclang"
+CONN 0.1 1 "sclang"
+RECV 0.11 /manifold/hello ,s "python"
+CONN 0.12 1 "python"
+MAP my room
+FRAME 0.13 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/my_room" 57122 2 2
+MSG /manifold/my_room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/my_room/levels ,ff 0.75 0.25
+FRAME 0.14 | front:0:0.75,left:1:0.25 | - | - | 0
+MAP my room
+FRAME 0.15 | front:0:0.75,left:1:0.25 | - | - | 1
+MSG /manifold/my_room/levels ,ff 0.75 0.25
+MAP 
+FRAME 0.2 | front:0:0.75,left:1:0.25 | - | - | 3
+MSG /manifold/map ,siii "/manifold/untitled" 57122 2 2
+MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/untitled/levels ,ff 0.75 0.25
 END

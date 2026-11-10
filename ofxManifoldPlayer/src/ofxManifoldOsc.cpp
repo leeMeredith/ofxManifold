@@ -121,10 +121,24 @@ std::string oscName(const std::string& name) {
 
 // ---------------------------------------------------------------------------
 
-void OscOut::setPrefix(const std::string& p) {
-    std::string q = p;
+void OscOut::setPrefix(const std::string& root) {
+    std::string q = root;
     while (!q.empty() && q.back() == '/') q.pop_back();
-    prefix_ = q.empty() ? std::string("/manifold") : q;
+    root_ = q.empty() ? std::string("/manifold") : q;
+    rename();
+}
+
+void OscOut::setMapName(const std::string& name) {
+    mapName_ = name.empty() ? std::string("untitled") : oscName(name);
+    rename();
+}
+
+// The addresses change: everything is said again under the new ones.
+void OscOut::rename() {
+    const std::string p = root_ + "/" + mapName_;
+    if (p == prefix_) return;
+    prefix_ = p;
+    reset();
 }
 
 void OscOut::setRate(double perSecond) {
@@ -159,6 +173,10 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
     for (const OscOutput& o : f.outputs) layout.emplace_back(o.name, o.channel);
     if (!describedYet_ || layout != described_ || describeAsked_
         || now >= lastDescribe_ + kDescribeEvery - 1e-9) {
+        msgs.push_back({root_ + "/map", {OscArg::text(p),
+                                         OscArg::integer(std::int32_t(answerPort_)),
+                                         OscArg::integer(std::int32_t(layout.size())),
+                                         OscArg::integer(kProtocol)}});
         OscMessage m{p + "/outputs", {OscArg::integer(std::int32_t(layout.size()))}};
         for (const auto& nc : layout) {
             m.args.push_back(OscArg::text(nc.first));
@@ -217,9 +235,9 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
 }
 
 void OscOut::receive(double now, const OscMessage& m) {
-    if (m.address == prefix_ + "/describe") {
+    if (m.address == prefix_ + "/describe" || m.address == root_ + "/describe") {
         describeAsked_ = true;
-    } else if (m.address == prefix_ + "/hello") {
+    } else if (m.address == prefix_ + "/hello" || m.address == root_ + "/hello") {
         helloYet_ = true;
         lastHello_ = now;
         peer_ = (!m.args.empty() && m.args[0].type == 's') ? m.args[0].s

@@ -44,6 +44,8 @@ int main(int argc, char** argv) {
     // than Python's two roundings. Sixteenths round the same either way.
     OscOut osc;
     osc.setPerOutput(true);
+    osc.setMapName("room");             // protocol 2: named, with a roll call
+    osc.setAnswerPort(listenPort);
     int packets = 0;
     for (int k = 0; k < 10; ++k) {
         const double now = k / 60.0;

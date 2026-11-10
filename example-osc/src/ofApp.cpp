@@ -68,15 +68,24 @@ void ofApp::setup() {
     ofBackground(30, 30, 34);
     text.setSize(12);
     applySmoothing();
-    model.loadRoom();
-    adopt();
-    cam.enableMouseInput();
-
     sender.setup(host, sendPort);
-    listener.setup(listenPort);
+    // The first answer port free. Not shared (reuse off): a second copy of
+    // this app must not quietly split the first one's answers.
+    for (int k = 0; k < kAnswerPorts && listenPort == 0; ++k) {
+        ofxOscReceiverSettings s;
+        s.port = kFirstAnswerPort + k;
+        s.reuse = false;
+        if (listener.setup(s)) listenPort = s.port;
+    }
+    osc.setAnswerPort(listenPort);
+
+    model.loadRoom();
+    adopt("room");
+    cam.enableMouseInput();
 }
 
-void ofApp::adopt() {
+void ofApp::adopt(const std::string& name) {
+    osc.setMapName(name);             // its addresses, /manifold/<name>/...
     evaluator = std::make_unique<Evaluator>(model.manifold());
     renderer = std::make_unique<ofxManifoldRenderer>(model.manifold());
     evaluation = evaluator->evaluate(point);
@@ -268,9 +277,11 @@ void ofApp::draw() {
     };
     const ofColor plain(200, 205, 215), dim(130, 136, 150);
     line("OSC to " + host + ":" + ofToString(sendPort), ofColor(235, 238, 245));
-    line("answers on " + ofToString(listenPort), plain);
-    line("prefix " + osc.prefix() + "   " + ofToString(osc.rate(), 0) + " a second"
-         + (paused ? "   PAUSED" : ""), plain);
+    line(listenPort ? "answers on " + ofToString(listenPort)
+                    : "no answer port free (" + ofToString(kFirstAnswerPort) + " on)",
+         listenPort ? plain : ofColor(255, 150, 120));
+    line(osc.prefix() + "   " + ofToString(osc.rate(), 0) + " a second"
+         + (paused ? "   PAUSED" : ""), ofColor(235, 238, 245));
     line(std::string("packed ") + (osc.packed() ? "on" : "off") + " (p)  per output "
          + (osc.perOutput() ? "on" : "off") + " (i)", plain);
     line(ofToString(sentLog.size()) + " messages, " + ofToString(bytes) + " bytes a second",
@@ -379,8 +390,8 @@ void ofApp::keyPressed(int key) {
     else if (key == OF_KEY_TAB) {
         model.cycleOutput(ofGetKeyPressed(OF_KEY_SHIFT) ? -1 : +1);
     }
-    else if (key == 'e') { model.loadRoom(); adopt(); say("the room: floor, middle and top"); }
-    else if (key == 'E') { model.loadExample(); adopt(); say("the editor's flat example"); }
+    else if (key == 'e') { model.loadRoom(); adopt("room"); say("the room: floor, middle and top"); }
+    else if (key == 'E') { model.loadExample(); adopt("example"); say("the editor's flat example"); }
     else if (key == 'o') open();
 }
 
@@ -394,5 +405,9 @@ void ofApp::open() {
     const Result r = openPair(model, d.getPath());
     message = r.message;
     messageUntil = ofGetElapsedTimef() + 3.0f;
-    if (r.changed) adopt();
+    if (r.changed) {
+        // The map's name: the pair's, without its folder.
+        const std::string base = pairFor(d.getPath()).base;
+        adopt(base.substr(base.find_last_of("/\\") + 1));
+    }
 }

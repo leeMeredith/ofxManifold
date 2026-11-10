@@ -173,6 +173,8 @@ int main(int argc, char** argv) {
                 const auto eq = tok.find('=');
                 const std::string k = tok.substr(0, eq), v = tok.substr(eq + 1);
                 if (k == "prefix") out.setPrefix(v);
+                else if (k == "map") out.setMapName(v);
+                else if (k == "port") out.setAnswerPort(std::stoi(v));
                 else if (k == "packed") out.setPacked(v == "1");
                 else if (k == "per_output") out.setPerOutput(v == "1");
                 else if (k == "rate") out.setRate(std::stod(v));
@@ -225,6 +227,8 @@ int main(int argc, char** argv) {
                         }
                     }
                     j += want;
+                } else if (s.rfind("MAP ", 0) == 0) {
+                    out.setMapName(s.substr(4));
                 } else if (s.rfind("RECV ", 0) == 0) {
                     std::istringstream rs(s.substr(5));
                     double now; std::string address, tags;

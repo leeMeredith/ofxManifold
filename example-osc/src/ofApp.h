@@ -46,6 +46,11 @@
 //   space           pause sending
 //   3               the 3D view on or off (drag in it to turn it)
 //   o               open a map pair (map + outputs)
+//
+// Its messages go under /manifold/<map's name> (the file's name; room, or
+// example), each description led by a roll call on /manifold/map, so copies
+// of this app with different maps can run at once, each heard apart.
+//
 //   e               the room example: three levels
 //   E               the editor's flat example
 
@@ -72,14 +77,16 @@ public:
     void keyReleased(int key) override;
 
 private:
-    // Where the messages go and where answers come back. sclang listens on
-    // 57120 by default; the patch beside this example answers to 57121.
-    // Change them here.
+    // Where the messages go, and where answers come back. sclang listens on
+    // 57120 by default. Answers: the first port free from kFirstAnswerPort,
+    // so several copies can run, one map each; each gives its port in the
+    // roll call, so receivers know where to answer it. 0: none was free.
     std::string host       = "127.0.0.1";
     int         sendPort   = 57120;
-    int         listenPort = 57121;
+    static constexpr int kFirstAnswerPort = 57121, kAnswerPorts = 16;
+    int         listenPort = 0;
 
-    void adopt();                       // after the map changes
+    void adopt(const std::string& name); // after the map changes: its name
     void open();
     void layoutWindow();                // the map, the column, the 3D view
     void followLevel();                 // the point's level is current

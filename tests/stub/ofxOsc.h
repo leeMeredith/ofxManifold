@@ -39,9 +39,17 @@ public:
     bool sendMessage(const ofxOscMessage&, bool = false) { return true; }
 };
 
+struct ofxOscReceiverSettings {
+    int port = 0;
+    std::string host = "0.0.0.0";
+    bool reuse = true;
+    bool start = true;
+};
+
 class ofxOscReceiver {
 public:
     bool setup(int) { return true; }
+    bool setup(const ofxOscReceiverSettings&) { return true; }
     bool hasWaitingMessages() const { return false; }
     bool getNextMessage(ofxOscMessage&) { return false; }
 };

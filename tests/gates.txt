@@ -2148,7 +2148,7 @@ replace:         return refresh || it == sent.end() || std::fabs(v - it->second)
 
 gate: Another prefix's describe is answered
 file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
-find:     if (m.address == prefix_ + "/describe") {
+find:     if (m.address == prefix_ + "/describe" || m.address == root_ + "/describe") {
 replace:     if (m.address.size() >= 9 && m.address.compare(m.address.size() - 9, 9, "/describe") == 0) {
 
 gate: A hello lasts for ever
@@ -2231,4 +2231,45 @@ gate: The speed limit is applied before the half-life
 file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
 find:         float v = from + (to - from) * alpha;\n        if (maxStep > 0.0f) {\n            const float d = v - from;
 replace:         float v = to;\n        if (maxStep > 0.0f) {\n            const float d = v - from;\n            v = from + std::max(-maxStep, std::min(maxStep, d));\n            v = from + (v - from) * alpha;
+nl: yes
+
+gate: No roll call
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         msgs.push_back({root_ + "/map", {OscArg::text(p),
+replace:         if (false) msgs.push_back({root_ + "/map", {OscArg::text(p),
+
+gate: The roll call leaves out the answer port
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:                                          OscArg::integer(std::int32_t(answerPort_)),
+replace:                                          OscArg::integer(0),
+
+gate: The roll call leaves out the protocol
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:                                          OscArg::integer(kProtocol)}});
+replace:                                          OscArg::integer(1)}});
+
+gate: The root's describe is not heard
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (m.address == prefix_ + "/describe" || m.address == root_ + "/describe") {
+replace:     if (m.address == prefix_ + "/describe") {
+
+gate: The root's hello is not heard
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     } else if (m.address == prefix_ + "/hello" || m.address == root_ + "/hello") {
+replace:     } else if (m.address == prefix_ + "/hello") {
+
+gate: A map's name goes into addresses uncleaned
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     mapName_ = name.empty() ? std::string("untitled") : oscName(name);
+replace:     mapName_ = name.empty() ? std::string("untitled") : name;
+
+gate: A map with no name has an empty segment
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     mapName_ = name.empty() ? std::string("untitled") : oscName(name);
+replace:     mapName_ = oscName(name);
+
+gate: A new name keeps quiet until the next description
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     prefix_ = p;\n    reset();
+replace:     prefix_ = p;
 nl: yes

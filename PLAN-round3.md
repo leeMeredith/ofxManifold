@@ -1292,6 +1292,38 @@ Added before the app was first built (2026-11-09):
   steps the half-life by 0.01 s, between the coarse steps. `drawGrid`
   returns before reading the grid when there is none. The window starts at
   1440 x 900.
+- **More than one map: protocol 2.** Two copies of example-osc collided two
+  ways: the same addresses, so a receiver could not tell the maps apart, and
+  the same answer port -- worse than a refusal, since ofxOscReceiver shares
+  ports by default (SO_REUSEPORT), so the second would quietly split the
+  first's answers. Now:
+  - every map's messages go under root/<its name> (`setMapName`, cleaned by
+    `oscName`; "untitled" when it has none, not "map", which would read like
+    the roll call). A new name says everything again at once.
+  - the roll call, root/map: `s` prefix, `i` answer port, `i` outputs, `i`
+    protocol (2), leading every description. A receiver listens on one
+    address to find every map, where to answer it, and when it has gone.
+  - describe and hello are heard on the map's prefix or the root (a receiver
+    asking every map on the port at once).
+  - example-osc hears answers on the first port free from 57121 (16 tried),
+    not shared (reuse off), given in its roll call and on its panel; the map's
+    name is its file's (room, example for the built-ins).
+  - the receivers follow every map: the SuperCollider patch makes a set of
+    voices per prefix (each map's bands a little higher), says hello to each
+    at its port, asks ports 57121-57136 to describe at start, lets a map go
+    after 5 s without a roll call, and warns once if two maps share a name;
+    `receive.py` the same, printing levels as numbers, a line per map when
+    they change. The patch's own functions are now called by key
+    (`~manifold[\build].(...)`): `~manifold.build.(...)` calls the function
+    as a pseudo-method of the Event, with the Event as its first argument.
+  - the master player later sends the same from one app: several prefixes,
+    several roll calls, one answer port -- the receivers cannot tell it from
+    several copies.
+  OSC.md is rewritten for protocol 2. Tests: an encoding vector for the roll
+  call (python-osc agreeing), a send script `maps_named_and_announced`, the
+  live UDP run now a named map with its roll call (58 packets); receive.py
+  run by hand against two simulated maps, one stopping. 8 new gates and one
+  moved (423).
 
 ---
 

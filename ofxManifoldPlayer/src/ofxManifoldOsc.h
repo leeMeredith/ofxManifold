@@ -84,10 +84,26 @@ public:
     static constexpr double kRefreshEvery  = 0.1;    // per output: all again
     static constexpr double kHelloLasts    = 3.0;
     static constexpr float  kChanged       = 1e-6f;
+    // The protocol, in every roll call (OSC.md): 2 puts the map's name in
+    // every address and adds the roll call.
+    static constexpr int    kProtocol      = 2;
 
     // ---- settings ----
-    void setPrefix(const std::string& p);            // "/manifold"
+    // The root every sender shares, "/manifold". Each map's messages go
+    // under root/<map name>; the roll call goes on root/map.
+    void setPrefix(const std::string& root);
+    const std::string& root() const { return root_; }
+    // The map's name, cleaned as output names are (oscName); "untitled" if
+    // empty (not "map": that would read like the roll call, root/map).
+    // A new name starts again (reset): announced and described at once.
+    void setMapName(const std::string& name);
+    const std::string& mapName() const { return mapName_; }
+    // root/<map name>: where this map's messages go and its answers come.
     const std::string& prefix() const { return prefix_; }
+    // The port this map hears answers on, given in the roll call so a
+    // receiver knows where to say hello; 0: not listening.
+    void setAnswerPort(int port) { answerPort_ = port; }
+    int  answerPort() const { return answerPort_; }
     void setPacked(bool on) { packed_ = on; }
     bool packed() const { return packed_; }
     void setPerOutput(bool on) { perOutput_ = on; }
@@ -99,10 +115,12 @@ public:
     // rate. Packed sends every level at every send. Per output sends what
     // changed by more than kChanged, and everything every kRefreshEvery. The
     // outputs are described on the first send, when they change, when asked,
-    // and every kDescribeEvery.
+    // and every kDescribeEvery; each description is led by the roll call,
+    // root/map: s prefix, i answer port, i outputs, i protocol.
     std::vector<OscMessage> frame(double now, const OscFrame& f);
 
-    // A message from a receiver: describe, or hello.
+    // A message from a receiver: describe, or hello, on this map's prefix
+    // or on the root (a receiver asking every map at once).
     void receive(double now, const OscMessage& m);
 
     // A hello within kHelloLasts; and the name it gave.
@@ -113,7 +131,11 @@ public:
     void reset();
 
 private:
-    std::string prefix_ = "/manifold";
+    void        rename();                            // prefix_ from the two
+    std::string root_ = "/manifold";
+    std::string mapName_ = "untitled";
+    std::string prefix_ = "/manifold/untitled";
+    int         answerPort_ = 0;
     bool        packed_ = true;
     bool        perOutput_ = false;
     double      rate_ = 60.0;

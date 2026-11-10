@@ -189,7 +189,12 @@ compare, `-` `=` change the half-life a step, shift a hundredth of a second.
 The map is drawn as the editor draws it, without the editing -- node shapes,
 halos, values, the links of the nodes being heard (`l`: every node, none) --
 and the editor's faders run along the bottom, showing what is sent; `tab` or
-a click on a fader rings that output's nodes in its colour. With it a SuperCollider patch
+a click on a fader rings that output's nodes in its colour. Each map's
+messages go under its own name -- `/manifold/room/levels` -- with a roll call
+on `/manifold/map`, and each copy of the app hears answers on the first port
+free from 57121, so several copies with different maps play at once and the
+receivers (the SuperCollider patch, `receive.py`) follow every one
+(protocol 2, `ofxManifoldPlayer/OSC.md`). With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
@@ -310,7 +315,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-906 vectors across fourteen suites, plus 415 mutation gates that introduce known
+908 vectors across fourteen suites, plus 423 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

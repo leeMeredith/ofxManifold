@@ -23,8 +23,8 @@ import reference_osc as R  # noqa: E402
 BIN = os.path.join(HERE, "..", "build", "osc_udp")
 
 
-def expected():
-    s = R.Sender(per_output=True)
+def expected(listen_port):
+    s = R.Sender(per_output=True, map_name="room", answer_port=listen_port)
     msgs = []
     for k in range(10):
         now = k / 60.0
@@ -40,7 +40,6 @@ def expected():
 
 
 def main():
-    want = expected()
     rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     rx.bind(("127.0.0.1", 0))
     rx.settimeout(3.0)
@@ -49,6 +48,7 @@ def main():
     probe.bind(("127.0.0.1", 0))
     listen_port = probe.getsockname()[1]
     probe.close()
+    want = expected(listen_port)
 
     proc = subprocess.Popen([BIN, str(send_port), str(listen_port)],
                             stdout=subprocess.PIPE, text=True)
@@ -75,7 +75,7 @@ def main():
         if g != w:
             fails.append(f"packet {k}: {g} -- want {w}")
             break
-    hello = R.encode("/manifold/hello", [("s", "python")])
+    hello = R.encode("/manifold/room/hello", [("s", "python")])
     socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(hello, ("127.0.0.1", listen_port))
     last = proc.stdout.readline().strip()
     proc.wait(timeout=5)

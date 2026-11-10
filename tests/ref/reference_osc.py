@@ -171,13 +171,23 @@ class Sender:
     REFRESH_EVERY = 0.1
     HELLO_LASTS = 3.0
     CHANGED = 1e-6
+    PROTOCOL = 2
 
-    def __init__(self, prefix="/manifold", packed=True, per_output=False,
-                 rate=60.0):
-        self.prefix = prefix.rstrip("/") or "/manifold"
+    def __init__(self, prefix="/manifold", map_name="untitled", answer_port=0,
+                 packed=True, per_output=False, rate=60.0):
+        self.root = prefix.rstrip("/") or "/manifold"
+        self.map_name = clean(map_name) if map_name else "untitled"
+        self.prefix = self.root + "/" + self.map_name
+        self.answer_port = answer_port
         self.packed = packed
         self.per_output = per_output
         self.rate = rate
+        self.peer = ""
+        self.last_hello = None
+        self.start_again()
+
+    def start_again(self):
+        """Everything said again: sent at once, announced, described."""
         self.next_send = None          # no send yet
         self.last_describe = None
         self.described = None          # the outputs last described
@@ -185,13 +195,20 @@ class Sender:
         self.last_refresh = None
         self.sent_out = {}             # name -> level last sent per output
         self.sent_value = {}
-        self.peer = ""
-        self.last_hello = None
+
+    def set_map(self, name):
+        """Another map's name: new addresses, so everything again."""
+        self.map_name = clean(name) if name else "untitled"
+        prefix = self.root + "/" + self.map_name
+        if prefix != self.prefix:
+            self.prefix = prefix
+            self.start_again()
 
     def receive(self, now, address, args):
-        if address == self.prefix + "/describe":
+        mine = (self.prefix, self.root)
+        if address in (p + "/describe" for p in mine):
             self.describe_asked = True
-        elif address == self.prefix + "/hello":
+        elif address in (p + "/hello" for p in mine):
             self.last_hello = now
             self.peer = args[0][1] if args and args[0][0] == "s" else ""
 
@@ -217,6 +234,11 @@ class Sender:
         if (self.described != layout or self.describe_asked
                 or self.last_describe is None
                 or now >= self.last_describe + self.DESCRIBE_EVERY - 1e-9):
+            # The roll call leads: which map, where it hears answers, how
+            # many outputs, which protocol.
+            msgs.append((self.root + "/map",
+                         [("s", p), ("i", self.answer_port), ("i", len(layout)),
+                          ("i", self.PROTOCOL)]))
             args = [("i", len(layout))]
             for n, c in layout:
                 args += [("s", n), ("i", c)]
@@ -277,6 +299,8 @@ def encode_vectors(out):
          [("i", 2), ("s", "brightness"), ("f", 0.75), ("s", "reverb"), ("f", 0.2)]),
         ("hello", "/manifold/hello", [("s", "sclang")]),
         ("describe", "/manifold/describe", []),
+        ("roll_call", "/manifold/map",
+         [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 2)]),
         ("utf8_name", "/manifold/out/café", [("f", 0.5)]),
     ]
     for name, address, args in cases:
@@ -332,7 +356,8 @@ class Script:
         out.append(f"# {doc}")
         # The prefix as given, so the C++ must clean it the same way.
         given = settings.get("prefix", "/manifold")
-        out.append(f"SEND {name} prefix={given} packed={int(self.s.packed)} "
+        out.append(f"SEND {name} prefix={given} map={settings.get('map_name', 'untitled')} "
+                   f"port={self.s.answer_port} packed={int(self.s.packed)} "
                    f"per_output={int(self.s.per_output)} rate={self.s.rate:g}")
 
     def frame(self, now, outputs, values=(), position=None):
@@ -343,6 +368,10 @@ class Script:
         self.out.append(f"FRAME {now!r} | {o} | {v} | {pos} | {len(msgs)}")
         for address, args in msgs:
             self.out.append(f"MSG {address} {tags(args)} {argtext(args)}".rstrip())
+
+    def map(self, name):
+        self.s.set_map(name)
+        self.out.append(f"MAP {name}")
 
     def recv(self, now, address, args=()):
         self.s.receive(now, address, list(args))
@@ -436,6 +465,35 @@ def send_vectors(out):
     t.recv(4.2, "/other/hello", [("s", "pd")])
     t.conn(7.1)
     t.frame(7.2, [])
+    t.end()
+
+    t = Script(out, "maps_named_and_announced",
+               "protocol 2: the map's name in every address; the roll call on "
+               "root/map leading every description, with the answer port; "
+               "describe and hello heard on the map's prefix or the root, not "
+               "another map's; a new name says everything again at once",
+               map_name="room", answer_port=57122)
+    t.frame(0.0, two, [("brightness", 0.5)])
+    t.frame(1 / 60, two)
+    t.recv(0.02, "/manifold/kitchen/describe")
+    t.frame(2 / 60, two)
+    t.recv(0.04, "/manifold/room/describe")
+    t.frame(3 / 60, two)
+    t.recv(0.06, "/manifold/describe")
+    t.frame(4 / 60, two)
+    t.recv(0.07, "/manifold/kitchen/hello", [("s", "pd")])
+    t.conn(0.08)
+    t.recv(0.09, "/manifold/room/hello", [("s", "sclang")])
+    t.conn(0.1)
+    t.recv(0.11, "/manifold/hello", [("s", "python")])
+    t.conn(0.12)
+    t.map("my room")
+    t.frame(0.13, two)
+    t.frame(0.14, two)
+    t.map("my room")
+    t.frame(0.15, two)
+    t.map("")
+    t.frame(0.2, two)
     t.end()
 
 
