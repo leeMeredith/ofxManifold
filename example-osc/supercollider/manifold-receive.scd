@@ -8,11 +8,16 @@
 // It listens for the roll call, /manifold/map, and starts a map for each
 // prefix it hears (/manifold/room, /manifold/forest ...): one voice per
 // output, as many as that map's outputs message says, built again when that
-// changes. Each voice is pink noise through its own band, so channels can be
-// told apart by ear, placed evenly from left to right; each map's bands start
-// a little higher than the last map's, so maps can be told apart too. A
-// voice's volume follows its level with a 20 ms lag, so sixty updates a
-// second sound smooth.
+// changes, placed evenly from left to right. A voice's volume follows its
+// level with a 20 ms lag, so sixty updates a second sound smooth.
+//
+// Each voice is a tone of its own -- a soft sine with two quiet overtones --
+// on the steps of a major pentatonic scale, so any outputs sounding together
+// stay consonant and each can be picked out by pitch: on the room, FL FR RL
+// RR on the floor, then the middle's four, then the top's, climbing. The post
+// window lists each output's note. Each map starts a fifth higher than the
+// last, so maps can be told apart too. Set ~manifold.sound = \noise below for
+// the first version's pink noise bands instead.
 //
 // It says hello to each map once a second, at the port its roll call gives,
 // so example-osc shows it answered; it asks every map to describe itself when
@@ -27,11 +32,19 @@
 ~manifold.firstPort = 57121;    // where example-osc copies may hear answers
 ~manifold.ports = 16;
 ~manifold.silentAfter = 5;      // seconds without a roll call: the map has gone
+~manifold.sound = \tone;        // \tone: a note per output; \noise: a noise band
+~manifold.scale = [0, 2, 4, 7, 9];  // major pentatonic, in semitones
+~manifold.lowest = 48;          // the first map's first note: C3, as MIDI
 
 s.waitForBoot {
     SynthDef(\manifoldVoice, { |out = 0, pan = 0, amp = 0, centre = 440|
         var sig = BPF.ar(PinkNoise.ar, centre, 0.4) * 2;
         sig = sig * Lag.kr(amp, 0.02);
+        Out.ar(out, Pan2.ar(sig, pan));
+    }).add;
+    SynthDef(\manifoldTone, { |out = 0, pan = 0, amp = 0, freq = 220|
+        var sig = SinOsc.ar(freq) + (SinOsc.ar(freq * 2) * 0.25) + (SinOsc.ar(freq * 3) * 0.08);
+        sig = sig * 0.3 * Lag.kr(amp, 0.02);
         Out.ar(out, Pan2.ar(sig, pan));
     }).add;
     s.sync;
@@ -56,15 +69,38 @@ s.waitForBoot {
     ~manifold.maps.keys.copy.do { |p| ~manifold[\drop].(p) };
     ~manifold.count = 0;
 
-    // A map's voices: one per output, spread from left to right, each a band
-    // higher, the map's lowest band its own.
+    // The i-th step up the scale from a map's lowest note, as MIDI.
+    ~manifold[\note] = { |m, i|
+        var steps = ~manifold.scale.size;
+        m[\lowest] + ~manifold.scale[i % steps] + (12 * (i div: steps));
+    };
+    // A MIDI note as a name: 60 is C4.
+    ~manifold[\noteName] = { |n|
+        ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][n % 12]
+        ++ ((n div: 12) - 1);
+    };
+
+    // A map's voices: one per output, spread from left to right, each a step
+    // higher -- a note up the scale, or a noise band.
     ~manifold[\build] = { |m, names|
+        var notes = names.collect { |name, i| ~manifold[\note].(m, i) };
         m[\voices].do(_.free);
         m[\voices] = names.collect { |name, i|
             var pan = if (names.size > 1) { i.linlin(0, names.size - 1, -0.9, 0.9) } { 0 };
-            Synth(\manifoldVoice, [\pan, pan, \centre, m[\base] * (1.5 ** i)]);
+            if (~manifold.sound == \noise) {
+                Synth(\manifoldVoice, [\pan, pan, \centre, 200 * (1.5 ** i)]);
+            } {
+                Synth(\manifoldTone, [\pan, pan, \freq, notes[i].midicps]);
+            };
         };
-        "manifold: % -- % outputs: %".format(m[\prefix], names.size, names.join(", ")).postln;
+        "manifold: % -- % outputs:".format(m[\prefix], names.size).postln;
+        names.do { |name, i|
+            if (~manifold.sound == \noise) {
+                "  %".format(name).postln;
+            } {
+                "  %  %".format(name, ~manifold[\noteName].(notes[i])).postln;
+            };
+        };
     };
 
     // A map heard for the first time: listen on its outputs and levels, and
@@ -72,7 +108,7 @@ s.waitForBoot {
     ~manifold[\start] = { |prefix, port|
         var m = (prefix: prefix, port: port, app: NetAddr("127.0.0.1", port),
                  names: nil, voices: [], seen: Main.elapsedTime, warned: false,
-                 base: 200 * (1.25 ** (~manifold.count % 6)));
+                 lowest: ~manifold.lowest + (7 * (~manifold.count % 4)));
         ~manifold.count = ~manifold.count + 1;
         m[\funcs] = [
             // .../outputs N name0 ch0 name1 ch1 ...

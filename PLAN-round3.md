@@ -1334,7 +1334,15 @@ Added before the app was first built (2026-11-09):
   nothing is followed), so changing who is followed never restarts the
   smoother: no jump in the sound. The drawlog session pins FL on the room and
   moves away, and follows O, the flat example's composite, onto its four
-  faders. Tests: an encoding vector for the roll
+  faders.
+- **A tone per output in the SuperCollider patch.** The noise bands were
+  hard to tell apart by ear; each output is now a note -- a soft sine with
+  two quiet overtones -- climbing a major pentatonic scale from C3 in channel
+  order, so anything sounding together stays consonant and each output can be
+  picked out by pitch (the room: C3 D3 E3 G3 on the floor, A3 C4 D4 E4 the
+  middle, G4 A4 C5 D5 the top). Each map starts a fifth above the last. The
+  post window lists every output's note. `~manifold.sound = \noise` brings
+  the bands back. Tests: an encoding vector for the roll
   call (python-osc agreeing), a send script `maps_named_and_announced`, the
   live UDP run now a named map with its roll call (58 packets); receive.py
   run by hand against two simulated maps, one stopping. 8 new gates and one
