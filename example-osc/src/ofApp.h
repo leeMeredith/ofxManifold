@@ -12,9 +12,16 @@
 // goes out, and whether anyone answered, is on the right.
 //
 // The map is drawn as the editor draws it, without the editing: node shapes
-// by kind, each node's share as a halo, values, the links of the nodes being
-// heard, and the outputs' faders along the bottom -- so an output that sounds
-// wrong can be seen to be unbound, trimmed or fed from somewhere unexpected.
+// by kind, each node's share as a halo, values, links, and the outputs'
+// faders along the bottom -- so an output that sounds wrong can be seen to be
+// unbound, trimmed or fed from somewhere unexpected.
+//
+// Where the editor has a selection, this follows one node: the loudest at
+// the point, or one pinned with shift-click. It is drawn as if selected --
+// ringed in yellow, its links on the map, and on the faders its share as a
+// brighter band, a dot over every output it feeds (its own, and any it is
+// bound to) and its fill line -- so moving toward a bound node shows its
+// share rising on both faders.
 //
 // What is sent is smoothed (OutputSmoother): one number per channel and per
 // node value, a fixed list, so a click across the map, a level crossed or the
@@ -40,7 +47,10 @@
 //   s               smoothing on or off
 //   - =             smoothing's half-life a step shorter / longer
 //   shift - =       a hundredth of a second shorter / longer
-//   l               links: of the nodes heard, of every node, none
+//   shift-click     follow that node, wherever the point goes; on nothing:
+//                   follow the loudest again
+//   l               links: of the node followed, the nodes heard, every
+//                   node, none
 //   tab, shift-tab  the next / last output: its nodes ringed in its colour
 //   click a fader   that output
 //   space           pause sending
@@ -111,14 +121,20 @@ private:
     ofxManifold::editor::ChartLayout chart;
     ofxManifold::editor::ChartLevels heard;         // smoothed: shown and sent
     std::vector<std::pair<std::string, float>> heardValues;
-    // Whose links are drawn: the nodes heard (0), every node (1), none (2).
+    // The node followed: the pinned one if there is one, else the loudest at
+    // the point. Drawn as the editor draws a selection.
+    ofxManifold::NodeID            pinned = ofxManifold::InvalidNode;
+    ofxManifold::editor::Selection followed;
+    void follow();
+    ofxManifold::NodeID nodeAt(glm::vec2 screen) const;
+    // Whose links are drawn: the node followed (0), the nodes heard (1),
+    // every node (2), none (3).
     int         links = 0;
     ofxManifold::editor::Selection linkSet;
     bool        show3D = true;
     bool        aimed  = false;          // the camera aimed once, then dragged
     ofEasyCam   cam;
     ofxManifold::editor::Text      text; // the column's label
-    ofxManifold::editor::Selection none; // nothing selected: a player
 
     glm::vec2 point{0.5f, 0.5f};
     float     z = 0.0f;

@@ -1319,7 +1319,22 @@ Added before the app was first built (2026-11-09):
   - the master player later sends the same from one app: several prefixes,
     several roll calls, one answer port -- the receivers cannot tell it from
     several copies.
-  OSC.md is rewritten for protocol 2. Tests: an encoding vector for the roll
+  OSC.md is rewritten for protocol 2.
+- **Following a node, in place of a selection.** The editor shows a binding
+  through the selection: a selected node's share as a brighter band on each
+  fader, a dot over every output it feeds (its own and any it is bound to),
+  its fill line, its links. example-osc had nothing selected, so none of it
+  showed. Now it follows one node -- the loudest at the point, or one pinned
+  with shift-click (shift-click off any node: the loudest again; a new map
+  unpins) -- and hands it to the views as the selection, so all of that is
+  drawn as the editor draws it, with the yellow ring on the map. `l` now
+  cycles the followed node's links (the default, as the editor), the nodes
+  heard, every node, none. The followed node's part goes through the
+  smoother with the rest, always as many numbers as channels (zeros when
+  nothing is followed), so changing who is followed never restarts the
+  smoother: no jump in the sound. The drawlog session pins FL on the room and
+  moves away, and follows O, the flat example's composite, onto its four
+  faders. Tests: an encoding vector for the roll
   call (python-osc agreeing), a send script `maps_named_and_announced`, the
   live UDP run now a named map with its roll call (58 packets); receive.py
   run by hand against two simulated maps, one stopping. 8 new gates and one

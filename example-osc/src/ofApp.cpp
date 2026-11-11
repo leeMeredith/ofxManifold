@@ -85,6 +85,8 @@ void ofApp::setup() {
 }
 
 void ofApp::adopt(const std::string& name) {
+    pinned = InvalidNode;             // another map's nodes: follow the loudest
+    followed.clear();
     osc.setMapName(name);             // its addresses, /manifold/<name>/...
     evaluator = std::make_unique<Evaluator>(model.manifold());
     renderer = std::make_unique<ofxManifoldRenderer>(model.manifold());
@@ -102,21 +104,28 @@ void ofApp::applySmoothing() {
 }
 
 // The map at the point, smoothed. The levels go through as one list --
-// routed by channel, after trim by channel, then silence -- so a fader's bar,
-// its trim tick and the silence bar glide together; its length is fixed by
-// the map's channels. The values are a second list, in the map's order.
+// routed by channel, after trim by channel, the followed node's part by
+// channel, then silence -- so a fader's bar, its trim tick, its bright band
+// and the silence bar glide together. Its length is fixed by the map's
+// channels: the followed node's part is always there, zeros when nothing is
+// followed, so changing who is followed never makes the smoother start over
+// (which would be a jump in the sound). The values are a second list.
 void ofApp::smooth(float dt) {
-    const Selection noSelection;
-    const ChartLevels raw = chartLevels3D(model, noSelection, evaluation, z);
+    const ChartLevels raw = chartLevels3D(model, followed, evaluation, z);
+    const std::size_t n = raw.routed.size(), m = raw.levels.size();
+    std::vector<float> part(raw.fromSelection);
+    part.resize(n, 0.0f);
     std::vector<float> v(raw.routed);
     v.insert(v.end(), raw.levels.begin(), raw.levels.end());
+    v.insert(v.end(), part.begin(), part.end());
     v.push_back(raw.silence);
     const std::vector<float>& s = levelSmoother.update(v, dt);
-    const std::size_t n = raw.routed.size(), m = raw.levels.size();
     heard = raw;
-    heard.routed.assign(s.begin(), s.begin() + std::ptrdiff_t(n));
-    heard.levels.assign(s.begin() + std::ptrdiff_t(n), s.begin() + std::ptrdiff_t(n + m));
-    heard.silence = s[n + m];
+    auto at = [&](std::size_t k) { return s.begin() + std::ptrdiff_t(k); };
+    heard.routed.assign(at(0), at(n));
+    heard.levels.assign(at(n), at(n + m));
+    heard.fromSelection.assign(at(n + m), at(n + m + n));
+    heard.silence = s[n + m + n];
 
     heardValues = valuesAt(model, evaluation, z);
     v.clear();
@@ -159,10 +168,38 @@ void ofApp::followLevel() {
     if (k != model.currentLevel()) model.goToLevel(k);
 }
 
+// The node followed: pinned, while it is on the map, else the loudest at the
+// point; nothing off the map.
+void ofApp::follow() {
+    NodeID id = InvalidNode;
+    if (pinned != InvalidNode && pinned < model.manifold().nodeCount()) {
+        id = pinned;
+    } else {
+        pinned = InvalidNode;
+        float most = 0.0f;
+        for (const auto& wn : evaluation.weights) {
+            if (wn.weight > most) { most = wn.weight; id = wn.id; }
+        }
+    }
+    if (followed.size() == 1 && followed.contains(id)) return;
+    followed.clear();
+    if (id != InvalidNode) followed.toggle(id);
+}
+
+// The node under the mouse, as the editor finds it: within 10 pixels.
+NodeID ofApp::nodeAt(glm::vec2 screen) const {
+    const Manifold2D& mf = model.manifold();
+    for (std::size_t i = 0; i < mf.nodeCount(); ++i) {
+        const glm::vec2 p = renderer->toScreen(mf.node(NodeID(i)).position);
+        if (glm::distance(p, screen) <= 10.0f) return NodeID(i);
+    }
+    return InvalidNode;
+}
+
 Scene ofApp::scene() const {
     Scene s;
     s.model = &model;
-    s.selection = &none;
+    s.selection = &followed;
     s.renderer = renderer.get();
     s.evaluation = &evaluation;
     s.text = &text;
@@ -213,11 +250,16 @@ void ofApp::update() {
     layoutWindow();
     evaluation = evaluator->evaluate(point);
 
-    // Whose links the map draws: the nodes the point is hearing, or all.
+    follow();
+
+    // Whose links the map draws: the node followed, the nodes the point is
+    // hearing, or all.
     linkSet.clear();
     if (links == 0) {
-        for (const auto& wn : evaluation.weights) if (wn.weight > 0.0f) linkSet.toggle(wn.id);
+        for (NodeID id : followed.nodes()) linkSet.toggle(id);
     } else if (links == 1) {
+        for (const auto& wn : evaluation.weights) if (wn.weight > 0.0f) linkSet.toggle(wn.id);
+    } else if (links == 2) {
         linkSet.selectAll(model.manifold().nodeCount());
     }
 
@@ -304,11 +346,15 @@ void ofApp::draw() {
          + ofToString(model.currentLevel() + 1) + " of " + ofToString(model.map3d().count()),
          plain);
     {
-        const char* whose[] = {"of the nodes heard", "of every node", "off"};
+        const char* whose[] = {"followed", "heard", "all", "off"};
         std::string out = "none";
         const auto& sel = model.selectedOutputs();
         if (!sel.empty()) out = model.mapping().targetName(sel.front());
         line("output " + out + " (tab)   links " + whose[links] + " (l)", plain);
+        std::string who = "nothing";
+        if (!followed.nodes().empty()) who = model.manifold().node(followed.nodes().front()).name;
+        line("following " + who + (pinned != InvalidNode ? ", pinned" : ", the loudest")
+             + " (shift-click)", plain);
     }
     y += 8.0f;
     line("last send:", ofColor(235, 238, 245));
@@ -328,6 +374,15 @@ void ofApp::mousePressed(int x, int y, int) {
     // A fader picks its output: its nodes ringed in its colour on the map.
     const TargetID hit = chart.outputAt(float(x), float(y));
     if (hit != InvalidTarget) { model.pickOutput(hit); return; }
+    // Shift-click on the map: follow that node, or the loudest again.
+    if (ofGetKeyPressed(OF_KEY_SHIFT) && renderer->viewport().inside(x, y)) {
+        pinned = nodeAt(glm::vec2(float(x), float(y)));
+        follow();
+        message = pinned != InvalidNode ? "following " + model.manifold().node(pinned).name + ", pinned"
+                                        : "following the loudest node";
+        messageUntil = ofGetElapsedTimef() + 2.5f;
+        return;
+    }
     if (renderer->viewport().inside(x, y)) point = renderer->toManifold({float(x), float(y)});
 }
 
@@ -335,6 +390,7 @@ void ofApp::mouseMoved(int x, int y) { mouse = glm::vec2(float(x), float(y)); }
 
 void ofApp::mouseDragged(int x, int y, int) {
     mouse = glm::vec2(float(x), float(y));
+    if (ofGetKeyPressed(OF_KEY_SHIFT)) return;      // a pin, not a move
     if (renderer->viewport().inside(x, y)) point = renderer->toManifold({float(x), float(y)});
 }
 
@@ -383,8 +439,9 @@ void ofApp::keyPressed(int key) {
         say(show3D ? "3D view on -- drag in it to turn it" : "3D view off -- 3 to show it");
     }
     else if (key == 'l') {
-        links = (links + 1) % 3;
-        const char* said[] = {"links of the nodes heard", "links of every node", "links off"};
+        links = (links + 1) % 4;
+        const char* said[] = {"links of the node followed", "links of the nodes heard",
+                              "links of every node", "links off"};
         say(said[links]);
     }
     else if (key == OF_KEY_TAB) {

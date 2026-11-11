@@ -187,9 +187,12 @@ number per output, a list the map fixes, so a click across the room or the
 point leaving the map glides instead of stepping; `s` turns it off to
 compare, `-` `=` change the half-life a step, shift a hundredth of a second.
 The map is drawn as the editor draws it, without the editing -- node shapes,
-halos, values, the links of the nodes being heard (`l`: every node, none) --
-and the editor's faders run along the bottom, showing what is sent; `tab` or
-a click on a fader rings that output's nodes in its colour. Each map's
+halos, values, links -- and the editor's faders run along the bottom, showing
+what is sent; `tab` or a click on a fader rings that output's nodes in its
+colour. In place of a selection it follows one node, the loudest at the
+point or one pinned with shift-click, drawn as the editor draws a selected
+node: its share as a brighter band on every fader it feeds, a dot over each,
+its links (`l`: the nodes heard, every node, none). Each map's
 messages go under its own name -- `/manifold/room/levels` -- with a roll call
 on `/manifold/map`, and each copy of the app hears answers on the first port
 free from 57121, so several copies with different maps play at once and the

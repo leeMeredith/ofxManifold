@@ -21,6 +21,12 @@ void frame(const char* what) {
 }
 
 void key(int k) { app->keyPressed(k); app->keyReleased(k); }
+void shiftClick(int x, int y) {
+    drawlogHeld().insert(OF_KEY_SHIFT);
+    app->mousePressed(x, y, 0);
+    app->mouseReleased(x, y, 0);
+    drawlogHeld().erase(OF_KEY_SHIFT);
+}
 
 } // namespace
 
@@ -39,9 +45,16 @@ int main() {
     a.mouseMoved(90, 560);     frame("hovering it: its numbers");
     key('+'); key('+'); key('_'); frame("shift - =: a hundredth at a time");
     key('3');                  frame("3D view off");
-    key('3');
+    key('3');                  frame("3D view on again");
+    shiftClick(80, 80);        frame("shift-click FL: followed, pinned");
+    a.mousePressed(225, 225, 0);
+    frame("the point by RR: FL still followed");
+    shiftClick(150, 150);      frame("shift-click on no node: the loudest again");
     key('E');                  frame("the editor's flat example");
-    key('l');                  frame("its links, every node");
+    a.mousePressed(118, 176, 0);
+    frame("the flat example, by O: the loudest followed");
+    key('l');                  frame("links of the nodes heard");
+    key('l');                  frame("links of every node");
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;
 }
