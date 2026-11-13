@@ -16,7 +16,7 @@
 // stay consonant and each can be picked out by pitch: on the room, FL FR RL
 // RR on the floor, then the middle's four, then the top's, climbing. The post
 // window lists each output's note. Each map starts a fifth higher than the
-// last, so maps can be told apart too. Set ~manifold.sound = \noise below for
+// last, so maps can be told apart too. Set ~manifold[\sound] = \noise below for
 // the first version's pink noise bands instead.
 //
 // It says hello to each map once a second, at the port its roll call gives,
@@ -28,13 +28,13 @@
 
 (
 ~manifold = ~manifold ? ();
-~manifold.root = "/manifold";
-~manifold.firstPort = 57121;    // where example-osc copies may hear answers
-~manifold.ports = 16;
-~manifold.silentAfter = 5;      // seconds without a roll call: the map has gone
-~manifold.sound = \tone;        // \tone: a note per output; \noise: a noise band
-~manifold.scale = [0, 2, 4, 7, 9];  // major pentatonic, in semitones
-~manifold.lowest = 48;          // the first map's first note: C3, as MIDI
+~manifold[\root] = "/manifold";
+~manifold[\firstPort] = 57121;    // where example-osc copies may hear answers
+~manifold[\ports] = 16;
+~manifold[\silentAfter] = 5;      // seconds without a roll call: the map has gone
+~manifold[\sound] = \tone;        // \tone: a note per output; \noise: a noise band
+~manifold[\scale] = [0, 2, 4, 7, 9];  // major pentatonic, in semitones
+~manifold[\lowest] = 48;          // the first map's first note: C3, as MIDI
 
 s.waitForBoot {
     SynthDef(\manifoldVoice, { |out = 0, pan = 0, amp = 0, centre = 440|
@@ -49,30 +49,35 @@ s.waitForBoot {
     }).add;
     s.sync;
 
-    // The patch's own functions are kept and called by key -- ~manifold[\drop].(p)
-    // -- because ~manifold.drop would call the function as a method of
-    // ~manifold, with ~manifold as its first argument.
+    // Everything in ~manifold is read and set by key -- ~manifold[\maps],
+    // ~manifold[\drop].(p) -- never as ~manifold.maps. An Event answers
+    // .something by running its own method of that name if it has one
+    // (~manifold.count is Collection's count, not ours), and by calling a
+    // function it holds with ~manifold as the first argument.
 
     // Let a map go: its voices and its listeners.
     ~manifold[\drop] = { |prefix|
-        var m = ~manifold.maps[prefix];
+        var m = ~manifold[\maps][prefix];
         if (m.notNil) {
             m[\voices].do(_.free);
             m[\funcs].do(_.free);
-            ~manifold.maps.removeAt(prefix);
+            ~manifold[\maps].removeAt(prefix);
             "manifold: % has gone".format(prefix).postln;
         };
     };
 
-    // Anything from a run before this one goes first.
-    ~manifold.maps = ~manifold.maps ? ();
-    ~manifold.maps.keys.copy.do { |p| ~manifold[\drop].(p) };
-    ~manifold.count = 0;
+    // Anything from a run before this one goes first. The maps are kept in a
+    // Dictionary, not an Event: their keys are prefixes, strings, and an Event
+    // matches keys by identity -- the same text arriving again in a new
+    // message would not find its map.
+    (~manifold[\maps] ? []).do { |m| m[\voices].do(_.free); m[\funcs].do(_.free) };
+    ~manifold[\maps] = Dictionary.new;
+    ~manifold[\count] = 0;
 
     // The i-th step up the scale from a map's lowest note, as MIDI.
     ~manifold[\note] = { |m, i|
-        var steps = ~manifold.scale.size;
-        m[\lowest] + ~manifold.scale[i % steps] + (12 * (i div: steps));
+        var steps = ~manifold[\scale].size;
+        m[\lowest] + ~manifold[\scale][i % steps] + (12 * (i div: steps));
     };
     // A MIDI note as a name: 60 is C4.
     ~manifold[\noteName] = { |n|
@@ -87,7 +92,7 @@ s.waitForBoot {
         m[\voices].do(_.free);
         m[\voices] = names.collect { |name, i|
             var pan = if (names.size > 1) { i.linlin(0, names.size - 1, -0.9, 0.9) } { 0 };
-            if (~manifold.sound == \noise) {
+            if (~manifold[\sound] == \noise) {
                 Synth(\manifoldVoice, [\pan, pan, \centre, 200 * (1.5 ** i)]);
             } {
                 Synth(\manifoldTone, [\pan, pan, \freq, notes[i].midicps]);
@@ -95,7 +100,7 @@ s.waitForBoot {
         };
         "manifold: % -- % outputs:".format(m[\prefix], names.size).postln;
         names.do { |name, i|
-            if (~manifold.sound == \noise) {
+            if (~manifold[\sound] == \noise) {
                 "  %".format(name).postln;
             } {
                 "  %  %".format(name, ~manifold[\noteName].(notes[i])).postln;
@@ -108,8 +113,8 @@ s.waitForBoot {
     ~manifold[\start] = { |prefix, port|
         var m = (prefix: prefix, port: port, app: NetAddr("127.0.0.1", port),
                  names: nil, voices: [], seen: Main.elapsedTime, warned: false,
-                 lowest: ~manifold.lowest + (7 * (~manifold.count % 4)));
-        ~manifold.count = ~manifold.count + 1;
+                 lowest: ~manifold[\lowest] + (7 * (~manifold[\count] % 4)));
+        ~manifold[\count] = ~manifold[\count] + 1;
         m[\funcs] = [
             // .../outputs N name0 ch0 name1 ch1 ...
             OSCFunc({ |msg|
@@ -128,7 +133,7 @@ s.waitForBoot {
                 };
             }, (prefix ++ "/levels").asSymbol)
         ];
-        ~manifold.maps[prefix] = m;
+        ~manifold[\maps][prefix] = m;
         "manifold: % playing, answers on port %".format(prefix, port).postln;
         m[\app].sendMsg(prefix ++ "/describe");
         m;
@@ -137,7 +142,7 @@ s.waitForBoot {
     // The roll call: /manifold/map prefix answer-port outputs protocol
     OSCdef(\manifoldRollCall, { |msg|
         var prefix = msg[1].asString, port = msg[2];
-        var m = ~manifold.maps[prefix];
+        var m = ~manifold[\maps][prefix];
         if (m.isNil) {
             m = ~manifold[\start].(prefix, port);
         } {
@@ -148,16 +153,16 @@ s.waitForBoot {
             };
         };
         m[\seen] = Main.elapsedTime;
-    }, (~manifold.root ++ "/map").asSymbol);
+    }, (~manifold[\root] ++ "/map").asSymbol);
 
     // Once a second: hello to every map; let go of any gone silent.
     ~manifold[\hello].stop;
     ~manifold[\hello] = Routine {
         loop {
             var now = Main.elapsedTime;
-            ~manifold.maps.keys.copy.do { |p|
-                var m = ~manifold.maps[p];
-                if (now - m[\seen] > ~manifold.silentAfter) {
+            ~manifold[\maps].keys.copy.do { |p|
+                var m = ~manifold[\maps][p];
+                if (now - m[\seen] > ~manifold[\silentAfter]) {
                     ~manifold[\drop].(p);
                 } {
                     if (m[\port] > 0) { m[\app].sendMsg(p ++ "/hello", "sclang") };
@@ -169,9 +174,9 @@ s.waitForBoot {
 
     // Ask every map listening to describe itself now: the root describe, to
     // each port a copy of example-osc may have.
-    ~manifold.ports.do { |k|
-        NetAddr("127.0.0.1", ~manifold.firstPort + k).sendMsg(~manifold.root ++ "/describe");
+    ~manifold[\ports].do { |k|
+        NetAddr("127.0.0.1", ~manifold[\firstPort] + k).sendMsg(~manifold[\root] ++ "/describe");
     };
-    "manifold: listening on % for %/map".format(NetAddr.langPort, ~manifold.root).postln;
+    "manifold: listening on % for %/map".format(NetAddr.langPort, ~manifold[\root]).postln;
 };
 )
