@@ -913,6 +913,99 @@ Open questions, each with a recommendation:
 2. **A shared output's voice**: a quiet tone at the root.
 3. **Brightness on by default**: yes.
 
+
+#### 3B-2c: height on the levels -- riding the bends (spec, 2026-11-14)
+
+Lee: "I'm able to take a node or several nodes and move it down or up with
+y or h -- is that shape maintained in a way that movement inside of it can
+be restrained and extrapolated? Right now the levels are flat, versus me
+moving one node or several."
+
+##### Where things stand
+
+- **The bend is kept and heard.** y and h give a node its own height on a
+  level; the map file keeps it; a level is a bent surface, its height at any
+  point blended from its nodes' heights as the sound is. `Levels::evaluate`
+  places the point between two levels against those surfaces at its x and y,
+  and the 3D view draws them bent.
+- **Outside is silent.** Below the bottom surface or above the top one, at
+  that x and y, the point is outside the map, as off a flat map's edge.
+- **Movement does not know the bend.** example-osc's arrows move a plain
+  height; the random height draws between the flat bases of the lowest and
+  highest levels, so where the floor is raised or the top lowered it can
+  land outside -- and the sound cuts out; "level 2 of 3" comes from the
+  flat bases.
+
+##### Height measured in levels
+
+A **level position** u: 0 on the floor's surface, 1 on the next level's, 1.5
+half way between the second and third -- at the point's own x and y. The
+height is worked out from u each frame, from the bent surfaces there. So:
+
+- **It rides the shape**: at a steady u, moving sideways follows the bends.
+- **It stays inside** (restrained, the default): u is held to 0..top, so the
+  point never leaves the volume. The random height draws u; the arrows move
+  u, at a steady rate in levels, whatever the gaps.
+- **Past the levels** (extrapolated, an option): beyond the bottom or top,
+  the outermost surfaces' spacing carries on -- below the floor by the gap
+  from the floor to the next level, above the top by the gap below it -- so
+  the bend is followed out there too. Still outside the map: silent, as now.
+- **In plain units** (as now), for anyone who wants it.
+
+##### In the kernel: two small additions to `Levels`
+
+    float heightAtPosition(const std::vector<WeightedNode>& floor, float u,
+                           bool extrapolate = false) const;
+    float positionAt(const std::vector<WeightedNode>& floor, float z) const;
+
+- `heightAtPosition`: k = floor(u) held to 0..L-2, f = u - k; the height is
+  h_k + f (h_{k+1} - h_k), each h the level's bent height at the point.
+  Restrained: u is first held to 0..L-1. Extrapolated: not, so the same
+  line carries on past the ends.
+- `positionAt`: its inverse -- the levels never cross (`fits` refuses a
+  height that would), so the surfaces are in order and it is exact both ways,
+  extrapolated too.
+- One level: u is 0 and the height that level's; outside the floor plan (no
+  weights), the flat bases.
+- Tested in the levels suite: flat bases, under a raised node, under a
+  lowered one, the round trip u -> z -> u, extrapolated below and above,
+  held when restrained, one level, off the floor plan; gates on each rule.
+
+##### In example-osc
+
+- **`k`**: the height on the levels (restrained, the default), past the
+  levels (extrapolated), in plain units. Switching keeps the point where it
+  is: u is worked out from the height, or the height from u.
+- **The arrows** on the levels: one level a second, shift a quarter.
+- **The random height** (`h` jumps or glides) draws u across the levels: a
+  RandomWalk whose height range is 0..L-1, in levels.
+- **Recordings** made on the levels keep u, so a gesture replays riding the
+  shape even after the levels are reshaped in the editor.
+- **The panel**: "level 1.50 -- between levels 2 and 3 (k)"; the level dot
+  and the 3D view's bright level follow the surfaces under the point.
+- **A map opened**: u from the point's height on the new map.
+
+##### For SuperCollider
+
+`/position` gains an optional fourth number, u: f x, f y, f z, f u -- worked
+out from the height when in plain units. Receivers reading three numbers
+are unaffected. With 3B-2b's shape message SuperCollider has both: which
+level each output is on, and where between the levels the point is.
+
+Tested by: the levels vectors above; the OSC encoding and a send script with
+four numbers; the drawlog session -- riding over a raised node at a steady
+u, the random height under a bend never outside, `k` switching without a
+jump.
+
+Open questions, each with a recommendation:
+
+1. **Default**: on the levels, restrained.
+2. **Arrow speed on the levels**: one level a second, shift a quarter.
+3. **Outside the floor plan**: the flat bases.
+4. **Order**: 3B-2c before 3B-2b's build, since the shape message and the
+   fourth number go out together, and riding the bends fixes the random
+   height dropping out under a bend.
+
 ---
 
 ## Done
@@ -1845,6 +1938,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-1** | OSC out that grows and shrinks with the map; `ofxManifoldPlayer`; `example-osc` | osc vectors, `make osc-live` |
 | **3B-2** | Movement, first slice: `Motion`, the recording as one, `RandomWalk` (jump and glide), bounds, seeds, step timing (every, clicks, pattern), clocks (seconds, a phase from SuperCollider), motion files; example-osc's movements | motion vectors, gates, drawlog session, `make osc-live` |
 | **3B-2b** | The map's shape for SuperCollider: `/shape` (levels, each output's level and place), `Model::outputPlaces`, protocol 3; the patch's musical behaviours, chosen in SuperCollider | editor and OSC vectors, gates, sclang logic run |
+| **3B-2c** | Height on the levels: `Levels::heightAtPosition` / `positionAt`, riding the bends, restrained or extrapolated; example-osc's `k`; u on `/position` | levels vectors, OSC vectors, gates, drawlog session |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.
