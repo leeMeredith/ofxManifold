@@ -490,6 +490,8 @@ in SuperCollider, three levels -- floor, middle, top -- with the panners
 SuperCollider provides to compare against the map); **movement** (paths,
 orbits, wandering, flocking, groups); the **master player**.
 
+(2026-11-13: movement first, at Lee's asking; the room is 3B-3.)
+
 #### 3B-1: OSC out that grows and shrinks with the map
 
 Messages for whatever is listening -- SuperCollider, Max, Pd, TouchDesigner,
@@ -530,6 +532,289 @@ pretty slow").
   builds as many channels as `/manifold/outputs` says and pans a test sound
   by the levels over stereo, smoothing with a 20 ms lag; a Python receiver
   with no dependencies; and a protocol page for anyone building their own.
+
+
+#### 3B-2: movement, first slice -- random jumps and glides (spec, 2026-11-13; clocks added the same night)
+
+The order changed: Lee wants movement before the virtual room ("I would like
+to work on movement"). The room waits for 3B-3.
+
+What he asked for: random movement that **jumps** -- "each click might move
+it only once, but no space in between" -- or **moves to a destination over a
+set amount of time**; bounded; an abstraction that is earned, not
+speculative; semantics that know nothing of what is moved; and room for
+what comes later -- "spirals, circular movement where it goes on a
+horizontal and orbits that can be moved laterally".
+
+And not to rule out his **ofxScPhaseBridge** (github.com/leeMeredith/
+ofxScPhaseBridge) as the clock: SuperCollider owns time and sends `/phase`,
+0 to 1 across a bar, a hundred times a second; it echoes `/beat <step>` when
+an armed step sounds. "This doesn't have to be tied but it can be what's
+used in place of time." So a movement is not in seconds: it is in whatever
+the clock counts.
+
+##### The one shared idea: where the point is at a given time
+
+    class Motion {                              // src/sources/ofxManifoldMotion.h
+    public:
+        virtual ~Motion() = default;
+        virtual glm::vec3 at(double t) const = 0;   // x, y on the map; z height
+        virtual double duration() const;            // infinity unless it ends
+    };
+
+That is the whole abstraction for this slice, and it is earned: the
+recording, the jump and the glide all fit it today. Nothing else is shared
+until a second kind needs it.
+
+- **Asked, not stepped.** A motion is asked a count; it does not advance a
+  frame. So it is the same at any frame rate, can be paused, scrubbed or run
+  backwards, and is tested as the trajectory is: positions at given times.
+- **It knows nothing of maps or sound.** It gives positions in the map's own
+  coordinates (x, y in 0..1, z in the map's height units). The player puts
+  the point there; evaluation, outputs, smoothing and OSC go on as now. The
+  same motion can move a group member later, or play on another map.
+- **A count in the clock's units, not seconds.** `t` is whatever the clock
+  counts: seconds by default, bars when SuperCollider's phase drives it (see
+  Clocks), a fader if someone wires one. Every setting is in the same unit --
+  the step interval, the travel, the speed -- so a walk set to a step every
+  1/16 and a quarter of travel steps on SuperCollider's sixteenths and
+  glides a quarter-bar, and stretches with the tempo. That is what
+  `sources/ofxManifoldPointSource.h` asked for from the start: the general
+  form of a source is deliberately not time.
+- **Not PointSource.** PointSource is a finite extent asked at t in 0..1; a
+  random walk has no end. A finite motion is still a PointSource by
+  `at(t * duration())`, and a recording is both.
+- **double, not float**, for the count: a float second loses milliseconds
+  after a few hours of running.
+- **Header-only, no openFrameworks**, beside the trajectory.
+
+##### The recording as a motion
+
+`RecordedMotion(const Trajectory&, End)`: `at(t)` is the trajectory at `t`
+of its own duration, with its height (`pointAtSeconds`, `heightAtSeconds`).
+Before 0, its start. After its end: **Hold** (the last point, the default) or
+**Loop**. Unknown duration counts as one unit, as `pointAtSeconds` already
+does. A recording is in the units of the clock it was recorded against:
+example-osc records against whichever clock is running, so a gesture
+recorded in bars plays back in bars, in time with the music at any tempo.
+
+##### Jump and glide are one thing: a random walk
+
+A jump is a glide that takes no time to arrive. So there is one class,
+`RandomWalk`, and a jump is `travel = 0`.
+
+    step k happens at time t_k  (the clock, below)
+    it starts from WHERE THE POINT IS at t_k  -- mid-travel if a step comes
+                                                  before the last arrived
+    it picks a destination d_k  (the bounds, below)
+    it travels from there to d_k over the travel time, eased, then holds
+    before step 1: the start position
+
+- **Travel**: the count per trip (0 = a jump), or a **speed** instead -- map
+  units per count, so a long trip takes longer.
+- **Easing**: `linear`, or `smooth` (smoothstep, 3u^2 - 2u^3: easing in and
+  out).
+
+##### When steps happen
+
+- **Every**: an interval, with optional **jitter** -- each interval drawn
+  from interval x (1 +/- jitter), jitter 0 to 0.9.
+- **At**: a list of counts -- **clicks**. Each click is stored as the count
+  it came at, so a walk driven by clicks is still "where at a given count",
+  replays the same, and saves. Clicks are only ever appended, at or after
+  the last.
+- **Pattern**: offsets within a cycle, repeating -- `{"cycle": 1, "at":
+  [0, 0.1875, 0.5]}` is steps 0, 3 and 8 of sixteen, every bar when the
+  count is bars. Exact: no network timing in it, the steps fall where the
+  count says. Offsets in 0 up to the cycle, increasing.
+
+##### Clocks: what drives the count
+
+Outside the motion, in `ofxManifoldPlayer` (no openFrameworks), tested like
+the rest. A clock is asked for the count now; the player asks the motion
+where that count puts the point.
+
+- **SecondsClock**: the app's own seconds, from when it started; pausable
+  (the count holds while paused, and goes on from there).
+- **PhaseClock**: a count built from a phase that wraps -- 0 to 1 once a
+  bar, as ofxScPhaseBridge's `/phase` sends it. It is fed each phase as it
+  arrives and answers bars: bar 3 at phase 0.25 is 3.25.
+  - **A wrap**: a drop of more than half (0.98, then 0.02) is a new bar. The
+    bridge keeps a bar to at least 0.1 s and sends a hundred phases a second:
+    at least ten readings a bar, plenty to tell.
+  - **Never backwards**: a smaller drop -- a packet out of order -- is
+    ignored; the count holds until the phase passes it again.
+  - **A restart** (bridge.scd run again, the phase back to 0) reads as a new
+    bar: the count goes on rising and a walk carries on.
+  - **The bar number, if it is sent**: a second argument, `/phase <f> <i
+    bar>`, is taken as the bar itself, so two apps on one bridge agree on
+    the bar, not only the beat. The bridge does not send it today; without
+    it each app counts bars from when it began listening.
+  - **Not heard**: no phase for a second and the clock says so; the count
+    holds.
+  - It takes phases from anything -- the bridge, Max, a script -- and knows
+    nothing of OSC: the app reads the message and hands it the number.
+- **Not tied.** ofxManifold does not use ofxScPhaseBridge's code and the
+  bridge needs nothing from ofxManifold; example-osc speaks the same
+  contract: `/phase` on port 9001, so `bridge.scd` drives it unchanged.
+  (Only one program can listen on 9001: the bridge's own example app, or
+  example-osc.)
+- **Delay**: example-osc sees each phase some milliseconds after SuperCollider
+  sends it and answers with levels, so movement on the bridge's clock runs a
+  frame or two -- some 20 to 30 ms -- behind SuperCollider's own clicks.
+
+##### Bounds: where it may go
+
+- **A rectangle** (default the whole map, 0..1 by 0..1) and a **height range**
+  (`z` low to high; low = high keeps one height).
+- **An inside test**, given by the player: `std::function<bool(glm::vec2)>`.
+  example-osc gives the map's own -- is the point on the map? -- so no
+  destination is ever off it. The motion still knows nothing of maps: it is
+  handed a yes/no.
+- **Step distance**: how far one step may go from where it starts. 0 means
+  anywhere in the bounds; 0.1 makes it wander nearby.
+- **Straight paths stay inside** (on by default when there is an inside
+  test): a glide between two points on an L-shaped map can cut across the
+  notch, off the map, and fall silent half way. A destination is refused if
+  any of 16 points along the way is outside. Off: any destination inside is
+  taken.
+- **Choosing**: up to 64 tries; each try draws a candidate (anywhere in the
+  rectangle, or within the step distance: a square of that half-width, a
+  draw outside the circle counting as a failed try -- no sine or cosine, so
+  C++ and Python agree to the last bit), then a height, and keeps the first
+  that passes every test. **If none passes, it stays where it is** for that
+  step. Every try uses the same number of draws, pass or fail, so the
+  sequence never depends on which tests ran.
+
+##### Random that repeats
+
+- **A seed.** The same seed, settings and clock give the same path every
+  time: a walk you liked can be saved, and the tests can check one.
+- **Our own generator**: splitmix64, a few lines. The standard library's
+  distributions differ between compilers, and the Python reference must
+  draw exactly the same numbers. A draw in 0..1 is the top 24 bits / 2^24,
+  exact in a float. The generator is checked against splitmix64's published
+  outputs, which carry outside authority.
+
+##### Memory that stays small
+
+A walk's step k depends on step k - 1 (it starts from there), so asking for
+an hour in means walking the hour. To keep that bounded and fast:
+
+- **It keeps where it last got to**, so playing forward costs one step at a
+  time.
+- **A checkpoint every 256 steps** -- step, time, position, the generator's
+  state: about 48 bytes. An hour at ten steps a second is 141 checkpoints,
+  7 KB.
+  Asking for an earlier time starts from the checkpoint before it.
+- **One thread.** The cache is mutable inside a const `at()`; a walk is not
+  asked from two threads at once.
+
+##### Saving
+
+A motion file, `"motion": 1`, JSON like the others:
+
+    {"motion": 1, "kind": "walk", "seed": 7, "units": "seconds",
+     "start": [0.5, 0.5, 0.0],
+     "clock": {"every": 0.5, "jitter": 0.0}      or {"at": [0.8, 1.9, 2.4]}
+                                                 or {"cycle": 1, "at": [0, 0.1875, 0.5]},
+     "travel": {"duration": 0.4}                 or {"speed": 0.25},
+     "easing": "smooth",
+     "bounds": {"rect": [0, 0, 1, 1], "z": [0, 0.5], "step": 0.0,
+                "inside": "map", "straight": true}}
+
+`"inside": "map"` says the player supplies the map's test; `"none"`, the
+rectangle alone. `"units"` -- `"seconds"` or `"bars"` -- says what the
+numbers count, so a walk written for bars is not played in seconds without
+anyone knowing: a player opening one for the other clock says so. A recording keeps its path file and is referred to by name:
+`{"motion": 1, "kind": "recorded", "path": "spin.json", "end": "loop"}`.
+Refused: unknown kind, version above 1, unknown units, travel or interval
+below 0, jitter outside 0..0.9, a rectangle inside out, z low above high,
+clicks going backwards, a pattern's offsets out of order or outside its
+cycle.
+
+##### Left room for, not built
+
+- **Circle**: centre, radius, a lap's count (one bar, on the bridge's
+  clock: the phase is its angle), starting angle; **spiral**: a
+  circle whose radius changes with time; **orbit moved sideways**: an orbit
+  whose centre is itself a Motion. The one thing to get right now is that
+  nothing in RandomWalk assumes a position is a constant: the start, the
+  rectangle's place, are plain data that a later slice can make a Motion.
+- **Edges for shapes that can leave the map**: stop at the edge, bounce,
+  wrap, or allow (silent outside). A walk never needs one: its destinations
+  are inside by construction.
+- **Flocking** does not fit "where at a given time": objects that steer by
+  each other have to be simulated forward together. It gets its own stepped
+  form later; a flock's leader can be any Motion.
+
+##### In example-osc
+
+- `m`: the movement -- your hand (as now), the recording, jump, glide.
+- `r`: record your hand's movement (again: stop); the recording loops.
+- `,` `.`: the step interval shorter / longer; `<` `>`: the travel time.
+- `{` `}`: the step distance -- anywhere, 0.5, 0.25, 0.1, 0.05.
+- `c`: when steps happen -- every interval; your clicks: a click on the map
+  (or return) is one step, and does not move the point itself; or the
+  bridge's beats: each `/beat` SuperCollider echoes -- each armed step that
+  sounds -- is one step, so the point moves once on every armed step, as
+  with a click. (Its count is the clock's at arrival, a few milliseconds
+  late; the Pattern kind is the exact one, for files and the library.)
+- `b`: the clock -- the app's own seconds, or SuperCollider's phase on port
+  9001 (the panel shows the bar and phase, and "phase not heard" when it
+  stops). Recording, steps and travel all follow it.
+- `h`: height -- stays where it is, or random across the map's levels.
+- `n`: a new seed.
+- The panel: the movement, its seed, interval, travel, step distance, when
+  steps happen, the clock and its count.
+- The bounds are the map's: its inside test, the whole rectangle, and the
+  height range of its levels.
+- Smoothing still applies to what is sent: a jump sounds like a quick glide
+  unless smoothing is off (`s`).
+
+##### Tested by
+
+`tests/ref/reference_motion.py` writes `tests/vectors/motion.vec`;
+`make test-motion` runs it; mutation gates on every rule above.
+
+- ANALYTIC: splitmix64's published outputs; a jump holds between steps and
+  arrives at once; linear travel is half way at half time; smooth travel is
+  0.15625 of the way at a quarter; before the first step, the start; one
+  height when low = high; no step longer than the step distance; every
+  destination inside the rectangle and the inside test; no straight path
+  through an L-shaped map's notch; steps exactly at click times; a click
+  mid-travel starting from where the point is; a walk with nowhere to go
+  staying put; a recording held and looped.
+- CROSS: positions along seeded walks, every kind of setting, against the
+  Python reference (1e-6).
+- SPEC: jitter, 64 tries, the same draws for a pass and a fail; asking times
+  out of order -- backwards, jumping ahead, across checkpoints -- gives the
+  same answers as asking in order.
+- Pattern steps: exactly at cycle x n + offset, for many cycles.
+- PhaseClock (ANALYTIC and SPEC): a wrap at more than half a drop and not
+  at less; a packet out of order held, never backwards; a restart a new
+  bar; the bar argument taken when there; "not heard" after a second; a
+  bar at the bridge's shortest, 0.1 s, at a hundred phases a second, never
+  miscounted. SecondsClock: paused and resumed, the count holding.
+- example-osc's `/phase` and `/beat` reading: `make osc-live` extended -- a
+  stand-in bridge sends phases and beats over UDP, and the walk steps on
+  them.
+- Files: round trips, and every refusal above.
+- example-osc through the drawlog session: each movement for some frames.
+
+Open questions for Lee, each with a recommendation:
+
+1. **Height by default**: stays where it is (`h` for random across levels).
+2. **Straight paths stay inside**: on by default.
+3. **Recording end**: loop in example-osc; hold by default in the library.
+4. **Travel by default**: 0.4, smooth easing; interval 0.5; step distance
+   anywhere. On the bridge's clock these are bars: a step every half bar.
+5. **The bridge's beats as steps** (`c`): each `/beat` echo moves the point
+   once, rather than example-osc keeping its own copy of which steps are
+   armed.
+6. **A suggestion for ofxScPhaseBridge**, not needed here: an optional bar
+   number, `/phase <f> <i bar>`, so several apps agree on the bar. Receivers
+   reading only the first argument are unaffected.
 
 ---
 
@@ -1251,7 +1536,7 @@ Added before the app was first built (2026-11-09):
   all. Made as a user would make it -- the floor, then a new level above
   twice -- with auto-output on whatever its setting, and the setting left as
   it was. One editor vector script (`room_three_levels`), 5 gates (407).
-  It is where the virtual room on headphones (3B-2) starts.
+  It is where the virtual room on headphones (now 3B-3) starts.
 - **example-osc shows the levels**: the editor's column of level dots right
   of the map, and its 3D view beside that (`3` shows and hides it). The
   level the point is on or above becomes current, so it is the brighter
@@ -1384,6 +1669,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-11** | Editor: keys tidied; L and F; a grid that fits; the lines highlighted | editor scripts, drawlog session extended |
 | **3A-12** | Editor: softer hints, a grid without gaps, a panel of what can be done | `make panel`, drawlog session |
 | **3B-1** | OSC out that grows and shrinks with the map; `ofxManifoldPlayer`; `example-osc` | osc vectors, `make osc-live` |
+| **3B-2** | Movement, first slice: `Motion`, the recording as one, `RandomWalk` (jump and glide), bounds, seeds, step timing (every, clicks, pattern), clocks (seconds, a phase from SuperCollider), motion files; example-osc's movements | motion vectors, gates, drawlog session, `make osc-live` |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.
