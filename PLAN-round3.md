@@ -1006,6 +1006,69 @@ Open questions, each with a recommendation:
    fourth number go out together, and riding the bends fixes the random
    height dropping out under a bend.
 
+
+#### 3B-2d: levels that touch -- closed shapes (spec, 2026-11-14)
+
+Lee: "does this solve maps that would otherwise be called deltahedrons, and
+does it deal with concave parts as long as they're within the volume?"
+
+What the stacked levels can be: one floor plan, every level a surface with
+one height over each point of it, so a vertical line crosses each level once.
+Concave floor plans and dents in a surface are inside that; overhangs, caves
+and tunnels are not. A closed shape whose top and bottom faces sit over the
+same floor-plan triangles -- a bipyramid, the octahedron, a tetrahedron on a
+face -- is a bottom level and a top level, apexes moved down and up, **except
+at the rim, where the two meet**: levels are kept strictly apart today (`fits`
+refuses a height that would reach the next level, and `evaluate` divides by
+the gap), so the rim would need a sliver. This slice lets levels touch.
+
+##### Touching, never crossing
+
+- **`Levels::fits`**: at or above the level below, at or below the level
+  above. Equal is a touch; passing is still refused.
+- **`Levels::evaluate(floor, z)` at a pinch** -- where the gap at the point is
+  0, so the levels are one height there: t = 0.5, the point shared equally,
+  as it is on both. Elsewhere unchanged; a gap shrinking toward a pinch is
+  still divided, never by 0.
+- **`Levels::evaluateAtPosition(floor, u)`** (new, with 3B-2c's level
+  position): below = floor(u) held to 0..L-2, t = u - below. No division: a
+  point riding the levels by position is never ambiguous, pinch or not. The
+  player rides by u, so it evaluates by u.
+- **`positionAt(floor, z)`** at a pinch, where many u give one z: the lowest.
+- **The editor**: y and h may bring a node to the level next to it -- the
+  refusal, naming the nodes, is now for passing it. Moving a whole level
+  (dragging its dot) likewise. New levels still start half way to the next,
+  never touching.
+- **Files**: a map with touching levels is written at the next map3 version,
+  so an older ofxManifold refuses it by its version, plainly, rather than by a
+  height it took for crossing; a map without touches is written as now.
+
+##### An example: the octahedron
+
+`Model::loadOctahedron()`: four rim nodes on a square and a centre node; two
+levels; the centre at -0.5 on the bottom and +0.5 on the top, the rim at 0 on
+both -- touching. Its own outputs per level (rim and centre, bottom and top),
+as the room has. In example-osc, `x`; on the `?` page.
+
+##### Tested by
+
+- Levels vectors: touching allowed, crossing refused; t = 0.5 at a pinch;
+  `evaluateAtPosition` against `evaluate` away from pinches; the octahedron's
+  inside -- points against the solid's own geometry (inside it exactly when
+  between its faces), its rim shared equally; `positionAt` the lowest at a
+  pinch. Gates on each.
+- Editor vectors: raised to touch, accepted; past, refused; the octahedron
+  example; files with touches at the new version, round trips, refused by the
+  old version's reader.
+- The drawlog session: the octahedron, riding u across the rim.
+
+Open questions, each with a recommendation:
+
+1. **At a pinch, t = 0.5.**
+2. **The file version only when levels touch.**
+3. **The octahedron as `x` in example-osc**, and in the editor beside cmd-e
+   as shift-cmd-e.
+
 ---
 
 ## Done
@@ -1939,6 +2002,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2** | Movement, first slice: `Motion`, the recording as one, `RandomWalk` (jump and glide), bounds, seeds, step timing (every, clicks, pattern), clocks (seconds, a phase from SuperCollider), motion files; example-osc's movements | motion vectors, gates, drawlog session, `make osc-live` |
 | **3B-2b** | The map's shape for SuperCollider: `/shape` (levels, each output's level and place), `Model::outputPlaces`, protocol 3; the patch's musical behaviours, chosen in SuperCollider | editor and OSC vectors, gates, sclang logic run |
 | **3B-2c** | Height on the levels: `Levels::heightAtPosition` / `positionAt`, riding the bends, restrained or extrapolated; example-osc's `k`; u on `/position` | levels vectors, OSC vectors, gates, drawlog session |
+| **3B-2d** | Levels that touch: `fits` at-or-beyond, a pinch shared at t = 0.5, `evaluateAtPosition`, the editor allowing touches, files versioned when they touch; the octahedron example | levels and editor vectors, gates, drawlog session |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

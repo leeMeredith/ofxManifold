@@ -103,6 +103,18 @@ which are the first thing to fail.
 
 ## Later
 
+**True 3D maps: tetrahedra.** The levels are a stack of surfaces over one
+floor plan: a vertical line crosses each level once. That covers concave
+floor plans, dents and bends, and -- once levels may touch (3B-2d) -- closed
+shapes whose top and bottom share a floor plan, like bipyramids. It cannot
+hold overhangs, caves or tunnels, nor solids whose upper and lower vertices
+sit at different x and y (the icosahedron, most deltahedra). The general
+form is nodes anywhere in space, filled with tetrahedra, a point in one
+shared among its four corners by barycentric weights: the triangle kernel,
+one dimension up. The kernel is the easy part; the editor -- placing and
+joining nodes in 3D, seeing inside -- is a round of its own. Asked for by Lee
+(2026-11-14), not yet planned.
+
 **Trajectory curve format.** Sampled points were the right first choice: it is
 what recording produces, it preserves timing exactly including pauses, and it
 needed no decision about curve families. A parametric format can be added later
