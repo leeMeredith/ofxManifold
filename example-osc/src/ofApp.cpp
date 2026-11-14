@@ -18,6 +18,44 @@ constexpr float kHalfLives[] = {0.01f, 0.02f, 0.05f, 0.1f, 0.2f, 0.5f, 1.0f, 2.0
 constexpr float kFineStep = 0.01f;
 // The faders' band along the bottom: this share of the window, within limits.
 constexpr float kChartShare = 0.24f, kChartMin = 130.0f, kChartMax = 220.0f;
+// Every key, for the ? page: a group's title, then key and what it does.
+struct OscKey { const char* key; const char* does; };
+struct OscKeyGroup { const char* title; std::vector<OscKey> keys; };
+const std::vector<OscKeyGroup>& keyGroups() {
+    static const std::vector<OscKeyGroup> groups = {
+        {"the point", {{"drag", "move it (with your hand)"},
+                       {"up / down", "hold: through the levels (shift: slowly)"},
+                       {"shift-click", "follow a node; on none: the loudest"},
+                       {"click a fader", "that output's nodes ringed"},
+                       {"tab", "the next output (shift: the last)"}}},
+        {"movement", {{"m", "your hand, the recording, jump, glide"},
+                      {"M", "your hand again, at once"},
+                      {"r", "record (stops anything moving); r: stop"},
+                      {", .", "a step more / less often"},
+                      {"< >", "travel shorter / longer (glide)"},
+                      {"{ }", "steps shorter / longer"},
+                      {"c", "steps on a timer, clicks, the bridge's beats"},
+                      {"return", "one step (with clicks; or click the map)"},
+                      {"h", "height stays / across the levels"},
+                      {"n", "a new seed"},
+                      {"b", "clock: seconds / SuperCollider's bars"}}},
+        {"sending", {{"space", "pause sending"},
+                     {"p", "packed messages on / off"},
+                     {"i", "per-output messages on / off"},
+                     {"[ ]", "send rate down / up"}}},
+        {"smoothing", {{"s", "on / off"},
+                       {"- =", "half-life a step shorter / longer"},
+                       {"shift - =", "a hundredth of a second"}}},
+        {"showing", {{"3", "the 3D view (drag in it to turn it)"},
+                     {"l", "links: followed, heard, all, none"},
+                     {"?", "this page (again, or a click: away)"}}},
+        {"maps", {{"o", "open a map you saved in the editor"},
+                  {"e", "the room: three levels"},
+                  {"E", "the editor's flat example"}}},
+    };
+    return groups;
+}
+
 // Movement's settings, stepped through by keys, in the clock's units
 // (seconds, or bars on SuperCollider's clock).
 constexpr double kIntervals[] = {0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0};
@@ -399,6 +437,7 @@ void ofApp::draw() {
     GridLook look;
     look.kind = GridKind::Free;
     drawMap(sc, look, MapOverlay{});
+    drawPaths();
     // The faders: what is sent, smoothed. Hover one for its numbers.
     drawChart(sc, chart, heard);
     if (show3D) {
@@ -419,6 +458,7 @@ void ofApp::draw() {
         y += 16.0f;
     };
     const ofColor plain(200, 205, 215), dim(130, 136, 150);
+    line("? for every key", ofColor(255, 214, 90));
     line("OSC to " + host + ":" + ofToString(sendPort), ofColor(235, 238, 245));
     line(listenPort ? "answers on " + ofToString(listenPort)
                     : "no answer port free (" + ofToString(kFirstAnswerPort) + " on)",
@@ -497,9 +537,65 @@ void ofApp::draw() {
         line(message, ofColor(255, 214, 90));
         y = keep;
     }
+    if (keySheet) drawKeySheet();
+}
+
+// The path being recorded, bright, as it grows; the recording playing, dim,
+// the whole loop. On the map, at the floor plan: heights are in the 3D view.
+void ofApp::drawPaths() const {
+    auto path = [&](const Trajectory& tr, const ofColor& c, float width) {
+        if (tr.sampleCount() < 2) return;
+        ofSetColor(c);
+        ofSetLineWidth(width);
+        for (std::size_t i = 1; i < tr.sampleCount(); ++i) {
+            const glm::vec2 a = renderer->toScreen(tr.sample(i - 1).position);
+            const glm::vec2 b = renderer->toScreen(tr.sample(i).position);
+            ofDrawLine(a.x, a.y, b.x, b.y);
+        }
+        ofSetLineWidth(1.0f);
+    };
+    if (recording) {
+        path(taking, ofColor(255, 110, 90), 3.0f);
+        // REC, by the map's top left corner.
+        ofSetColor(255, 80, 70);
+        ofFill();
+        ofDrawCircle(mapArea.getX() + 14.0f, mapArea.getY() + 14.0f, 6.0f);
+        ofDrawBitmapString("REC -- r to stop", mapArea.getX() + 26.0f, mapArea.getY() + 19.0f);
+    } else if (moving == Moving::Recording && hasRecording) {
+        path(recorded.path(), ofColor(255, 150, 120, 140), 2.0f);
+    }
+}
+
+// Every key on one page, in groups, over everything else.
+void ofApp::drawKeySheet() const {
+    const float W = float(ofGetWidth()), H = float(ofGetHeight());
+    ofSetColor(18, 18, 22, 235);
+    ofFill();
+    ofDrawRectangle(0.0f, 0.0f, W, H);
+    float x = 40.0f, y = 50.0f;
+    ofSetColor(255, 214, 90);
+    ofDrawBitmapString("every key -- ? again, or a click, to go back", x, y);
+    y += 32.0f;
+    const float top = y, column = 480.0f;   // the longest line is 464 pixels
+    for (const OscKeyGroup& g : keyGroups()) {
+        const float need = 22.0f + 16.0f * float(g.keys.size()) + 14.0f;
+        if (y + need > H - 30.0f && y > top) { y = top; x += column; }
+        ofSetColor(150, 200, 255);
+        ofDrawBitmapString(g.title, x, y);
+        y += 22.0f;
+        for (const OscKey& k : g.keys) {
+            ofSetColor(255, 255, 255);
+            ofDrawBitmapString(k.key, x, y);
+            ofSetColor(200, 205, 215);
+            ofDrawBitmapString(k.does, x + 112.0f, y);
+            y += 16.0f;
+        }
+        y += 14.0f;
+    }
 }
 
 void ofApp::mousePressed(int x, int y, int) {
+    if (keySheet) { keySheet = false; return; }    // a click: back to the map
     // A fader picks its output: its nodes ringed in its colour on the map.
     const TargetID hit = chart.outputAt(float(x), float(y));
     if (hit != InvalidTarget) { model.pickOutput(hit); return; }
@@ -538,6 +634,8 @@ void ofApp::keyPressed(int key) {
         message = t;
         messageUntil = ofGetElapsedTimef() + 2.5f;
     };
+    if (key == '?' || key == '/') { keySheet = !keySheet; return; }
+    if (keySheet) return;             // the page is up: keys wait for it to go
     if (key == OF_KEY_UP) glideDir = +1;
     else if (key == OF_KEY_DOWN) glideDir = -1;
     else if (key == 'p') { osc.setPacked(!osc.packed()); osc.reset(); }
@@ -598,12 +696,22 @@ void ofApp::keyPressed(int key) {
         startMoving();
         say("moving: " + movingName());
     }
+    else if (key == 'M') {
+        recording = false;
+        moving = Moving::Hand;
+        startMoving();
+        say("your hand: the point stays where it is");
+    }
     else if (key == 'r') {
         if (!recording) {
+            // Whatever was moving stops where it is, and your hand takes over:
+            // a recording is of what you do, never of the last one playing.
+            moving = Moving::Hand;
+            startMoving();
             taking.clear();
             takingFrom = count();
             recording = true;
-            say("recording -- r again to stop");
+            say("recording -- drag the point; r again to stop");
         } else {
             recording = false;
             taking.finalize();

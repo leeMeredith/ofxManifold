@@ -68,9 +68,17 @@ int main() {
     frame("n, <, {: a new seed, shorter travel, shorter steps");
     key('m');                  frame("m: your hand again");
     key('r');
-    for (int i = 0; i < 20; ++i) { a.mouseDragged(100 + 6 * i, 150, 0); app->update(); }
-    key('r');  run(10);        frame("r, drag, r: the recording plays");
+    for (int i = 0; i < 10; ++i) { a.mouseDragged(100 + 6 * i, 150, 0); app->update(); }
+    frame("recording: REC, the path drawn as it grows");
+    for (int i = 10; i < 20; ++i) { a.mouseDragged(100 + 6 * i, 150, 0); app->update(); }
+    key('r');  run(10);        frame("r, drag, r: the recording plays, its loop drawn");
     run(60);                   frame("the recording looping");
+    key('r');                  frame("r again: the playing stops, your hand records anew");
+    for (int i = 0; i < 15; ++i) { a.mouseDragged(150, 100 + 6 * i, 0); app->update(); }
+    key('r');  run(20);        frame("r: the new recording plays");
+    key('M');  run(20);        frame("M: your hand, the point where it was");
+    key('?');                  frame("?: every key");
+    a.mousePressed(300, 300, 0); frame("a click: back to the map");
     key('b');                  frame("b: SuperCollider's bars -- no phase heard");
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;

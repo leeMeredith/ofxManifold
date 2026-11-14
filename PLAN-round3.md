@@ -1678,6 +1678,21 @@ Built as specified (2026-11-14), every recommendation taken. What it came to:
 - **Not done here**: circles, spirals, orbits with a moving centre, edges for
   shapes that can leave the map, flocking -- the next movement slices.
 
+Lee, trying it (2026-11-14): "I was able to record, but I wasn't able to
+re-record or stop", and the keys were hard to find. So:
+
+- **`r` always records your hand.** Before, a second `r` while the recording
+  played recorded the playing -- the point was the recording's, and drags were
+  ignored. Now `r` stops whatever is moving where it is and hands the point
+  back to you; `r` again stops and loops the new one.
+- **`M`**: your hand at once, from any movement (`m` cycles through them).
+- **The path is drawn**: bright and growing while recording, with REC by the
+  map's corner; dim, the whole loop, while it plays.
+- **`?`**: every key on one page, in groups -- the point, movement, sending,
+  smoothing, showing, maps; `?` again or a click to go back. The panel's
+  first line says so. The drawlog session records it, and recording, playing,
+  re-recording and `M`.
+
 ---
 
 ## Answered

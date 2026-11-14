@@ -74,7 +74,9 @@
 //
 // Movement:
 //   m               the movement: your hand, the recording, jump, glide
-//   r               record your hand (again: stop); the recording loops
+//   M               your hand again at once: anything moving stops there
+//   r               record: anything moving stops and your hand takes over,
+//                   the path drawn as you go; r again stops, and it loops
 //   , .             the step interval shorter / longer
 //   < >             the travel time shorter / longer (glide)
 //   { }             the step distance shorter / longer (anywhere at the top)
@@ -83,6 +85,8 @@
 //   h               height: stays, or random across the map's levels
 //   n               a new seed
 //   b               the clock: the app's own seconds, or SuperCollider's bars
+//
+//   ?               every key, on one page (again, or a click: away)
 
 #include "ofMain.h"
 #include "ofxManifold.h"
@@ -135,6 +139,9 @@ private:
     void   step();                      // a click or a beat: one step
     void   readBridge(double now);      // /phase and /beat on kBridgePort
     std::string movingName() const;
+    void drawPaths() const;             // the path being recorded, or playing
+    void drawKeySheet() const;          // ? : every key on one page
+    bool keySheet = false;
 
     ofxManifold::editor::Model                    model;
     std::unique_ptr<ofxManifold::Evaluator>       evaluator;
