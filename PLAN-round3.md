@@ -816,6 +816,103 @@ Open questions for Lee, each with a recommendation:
    number, `/phase <f> <i bar>`, so several apps agree on the bar. Receivers
    reading only the first argument are unaffected.
 
+
+#### 3B-2b: the map's shape for SuperCollider (spec, 2026-11-14)
+
+Lee: "is there a method in which we could expand and contract the tones
+based on the map and how many levels it's given ... is there a musical
+behavior that could deal with that?" -- and, on the options: "trying to not
+make openFrameworks decide, and leave that decision as much as possible in
+the SuperCollider work ... feed it exactly whatever it needs."
+
+So the split is: **the player says what the map is; SuperCollider decides
+what it sounds like.** Nothing musical is chosen in C++.
+
+##### What SuperCollider is missing
+
+The outputs message gives each output's name and channel, nothing more. The
+patch climbs a scale in channel order; on the room that happens to put the
+floor first, but it cannot tell three levels of four from twelve outputs on
+one, and a map numbered otherwise would scramble it.
+
+##### The shape message
+
+Sent with every description, after the outputs message -- the first send,
+any change, when asked, every two seconds -- and whenever the shape alone
+changes (a level's height, an owner node moved, a binding):
+
+    /manifold/room/shape
+        i L, then L x f        the levels' heights, lowest first
+        i N, then N x (s name, i channel, i level, i levels, i placed, f x, f y, f z)
+
+For each output, in the outputs message's order:
+
+- **level**: the lowest level whose nodes feed it; -1 when no level does.
+- **levels**: how many levels feed it -- 1 for a level's own output, more for
+  one shared across levels, 0 for none.
+- **placed**, **x y z**: whether it has an owner node -- the node of its name,
+  or the node it is named after (FL for FL-2), as the editor's `ownerOf` --
+  and if so where: the node's place on the floor plan and its height on that
+  level. Unplaced: 0, and x y z are 0.
+
+All of it is already in the map: no new idea, only what the editor knows,
+said out loud. A receiver that does not know the message ignores it.
+
+The roll call's protocol becomes **3**: "has a shape message". OSC.md gets
+the table and the outline step.
+
+##### Where it is worked out
+
+- **The editor's model**: `Model::outputPlaces()` -- per output, level,
+  levels, placed, position -- from the map's bindings per level and
+  `ownerOf`. Tested in the editor's vectors (the room; the flat example; an
+  output shared by two levels; one fed by none; a node moved).
+- **The player** stays map-agnostic: `OscOutput` gains `level`, `levels`,
+  `placed`, `position`; `OscFrame` gains the levels' heights. `OscOut` sends
+  the shape after the outputs, and treats any change in it as a change to
+  describe. Tested as the rest of the OSC: an encoding vector against
+  python-osc, send scripts (sent with the description, again on a change of
+  height, of owner position, of feeding level; not when only levels move).
+- **example-osc** fills them from the model each frame.
+
+##### What SuperCollider does with it -- decided there, switchable there
+
+The patch, at its top: `~manifold[\music]` picks the behaviour, and every
+number it uses is a setting beside it.
+
+- **\registers** (the default): each level a chord in its own register, each
+  of its outputs a chord note -- 3 a triad, 4 a seventh, 5 and on adding 9,
+  11, 13. The levels share a fixed range (`~manifold[\span]`, 30 semitones
+  from C3) -- "fit": more levels sit closer -- or each takes an octave
+  (`~manifold[\fit] = false`: "spread").
+- **\progression**: each level a chord in one key -- I, IV, V, vi, ii, iii --
+  so rising through the levels moves through the progression.
+- **\series**: each level the next overtone over one root, its outputs the
+  notes within it; wide at the bottom, close at the top, as the series is.
+- **Brightness**, with any of them (`~manifold[\bright]`, on): the point's
+  height from `/position` opens each voice's filter.
+- **Panning by place**: a placed output pans by its node's x on the map; an
+  unplaced one, by its order, as now.
+- **Outputs on no level** (level -1) or **shared** (levels > 1): their own
+  voices, a quiet tone at the root -- they are not any level's chord.
+- **No shape message** (an older sender): today's climb in channel order.
+- `\tone` and `\noise` stay, as the timbre under any behaviour.
+
+##### Tested by
+
+- Editor vectors for `outputPlaces()`; OSC vectors and send scripts for the
+  shape; the live UDP run carrying it; gates on each.
+- The patch's logic in sclang, without a server, as before: the notes each
+  behaviour gives the room, a five-level map, a map with a shared output and
+  one with no shape message, printed and checked.
+- The sound itself is Lee's to hear.
+
+Open questions, each with a recommendation:
+
+1. **The span for \registers**: 30 semitones from C3 (C3 to F#5).
+2. **A shared output's voice**: a quiet tone at the root.
+3. **Brightness on by default**: yes.
+
 ---
 
 ## Done
@@ -1747,6 +1844,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-12** | Editor: softer hints, a grid without gaps, a panel of what can be done | `make panel`, drawlog session |
 | **3B-1** | OSC out that grows and shrinks with the map; `ofxManifoldPlayer`; `example-osc` | osc vectors, `make osc-live` |
 | **3B-2** | Movement, first slice: `Motion`, the recording as one, `RandomWalk` (jump and glide), bounds, seeds, step timing (every, clicks, pattern), clocks (seconds, a phase from SuperCollider), motion files; example-osc's movements | motion vectors, gates, drawlog session, `make osc-live` |
+| **3B-2b** | The map's shape for SuperCollider: `/shape` (levels, each output's level and place), `Model::outputPlaces`, protocol 3; the patch's musical behaviours, chosen in SuperCollider | editor and OSC vectors, gates, sclang logic run |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.
