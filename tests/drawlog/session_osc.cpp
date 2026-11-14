@@ -63,7 +63,7 @@ int main() {
     key('c');                  frame("c: steps on your clicks");
     key(OF_KEY_RETURN); run(30); frame("return: one step");
     key('h');  key('c'); key('c'); run(70);
-    frame("h: height across the levels; steps on a timer again");
+    frame("h: the height jumps on its own; steps on a timer again");
     key('n');  key('<'); key('{'); run(70);
     frame("n, <, {: a new seed, shorter travel, shorter steps");
     key('m');                  frame("m: your hand again");
@@ -77,6 +77,16 @@ int main() {
     for (int i = 0; i < 15; ++i) { a.mouseDragged(150, 100 + 6 * i, 0); app->update(); }
     key('r');  run(20);        frame("r: the new recording plays");
     key('M');  run(20);        frame("M: your hand, the point where it was");
+    // The height on its own: gliding while your hand drags the floor; then
+    // by hand with the arrows while the floor glides.
+    key('h');                  // jumps -> glides
+    for (int i = 0; i < 40; ++i) { a.mouseDragged(120 + 3 * i, 130, 0); app->update(); }
+    frame("h: the height glides while the point is dragged");
+    key('h');                  // glides -> by hand
+    key('m'); key('m'); key('m');   // hand -> recording -> jump -> glide
+    a.keyPressed(OF_KEY_UP); run(40); a.keyReleased(OF_KEY_UP);
+    frame("the floor glides; up held: the height rises by hand");
+    key('M');
     key('?');                  frame("?: every key");
     a.mousePressed(300, 300, 0); frame("a click: back to the map");
     key('b');                  frame("b: SuperCollider's bars -- no phase heard");

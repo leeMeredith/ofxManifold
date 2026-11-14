@@ -199,7 +199,9 @@ free from 57121, so several copies with different maps play at once and the
 receivers (the SuperCollider patch, `receive.py`) follow every one
 (protocol 2, `ofxManifoldPlayer/OSC.md`). The point can also move itself
 (`m`): a recording of your hand (`r`, its path drawn as you go), looped;
-random jumps; random glides
+random jumps; random glides -- and the height on its own (`h`): by hand with
+↑ ↓, jumping or gliding, whatever moves the floor, so you can drag the point
+while the height wanders, or hold ↑ while the floor glides;
 that stay on the map and never cut across it -- on a timer (`,` `.`), on
 your clicks, or on the beats of Lee's
 [ofxScPhaseBridge](https://github.com/leeMeredith/ofxScPhaseBridge) (`c`).

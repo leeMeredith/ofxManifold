@@ -82,7 +82,9 @@
 //   { }             the step distance shorter / longer (anywhere at the top)
 //   c               when steps happen: a timer, your clicks, the bridge's beats
 //   return          one step (with clicks; a click on the map does the same)
-//   h               height: stays, or random across the map's levels
+//   h               the height: by hand, jumping, gliding -- on its own,
+//                   whatever moves the floor: drag the point while the
+//                   height wanders, or hold up / down while the floor does
 //   n               a new seed
 //   b               the clock: the app's own seconds, or SuperCollider's bars
 //
@@ -134,8 +136,15 @@ private:
     // ---- movement (3B-2) ----
     enum class Moving { Hand, Recording, Jump, Glide };
     enum class Steps { Timer, Clicks, Beats };
+    // The height moves on its own: by hand (the arrows; or, while a
+    // recording plays, the heights recorded), or jumping or gliding at
+    // random across the map's levels, whatever moves the floor.
+    enum class HeightBy { Hand, Jump, Glide };
     double count() const;               // the clock's count now
-    void   startMoving();               // the walk again, from where the point is
+    void   startMoving();               // the walks again, from where the point is
+    void   startHeight();               // the height's walk again
+    bool   floorWalks() const { return moving == Moving::Jump || moving == Moving::Glide; }
+    bool   heightWalks() const { return heightBy != HeightBy::Hand; }
     void   step();                      // a click or a beat: one step
     void   readBridge(double now);      // /phase and /beat on kBridgePort
     std::string movingName() const;
@@ -207,7 +216,9 @@ private:
     int         intervalAt = 3;          // kIntervals[]: 0.5
     int         travelAt = 3;            // kTravels[]: 0.4
     int         stepAt = 0;              // kSteps[]: anywhere
-    bool        heightAcross = false;    // h: random across the levels
+    HeightBy    heightBy = HeightBy::Hand;
+    ofxManifold::RandomWalk heightWalk;  // x and y held: only its height is used
+    double      heightFrom = 0.0;
 
     ofxManifold::player::OscOut osc;
     ofxOscSender                sender;

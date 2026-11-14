@@ -1693,6 +1693,23 @@ re-record or stop", and the keys were hard to find. So:
   first line says so. The drawlog session records it, and recording, playing,
   re-recording and `M`.
 
+Then: "add alongside the height a random, so I can use the mouse and it would
+randomly move the height, smooth and abrupt ... and the opposite, where height
+can be moved smooth by hand with up and down while the other random behaviors
+go for x". So the height moves on its own:
+
+- **`h`: the height by hand, jumping, or gliding**, whatever moves the floor.
+  Drag the point while the height wanders across the levels; or let the floor
+  jump or glide and hold up or down for the height. (`h` was "stays / random
+  across the levels", tied to the floor's walk; it is now the height's own.)
+- **A second walk for the height**: the floor's timing and travel (one set of
+  keys), its own seed stream, the map's levels for its range, x and y held
+  still -- a RandomWalk with a rectangle of one point, so nothing new was
+  needed in the library. Clicks and beats step both walks. A map with one
+  level has no range: the panel says the height stays.
+- **By hand, while a recording plays**, means the heights you recorded; the
+  arrows move the height in every other case.
+
 ---
 
 ## Answered

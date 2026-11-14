@@ -24,7 +24,7 @@ struct OscKeyGroup { const char* title; std::vector<OscKey> keys; };
 const std::vector<OscKeyGroup>& keyGroups() {
     static const std::vector<OscKeyGroup> groups = {
         {"the point", {{"drag", "move it (with your hand)"},
-                       {"up / down", "hold: through the levels (shift: slowly)"},
+                       {"up / down", "hold: the height (shift: slowly)"},
                        {"shift-click", "follow a node; on none: the loudest"},
                        {"click a fader", "that output's nodes ringed"},
                        {"tab", "the next output (shift: the last)"}}},
@@ -36,7 +36,7 @@ const std::vector<OscKeyGroup>& keyGroups() {
                       {"{ }", "steps shorter / longer"},
                       {"c", "steps on a timer, clicks, the bridge's beats"},
                       {"return", "one step (with clicks; or click the map)"},
-                      {"h", "height stays / across the levels"},
+                      {"h", "height: by hand, jumps, glides"},
                       {"n", "a new seed"},
                       {"b", "clock: seconds / SuperCollider's bars"}}},
         {"sending", {{"space", "pause sending"},
@@ -153,11 +153,13 @@ std::string ofApp::movingName() const {
     return "";
 }
 
-// The walk again, from where the point is now, with the settings as they are.
-// Its count starts now; it stays on the map and never crosses off it.
+// The walks again, from where the point is now, with the settings as they
+// are. Their counts start now; the floor's stays on the map and never crosses
+// off it; the height's is its own.
 void ofApp::startMoving() {
     movedFrom = count();
-    if (moving != Moving::Jump && moving != Moving::Glide) return;
+    startHeight();
+    if (!floorWalks()) return;
     WalkSettings s;
     // The seed and how many times the walk has started again: the same seed
     // starting again from where the first step went would only go there
@@ -170,13 +172,7 @@ void ofApp::startMoving() {
     s.travel = moving == Moving::Jump ? 0.0 : kTravels[travelAt];
     s.easing = Easing::Smooth;
     s.step = kSteps[stepAt];
-    const Levels& lv = model.map3d().levels();
-    if (heightAcross && lv.count() > 1) {
-        s.zLow = lv.base(0);
-        s.zHigh = lv.base(lv.count() - 1);
-    } else {
-        s.zLow = s.zHigh = z;
-    }
+    s.zLow = s.zHigh = z;             // the floor's walk: its height is not used
     s.insideMap = true;
     s.straight = true;
     walk = RandomWalk(s);
@@ -188,9 +184,33 @@ void ofApp::startMoving() {
     });
 }
 
-// A click or a beat: one step, at the clock's count.
+// The height's own walk: the same timing and travel as the floor's (one set
+// of keys), its own draws, the map's levels for its range; x and y held
+// still, so only its height moves. A map with one level has no range: the
+// height stays.
+void ofApp::startHeight() {
+    heightFrom = count();
+    if (!heightWalks()) return;
+    WalkSettings s;
+    s.seed = SplitMix64((seed ^ 0xA0761D6478BD642FULL) * 0x100000001B3ULL + ++restarts).next();
+    s.start = glm::dvec3(0.5, 0.5, z);
+    s.steps = steps == Steps::Timer ? StepTiming::every(kIntervals[intervalAt])
+                                    : StepTiming::clicks();
+    s.travel = heightBy == HeightBy::Jump ? 0.0 : kTravels[travelAt];
+    s.easing = Easing::Smooth;
+    s.x0 = s.x1 = 0.5;
+    s.y0 = s.y1 = 0.5;
+    const Levels& lv = model.map3d().levels();
+    s.zLow = lv.base(0);
+    s.zHigh = lv.base(lv.count() - 1);
+    heightWalk = RandomWalk(s);
+}
+
+// A click or a beat: one step, at the clock's count -- of the floor's walk
+// and the height's, whichever are walking.
 void ofApp::step() {
-    if (moving == Moving::Jump || moving == Moving::Glide) walk.addStep(count() - movedFrom);
+    if (floorWalks()) walk.addStep(count() - movedFrom);
+    if (heightWalks()) heightWalk.addStep(count() - heightFrom);
 }
 
 // /phase into the phase clock; /beat, with beats as the steps, one step.
@@ -370,16 +390,19 @@ void ofApp::update() {
     appSeconds += ofGetLastFrameTime();
     readBridge(now);
 
-    // Moving itself: the point is where the movement says at the count.
+    // Moving itself: the floor where its movement says at the count, the
+    // height where its own says -- each on its own.
     if (moving == Moving::Recording && hasRecording) {
         const glm::vec3 p = recorded.at(count() - movedFrom);
         point = glm::vec2(p.x, p.y);
-        z = p.z;
-    } else if (moving == Moving::Jump || moving == Moving::Glide) {
+        if (heightBy == HeightBy::Hand) z = p.z;   // the heights recorded
+    } else if (floorWalks()) {
         const glm::vec3 p = walk.at(count() - movedFrom);
         point = glm::vec2(p.x, p.y);
-        z = p.z;
-    } else if (glideDir != 0) {
+    }
+    if (heightWalks()) {
+        z = heightWalk.at(count() - heightFrom).z;
+    } else if (glideDir != 0 && !(moving == Moving::Recording && hasRecording)) {
         z = glide(z, glideDir, ofGetKeyPressed(OF_KEY_SHIFT), float(ofGetLastFrameTime()));
     }
     // Recording takes the point wherever it is, on the clock running.
@@ -489,12 +512,16 @@ void ofApp::draw() {
     {
         // Movement.
         line("moving: " + movingName() + ", seed " + ofToString(seed) + " (m n)", plain);
-        if (moving == Moving::Jump || moving == Moving::Glide) {
+        const char* heights[] = {"by hand", "jumps", "glides"};
+        line(std::string("height ") + heights[int(heightBy)]
+             + (heightWalks() && model.map3d().count() < 2 ? " -- one level: stays" : "")
+             + " (h)", plain);
+        if (floorWalks() || heightWalks()) {
             line("every " + ofToString(kIntervals[intervalAt]) + ", travel "
-                 + (moving == Moving::Jump ? std::string("none") : ofToString(kTravels[travelAt]))
-                 + " (, . < >)", plain);
-            line("step " + (kSteps[stepAt] > 0.0 ? ofToString(kSteps[stepAt]) : std::string("anywhere"))
-                 + ", height " + (heightAcross ? "across levels" : "stays") + " ({ } h)", plain);
+                 + ofToString(kTravels[travelAt]) + " (, . < >)", plain);
+            if (floorWalks())
+                line("steps " + (kSteps[stepAt] > 0.0 ? "up to " + ofToString(kSteps[stepAt])
+                                                       : std::string("anywhere")) + " ({ })", plain);
             const char* when[] = {"steps on a timer", "steps on your clicks", "steps on the bridge's beats"};
             line(std::string(when[int(steps)]) + " (c)", plain);
         }
@@ -636,8 +663,10 @@ void ofApp::keyPressed(int key) {
     };
     if (key == '?' || key == '/') { keySheet = !keySheet; return; }
     if (keySheet) return;             // the page is up: keys wait for it to go
-    if (key == OF_KEY_UP) glideDir = +1;
-    else if (key == OF_KEY_DOWN) glideDir = -1;
+    if (key == OF_KEY_UP || key == OF_KEY_DOWN) {
+        if (heightWalks()) say("the height is moving itself -- h for by hand");
+        glideDir = key == OF_KEY_UP ? +1 : -1;
+    }
     else if (key == 'p') { osc.setPacked(!osc.packed()); osc.reset(); }
     else if (key == 'i') { osc.setPerOutput(!osc.perOutput()); osc.reset(); }
     else if (key == '[') osc.setRate(osc.rate() >= 20.0 ? osc.rate() - 10.0 : osc.rate() / 2.0);
@@ -756,9 +785,12 @@ void ofApp::keyPressed(int key) {
         if (steps == Steps::Clicks) step();
     }
     else if (key == 'h') {
-        heightAcross = !heightAcross;
-        startMoving();
-        say(heightAcross ? "height: random across the levels" : "height: stays");
+        heightBy = heightBy == HeightBy::Hand ? HeightBy::Jump
+                 : heightBy == HeightBy::Jump ? HeightBy::Glide : HeightBy::Hand;
+        startHeight();
+        const char* said[] = {"height by hand: up and down", "height jumps at random",
+                              "height glides at random"};
+        say(said[int(heightBy)]);
     }
     else if (key == 'n') {
         ++seed;
