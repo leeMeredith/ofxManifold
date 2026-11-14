@@ -18,6 +18,14 @@ constexpr float kHalfLives[] = {0.01f, 0.02f, 0.05f, 0.1f, 0.2f, 0.5f, 1.0f, 2.0
 constexpr float kFineStep = 0.01f;
 // The faders' band along the bottom: this share of the window, within limits.
 constexpr float kChartShare = 0.24f, kChartMin = 130.0f, kChartMax = 220.0f;
+// Movement's settings, stepped through by keys, in the clock's units
+// (seconds, or bars on SuperCollider's clock).
+constexpr double kIntervals[] = {0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0};
+constexpr double kTravels[]   = {0.05, 0.1, 0.2, 0.4, 0.8, 1.6};
+constexpr double kSteps[]     = {0.0, 0.5, 0.25, 0.1, 0.05};     // 0: anywhere
+template <class T, std::size_t N> int stepIn(const T (&)[N], int at, int by) {
+    return std::max(0, std::min(int(N) - 1, at + by));
+}
 
 std::string describe(const OscMessage& m) {
     std::string t = m.address;
@@ -79,12 +87,90 @@ void ofApp::setup() {
     }
     osc.setAnswerPort(listenPort);
 
+    // ofxScPhaseBridge's port: /phase and /beat from bridge.scd. Not shared:
+    // if the bridge's own example app has it, this says so and goes on.
+    {
+        ofxOscReceiverSettings s;
+        s.port = kBridgePort;
+        s.reuse = false;
+        bridgeOpen = bridge.setup(s);
+    }
+
     model.loadRoom();
     adopt("room");
     cam.enableMouseInput();
 }
 
+double ofApp::count() const {
+    return onPhase ? phase.count() : seconds.count(appSeconds);
+}
+
+std::string ofApp::movingName() const {
+    switch (moving) {
+    case Moving::Hand:      return "your hand";
+    case Moving::Recording: return "the recording";
+    case Moving::Jump:      return "jump";
+    case Moving::Glide:     return "glide";
+    }
+    return "";
+}
+
+// The walk again, from where the point is now, with the settings as they are.
+// Its count starts now; it stays on the map and never crosses off it.
+void ofApp::startMoving() {
+    movedFrom = count();
+    if (moving != Moving::Jump && moving != Moving::Glide) return;
+    WalkSettings s;
+    // The seed and how many times the walk has started again: the same seed
+    // starting again from where the first step went would only go there
+    // again, so each start draws afresh -- still the same sequence of walks
+    // for the same seed and keys, every run.
+    s.seed = SplitMix64(seed * 0x100000001B3ULL + ++restarts).next();
+    s.start = glm::dvec3(point.x, point.y, z);
+    s.steps = steps == Steps::Timer ? StepTiming::every(kIntervals[intervalAt])
+                                    : StepTiming::clicks();
+    s.travel = moving == Moving::Jump ? 0.0 : kTravels[travelAt];
+    s.easing = Easing::Smooth;
+    s.step = kSteps[stepAt];
+    const Levels& lv = model.map3d().levels();
+    if (heightAcross && lv.count() > 1) {
+        s.zLow = lv.base(0);
+        s.zHigh = lv.base(lv.count() - 1);
+    } else {
+        s.zLow = s.zHigh = z;
+    }
+    s.insideMap = true;
+    s.straight = true;
+    walk = RandomWalk(s);
+    // An evaluator of its own: the app's keeps track of which region the
+    // point was last in, and the walk's tries must not disturb that.
+    auto ev = std::make_shared<Evaluator>(model.manifold());
+    walk.setInside([ev](glm::dvec2 p) {
+        return ev->evaluate(glm::vec2(float(p.x), float(p.y))).inside;
+    });
+}
+
+// A click or a beat: one step, at the clock's count.
+void ofApp::step() {
+    if (moving == Moving::Jump || moving == Moving::Glide) walk.addStep(count() - movedFrom);
+}
+
+// /phase into the phase clock; /beat, with beats as the steps, one step.
+void ofApp::readBridge(double now) {
+    if (!bridgeOpen) return;
+    for (int k = 0; k < 256 && bridge.hasWaitingMessages(); ++k) {
+        ofxOscMessage in;
+        if (!bridge.getNextMessage(in)) break;
+        OscMessage m;
+        if (!fromOfx(in, m)) continue;
+        if (readPhase(m, phase, now)) continue;
+        int beat = 0;
+        if (readBeat(m, beat) && steps == Steps::Beats) step();
+    }
+}
+
 void ofApp::adopt(const std::string& name) {
+    recording = false;
     pinned = InvalidNode;             // another map's nodes: follow the loudest
     followed.clear();
     osc.setMapName(name);             // its addresses, /manifold/<name>/...
@@ -95,6 +181,7 @@ void ofApp::adopt(const std::string& name) {
     osc.reset();                      // the new map's outputs, described at once
     levelSmoother.reset();            // another map: taken at once, not glided into
     valueSmoother.reset();
+    startMoving();                    // a walk on this map's own bounds
 }
 
 void ofApp::applySmoothing() {
@@ -242,9 +329,23 @@ OscFrame ofApp::frameNow(const ChartLevels& lv) const {
 
 void ofApp::update() {
     const double now = ofGetElapsedTimef();
-    if (glideDir != 0) {
+    appSeconds += ofGetLastFrameTime();
+    readBridge(now);
+
+    // Moving itself: the point is where the movement says at the count.
+    if (moving == Moving::Recording && hasRecording) {
+        const glm::vec3 p = recorded.at(count() - movedFrom);
+        point = glm::vec2(p.x, p.y);
+        z = p.z;
+    } else if (moving == Moving::Jump || moving == Moving::Glide) {
+        const glm::vec3 p = walk.at(count() - movedFrom);
+        point = glm::vec2(p.x, p.y);
+        z = p.z;
+    } else if (glideDir != 0) {
         z = glide(z, glideDir, ofGetKeyPressed(OF_KEY_SHIFT), float(ofGetLastFrameTime()));
     }
+    // Recording takes the point wherever it is, on the clock running.
+    if (recording) taking.addSample(float(count() - takingFrom), glm::vec3(point.x, point.y, z));
     followLevel();
     text.fit();
     layoutWindow();
@@ -346,6 +447,33 @@ void ofApp::draw() {
          + ofToString(model.currentLevel() + 1) + " of " + ofToString(model.map3d().count()),
          plain);
     {
+        // Movement.
+        line("moving: " + movingName() + ", seed " + ofToString(seed) + " (m n)", plain);
+        if (moving == Moving::Jump || moving == Moving::Glide) {
+            line("every " + ofToString(kIntervals[intervalAt]) + ", travel "
+                 + (moving == Moving::Jump ? std::string("none") : ofToString(kTravels[travelAt]))
+                 + " (, . < >)", plain);
+            line("step " + (kSteps[stepAt] > 0.0 ? ofToString(kSteps[stepAt]) : std::string("anywhere"))
+                 + ", height " + (heightAcross ? "across levels" : "stays") + " ({ } h)", plain);
+            const char* when[] = {"steps on a timer", "steps on your clicks", "steps on the bridge's beats"};
+            line(std::string(when[int(steps)]) + " (c)", plain);
+        }
+        if (recording) {
+            line("recording " + ofToString(count() - takingFrom, 1) + " (r: stop)", ofColor(255, 150, 120));
+        } else if (hasRecording) {
+            line("a recording, " + ofToString(recorded.path().duration(), 1)
+                 + (recordedOnPhase ? " bars" : " s") + ", loops (r: again)", plain);
+        }
+        if (onPhase) {
+            line(phase.heard(now) ? "clock: bar " + ofToString(phase.bar()) + ", phase "
+                                        + ofToString(phase.phase(), 2) + " (b)"
+                                  : std::string("clock: bars -- phase not heard (b)"),
+                 phase.heard(now) ? plain : ofColor(255, 150, 120));
+        } else {
+            line("clock: seconds, " + ofToString(count(), 1) + " (b)", plain);
+        }
+        if (!bridgeOpen) line("port 9001 taken: no bridge here", dim);
+
         const char* whose[] = {"followed", "heard", "all", "off"};
         std::string out = "none";
         const auto& sel = model.selectedOutputs();
@@ -357,12 +485,13 @@ void ofApp::draw() {
              + " (shift-click)", plain);
     }
     y += 8.0f;
+    const float messageY = y;
     line("last send:", ofColor(235, 238, 245));
     for (std::size_t k = 0; k < lastSent.size() && k < 24; ++k) line(lastSent[k], dim);
     if (!message.empty() && ofGetElapsedTimef() < messageUntil) {
         // Under the status, over the list, so the faders never hide it.
         const float keep = y;
-        y = 40.0f + 16.0f * 11.0f;
+        y = messageY;
         ofSetColor(30, 30, 34);
         ofDrawRectangle(x - 4.0f, y - 12.0f, kOscPanelWidth + 8.0f, 18.0f);
         line(message, ofColor(255, 214, 90));
@@ -374,6 +503,15 @@ void ofApp::mousePressed(int x, int y, int) {
     // A fader picks its output: its nodes ringed in its colour on the map.
     const TargetID hit = chart.outputAt(float(x), float(y));
     if (hit != InvalidTarget) { model.pickOutput(hit); return; }
+    // Moving by itself: a click on the map is a step (with clicks), or puts
+    // the walk somewhere new to go on from.
+    if (moving != Moving::Hand && !ofGetKeyPressed(OF_KEY_SHIFT)
+        && renderer->viewport().inside(x, y)) {
+        if (moving != Moving::Recording && steps == Steps::Clicks) { step(); return; }
+        point = renderer->toManifold({float(x), float(y)});
+        if (moving != Moving::Recording) startMoving();
+        return;
+    }
     // Shift-click on the map: follow that node, or the loudest again.
     if (ofGetKeyPressed(OF_KEY_SHIFT) && renderer->viewport().inside(x, y)) {
         pinned = nodeAt(glm::vec2(float(x), float(y)));
@@ -391,6 +529,7 @@ void ofApp::mouseMoved(int x, int y) { mouse = glm::vec2(float(x), float(y)); }
 void ofApp::mouseDragged(int x, int y, int) {
     mouse = glm::vec2(float(x), float(y));
     if (ofGetKeyPressed(OF_KEY_SHIFT)) return;      // a pin, not a move
+    if (moving != Moving::Hand) return;             // it moves itself
     if (renderer->viewport().inside(x, y)) point = renderer->toManifold({float(x), float(y)});
 }
 
@@ -450,6 +589,81 @@ void ofApp::keyPressed(int key) {
     else if (key == 'e') { model.loadRoom(); adopt("room"); say("the room: floor, middle and top"); }
     else if (key == 'E') { model.loadExample(); adopt("example"); say("the editor's flat example"); }
     else if (key == 'o') open();
+    // ---- movement ----
+    else if (key == 'm') {
+        moving = moving == Moving::Hand      ? (hasRecording ? Moving::Recording : Moving::Jump)
+               : moving == Moving::Recording ? Moving::Jump
+               : moving == Moving::Jump      ? Moving::Glide
+                                             : Moving::Hand;
+        startMoving();
+        say("moving: " + movingName());
+    }
+    else if (key == 'r') {
+        if (!recording) {
+            taking.clear();
+            takingFrom = count();
+            recording = true;
+            say("recording -- r again to stop");
+        } else {
+            recording = false;
+            taking.finalize();
+            if (taking.sampleCount() > 1) {
+                recorded = RecordedMotion(taking, RecordedMotion::End::Loop);
+                hasRecording = true;
+                recordedOnPhase = onPhase;
+                moving = Moving::Recording;
+                startMoving();
+                say("recorded: it loops (m for the others)");
+            } else {
+                say("nothing recorded");
+            }
+        }
+    }
+    else if (key == ',' || key == '.') {
+        intervalAt = stepIn(kIntervals, intervalAt, key == '.' ? 1 : -1);
+        startMoving();
+        say("a step every " + ofToString(kIntervals[intervalAt]));
+    }
+    else if (key == '<' || key == '>') {
+        travelAt = stepIn(kTravels, travelAt, key == '>' ? 1 : -1);
+        startMoving();
+        say("travel " + ofToString(kTravels[travelAt]));
+    }
+    else if (key == '{' || key == '}') {
+        // { shorter steps (further down the list), } longer, up to anywhere.
+        stepAt = stepIn(kSteps, stepAt, key == '{' ? 1 : -1);
+        startMoving();
+        say(kSteps[stepAt] > 0.0 ? "steps of up to " + ofToString(kSteps[stepAt])
+                                 : std::string("steps anywhere on the map"));
+    }
+    else if (key == 'c') {
+        steps = steps == Steps::Timer ? Steps::Clicks
+              : steps == Steps::Clicks ? Steps::Beats : Steps::Timer;
+        startMoving();
+        const char* said[] = {"steps on a timer", "steps on your clicks (or return)",
+                              "steps on the bridge's beats"};
+        say(said[int(steps)]);
+    }
+    else if (key == OF_KEY_RETURN) {
+        if (steps == Steps::Clicks) step();
+    }
+    else if (key == 'h') {
+        heightAcross = !heightAcross;
+        startMoving();
+        say(heightAcross ? "height: random across the levels" : "height: stays");
+    }
+    else if (key == 'n') {
+        ++seed;
+        startMoving();
+        say("seed " + ofToString(seed));
+    }
+    else if (key == 'b') {
+        onPhase = !onPhase;
+        startMoving();                // the count changes units: start again
+        say(onPhase ? (phase.heard(ofGetElapsedTimef()) ? "the clock: SuperCollider's bars"
+                                                        : "the clock: bars -- no phase heard yet on 9001")
+                    : "the clock: seconds");
+    }
 }
 
 void ofApp::keyReleased(int key) {

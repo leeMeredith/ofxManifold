@@ -85,6 +85,18 @@ panel shows which. Both are set at the top of its `ofApp.h`. It does not
 share its port with another program (no SO_REUSEPORT): a second copy takes
 the next one rather than quietly splitting the first one's answers.
 
+## A clock from SuperCollider (example-osc)
+
+Not part of the protocol above, and nothing waits for it: example-osc also
+listens on port 9001 for the contract of ofxScPhaseBridge
+(github.com/leeMeredith/ofxScPhaseBridge), so its `bridge.scd` drives
+movement unchanged.
+
+| Address | Arguments | Effect |
+|---|---|---|
+| `/phase` | `f` 0..1 across a bar, optional `i` bar | the clock: bars counted as the phase wraps (`PhaseClock`); with the bar, the bar itself |
+| `/beat` | `i` step | with steps on the bridge's beats, one step of a walk |
+
 ## On the wire
 
 OSC 1.0: one message per UDP packet, no bundles, arguments `i` (32-bit int),

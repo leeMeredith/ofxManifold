@@ -1633,6 +1633,51 @@ Added before the app was first built (2026-11-09):
   run by hand against two simulated maps, one stopping. 8 new gates and one
   moved (423).
 
+### 3B-2: movement, first slice -- random jumps and glides, clocks
+
+Built as specified (2026-11-14), every recommendation taken. What it came to:
+
+- **`src/sources/ofxManifoldMotion.h`** (header-only, no openFrameworks):
+  `Motion`, `RecordedMotion`, `SplitMix64`, `StepTiming` (every, at, pattern),
+  `WalkSettings`, `RandomWalk`. Worked in double. The walk keeps where it
+  last got to and a checkpoint every 256 steps; `stepsBy`, `stepTime`,
+  `addStep` (append only), `checkpoints` for the tests.
+- **`src/io/ofxManifoldSerializeMotion.h`**: `saveMotion`, `loadMotion`.
+  Numbers as the shorter of %.15g and %.17g that reads back exactly, so
+  0.30000000000000004 survives and 0.4 stays 0.4; the Python writes the
+  same text, byte for byte.
+- **`ofxManifoldPlayer/src/ofxManifoldClocks.h`** (header-only):
+  `SecondsClock`, `PhaseClock`, `readPhase`, `readBeat`. One correction to
+  the spec as written: a restart reads as a new bar only when it comes late
+  in a bar (a drop of more than half); early in one, the count holds until
+  the phase passes where it was. Never backwards either way.
+- **Tests**: `tests/ref/reference_motion.py` writes `tests/vectors/motion.vec`,
+  52 vectors (39 ANALYTIC, 7 CROSS, 6 SPEC); `make test-motion`. The
+  reference refuses to write a vector whose yes/no rests on the last bit (a
+  candidate within 1e-9 of an edge), so float rounding on another machine
+  cannot flip a choice; the suite passes under `-mfma -ffp-contract=fast`.
+  splitmix64 against Rosetta Code's published outputs for seed 1234567.
+  `make osc-live` adds a stand-in bridge over UDP (`tests/phase_udp.cpp`,
+  `tests/check_phase_udp.py`): 121 phases with one late packet, 9 beats,
+  read as example-osc reads them, checked against the reference. 38 gates,
+  every one caught (461).
+- **example-osc**: `m` hand / recording / jump / glide; `r` records (on the
+  clock running, so a recording made in bars plays in bars); `,` `.` the
+  interval (1/16 to 4); `<` `>` the travel (0.05 to 1.6); `{` `}` the step
+  distance (anywhere, 0.5, 0.25, 0.1, 0.05); `c` timer / clicks / the
+  bridge's beats; return a step; `h` height stays / across the levels; `n` a
+  new seed; `b` seconds / SuperCollider's bars. Bounds are the map's: its
+  inside test through an evaluator of the walk's own (the app's keeps track
+  of the region the point was in, and the walk's tries must not disturb it),
+  the whole rectangle, the levels' heights. Each time a walk starts again --
+  a key, a click to put it somewhere -- it draws afresh from the seed and
+  the count of starts: the same seed starting again from where its first
+  step went would only go there again (found in the drawlog session). The
+  seconds clock is the frames' times summed, so the drawlog session moves
+  too. Port 9001 not shared; when taken, the panel says so.
+- **Not done here**: circles, spirals, orbits with a moving centre, edges for
+  shapes that can leave the map, flocking -- the next movement slices.
+
 ---
 
 ## Answered

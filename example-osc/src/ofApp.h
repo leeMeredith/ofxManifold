@@ -1,6 +1,6 @@
 #pragma once
 
-// ofxManifold -- example-osc (round 3B-1).
+// ofxManifold -- example-osc (rounds 3B-1 and 3B-2).
 //
 // The smallest player: one map, one point, and OSC out that grows and
 // shrinks with the map -- for SuperCollider, Max, Pd, TouchDesigner, a
@@ -28,6 +28,14 @@
 // point leaving the map glides over the half-life instead of stepping. The
 // faders show what is sent, smoothed. Click far from the point to hear it; s
 // to compare without.
+//
+// The point can move itself (3B-2): a recording of your hand, looped; random
+// jumps; random glides. A movement is asked a count -- the app's own seconds,
+// or bars from SuperCollider's phase (ofxScPhaseBridge's /phase on port 9001;
+// bridge.scd drives it unchanged) -- so on SuperCollider's clock a step every
+// 1/16 lands on its sixteenths. Jumps and glides stay on the map, never cross
+// off it on the way, and step on a timer, on your clicks, or on the bridge's
+// beats: each armed step that sounds moves the point once.
 //
 // The receiver need not know how many outputs there are: the app describes
 // them (/manifold/outputs) on the first send, when they change, when asked,
@@ -63,6 +71,18 @@
 //
 //   e               the room example: three levels
 //   E               the editor's flat example
+//
+// Movement:
+//   m               the movement: your hand, the recording, jump, glide
+//   r               record your hand (again: stop); the recording loops
+//   , .             the step interval shorter / longer
+//   < >             the travel time shorter / longer (glide)
+//   { }             the step distance shorter / longer (anywhere at the top)
+//   c               when steps happen: a timer, your clicks, the bridge's beats
+//   return          one step (with clicks; a click on the map does the same)
+//   h               height: stays, or random across the map's levels
+//   n               a new seed
+//   b               the clock: the app's own seconds, or SuperCollider's bars
 
 #include "ofMain.h"
 #include "ofxManifold.h"
@@ -107,6 +127,15 @@ private:
     void smooth(float dt);
     void applySmoothing();              // smoothOn and halfLife to both
 
+    // ---- movement (3B-2) ----
+    enum class Moving { Hand, Recording, Jump, Glide };
+    enum class Steps { Timer, Clicks, Beats };
+    double count() const;               // the clock's count now
+    void   startMoving();               // the walk again, from where the point is
+    void   step();                      // a click or a beat: one step
+    void   readBridge(double now);      // /phase and /beat on kBridgePort
+    std::string movingName() const;
+
     ofxManifold::editor::Model                    model;
     std::unique_ptr<ofxManifold::Evaluator>       evaluator;
     std::unique_ptr<ofxManifoldRenderer>          renderer;
@@ -147,6 +176,31 @@ private:
     ofxManifold::player::OutputSmoother levelSmoother, valueSmoother;
     bool  smoothOn = true;
     float halfLife = 0.05f;
+
+    // Movement. The walk and the recording are asked count() - movedFrom.
+    Moving      moving = Moving::Hand;
+    Steps       steps = Steps::Timer;
+    double      appSeconds = 0.0;        // summed frame times: the seconds clock
+    ofxManifold::player::SecondsClock seconds;
+    ofxManifold::player::PhaseClock   phase;
+    bool        onPhase = false;         // b: bars from SuperCollider
+    static constexpr int kBridgePort = 9001;   // ofxScPhaseBridge's
+    ofxOscReceiver bridge;
+    bool        bridgeOpen = false;
+    double      movedFrom = 0.0;
+    ofxManifold::RandomWalk     walk;
+    ofxManifold::RecordedMotion recorded;
+    bool        hasRecording = false;
+    bool        recording = false;
+    bool        recordedOnPhase = false;
+    ofxManifold::Trajectory     taking;  // being recorded
+    double      takingFrom = 0.0;
+    std::uint64_t seed = 1;
+    std::uint64_t restarts = 0;          // walks started: each draws afresh
+    int         intervalAt = 3;          // kIntervals[]: 0.5
+    int         travelAt = 3;            // kTravels[]: 0.4
+    int         stepAt = 0;              // kSteps[]: anywhere
+    bool        heightAcross = false;    // h: random across the levels
 
     ofxManifold::player::OscOut osc;
     ofxOscSender                sender;

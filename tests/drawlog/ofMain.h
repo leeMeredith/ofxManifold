@@ -124,6 +124,7 @@ inline void ofToggleFullscreen() { drawlogRecord("fullscreen", {}); }
 #define OF_KEY_DEL 127
 #define OF_KEY_ESC 27
 #define OF_KEY_TAB 9
+#define OF_KEY_RETURN 13
 #define OF_KEY_SHIFT 0x1
 #define OF_KEY_ALT 0x2
 #define OF_KEY_COMMAND 0x4

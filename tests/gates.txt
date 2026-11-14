@@ -2273,3 +2273,195 @@ file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
 find:     prefix_ = p;\n    reset();
 replace:     prefix_ = p;
 nl: yes
+
+gate: splitmix64 with the wrong increment
+file: src/sources/ofxManifoldMotion.h
+find:         state_ += 0x9E3779B97F4A7C15ULL;
+replace:         state_ += 0x9E3779B97F4A7C14ULL;
+
+gate: A unit draw from the wrong bits
+file: src/sources/ofxManifoldMotion.h
+find:     double unit() { return double(next() >> 40) * (1.0 / 16777216.0); }
+replace:     double unit() { return double(next() >> 41) * (1.0 / 8388608.0); }
+
+gate: A looped recording holds instead
+file: src/sources/ofxManifoldMotion.h
+find:         else if (end_ == End::Loop) s = std::fmod(s, d);
+replace:         else if (false) s = std::fmod(s, d);
+
+gate: Jitter ignored
+file: src/sources/ofxManifoldMotion.h
+find:             if (c.jitter > 0.0) i = c.interval * (1.0 + c.jitter * (2.0 * gen.unit() - 1.0));
+replace:             if (false) i = c.interval * (1.0 + c.jitter * (2.0 * gen.unit() - 1.0));
+
+gate: Jitter draws from the places' stream
+file: src/sources/ofxManifoldMotion.h
+find:         st.time = SplitMix64(s_.seed ^ kTimeStream);
+replace:         st.time = SplitMix64(s_.seed);
+
+gate: The first interval counted from minus infinity
+file: src/sources/ofxManifoldMotion.h
+find:             const double base = st.k == 0 ? 0.0 : st.tk;
+replace:             const double base = st.k == 0 ? 0.5 : st.tk;
+
+gate: A pattern ignores its cycle
+file: src/sources/ofxManifoldMotion.h
+find:             return {double(st.k / m) * c.cycle + c.at[st.k % m], gen};
+replace:             return {double(st.k / m) + c.at[st.k % m], gen};
+
+gate: Smooth easing is linear
+file: src/sources/ofxManifoldMotion.h
+find:         const double e = s_.easing == Easing::Smooth ? u * u * (3.0 - 2.0 * u) : u;
+replace:         const double e = u;
+
+gate: A trip goes on past its destination
+file: src/sources/ofxManifoldMotion.h
+find:         if (st.dur <= 0.0 || t >= st.tk + st.dur) return st.dest;
+replace:         if (st.dur <= 0.0) return st.dest;
+
+gate: A step may go beyond the step distance
+file: src/sources/ofxManifoldMotion.h
+find:         if (!within) return false;
+replace:         (void)within;
+
+gate: A destination may leave the rectangle
+file: src/sources/ofxManifoldMotion.h
+find:         if (!(s_.x0 <= c.x && c.x <= s_.x1 && s_.y0 <= c.y && c.y <= s_.y1)) return false;
+replace:         (void)0;
+
+gate: A destination off the map is taken when paths need not be straight
+file: src/sources/ofxManifoldMotion.h
+find:         if (!inside_(glm::dvec2(c.x, c.y))) return false;
+replace:         (void)0;
+
+gate: Straight paths are not checked
+file: src/sources/ofxManifoldMotion.h
+find:         if (!s_.straight) return true;
+replace:         return true;
+
+gate: Only the first point along the way is checked
+file: src/sources/ofxManifoldMotion.h
+find:         for (int i = 1; i <= kAlong; ++i) {
+replace:         for (int i = 1; i <= 1; ++i) {
+
+gate: The height is drawn only when there is a range
+file: src/sources/ofxManifoldMotion.h
+find:             const double ux = gen.unit(), uy = gen.unit(), uz = gen.unit();
+replace:             const double ux = gen.unit(), uy = gen.unit(), uz = s_.zHigh > s_.zLow ? gen.unit() : 0.0;
+
+gate: Four tries, not sixty-four
+file: src/sources/ofxManifoldMotion.h
+find:     static constexpr int           kTries = 64;
+replace:     static constexpr int           kTries = 4;
+
+gate: With nowhere to go it goes to the corner
+file: src/sources/ofxManifoldMotion.h
+find:         return p;\n    }\n\n    State advance
+replace:         return glm::dvec3(s_.x0, s_.y0, s_.zLow);\n    }\n\n    State advance
+nl: yes
+
+gate: Speed multiplied, not divided
+file: src/sources/ofxManifoldMotion.h
+find:             n.dur = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z) / s_.travel;
+replace:             n.dur = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z) * s_.travel;
+
+gate: A step starts from the last destination, not where the point is
+file: src/sources/ofxManifoldMotion.h
+find:         n.from = position(st, n.tk);
+replace:         n.from = st.dest;
+
+gate: Going back starts from the latest checkpoint
+file: src/sources/ofxManifoldMotion.h
+find:             while (i > 1 && !(checkpoints_[i - 1].tk <= t)) --i;
+replace:             while (false && i > 1 && !(checkpoints_[i - 1].tk <= t)) --i;
+
+gate: A checkpoint every step
+file: src/sources/ofxManifoldMotion.h
+find:             if (cur_.k % kCheckpoint == 0 && checkpoints_.size() == cur_.k / kCheckpoint)
+replace:             if (checkpoints_.size() == cur_.k / kCheckpoint || true)
+
+gate: A click before the last is taken
+file: src/sources/ofxManifoldMotion.h
+find:         if (!s_.steps.at.empty() && t < s_.steps.at.back()) return false;
+replace:         (void)0;
+
+gate: Motion numbers always at fifteen digits
+file: src/io/ofxManifoldSerializeMotion.h
+find:     if (std::strtod(buf, nullptr) != v) std::snprintf(buf, sizeof(buf), "%.17g", v);
+replace:     (void)0;
+
+gate: A motion file's units are always seconds
+file: src/io/ofxManifoldSerializeMotion.h
+find:       << ", \"units\": \"" << units << "\",\n";
+replace:       << ", \"units\": \"" << "seconds" << "\",\n";
+
+gate: Inside map saved as none
+file: src/io/ofxManifoldSerializeMotion.h
+find:       << ", \"inside\": \"" << (s.insideMap ? "map" : "none")
+replace:       << ", \"inside\": \"" << "none"
+
+gate: Jitter of 0.95 accepted
+file: src/io/ofxManifoldSerializeMotion.h
+find:         if (!(j >= 0.0 && j <= 0.9)) return fail("jitter must be 0 to 0.9");
+replace:         if (!(j >= 0.0 && j <= 1.0)) return fail("jitter must be 0 to 0.9");
+
+gate: A pattern's offsets may fall outside its cycle
+file: src/io/ofxManifoldSerializeMotion.h
+find:             if (offs[i] < 0.0 || offs[i] >= cyc || (i && !(offs[i] > offs[i - 1])))
+replace:             if (offs[i] < 0.0 || (i && !(offs[i] > offs[i - 1])))
+
+gate: Clicks may go backwards in a file
+file: src/io/ofxManifoldSerializeMotion.h
+find:             if (at[i] < at[i - 1]) return fail("clicks must not go backwards");
+replace:             (void)at;
+
+gate: Unknown units accepted
+file: src/io/ofxManifoldSerializeMotion.h
+find:     if (units != "seconds" && units != "bars") return fail("unknown units");
+replace:     (void)units;
+
+gate: A rectangle inside out accepted
+file: src/io/ofxManifoldSerializeMotion.h
+find:     if (s.x0 > s.x1 || s.y0 > s.y1) return fail("the rectangle is inside out");
+replace:     (void)0;
+
+gate: A wrap at a drop of less than half
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:         if (phase_ - phase > 0.5) {
+replace:         if (phase_ - phase > 0.4) {
+
+gate: The phase clock goes backwards
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:         } else if (phase >= phase_) {\n            phase_ = phase;
+replace:         } else {\n            phase_ = phase;
+nl: yes
+
+gate: A sent bar may go backwards
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:             if (bar > bar_ || (bar == bar_ && phase > phase_)) {
+replace:             if (true) {
+
+gate: The first phase ignores its bar
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:             bar_ = bar != kNoBar ? bar : 0;
+replace:             bar_ = 0;
+
+gate: Heard for half a second only
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:     static constexpr double kHeardFor = 1.0;
+replace:     static constexpr double kHeardFor = 0.4;
+
+gate: Resuming jumps the seconds ahead
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:         origin_ = now - held_;
+replace:         origin_ = now;
+
+gate: /phase not read
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:     if (m.address != "/phase" || m.args.empty() || m.args[0].type != 'f') return false;
+replace:     if (m.address != "/phases" || m.args.empty() || m.args[0].type != 'f') return false;
+
+gate: /beat not read
+file: ofxManifoldPlayer/src/ofxManifoldClocks.h
+find:     if (m.address != "/beat" || m.args.empty() || m.args[0].type != 'i') return false;
+replace:     if (m.address != "/beats" || m.args.empty() || m.args[0].type != 'i') return false;

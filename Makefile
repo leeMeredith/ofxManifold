@@ -24,6 +24,7 @@ EDI_RUN  := $(BUILD)/run_editor
 LVL_RUN  := $(BUILD)/run_levels
 OSC_RUN  := $(BUILD)/run_osc
 SMOOTH_RUN := $(BUILD)/run_smooth
+MOTION_RUN := $(BUILD)/run_motion
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -39,6 +40,7 @@ EDI_VEC  := tests/vectors/editor.vec
 LVL_VEC  := tests/vectors/levels.vec
 OSC_VEC  := tests/vectors/osc.vec
 SMOOTH_VEC := tests/vectors/smooth.vec
+MOTION_VEC := tests/vectors/motion.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -86,15 +88,17 @@ AUTHORING := src/authoring/ofxManifoldGrid.h \
              src/authoring/ofxManifoldRing.h
 
 SOURCES  := src/sources/ofxManifoldPointSource.h \
-            src/sources/ofxManifoldTrajectory.h
+            src/sources/ofxManifoldTrajectory.h \
+            src/sources/ofxManifoldMotion.h
 
 IO       := src/io/ofxManifoldJSON.h \
             src/io/ofxManifoldSerialize.h \
-            src/io/ofxManifoldSerialize3D.h
+            src/io/ofxManifoldSerialize3D.h \
+            src/io/ofxManifoldSerializeMotion.h
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth headers workflow wrapper vectors clean
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion headers workflow wrapper vectors clean
 
 all: test
 
@@ -102,7 +106,7 @@ all: test
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible door keys panel headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
-      test-levels test-osc osc-live test-smooth
+      test-levels test-osc osc-live test-smooth test-motion
 	@echo ""
 	@echo "all suites green"
 
@@ -266,11 +270,29 @@ $(SMOOTH_RUN): tests/run_smooth.cpp $(PLAYER_CPP) $(PLAYER_H) $(INTERP)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/run_smooth.cpp $(PLAYER_CPP)
 
+# Movement (3B-2): random walks, recordings, clocks, motion files.
+test-motion: $(MOTION_RUN) $(MOTION_VEC)
+	@./$(MOTION_RUN) $(MOTION_VEC)
+
+$(MOTION_RUN): tests/run_motion.cpp $(SOURCES) $(IO) $(PLAYER_CPP) $(PLAYER_H)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/run_motion.cpp $(PLAYER_CPP)
+
+$(MOTION_VEC): tests/ref/reference_motion.py
+	@python3 tests/ref/reference_motion.py
+
 $(SMOOTH_VEC): tests/ref/reference_smooth.py
 	@python3 tests/ref/reference_smooth.py
 
-osc-live: $(BUILD)/osc_udp
+osc-live: $(BUILD)/osc_udp $(BUILD)/phase_udp
 	@python3 tests/check_osc_udp.py
+	@python3 tests/check_phase_udp.py
+
+# A stand-in for ofxScPhaseBridge over UDP (3B-2): /phase and /beat read as
+# example-osc reads them, into a PhaseClock and a walk.
+$(BUILD)/phase_udp: tests/phase_udp.cpp $(PLAYER_CPP) $(PLAYER_H) $(SOURCES)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -IofxManifoldPlayer/src -o $@ tests/phase_udp.cpp $(PLAYER_CPP)
 
 $(BUILD)/osc_udp: tests/osc_udp.cpp $(PLAYER_CPP) $(PLAYER_H)
 	@mkdir -p $(BUILD)
@@ -294,6 +316,7 @@ vectors:
 	@python3 tests/ref/reference_levels.py
 	@python3 tests/ref/reference_osc.py
 	@python3 tests/ref/reference_smooth.py
+	@python3 tests/ref/reference_motion.py
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)

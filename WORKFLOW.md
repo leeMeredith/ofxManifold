@@ -105,6 +105,7 @@ edit src/core/*.h  →  make test  →  green?  →  commit  →  next step
 | `make keys` | every key listed in the editor's key panel reaches the app: returned by `keyId()`, answered by `keyPressed()` |
 | `make panel` | the editor window's layout at 576 window and text sizes: the key panel inside its room and above or beside the faders, no line on another, every key shown once in order or counted, each column starting at its top, the views never under half their size, every key shown at 1280 x 800 and up with text up to 14 |
 | `make test-osc` | ofxManifoldPlayer's OSC out against `tests/vectors/osc.vec`: each message's bytes, malformed packets refused, the sender frame by frame |
+| `make test-motion` | Movement against `tests/vectors/motion.vec`: splitmix64's published outputs, random walks asked in and out of order, recordings, the phase and seconds clocks, motion files saved byte for byte and refused |
 | `make test-smooth` | ofxManifoldPlayer's output smoother against `tests/vectors/smooth.vec`: sequences of ticks, every list checked, and the kernel's WeightSmoother run alongside on the same numbers |
 | `make osc-live` | the same sender over a real UDP socket on this machine, every packet checked against the reference, a hello sent back and counted |
 | `make drawlog` | records every drawing call of a scripted editing session; record before and after a change meant to leave the screen alone, and `cmp` |

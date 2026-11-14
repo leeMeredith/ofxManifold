@@ -4,3 +4,4 @@
 
 #include "ofxManifoldOsc.h"
 #include "ofxManifoldOutputSmoother.h"
+#include "ofxManifoldClocks.h"

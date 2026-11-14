@@ -21,6 +21,7 @@ void frame(const char* what) {
 }
 
 void key(int k) { app->keyPressed(k); app->keyReleased(k); }
+void run(int frames) { for (int i = 0; i < frames; ++i) app->update(); }   // unrecorded
 void shiftClick(int x, int y) {
     drawlogHeld().insert(OF_KEY_SHIFT);
     app->mousePressed(x, y, 0);
@@ -55,6 +56,22 @@ int main() {
     frame("the flat example, by O: the loudest followed");
     key('l');                  frame("links of the nodes heard");
     key('l');                  frame("links of every node");
+    // Movement (3B-2). Each update is 1/60 s of the app's own seconds.
+    key('e');                  frame("the room again, moved by hand");
+    key('m');  run(40);        frame("m: jump -- stepped, on the map");
+    key('m');  run(40);        frame("m: glide");
+    key('c');                  frame("c: steps on your clicks");
+    key(OF_KEY_RETURN); run(30); frame("return: one step");
+    key('h');  key('c'); key('c'); run(70);
+    frame("h: height across the levels; steps on a timer again");
+    key('n');  key('<'); key('{'); run(70);
+    frame("n, <, {: a new seed, shorter travel, shorter steps");
+    key('m');                  frame("m: your hand again");
+    key('r');
+    for (int i = 0; i < 20; ++i) { a.mouseDragged(100 + 6 * i, 150, 0); app->update(); }
+    key('r');  run(10);        frame("r, drag, r: the recording plays");
+    run(60);                   frame("the recording looping");
+    key('b');                  frame("b: SuperCollider's bars -- no phase heard");
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;
 }

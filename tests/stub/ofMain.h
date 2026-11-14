@@ -56,6 +56,7 @@ inline float ofDegToRad(float d){return d*0.01745329f;}
 inline float ofRadToDeg(float r){return r*57.2957795f;}
 #define OF_KEY_ESC 27
 #define OF_KEY_TAB 9
+#define OF_KEY_RETURN 13
 #define OF_KEY_SHIFT 0x1
 #define OF_KEY_ALT 0x2
 #define OF_KEY_COMMAND 0x4

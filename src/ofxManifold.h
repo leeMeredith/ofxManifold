@@ -26,6 +26,7 @@
 
 #include "sources/ofxManifoldPointSource.h"
 #include "sources/ofxManifoldTrajectory.h"
+#include "sources/ofxManifoldMotion.h"
 
 #include "authoring/ofxManifoldGrid.h"
 #include "authoring/ofxManifoldRing.h"
@@ -37,5 +38,6 @@
 #include "io/ofxManifoldJSON.h"
 #include "io/ofxManifoldSerialize.h"
 #include "io/ofxManifoldSerialize3D.h"
+#include "io/ofxManifoldSerializeMotion.h"
 
 #include "ofx/ofxManifoldRenderer.h"

@@ -19,13 +19,13 @@ serialization the standard library's own JSON parser against a hand-written one.
 | `interpretation` | 69 | curves, spread, blend, interpolate, coverage, smoothing, negative weights |
 | `mapping` | 35 + 130 | bindings, aggregators, dense output, blending by name; outputs with channel and trim, silence, fill, derived outputs before or after the fader, rigs, blending any number of maps, the agreement check |
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
-| `sources` | 82 | trajectories, real-time replay, velocity, the touring case, paths with height |
+| `sources` | 82 + 52 | trajectories, real-time replay, velocity, the touring case, paths with height; movement (3B-2): splitmix64 against its published outputs, random walks -- jump and glide -- asked in and out of order, bounds, the map's inside test, straight paths, steps on a timer, on clicks and in a pattern, recordings held and looped, the seconds and phase clocks, motion files |
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
 | `ofxManifoldEditor` (logic) | 67 scripts, 873 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line, rings, blocks and triangles laid out in one step, c and C for a node's own output or silence, L and F to lay out nodes and join the grid's whole cells, the nodes in line |
 
 | `ofxManifoldPlayer` | 35 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
 
-**908 vectors, 423 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**960 vectors, 461 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 

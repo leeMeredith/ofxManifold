@@ -36,7 +36,7 @@ import re
 import subprocess
 import sys
 
-# target -> (binary under build/, sources compiled into it)
+# target -> (binary under build/, or a list of them; sources compiled into it)
 EDITOR_CPP = sorted(glob.glob("ofxManifoldEditor/src/*.cpp"))
 PLAYER_CPP = sorted(glob.glob("ofxManifoldPlayer/src/*.cpp"))
 SUITES = {
@@ -56,9 +56,12 @@ SUITES = {
     "panel":               ("check_panel",        ["tests/check_panel.cpp"] + EDITOR_CPP),
     # ofxManifoldPlayer's OSC out (3B-1): the vectors, and over a socket
     "test-osc":            ("run_osc",            ["tests/run_osc.cpp"] + PLAYER_CPP),
-    "osc-live":            ("osc_udp",            ["tests/osc_udp.cpp"] + PLAYER_CPP),
+    "osc-live":            (["osc_udp", "phase_udp"],
+                            ["tests/osc_udp.cpp", "tests/phase_udp.cpp"] + PLAYER_CPP),
     # ofxManifoldPlayer's output smoother (3B-1)
     "test-smooth":         ("run_smooth",         ["tests/run_smooth.cpp"] + PLAYER_CPP),
+    # movement (3B-2)
+    "test-motion":         ("run_motion",         ["tests/run_motion.cpp"] + PLAYER_CPP),
 }
 INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src", "-IofxManifoldPlayer/src"]
 
@@ -105,9 +108,10 @@ def main():
         return subprocess.run(["make", "--no-print-directory", "test"]).returncode
 
     for _name, binary in chosen:
-        path = os.path.join("build", binary)
-        if os.path.exists(path):
-            os.remove(path)
+        for b in (binary if isinstance(binary, list) else [binary]):
+            path = os.path.join("build", b)
+            if os.path.exists(path):
+                os.remove(path)
     targets = [name for name, _b in chosen]
     if target.startswith("ofxManifoldEditor" + os.sep):
         targets.append("door")

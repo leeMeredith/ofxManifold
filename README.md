@@ -197,7 +197,14 @@ messages go under its own name -- `/manifold/room/levels` -- with a roll call
 on `/manifold/map`, and each copy of the app hears answers on the first port
 free from 57121, so several copies with different maps play at once and the
 receivers (the SuperCollider patch, `receive.py`) follow every one
-(protocol 2, `ofxManifoldPlayer/OSC.md`). With it a SuperCollider patch
+(protocol 2, `ofxManifoldPlayer/OSC.md`). The point can also move itself
+(`m`): a recording of your hand (`r`), looped; random jumps; random glides
+that stay on the map and never cut across it -- on a timer (`,` `.`), on
+your clicks, or on the beats of Lee's
+[ofxScPhaseBridge](https://github.com/leeMeredith/ofxScPhaseBridge) (`c`).
+Every movement counts in the clock's units: the app's own seconds, or bars
+from SuperCollider's `/phase` on port 9001 (`b`), so a step every 1/16 lands
+on SuperCollider's sixteenths and stretches with its tempo. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
@@ -318,7 +325,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-908 vectors across fourteen suites, plus 423 mutation gates that introduce known
+960 vectors across fifteen suites, plus 461 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite
