@@ -908,11 +908,43 @@ number it uses is a setting beside it.
   one with no shape message, printed and checked.
 - The sound itself is Lee's to hear.
 
+##### Also in this slice: the map's names, one level at a time
+
+Lee: "the map has overlapping names, so the node has all of the
+three-dimensional layers' names over the top of each other. Whatever level
+you are on, the left two-dimensional map should display those only."
+
+What is there, from example-osc's drawing record (`make drawlog`): every
+node's name is drawn TWICE, 2 pixels apart -- once by the renderer's own
+nodes (`ofxManifoldRenderer`, its bitmap font, pale) and once by the
+editor's node glyph, in its output's colour. The editor app turns the
+renderer's nodes off (`renderer->style.drawNodes = false`, "nodes are drawn
+here, not by the renderer"); example-osc never did. The plan view draws the
+floor plan once, not once per level -- but two names a hair apart read as
+layers stacked. And the glyph's colour does come from the wrong level: a
+name takes the colour of the output named after it, FL on every level,
+while on level 2 FL sounds through FL-2 (its fader another colour).
+
+- **example-osc**: the renderer's nodes off, as in the editor -- one name
+  per node, one dot.
+- **A name in its own output's colour on the level you are on**, in both
+  apps: `Model::ownOutput(node)` -- of the outputs the node is bound to on
+  the current level, the one `ownerOf()` says is its own (FL-2 for FL on
+  level 2), else none. The glyph's name and link lines then match the
+  fader you hear on that level.
+- **Tested by**: editor vectors for `ownOutput` on each level of the room
+  and the octahedron, and for a node with no own output; the drawlog shows
+  each name once; gates on each.
+
 Open questions, each with a recommendation:
 
 1. **The span for \registers**: 30 semitones from C3 (C3 to F#5).
 2. **A shared output's voice**: a quiet tone at the root.
 3. **Brightness on by default**: yes.
+4. **The name on the map**: the node's name (FL) on every level, in its
+   own output's colour there -- not the output's name (FL-2). The level is
+   in the colour, the panel ("on level 2 of 3") and the dots; the faders
+   carry FL-2.
 
 
 #### 3B-2c: height on the levels -- riding the bends (spec, 2026-11-14)
@@ -2054,6 +2086,12 @@ Built as specified (2026-11-14), every recommendation taken ("next").
   ground allowed, two crossings added); in `editor.vec`, `levels_raise`,
   `levels_go_and_move`, `levels_drag` (0.45, not 0.44) and `levels_match`,
   each script's note saying so; refusals read "would pass" not "would reach".
+  CI then found the one gate left uncaught: `levels_match`'s only refused
+  match had become a touch, so "Matching heights is not all or nothing"
+  survived. The script now raises E to touch the top and matches N past it,
+  refused. A lesson for the slice that turns a refusal into an allowance:
+  every gate on the refusals it loosens needs its own case still refused --
+  run the gates on the changed files, not only the gates edited.
 - **Gates**: 23 new, 12 re-anchored and turned round (a node may pass, where
   it was: may touch). 490.
 - **Drawlog**: the editor's session ends on shift-cmd-e; example-osc's rides
@@ -2099,7 +2137,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3A-12** | Editor: softer hints, a grid without gaps, a panel of what can be done | `make panel`, drawlog session |
 | **3B-1** | OSC out that grows and shrinks with the map; `ofxManifoldPlayer`; `example-osc` | osc vectors, `make osc-live` |
 | **3B-2** | Movement, first slice: `Motion`, the recording as one, `RandomWalk` (jump and glide), bounds, seeds, step timing (every, clicks, pattern), clocks (seconds, a phase from SuperCollider), motion files; example-osc's movements | motion vectors, gates, drawlog session, `make osc-live` |
-| **3B-2b** | The map's shape for SuperCollider: `/shape` (levels, each output's level and place), `Model::outputPlaces`, protocol 3; the patch's musical behaviours, chosen in SuperCollider | editor and OSC vectors, gates, sclang logic run |
+| **3B-2b** | The map's shape for SuperCollider: `/shape` (levels, each output's level and place), `Model::outputPlaces`, protocol 3; the patch's musical behaviours, chosen in SuperCollider; each node's name once on the map, in its own output's colour on the current level | editor and OSC vectors, gates, sclang logic run |
 | **3B-2c** | Height on the levels: `Levels::heightAtPosition` / `positionAt`, riding the bends, restrained or extrapolated; example-osc's `k`; u on `/position` | levels vectors, OSC vectors, gates, drawlog session |
 | **3B-2d** | Levels that touch: `fits` at-or-beyond, a pinch shared at t = 0.5, `evaluateAtPosition`, the editor allowing touches, files versioned when they touch; the octahedron example | levels and editor vectors, gates, drawlog session |
 
