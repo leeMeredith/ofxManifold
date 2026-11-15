@@ -227,6 +227,8 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               !drag && outputs > 0, unlessDrag("no outputs yet")),
         entry("empty", "cmd-n", "new empty map", !drag, dragging),
         entry("example", "cmd-e", "the example map", !drag, dragging),
+        entry("octahedron", "shift-cmd-e", "the octahedron: two levels touching",
+              !drag, dragging),
         entry("fullscreen", "ctrl-cmd-f", "full screen", true, ""),
         entry("textsize", "cmd-+ cmd--", "text size", true, ""),
         entry("keysheet", "?", "every key, over the whole window", true, ""),

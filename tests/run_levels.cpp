@@ -690,6 +690,38 @@ int main(int argc, char** argv) {
                        << ", expected " << want;
             record(cls, name, ok, d.str());
 
+        } else if (kind == "EVALU") {
+            // Weights by level position (3B-2d): the point reproduced is the
+            // floor plan's (x, y) at the height u gives there.
+            std::string sn; in >> sn;
+            expectKeyword(in, "W");
+            Evaluation floor;
+            floor.inside = true;
+            std::string tok;
+            while (in >> tok && tok != "U") {
+                if (tok == "-") { floor.inside = false; continue; }
+                const std::size_t eq = tok.find('=');
+                floor.weights.push_back(WeightedNode{
+                    static_cast<NodeID>(std::stoul(tok.substr(0, eq))),
+                    std::stof(tok.substr(eq + 1))});
+            }
+            float u; in >> u;
+            expectKeyword(in, "EXPECT");
+            std::map<std::pair<NodeID, LevelID>, float> want;
+            const bool inside = readExpect(in, want);
+            const Stack& st = stacks[sn];
+            const Plan& plan = plans[st.plan];
+            float px = 0.0f, py = 0.0f;
+            for (const auto& wn : floor.weights) {
+                px += wn.weight * plan.pos[wn.id].x;
+                py += wn.weight * plan.pos[wn.id].y;
+            }
+            const float z = st.levels.heightAtPosition(floor.weights, u);
+            const Evaluation3D e = st.levels.evaluateAtPosition(floor, u);
+            const bool ok = check(e, inside, want, st.levels, plan, px, py, z,
+                                  st.levels.count() == 1, d);
+            record(cls, name, ok, d.str());
+
         } else if (kind == "EVALXYZ") {
             // The whole path: the C++ floor plan evaluates (x, y) itself.
             std::string sn, fp; in >> sn >> fp;
@@ -922,6 +954,23 @@ int main(int argc, char** argv) {
                            || fl.nodeCount() != plans["square"].pos.size())) {
                     ok = false; d << "a refused load changed its outputs";
                 }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "REFUSEOLD") {
+            // An ofxManifold from before 3B-2d read map files up to version
+            // 3: a touching map, at 4, is refused by its version.
+            std::string file, reason, tok; in >> file;
+            while (in >> tok) reason += (reason.empty() ? "" : " ") + tok;
+            std::string text;
+            bool ok = slurp(file, text);
+            if (ok) {
+                Manifold2D fl;
+                const io::LoadResult r = io::detail::loadFloor(text, fl, 3);
+                ok = !r.ok && r.error.find(reason) != std::string::npos;
+                if (!ok) d << (r.ok ? "loaded" : "wrong reason: " + r.error);
+            } else {
+                d << "missing " << file;
             }
             record(cls, name, ok, d.str());
 

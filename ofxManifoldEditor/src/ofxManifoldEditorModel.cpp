@@ -180,6 +180,46 @@ void Model::loadRoom() {
     settleCurrentOutput();
 }
 
+void Model::loadOctahedron() {
+    newEmpty();
+    // The rim, a diamond, and its centre; four triangles fanned from C.
+    const auto N = manifold_.addNode("N", {0.50f, 0.80f});
+    const auto E = manifold_.addNode("E", {0.80f, 0.50f});
+    const auto S = manifold_.addNode("S", {0.50f, 0.20f});
+    const auto W = manifold_.addNode("W", {0.20f, 0.50f});
+    const auto C = manifold_.addNode("C", {0.50f, 0.50f});
+    manifold_.addTriangle(C, N, E);
+    manifold_.addTriangle(C, E, S);
+    manifold_.addTriangle(C, S, W);
+    manifold_.addTriangle(C, W, N);
+    TargetID first = InvalidTarget;
+    int ch = 0;
+    for (NodeID id : {N, E, S, W, C}) {
+        const TargetID t = map_.addOutput(manifold_.node(id).name, ch++);
+        map_.bind(0, id, t);
+        if (first == InvalidTarget) first = t;
+    }
+    refreshTopology();
+    // The top: a copy with its own outputs, as n makes it, whatever the
+    // auto-output setting is; it is left as it was.
+    const bool wasAuto = autoOutput_;
+    autoOutput_ = true;
+    newLevel(true);
+    autoOutput_ = wasAuto;
+    // The bottom starts at -0.5 and the top at 0.5 -- the apexes, where C
+    // stays -- and the rim is brought to 0 on both, where they touch.
+    const std::size_t n = manifold_.nodeCount();
+    map_.moveLevel(1, 0.25f, n);
+    map_.moveLevel(0, -0.5f, n);
+    for (NodeID id : {N, E, S, W}) {
+        map_.setHeight(0, id, 0.0f);
+        map_.setHeight(1, id, 0.0f);
+    }
+    goToLevel(0);
+    selectOnlyOutput(first);
+    settleCurrentOutput();
+}
+
 void Model::newEmpty() {
     manifold_ = Manifold2D();
     map_ = Map3D();
@@ -1424,7 +1464,7 @@ Result Model::newLevel(bool above) {
                        + (above ? "above" : "below") + " -- "
                        + (who.empty() ? std::string("a level starts there")
                                       : who)
-                       + " would reach the level next to it", 3.0f);
+                       + " would pass the level next to it", 3.0f);
     }
     level_ = at;
     std::string msg = "new level " + std::to_string(at + 1) + " of "
@@ -1502,28 +1542,26 @@ Result Model::raise(const Selection& sel, int direction, bool fine) {
                          : (direction > 0 ? std::ceil(k) : std::floor(k));
         moves.emplace_back(id, base + next * unit);
     }
-    // All or nothing: strictly above the level below, strictly below the
-    // level above, for every node, before any moves.
+    // All or nothing: at or above the level below, at or below the level
+    // above -- touching allowed, passing not (3B-2d) -- for every node,
+    // before any moves.
     std::string blocked;
     for (const auto& mv : moves) {
-        const bool under = level_ + 1 >= lv.count()
-                        || mv.second < lv.height(level_ + 1, mv.first);
-        const bool over = level_ == 0
-                       || mv.second > lv.height(level_ - 1, mv.first);
-        if (!under || !over) {
+        if (!lv.fits(level_, mv.first, mv.second)) {
             blocked += (blocked.empty() ? "" : ", ")
                      + manifold_.node(mv.first).name;
         }
     }
     if (!blocked.empty()) {
-        return refusal(blocked + " would reach the level "
+        return refusal(blocked + " would pass the level "
                        + (direction > 0 ? "above" : "below"), 2.5f);
     }
     float lo = 1e9f, hi = -1e9f;
     for (const auto& mv : moves) {
         map_.setHeight(level_, mv.first, mv.second);
-        lo = std::min(lo, mv.second - base);
-        hi = std::max(hi, mv.second - base);
+        const float h = lv.height(level_, mv.first);   // settled, on a touch
+        lo = std::min(lo, h - base);
+        hi = std::max(hi, h - base);
     }
     const std::string a = offset(lo), b = offset(hi);
     return changed("height " + a + (a == b ? std::string() : " to " + b), 2.0f);
@@ -1691,7 +1729,7 @@ Result Model::moveLevel(LevelID k, float base) {
         return refusal("level " + std::to_string(k + 1) + " cannot start at "
                        + height(base) + " -- "
                        + (who.empty() ? "it would pass the level " + where
-                                      : who + " would reach the level " + where),
+                                      : who + " would pass the level " + where),
                        3.0f);
     }
     level_ = k;
@@ -1720,11 +1758,8 @@ Result Model::matchHeights(const Selection& sel) {
     const Levels& lv = map_.levels();
     const NodeID first = sel.nodes().front();
     const float h0 = lv.height(level_, first);
-    // Fits strictly between the same node on the levels either side.
-    auto fits = [&](NodeID n, float h) {
-        return (level_ == 0 || h > lv.height(level_ - 1, n))
-            && (level_ + 1 >= lv.count() || h < lv.height(level_ + 1, n));
-    };
+    // Keeps to the same node on the levels either side, touching allowed.
+    auto fits = [&](NodeID n, float h) { return lv.fits(level_, n, h); };
     std::string blocked;
     std::vector<NodeID> moved;
     for (std::size_t i = 1; i < sel.nodes().size(); ++i) {
@@ -1738,7 +1773,7 @@ Result Model::matchHeights(const Selection& sel) {
     const std::string name = manifold_.node(first).name;
     if (!blocked.empty()) {
         return refusal(blocked + " cannot be at " + name + "'s height -- it "
-                       "would reach a level next to it", 3.0f);
+                       "would pass a level next to it", 3.0f);
     }
     if (moved.empty()) {
         Result r;
@@ -1757,9 +1792,7 @@ Result Model::flattenHeights(const Selection& sel) {
     std::string blocked;
     std::vector<NodeID> moved;
     for (NodeID n : sel.nodes()) {
-        const bool fits = (level_ == 0 || base > lv.height(level_ - 1, n))
-                       && (level_ + 1 >= lv.count()
-                           || base < lv.height(level_ + 1, n));
+        const bool fits = lv.fits(level_, n, base);
         if (!fits) {
             blocked += (blocked.empty() ? "" : ", ") + manifold_.node(n).name;
         } else if (lv.height(level_, n) != base) {
@@ -1768,7 +1801,7 @@ Result Model::flattenHeights(const Selection& sel) {
     }
     if (!blocked.empty()) {
         return refusal(blocked + " cannot go back to the level's start -- it "
-                       "would reach a level next to it", 3.0f);
+                       "would pass a level next to it", 3.0f);
     }
     if (moved.empty()) {
         Result r;

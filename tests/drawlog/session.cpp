@@ -323,6 +323,12 @@ int main() {
     key('4');
     frame("the polar grid: whole rings only");
 
+    // round 3B-2d: the octahedron, two levels meeting at the rim
+    hold(OF_KEY_COMMAND); hold(OF_KEY_SHIFT);
+    key('E');
+    release(OF_KEY_SHIFT); release(OF_KEY_COMMAND);
+    frame("shift-cmd-e: the octahedron -- two levels meeting at the rim");
+
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;
 }

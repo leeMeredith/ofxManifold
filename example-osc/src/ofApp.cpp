@@ -52,6 +52,7 @@ const std::vector<OscKeyGroup>& keyGroups() {
                      {"?", "this page (again, or a click: away)"}}},
         {"maps", {{"o", "open a map you saved in the editor"},
                   {"e", "the room: three levels"},
+                  {"x", "the octahedron: two levels touching"},
                   {"E", "the editor's flat example"}}},
     };
     return groups;
@@ -270,7 +271,8 @@ void ofApp::applySmoothing() {
 // followed, so changing who is followed never makes the smoother start over
 // (which would be a jump in the sound). The values are a second list.
 void ofApp::smooth(float dt) {
-    const ChartLevels raw = chartLevels3D(model, followed, evaluation, z);
+    const Evaluation3D e = heardAt();
+    const ChartLevels raw = chartLevels3D(model, followed, evaluation, e);
     const std::size_t n = raw.routed.size(), m = raw.levels.size();
     std::vector<float> part(raw.fromSelection);
     part.resize(n, 0.0f);
@@ -286,7 +288,7 @@ void ofApp::smooth(float dt) {
     heard.fromSelection.assign(at(n + m), at(n + m + n));
     heard.silence = s[n + m + n];
 
-    heardValues = valuesAt(model, evaluation, z);
+    heardValues = valuesAt(model, evaluation.inside ? e : Evaluation3D{});
     v.clear();
     for (const auto& p : heardValues) v.push_back(p.second);
     const std::vector<float>& sv = valueSmoother.update(v, dt);
@@ -335,6 +337,16 @@ std::vector<WeightedNode> ofApp::floorWeights() const {
 }
 
 float ofApp::topLevel() const { return float(model.map3d().count() - 1); }
+
+// The 3D weights the point is heard by (3B-2d). On the levels it rides by
+// its level position u, so it is read by u: no division, and where levels
+// touch -- the octahedron's rim -- u still says how far up it is. In units
+// it moves by height, and is read by height.
+Evaluation3D ofApp::heardAt() const {
+    const Levels& lv = model.map3d().levels();
+    return heightIn == HeightIn::Units ? lv.evaluate(evaluation, z)
+                                       : lv.evaluateAtPosition(evaluation, u);
+}
 
 // The node followed: pinned, while it is on the map, else the loudest at the
 // point; nothing off the map.
@@ -781,6 +793,10 @@ void ofApp::keyPressed(int key) {
     }
     else if (key == 'e') { model.loadRoom(); adopt("room"); say("the room: floor, middle and top"); }
     else if (key == 'E') { model.loadExample(); adopt("example"); say("the editor's flat example"); }
+    else if (key == 'x') {
+        model.loadOctahedron(); adopt("octahedron");
+        say("the octahedron: two levels meeting at the rim");
+    }
     else if (key == 'o') open();
     // ---- movement ----
     else if (key == 'm') {

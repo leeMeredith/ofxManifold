@@ -28,9 +28,12 @@
 //
 // Shape. Every level has the same floor plan, so every horizontal slice of the
 // volume is the same shape: it cannot narrow to a waist or a point -- no
-// hourglass, no double pyramid. Levels may not cross or touch: each node is
-// strictly higher on each level than on the one below. Every operation that
-// could break that refuses instead, changing nothing, and says which nodes.
+// hourglass, no double pyramid. Levels may touch but never cross (round
+// 3B-2d): each node is at least as high on each level as on the one below,
+// and each level starts no lower than the one below it. Where two levels are
+// one height, they PINCH: a closed shape -- a bipyramid, the octahedron --
+// is a bottom and a top level meeting at its rim. Every operation that could
+// make levels cross refuses instead, changing nothing, and says which nodes.
 //
 // Nodes. Levels never needs to be told about a new node: a node with no height
 // of its own sits at each level's starting height. Removing nodes renumbers
@@ -130,7 +133,10 @@ public:
     }
 
     // Its inverse: the level position of height z. The levels never cross,
-    // so the surfaces are in order and the two agree both ways.
+    // so the surfaces are in order and the two agree both ways -- except at
+    // a pinch (3B-2d), where levels touch and many positions have one height:
+    // there, the lowest. Extrapolated through an end cell with no gap there
+    // is no slope to carry on: the nearer level.
     float positionAt(const std::vector<WeightedNode>& w, float z,
                      bool extrapolate = false) const {
         const std::size_t n = levels_.size();
@@ -141,11 +147,71 @@ public:
             if (z <= h[0]) return 0.0f;
             if (z >= h[n - 1]) return float(n - 1);
         }
-        // The highest level at or below z, never the top one; below the
-        // bottom, the bottom cell, carried on.
+        // The lowest cell whose top is at or above z, never past the top
+        // one; below the bottom, the bottom cell, carried on.
         LevelID k = 0;
-        while (k + 2 < n && !(z < h[k + 1])) ++k;
-        return float(k) + (z - h[k]) / (h[k + 1] - h[k]);
+        while (k + 2 < n && z > h[k + 1]) ++k;
+        const float gap = h[k + 1] - h[k];
+        if (!(gap > 0.0f)) return float(z > h[k] ? k + 1 : k);
+        return float(k) + (z - h[k]) / gap;
+    }
+
+    // The weights at level position u (3B-2d) -- what a point riding the
+    // levels by position, as the player does, is heard as. The cell is
+    // floor(u), held to the cells there are, and t is u's part of the way up
+    // it: no division, so a pinch is no different from anywhere else.
+    // Outside the floor plan, or with u outside 0..count()-1, outside. One
+    // level: u is ignored, as z is by evaluate().
+    Evaluation3D evaluateAtPosition(const Evaluation& floor, float u) const {
+        Evaluation3D out;
+        if (!floor.inside) return out;
+        const std::size_t n = levels_.size();
+        if (n == 1) return evaluate(floor, 0.0f);
+        if (!(u >= 0.0f && u <= float(n - 1))) return out;
+        const LevelID k = cellBelow(u, n);
+        return share(floor, k, u - float(k));
+    }
+
+    // ---- touching (round 3B-2d) ----------------------------------------------
+    //
+    // A height within kTouch of the same node on the level next to it is ON
+    // that level: it settles there exactly, a touch. Heights are sums and
+    // differences of floats -- a node stepped down 0.05 at a time onto the
+    // level below can land a rounding error past it, or short of it -- and a
+    // touch is meant exactly, so that the levels are one height there and the
+    // point is shared (evaluate()'s pinch). Files are read exactly: a file
+    // says what it means.
+    static constexpr float kTouch = 1e-6f;
+
+    // Would node n at height h on level k keep to its levels -- at or above
+    // the level below, at or below the level above, once settled? Touching
+    // is allowed, passing is not.
+    bool fits(LevelID k, NodeID n, float h) const {
+        h = settle(k, n, h);
+        if (k > 0 && !(h >= height(k - 1, n))) return false;
+        if (k + 1 < levels_.size() && !(h <= height(k + 1, n))) return false;
+        return true;
+    }
+
+    // h, settled onto the level below or above where within kTouch of it.
+    float settle(LevelID k, NodeID n, float h) const {
+        if (k > 0) h = settleOn(h, height(k - 1, n), true);
+        if (k + 1 < levels_.size()) h = settleOn(h, height(k + 1, n), false);
+        return h;
+    }
+
+    // Do any two neighbouring levels touch -- a node, or the starts? Only
+    // then does a file need the version that can say so (3B-2d).
+    bool touches(std::size_t nodeCount) const {
+        for (LevelID k = 1; k < levels_.size(); ++k) {
+            if (!(levels_[k].base > levels_[k - 1].base)) return true;
+            const std::size_t n = std::max({nodeCount, levels_[k].heights.size(),
+                                            levels_[k - 1].heights.size()});
+            for (NodeID i = 0; i < n; ++i) {
+                if (!(height(k, i) > height(k - 1, i))) return true;
+            }
+        }
+        return false;
     }
 
     // ---- making levels ----------------------------------------------------
@@ -155,8 +221,8 @@ public:
     // goes wherever its starting height puts it.
     //
     // Refused, changing nothing, if another level already starts there, or if
-    // any node's copy would not be strictly between that node on the levels
-    // around it. `nodeCount` is the floor plan's, so nodes with no height of
+    // any node's copy would pass that node on a level around it -- touching
+    // is allowed. `nodeCount` is the floor plan's, so nodes with no height of
     // their own are checked too. Returns the new level's id, or count() on
     // refusal; `blocked` receives the nodes that refused it.
     LevelID copyLevel(LevelID from, float newBase, std::size_t nodeCount,
@@ -177,9 +243,11 @@ public:
 
         std::vector<NodeID> bad;
         for (NodeID i = 0; i < n; ++i) {
-            const float h = made.heights[i];
-            const bool overLower = (at == 0) || h > height(at - 1, i);
-            const bool underUpper = (at == levels_.size()) || h < height(at, i);
+            float& h = made.heights[i];
+            if (at > 0) h = settleOn(h, height(at - 1, i), true);
+            if (at < levels_.size()) h = settleOn(h, height(at, i), false);
+            const bool overLower = (at == 0) || h >= height(at - 1, i);
+            const bool underUpper = (at == levels_.size()) || h <= height(at, i);
             if (!overLower || !underUpper) bad.push_back(i);
         }
         if (!bad.empty()) {
@@ -201,8 +269,9 @@ public:
     // ---- bending ------------------------------------------------------------
 
     // Raise (dz > 0) or lower (dz < 0) nodes on one level. All or nothing:
-    // refused, changing nothing, if any of them would reach the level above
-    // or below; `blocked` receives those nodes.
+    // refused, changing nothing, if any of them would pass the level above
+    // or below -- reaching it, touching, is allowed; `blocked` receives those
+    // nodes.
     bool raise(LevelID k, const std::vector<NodeID>& nodes, float dz,
                std::vector<NodeID>* blocked = nullptr) {
         if (blocked) blocked->clear();
@@ -216,41 +285,52 @@ public:
             if (blocked) *blocked = bad;
             return false;
         }
-        for (NodeID n : nodes) set(k, n, height(k, n) + dz);
+        for (NodeID n : nodes) set(k, n, settle(k, n, height(k, n) + dz));
         return true;
     }
 
     // Move a whole level up (dz > 0) or down: its starting height and every
     // node on it, bends kept (round 3A-6b). All or nothing: refused, changing
-    // nothing, if any node -- of `nodeCount`, or any bent one -- would reach
+    // nothing, if any node -- of `nodeCount`, or any bent one -- would pass
     // the level above or below; `blocked` receives those nodes. Refused too,
-    // with `blocked` empty, if its start would reach a neighbour's start.
+    // with `blocked` empty, if its start would pass a neighbour's start.
+    // Reaching either is a touch, and allowed.
     bool moveLevel(LevelID k, float dz, std::size_t nodeCount,
                    std::vector<NodeID>* blocked = nullptr) {
         if (blocked) blocked->clear();
         if (k >= levels_.size()) return false;
-        const float nb = levels_[k].base + dz;
+        float nb = levels_[k].base + dz;
+        if (k > 0) nb = settleOn(nb, levels_[k - 1].base, true);
+        if (k + 1 < levels_.size()) nb = settleOn(nb, levels_[k + 1].base, false);
         const std::size_t n = std::max(nodeCount, levels_[k].heights.size());
         std::vector<NodeID> bad;
         for (NodeID i = 0; i < n; ++i) {
             if (!fits(k, i, height(k, i) + dz)) bad.push_back(i);
         }
         const bool basesFit =
-            (k == 0 || nb > levels_[k - 1].base)
-            && (k + 1 >= levels_.size() || nb < levels_[k + 1].base);
+            (k == 0 || nb >= levels_[k - 1].base)
+            && (k + 1 >= levels_.size() || nb <= levels_[k + 1].base);
         if (!bad.empty() || !basesFit) {
             if (blocked) *blocked = bad;
             return false;
         }
+        // Unbent nodes stay equal to the base; one that settles on a
+        // neighbour, a float's width away from the base, takes a height of
+        // its own.
+        std::vector<float> moved(n);
+        for (NodeID i = 0; i < n; ++i) moved[i] = settle(k, i, height(k, i) + dz);
         Level& l = levels_[k];
-        for (float& h : l.heights) h += dz;   // unbent stay equal to the base
         l.base = nb;
+        for (NodeID i = 0; i < n; ++i) {
+            if (i < l.heights.size() || moved[i] != nb) set(k, i, moved[i]);
+        }
         return true;
     }
 
-    // How far a whole level can move before it would reach a neighbour:
+    // How far a whole level can move before it would pass a neighbour:
     // {down, up}, each the smallest gap over its nodes and its start; a move
-    // must stay strictly inside. Infinite where there is no neighbour.
+    // may go that far and touch. 0 where it already touches. Infinite where
+    // there is no neighbour.
     std::pair<float, float> room(LevelID k, std::size_t nodeCount) const {
         const float inf = std::numeric_limits<float>::infinity();
         float down = inf, up = inf;
@@ -272,12 +352,12 @@ public:
     }
 
     // Put one node at a height on one level -- what a file does on load.
-    // Refused, changing nothing, if that would reach the level above or below.
+    // Refused, changing nothing, if that would pass the level above or below.
     bool setHeight(LevelID k, NodeID n, float h) {
         if (k >= levels_.size() || n == InvalidNode || !fits(k, n, h)) {
             return false;
         }
-        set(k, n, h);
+        set(k, n, settle(k, n, h));
         return true;
     }
 
@@ -287,9 +367,9 @@ public:
     // `bends` -- per level, (node, height) pairs. Checked WHOLE, after all of
     // it is in place: set one by one, a valid file could be refused part way
     // (a node raised on the ground before the level above it is raised too).
-    // Refused, changing nothing, if the bases are not strictly increasing, or
-    // any node -- of `nodeCount`, or any bent one -- would not be strictly
-    // between its levels. `why` says which.
+    // Refused, changing nothing, if a base is below the one before it, or
+    // any node -- of `nodeCount`, or any bent one -- would be below itself on
+    // the level before. Equal is a touch, and allowed. `why` says which.
     bool rebuild(const std::vector<float>& bases,
                  const std::vector<std::vector<std::pair<NodeID, float>>>& bends,
                  std::size_t nodeCount, std::string* why = nullptr) {
@@ -299,9 +379,9 @@ public:
         };
         if (bases.empty()) return fail("a map has at least one level");
         for (std::size_t k = 1; k < bases.size(); ++k) {
-            if (!(bases[k] > bases[k - 1])) {
-                return fail("level starting heights are not strictly "
-                            "increasing at level " + std::to_string(k));
+            if (!(bases[k] >= bases[k - 1])) {
+                return fail("level starting heights are not increasing at "
+                            "level " + std::to_string(k));
             }
         }
         std::vector<Level> made;
@@ -329,8 +409,8 @@ public:
         };
         for (std::size_t k = 1; k < made.size(); ++k) {
             for (NodeID i = 0; i < n; ++i) {
-                if (!(at(k, i) > at(k - 1, i))) {
-                    return fail("levels cross or touch at node "
+                if (!(at(k, i) >= at(k - 1, i))) {
+                    return fail("levels cross at node "
                                 + std::to_string(i) + " between levels "
                                 + std::to_string(k - 1) + " and "
                                 + std::to_string(k));
@@ -391,24 +471,25 @@ public:
         // The highest level at or below z, never the top one.
         LevelID k = 0;
         while (k + 2 < n && h[k + 1] <= z) ++k;
-        float t = (z - h[k]) / (h[k + 1] - h[k]);
-        if (t < 0.0f) t = 0.0f;
-        if (t > 1.0f) t = 1.0f;
 
-        out.inside = true;
-        out.below = k;
-        out.t = t;
-        for (const auto& wn : floor.weights) {
-            if (t < 1.0f) {
-                out.weights.push_back(LevelWeight{wn.id, k,
-                                                  wn.weight * (1.0f - t)});
-            }
-            if (t > 0.0f) {
-                out.weights.push_back(LevelWeight{wn.id, k + 1,
-                                                  wn.weight * t});
-            }
+        // A PINCH (3B-2d): where two levels are one height at the point, a
+        // point there is on both, and shared equally, t = 0.5. Either the
+        // cell found has no gap, or z sits on its lower level and the level
+        // below that is the same height. Where more than two meet, the top
+        // two. A gap shrinking toward a pinch is still divided, never 0.
+        const float gap = h[k + 1] - h[k];
+        float t;
+        if (!(gap > 0.0f)) {
+            t = 0.5f;
+        } else if (k > 0 && !(z > h[k]) && !(h[k] > h[k - 1])) {
+            --k;
+            t = 0.5f;
+        } else {
+            t = (z - h[k]) / gap;
+            if (t < 0.0f) t = 0.0f;
+            if (t > 1.0f) t = 1.0f;
         }
-        return out;
+        return share(floor, k, t);
     }
 
 private:
@@ -430,12 +511,36 @@ private:
         return std::min(LevelID(f), LevelID(n - 2));
     }
 
-    // Strictly above the level below and strictly below the level above.
-    bool fits(LevelID k, NodeID n, float h) const {
-        if (k > 0 && !(h > height(k - 1, n))) return false;
-        if (k + 1 < levels_.size() && !(h < height(k + 1, n))) return false;
-        return true;
+    // h past `edge` -- below it when `below`, above it otherwise -- by no
+    // more than kTouch, is on it.
+    static float settleOn(float h, float edge, bool below) {
+        if (below ? (h < edge && h >= edge - kTouch)
+                  : (h > edge && h <= edge + kTouch)) {
+            return edge;
+        }
+        return h;
     }
+
+    // The floor plan's weights split between level k, 1 - t, and the one
+    // above it, t.
+    static Evaluation3D share(const Evaluation& floor, LevelID k, float t) {
+        Evaluation3D out;
+        out.inside = true;
+        out.below = k;
+        out.t = t;
+        for (const auto& wn : floor.weights) {
+            if (t < 1.0f) {
+                out.weights.push_back(LevelWeight{wn.id, k,
+                                                  wn.weight * (1.0f - t)});
+            }
+            if (t > 0.0f) {
+                out.weights.push_back(LevelWeight{wn.id, k + 1,
+                                                  wn.weight * t});
+            }
+        }
+        return out;
+    }
+
 
     void set(LevelID k, NodeID n, float h) {
         Level& l = levels_[k];

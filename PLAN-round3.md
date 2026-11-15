@@ -238,7 +238,7 @@ level of null nodes above the top fades to silence, the way a null ring does
 in 2D (D-014).
 
 **Levels can't cross.** Every node must be strictly higher on each level than
-on the one below. A raise that would reach the next level is **refused**,
+on the one below. (Since 3B-2d, at least as high: levels may touch.) A raise that would reach the next level is **refused**,
 naming the node, the same way a 2D move that would invert a region is
 refused. Because each node's heights are in order and the weights are never
 negative, the levels' heights at any (x, y) are in order too, so step 3
@@ -275,7 +275,8 @@ no outputs, gains or audio in it:
   every horizontal slice of the volume is the same shape: nothing can narrow
   to a waist or a point. Levels can't cross or touch (a raise that reaches
   the next level is refused), so no column pinches to zero thickness and no
-  cell turns inside out.
+  cell turns inside out. (Since 3B-2d levels may touch, so a column may pinch to
+  zero thickness -- a closed shape's rim -- and the point there is shared.)
 - **Floor-plan edits follow `Mapping`'s rule.** A new node needs nothing: on
   every level it has that level's starting height. Removing nodes is
   `levels.remapNodes(table)` with the table `Manifold2D::removeNodes()`
@@ -1997,6 +1998,69 @@ Built as specified (2026-11-14), every recommendation taken ("next", after
   there, 0.561, the bend's gap carried on; `k` to units and back without a
   jump.
 - **Not done**: the editor's own listening point still moves in units.
+
+### 3B-2d: levels that touch -- closed shapes
+
+Built as specified (2026-11-14), every recommendation taken ("next").
+
+- **Touching, never crossing.** `Levels::fits`, `copyLevel`, `moveLevel`,
+  `setHeight` and `rebuild` (a file) take at-or-beyond; passing is refused as
+  before, naming the nodes. Starts may touch too (`moveLevel`, files); a
+  copy still may not start where a level starts. `fits` is now public, and
+  the editor's raise, match and flatten ask it rather than each keeping its
+  own copy of the rule.
+- **Settling, not in the spec.** A touch reached by arithmetic -- 0.5 - 0.3
+  - 0.2 lands 1.5e-8 below 0 in float -- would have been refused as passing.
+  Within `Levels::kTouch` (1e-6) of the level next to it, a height SETTLES
+  on it exactly, so a touch is one height and the pinch is found. Files are
+  read exactly. Found by the vector `moved_refused`, which failed in C++ and
+  passed in Python's double.
+- **The pinch**: `evaluate` finds its cell as before; where the cell has no
+  gap, or z sits on its lower level and the level below is the same height
+  there, t = 0.5 between those two. Where more than two meet, the top two.
+  The reference finds it another way -- every level at z, the top two of
+  them. `positionAt` takes the lowest cell whose top reaches z, so at a pinch
+  the lowest position; extrapolated through an end cell with no gap, the
+  nearer level.
+- **`Levels::evaluateAtPosition(floor, u)`**: the cell floor(u), t its
+  fraction, no division; outside past 0..L-1 or off the plan. The reference
+  is a hat over the levels, 1 - |u - j|. `Levels::touches(nodeCount)`.
+- **Files**: the map file is version 4 exactly when levels touch
+  (`detail::map3Version`); loadMap3D reads up to 4 and refuses a touch in a
+  version 3 file ("levels that touch need version 4"); the old 3D reader --
+  `loadFloor` up to 3 -- refuses version 4 by its version, checked by a new
+  record, REFUSEOLD.
+- **The octahedron**: `Model::loadOctahedron()` -- rim N E S W on a diamond,
+  C at its centre, four triangles; the bottom starts at -0.5 and the top at
+  0.5, C at the starts, the rim at 0 on both; ten outputs. Taller than a
+  regular one (that would be +-0.3). shift-cmd-e in the editor (and its key
+  sheet), `x` in example-osc (and its `?` page). The Python reference builds
+  it from the finished shape, the C++ the way a user would.
+- **example-osc rides by u**: on the levels (and past them) the point is
+  heard by `evaluateAtPosition`, in units by `evaluate`. New overloads of
+  `chartLevels3D`, `valuesAt` and `dotColumn` take the 3D weights ready.
+- **Dragging a level's dot** stops at the neighbour, touching -- or a step
+  short where the touch would not land in float -- so letting go still
+  always lands.
+- **Vectors**: 52 levels (stacks that touch, copies that touch above and
+  below, starts that touch, pinches between two and three levels, the
+  octahedron's inside against the solid's own faces through the C++ floor
+  plan, EVALU against EVAL3 away from pinches, positions at a pinch, the
+  touching map's files and refusals); 2 editor scripts (`levels_touch`,
+  `octahedron`, saved and reopened). 1070 vectors.
+- **Existing vectors changed meaning, by design**: in `levels.vec`,
+  `moved_refused`'s last move (a touch, now allowed), `refuse_reach` (its
+  first raise now passes by 0.1, not touches) and `set_heights` (0.0 on the
+  ground allowed, two crossings added); in `editor.vec`, `levels_raise`,
+  `levels_go_and_move`, `levels_drag` (0.45, not 0.44) and `levels_match`,
+  each script's note saying so; refusals read "would pass" not "would reach".
+- **Gates**: 23 new, 12 re-anchored and turned round (a node may pass, where
+  it was: may touch). 490.
+- **Drawlog**: the editor's session ends on shift-cmd-e; example-osc's rides
+  up by the rim at E -- height -0.041 to 0.000 while u goes 0 to 0.5, both
+  levels heard -- then over the centre, the same u.
+- **Not done**: the one drag branch that backs off a step when a touch would
+  not land has no vector -- no drag found makes float miss.
 
 ---
 

@@ -4,8 +4,8 @@ ofxManifold -- reference for the 3D map's geometry (round 3A-4).
 
 A 3D map is one floor plan seen at several levels. This writes the vectors
 for src/core/ofxManifoldLevels.h: making levels by copying, bending them,
-refusing anything that would make levels cross or touch, and weighting a
-point (x, y, z) over (node, level).
+refusing anything that would make levels cross -- touching is allowed since
+round 3B-2d --, and weighting a point (x, y, z) over (node, level).
 
 Formulated differently from the C++ on purpose:
   - Levels are held here as a full table of heights, every node on every
@@ -16,6 +16,11 @@ Formulated differently from the C++ on purpose:
     vertical span at (x, y) holds z. The C++ walks up from the bottom.
   - Weights inside a cell come from the distance to the UPPER level,
     (H_upper - z) / (H_upper - H_lower), not from the lower.
+  - A pinch (3B-2d) is found by collecting EVERY level whose height at the
+    point is z and sharing the point between the top two of them; the C++
+    looks one level down from the cell its walk found.
+  - Weights by level position (3B-2d) are a hat over the levels, each level j
+    weighing max(0, 1 - |u - j|); the C++ splits one cell by u's fraction.
 
 The property that makes it a 3D map is checked in the runner, not assumed:
 the weights reproduce the point. Sum over (node, level) of weight times
@@ -38,8 +43,26 @@ OUT = "tests/vectors/levels.vec"
 # the model
 # ---------------------------------------------------------------------------
 
+TOUCH = 1e-6
+
+
+def settle(h, lo=None, hi=None):
+    """3B-2d: a height within TOUCH past the level below (lo) or above (hi)
+    is on it, exactly."""
+    if lo is not None and lo - TOUCH <= h < lo:
+        h = lo
+    if hi is not None and hi < h <= hi + TOUCH:
+        h = hi
+    return h
+
+
 class Stack:
     """bases[k], and H[k][i]: node i's height on level k, for every node."""
+
+    def around(self, H, k, i):
+        """Node i's heights on the levels either side of k in table H."""
+        return (H[k - 1][i] if k > 0 else None,
+                H[k + 1][i] if k + 1 < len(H) else None)
 
     def __init__(self, node_count):
         self.n = node_count
@@ -47,8 +70,14 @@ class Stack:
         self.H = [[0.0] * node_count]
 
     def ordered(self, H):
-        return all(H[k][i] < H[k + 1][i]
+        return all(H[k][i] <= H[k + 1][i]
                    for k in range(len(H) - 1) for i in range(self.n))
+
+    def touches(self):
+        return (any(self.bases[k] == self.bases[k + 1]
+                    for k in range(len(self.bases) - 1))
+                or any(self.H[k][i] == self.H[k + 1][i]
+                       for k in range(len(self.H) - 1) for i in range(self.n)))
 
     def copy(self, frm, new_base):
         if new_base in self.bases:
@@ -57,9 +86,11 @@ class Stack:
         row = [h + shift for h in self.H[frm]]
         at = sum(1 for b in self.bases if b < new_base)
         H = self.H[:at] + [row] + self.H[at:]
+        for i in range(self.n):
+            row[i] = settle(row[i], *self.around(H, at, i))
         bad = [i for i in range(self.n)
-               if (at > 0 and not row[i] > H[at - 1][i])
-               or (at + 1 < len(H) and not row[i] < H[at + 1][i])]
+               if (at > 0 and not row[i] >= H[at - 1][i])
+               or (at + 1 < len(H) and not row[i] <= H[at + 1][i])]
         if bad:
             return None, bad
         self.H = H
@@ -69,10 +100,10 @@ class Stack:
     def raise_(self, k, nodes, dz):
         H = [list(r) for r in self.H]
         for i in nodes:
-            H[k][i] += dz
+            H[k][i] = settle(H[k][i] + dz, *self.around(H, k, i))
         bad = [i for i in nodes
-               if (k > 0 and not H[k][i] > H[k - 1][i])
-               or (k + 1 < len(H) and not H[k][i] < H[k + 1][i])]
+               if (k > 0 and not H[k][i] >= H[k - 1][i])
+               or (k + 1 < len(H) and not H[k][i] <= H[k + 1][i])]
         if bad:
             return bad
         self.H = H
@@ -80,14 +111,18 @@ class Stack:
 
     def move(self, k, dz):
         """A whole level: its start and every node. Refused if a node, or
-        the start, would reach a neighbour."""
-        row = [h + dz for h in self.H[k]]
-        nb = self.bases[k] + dz
+        the start, would pass a neighbour; reaching one is a touch."""
+        H = [list(r) for r in self.H]
+        row = [settle(h + dz, *self.around(H, k, i))
+               for i, h in enumerate(self.H[k])]
+        nb = settle(self.bases[k] + dz,
+                    self.bases[k - 1] if k > 0 else None,
+                    self.bases[k + 1] if k + 1 < len(self.bases) else None)
         bad = [i for i in range(self.n)
-               if (k > 0 and not row[i] > self.H[k - 1][i])
-               or (k + 1 < len(self.H) and not row[i] < self.H[k + 1][i])]
-        bases_fit = ((k == 0 or nb > self.bases[k - 1])
-                     and (k + 1 >= len(self.H) or nb < self.bases[k + 1]))
+               if (k > 0 and not row[i] >= self.H[k - 1][i])
+               or (k + 1 < len(self.H) and not row[i] <= self.H[k + 1][i])]
+        bases_fit = ((k == 0 or nb >= self.bases[k - 1])
+                     and (k + 1 >= len(self.H) or nb <= self.bases[k + 1]))
         if bad or not bases_fit:
             return bad if bad else ["-"]
         self.H[k] = row
@@ -107,7 +142,7 @@ class Stack:
 
     def set(self, k, i, h):
         H = [list(r) for r in self.H]
-        H[k][i] = h
+        H[k][i] = settle(h, *self.around(H, k, i))
         if not self.ordered(H):
             return False
         self.H = H
@@ -150,9 +185,17 @@ class Stack:
         eps = 1e-6
         if z < Hxy[0] - eps or z > Hxy[-1] + eps:
             return None
+        on = [k for k in range(L) if Hxy[k] == z]
+        if len(on) >= 2:                        # a pinch: the top two share
+            k = on[-2]
+            return {(i, j): w * 0.5 for i, w in lam.items() if w != 0.0
+                    for j in (k, k + 1)}
         for k in range(L - 2, -1, -1):          # top cell first
             lo, hi = Hxy[k], Hxy[k + 1]
             if lo - eps <= z or k == 0:
+                if hi == lo:                    # a pinch, z within eps
+                    return {(i, j): w * 0.5 for i, w in lam.items()
+                            if w != 0.0 for j in (k, k + 1)}
                 up = (hi - z) / (hi - lo)       # 1 at the lower level
                 up = min(1.0, max(0.0, up))
                 out = {}
@@ -186,8 +229,10 @@ def height_at_position(st, lam, u, extrapolate=False):
 
 
 def position_at(st, lam, z, extrapolate=False):
-    """Its inverse, worked out the other way: by walking the cells from the
-    top down, as `weigh` does, and solving within the one that holds z."""
+    """Its inverse, worked out the other way: every cell whose span holds z
+    is a candidate, and the LOWEST is taken -- at a pinch (3B-2d) many u have
+    one z. Past the ends, the end cell, carried on; through an end cell with
+    no gap there is no slope, so the nearer level."""
     L = len(st.H)
     if L == 1:
         return 0.0
@@ -197,10 +242,33 @@ def position_at(st, lam, z, extrapolate=False):
             return 0.0
         if z >= h[-1]:
             return float(L - 1)
-    for k in range(L - 2, -1, -1):
-        if h[k] <= z or k == 0:
-            return k + (z - h[k]) / (h[k + 1] - h[k])
-    return 0.0
+    held = [k for k in range(L - 1) if h[k] <= z <= h[k + 1]]
+    k = min(held) if held else (0 if z < h[0] else L - 2)
+    if h[k + 1] == h[k]:
+        return float(k) if z <= h[k] else float(k + 1)
+    return k + (z - h[k]) / (h[k + 1] - h[k])
+
+
+def weigh_at_position(st, lam, u):
+    """3B-2d: the weights at level position u, as a hat over the levels --
+    level j weighs 1 - |u - j| where that is positive. None outside: off the
+    floor plan, or u outside 0..L-1. One level: u ignored."""
+    if lam is None:
+        return None
+    L = len(st.H)
+    if L == 1:
+        return st.weigh(lam, 0.0)
+    if not 0.0 <= u <= L - 1:
+        return None
+    out = {}
+    for j in range(L):
+        hat = 1.0 - abs(u - j)
+        if hat <= 0.0:
+            continue
+        for i, w in lam.items():
+            if w * hat != 0.0:
+                out[(i, j)] = w * hat
+    return out
 
 
 def floor_weights(nodes, tris, p):
@@ -256,10 +324,20 @@ def build():
     out.append("TRIS square " + " ".join(f"{a},{b},{c}" for a, b, c in tris))
     out.append("")
 
+    # The octahedron's floor plan (3B-2d): a diamond rim N E S W and its
+    # centre C, four triangles fanned from C.
+    dia = {0: (0.5, 0.8), 1: (0.8, 0.5), 2: (0.5, 0.2), 3: (0.2, 0.5),
+           4: (0.5, 0.5)}
+    dtris = [(4, 0, 1), (4, 1, 2), (4, 2, 3), (4, 3, 0)]
+    out.append("NODES diamond " + " ".join(f"{i}:{fmt(x)},{fmt(y)}"
+                                           for i, (x, y) in dia.items()))
+    out.append("TRIS diamond " + " ".join(f"{a},{b},{c}" for a, b, c in dtris))
+    out.append("")
+
     stacks = {}
 
-    def stack_rec(name, ops, note=None):
-        st = Stack(4)
+    def stack_rec(name, ops, note=None, plan="square", nodes=4):
+        st = Stack(nodes)
         results = []
         for op in ops:
             kind = op[0]
@@ -294,7 +372,7 @@ def build():
         if note:
             for line in note:
                 out.append("# " + line)
-        out.append(f"STACK {name} NODES square OPS " + " ; ".join(results))
+        out.append(f"STACK {name} NODES {plan} OPS " + " ; ".join(results))
         out.append(f"HEIGHTS heights_{name} ANALYTIC {name} {heights_s(st)}")
         stacks[name] = st
         return st
@@ -339,7 +417,10 @@ def build():
                ("MOVE", 1, -0.25), ("MOVE", 0, 0.25), ("MOVE", 1, -0.2)],
               ["node 0 bent down to 0.2 on the upper level: moving that level",
                "down 0.25 would put node 0 below the ground -- refused, naming",
-               "it; the ground up 0.25 likewise; down 0.2 touches -- refused"])
+               "it; the ground up 0.25 likewise; down 0.2 reaches the ground",
+               "-- refused before 3B-2d, a touch now, and allowed. In float",
+               "0.5 - 0.3 - 0.2 lands 1.5e-8 below the ground: within kTouch,",
+               "it settles on it exactly"])
     stack_rec("moved_bases",
               [("COPY", 0, 0.5), ("RAISE", 1, 0.3, [0, 1, 2, 3]),
                ("MOVE", 0, 0.6), ("MOVE", 0, 0.4)],
@@ -351,11 +432,12 @@ def build():
     out.append("# REFUSED, changing nothing, and naming the nodes:")
     stack_rec("refuse_reach",
               [("COPY", 0, 0.5), ("COPY", 1, 1.0),
-               ("RAISE", 1, 0.5, [2]), ("RAISE", 1, 0.6, [1, 2]),
+               ("RAISE", 1, 0.6, [2]), ("RAISE", 1, 0.6, [1, 2]),
                ("RAISE", 1, -0.6, [0]),
                ("RAISE", 1, 0.3, [2]), ("RAISE", 1, 0.3, [1, 2])],
-              ["raising the middle level's node 2 by 0.5 would TOUCH the top",
-               "level (1.0): touching is refused, not just crossing. Then",
+              ["raising the middle level's node 2 by 0.6 would PASS the top",
+               "level (1.0): refused. (By 0.5 it would touch, refused before",
+               "3B-2d and allowed now: see `touch`.) Then",
                "nodes 1 and 2 by 0.6: both refused, so neither moves -- all",
                "or nothing. Lowering node 0 below the ground: refused.",
                "Then node 2 up 0.3 (to 0.8, fine), and nodes 1 and 2 up 0.3",
@@ -382,10 +464,57 @@ def build():
               ["removing the bent middle level leaves 0 and 1 flat"])
     stack_rec("set_heights",
               [("COPY", 0, 1.0), ("SET", 1, 2, 1.5), ("SET", 1, 0, 0.0),
-               ("SET", 0, 1, -0.25)],
+               ("SET", 0, 1, -0.25), ("SET", 1, 0, -0.25), ("SET", 0, 0, 0.25)],
               ["set one node's height, as a file does: 1.5 fits; 0.0 on",
-               "level 1 touches the ground and is refused; -0.25 on the",
-               "ground fits"])
+               "level 1 touches the ground -- refused before 3B-2d, allowed",
+               "now; -0.25 on the ground fits. Then node 0 on level 1 below",
+               "the ground, and the ground's node 0 above level 1's: both",
+               "cross, both refused"])
+    out.append("")
+
+    out.append("# Round 3B-2d: LEVELS THAT TOUCH. Reaching the next level is a")
+    out.append("# touch, allowed; passing it is still refused, all or nothing.")
+    stack_rec("touch",
+              [("COPY", 0, 0.5), ("RAISE", 1, -0.5, [2]),
+               ("RAISE", 1, -0.25, [2]), ("MOVE", 1, -0.25), ("ROOM", 1),
+               ("COPY", 0, 0.25), ("MOVE", 1, 0.25), ("ROOM", 1)],
+              ["the upper level's node 2 lowered by 0.5 to the ground: a",
+               "touch, allowed. Lowered 0.25 more it would pass the ground:",
+               "refused. Moving the whole level down: node 2 would pass,",
+               "refused; its room down is 0. A copy of the ground at 0.25",
+               "would put node 2 above itself on the level over it: refused.",
+               "Up 0.25, and the room down is 0.25"])
+    stack_rec("touch_bases",
+              [("COPY", 0, 0.5), ("MOVE", 0, 0.5), ("ROOM", 0),
+               ("MOVE", 0, 0.25), ("ROOM", 1)],
+              ["the ground moved up to the level above: every node and the",
+               "start touch -- allowed, room 0 up. Further would pass every",
+               "node: refused, naming all four"])
+    stack_rec("copy_touch_below",
+              [("COPY", 0, 0.5), ("RAISE", 0, 0.25, [1]), ("COPY", 1, 0.25)],
+              ["a copy may touch the level below it: the upper level copied",
+               "to 0.25 meets the ground's node 1, raised to 0.25"])
+    stack_rec("copy_touch_above",
+              [("COPY", 0, 0.5), ("RAISE", 1, -0.25, [2]), ("COPY", 0, 0.25)],
+              ["and the level above it: the ground copied to 0.25 meets the",
+               "upper level's node 2, lowered to 0.25"])
+    stack_rec("pinch3",
+              [("COPY", 0, 0.5), ("COPY", 1, 1.0), ("RAISE", 1, -0.5, [2])],
+              ["three levels, the middle one's node 2 down on the ground: a",
+               "pinch between the lower two there, the top still above"])
+    stack_rec("pinch_all",
+              [("COPY", 0, 0.5), ("COPY", 1, 1.0), ("RAISE", 1, -0.5, [3]),
+               ("RAISE", 2, -1.0, [3])],
+              ["three levels all at 0 over node 3: where more than two meet,",
+               "the top two share the point"])
+    stack_rec("octa",
+              [("COPY", 0, 0.5), ("MOVE", 0, -0.5),
+               ("RAISE", 0, 0.5, [0, 1, 2, 3]), ("RAISE", 1, -0.5, [0, 1, 2, 3])],
+              ["THE OCTAHEDRON on the diamond: the bottom level starts at",
+               "-0.5, the top at 0.5; the rim N E S W raised on the bottom and",
+               "lowered on the top to 0, where the two meet. The centre stays",
+               "at the starts, the apexes. Taller than a regular one."],
+              plan="diamond", nodes=5)
     out.append("")
 
     out.append("#" + "-" * 68)
@@ -538,6 +667,116 @@ def build():
         w = None if lam is None else stacks[sname].weigh(lam, z)
         out.append(f"EVALXYZ {name} {cls} {sname} SQUARE P {fmt(p[0])} "
                    f"{fmt(p[1])} {fmt(z)} EXPECT {w3_s(w)}")
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# PINCHES (round 3B-2d). Where two levels are one height at the")
+    out.append("# point, a point there is on both: shared equally, t = 0.5. Where")
+    out.append("# more meet, the top two. A gap shrinking toward a pinch is")
+    out.append("# still divided, never by 0.")
+    out.append("#" + "-" * 68)
+    eval_rec("pinch_on_ground", "ANALYTIC", "pinch3", {2: 1.0}, 0.0,
+             ["over node 2 the middle level is on the ground: z = 0 is on",
+              "both, shared equally -- not given to the middle level alone"])
+    eval_rec("pinch_above_it", "ANALYTIC", "pinch3", {2: 1.0}, 0.25,
+             ["above the pinch, the upper cell, as anywhere"])
+    eval_rec("pinch_beside", "CROSS", "pinch3", {1: 0.5, 2: 0.5}, 0.125,
+             ["half way to node 1 the middle level is at 0.25: a gap, divided"])
+    eval_rec("pinch_three", "ANALYTIC", "pinch_all", {3: 1.0}, 0.0,
+             ["three levels meeting at node 3: the top two share it"])
+    eval_rec("touch_bases_on", "ANALYTIC", "touch_bases", mid, 0.5,
+             ["two levels touching everywhere: every point between them is",
+              "on both"])
+    eval_rec("octa_rim_vertex", "ANALYTIC", "octa", {1: 1.0}, 0.0,
+             ["the octahedron's rim, at node E: on both faces, shared"])
+    eval_rec("octa_near_rim", "CROSS", "octa", {1: 0.98, 4: 0.02}, 0.005,
+             ["just inside the rim the faces are 0.02 apart: still divided"])
+    eval_rec("octa_above_rim", "ANALYTIC", "octa", {1: 1.0}, 0.01,
+             ["over the rim nothing is above the faces: outside"])
+
+    # The solid's own geometry: over the diamond, the centre's floor-plan
+    # weight is 1 - r, r the diamond's own distance |dx| + |dy| over 0.3,
+    # and the faces are at -0.5 (1 - r) and +0.5 (1 - r). Inside exactly
+    # when between them -- worked out here from the shape, not the levels.
+    def octa_inside(p, z):
+        r = (abs(p[0] - 0.5) + abs(p[1] - 0.5)) / 0.3
+        if r > 1.0 + 1e-12:
+            return False
+        return abs(z) <= 0.5 * (1.0 - r) + 1e-6
+    out.append("# The octahedron, through the C++ floor plan: each point is")
+    out.append("# inside exactly when the solid's own faces hold it")
+    for name, cls, p, z in (
+            ("octa_centre", "ANALYTIC", (0.5, 0.5), 0.0),
+            ("octa_under_apex", "ANALYTIC", (0.5, 0.5), 0.4),
+            ("octa_past_apex", "ANALYTIC", (0.5, 0.5), 0.55),
+            ("octa_half_out", "CROSS", (0.65, 0.5), 0.2),
+            ("octa_half_on_face", "CROSS", (0.65, 0.5), -0.25),
+            ("octa_half_past", "CROSS", (0.65, 0.5), 0.3),
+            ("octa_rim_edge", "CROSS", (0.65, 0.65), 0.0),
+            ("octa_beyond_rim", "ANALYTIC", (0.75, 0.75), 0.0),
+            ("octa_lower_quarter", "CROSS", (0.4, 0.45), -0.2)):
+        lam = floor_weights(dia, dtris, p)
+        w = None if lam is None else stacks["octa"].weigh(lam, z)
+        assert (w is not None) == octa_inside(p, z), (name, w)
+        out.append(f"EVALXYZ {name} {cls} octa diamond P {fmt(p[0])} "
+                   f"{fmt(p[1])} {fmt(z)} EXPECT {w3_s(w)}")
+    out.append("")
+
+    out.append("# EVALU: weights by level position u (3B-2d), as the player")
+    out.append("# rides: the cell floor(u), t its fraction -- no division, so")
+    out.append("# a pinch is like anywhere else. Away from pinches it must")
+    out.append("# agree with EVAL3 at the height u gives.")
+
+    def evalu(name, cls, sname, lam, u, note=None):
+        for line in note or []:
+            out.append("# " + line)
+        st = stacks[sname]
+        w = weigh_at_position(st, lam, u)
+        out.append(f"EVALU {name} {cls} {sname} W {lam_s(lam) if lam else '-'} "
+                   f"U {fmt(u)} EXPECT {w3_s(w)}")
+        return w
+    for name, sname, lam, u in (("u_eval_half", "three", mid, 0.5),
+                                ("u_eval_upper", "bent", {2: 1.0}, 1.5),
+                                ("u_eval_partial", "bent",
+                                 {0: 0.2, 1: 0.3, 2: 0.4, 3: 0.1}, 0.7),
+                                ("u_eval_on_level", "three", mid, 1.0),
+                                ("u_eval_top", "bent", {2: 1.0}, 2.0),
+                                ("u_eval_bottom", "three", mid, 0.0)):
+        w = evalu(name, "CROSS", sname, lam, u)
+        z = height_at_position(stacks[sname], lam, u)
+        wz = stacks[sname].weigh(lam, z)
+        assert set(w) == set(wz) and all(abs(w[k] - wz[k]) < 1e-9 for k in w), \
+            (name, w, wz)
+    evalu("u_eval_one_level", "ANALYTIC", "flat", mid, 1.7,
+          ["one level: u ignored, as z is"])
+    evalu("u_eval_past_top", "ANALYTIC", "three", mid, 2.4,
+          ["past the top: outside, as above it by z"])
+    evalu("u_eval_below", "ANALYTIC", "three", mid, -0.1)
+    evalu("u_eval_off_plan", "ANALYTIC", "three", None, 0.5,
+          ["off the floor plan: outside"])
+    evalu("u_eval_rim", "ANALYTIC", "octa", {1: 1.0}, 0.25,
+          ["on the octahedron's rim, a quarter of the way: a quarter on the",
+           "top level -- by height it would be ambiguous, by u it is not"])
+    evalu("u_eval_apexes", "ANALYTIC", "octa", {4: 1.0}, 0.5,
+          ["half way from apex to apex: the centre, shared"])
+    evalu("u_eval_pinch3", "ANALYTIC", "pinch3", {2: 1.0}, 0.5)
+    out.append("")
+
+    out.append("# AT A PINCH many positions have one height: positionAt gives")
+    out.append("# the lowest. Extrapolated through an end cell with no gap,")
+    out.append("# there is no slope: the nearer level.")
+    zpos("z_pinch_lowest", "ANALYTIC", "pinch3", {2: 1.0}, 0.0, False, 0.0)
+    zpos("z_pinch_lowest_x", "ANALYTIC", "pinch3", {2: 1.0}, 0.0, True, 0.0)
+    zpos("z_pinch_above", "ANALYTIC", "pinch3", {2: 1.0}, 0.5, False, 1.5)
+    zpos("z_pinch_all", "ANALYTIC", "pinch_all", {3: 1.0}, 0.0, True, 0.0,
+         ["three levels at one height: the lowest of them all"])
+    zpos("z_octa_rim", "ANALYTIC", "octa", {1: 1.0}, 0.0, False, 0.0)
+    zpos("z_octa_rim_above_x", "ANALYTIC", "octa", {1: 1.0}, 0.3, True, 1.0)
+    zpos("z_octa_rim_below_x", "ANALYTIC", "octa", {1: 1.0}, -0.3, True, 0.0)
+    zpos("z_octa_centre", "ANALYTIC", "octa", {4: 1.0}, 0.25, False, 0.75)
+    upos("u_octa_rim", "ANALYTIC", "octa", {1: 1.0}, 0.6, False, 0.0,
+         ["anywhere on the rim is the rim's height"])
+    upos("u_pinch_all", "ANALYTIC", "pinch_all", {3: 1.0}, 1.5, False, 0.0)
     out.append("")
 
     out.append("# CONTINUITY: sweeping across the square's diagonal -- from one")
@@ -1014,7 +1253,7 @@ def files_of(m3, sq, tris):
     """The pair of files for a Map3 model, as plain JSON."""
     names = [f"n{i}" for i in range(len(sq))]
     mp = {
-        "version": 3, "space": "normalized",
+        "version": 4 if m3.stack.touches() else 3, "space": "normalized",
         "nodes": [{"id": names[i], "position": [sq[i][0], sq[i][1]],
                    "weight": 1.0} for i in sorted(sq)],
         "regions": [[names[a], names[b], names[c]] for a, b, c in tris],
@@ -1161,6 +1400,23 @@ def build_files3(out, sq, tris, maps):
     out.append("MAP3 lowered NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; "
                "COPY 0 -0.5 =0 ; REMOVELEVEL 1 =OK")
     out.append("SAVE3 save3_lowered ANALYTIC lowered MAPV 3 OUTV 2")
+    out.append("# levels that touch (3B-2d): the map file at version 4, and only")
+    out.append("# then -- an older reader refuses it by its version, plainly,")
+    out.append("# not by a height it took for crossing")
+    m5 = Map3(4)
+    for o in ("OUT L 1 1", "BIND 0 0 L 1", "COPY 0 1", "SETH 1 2 0"):
+        m5.op(o.split())
+    maps["touching"] = m5
+    out.append("MAP3 touching NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; "
+               "COPY 0 1 =1 ; SETH 1 2 0 =OK")
+    out.append("SAVE3 save3_touching ANALYTIC touching MAPV 4 OUTV 3")
+    mp5, outs5 = files_of(m5, sq, tris)
+    write_fixture("map3_touching.json", mp5)
+    write_fixture("map3_touching-outputs.json", outs5)
+    out.append("FILE3 file3_touching ANALYTIC map3_touching.json "
+               "map3_touching-outputs.json AS touching")
+    out.append("REFUSEOLD refuseold_touching ANALYTIC map3_touching.json "
+               "unsupported version 4")
     out.append("")
 
     out.append("# REFUSED, each for its own reason, leaving nothing half-read")
@@ -1206,6 +1462,10 @@ def build_files3(out, sq, tris, maps):
     m8["regions"] = base_map["regions"]
     bad("bad3_levels_v2.json", m8, "map3_forest-outputs.json", None,
         "version 3", "levels in a version 2 map file")
+    m9 = _json.loads(_json.dumps(mp5))
+    m9["version"] = 3
+    bad("bad3_touch_v3.json", m9, "map3_touching-outputs.json", None,
+        "need version 4", "levels that touch in a version 3 map file")
     o3 = _json.loads(_json.dumps(base_out))
     o3["bindings"].append({"node": "n0", "level": 1, "target": "Nowhere",
                            "weight": 1.0})
@@ -1225,6 +1485,8 @@ def build_files3(out, sq, tris, maps):
                "loadMap3D")
     out.append("REFUSE2D refuse2d_outputs ANALYTIC OUTPUTS "
                "map3_forest-outputs.json loadMap3D")
+    out.append("REFUSE2D refuse2d_touching ANALYTIC MAP map3_touching.json "
+               "loadMap3D")
 
 
 def main():
@@ -1239,7 +1501,8 @@ def main():
                                             "CONT", "NEWNODE", "REMAP3",
                                             "CH3", "CH3XYZ", "VAL3",
                                             "FILE3", "SAVE3", "REFUSE3",
-                                            "REFUSE2D"):
+                                            "REFUSE2D", "UPOS", "ZPOS",
+                                            "EVALU", "REFUSEOLD"):
             counts[parts[2]] = counts.get(parts[2], 0) + 1
     print(f"wrote {OUT}")
     for k in sorted(counts):

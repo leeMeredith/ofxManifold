@@ -21,8 +21,14 @@ ChartLevels chartLevels3D(const Model& model, const Selection& sel,
     const Map3D& map = model.map3d();
     // One level: the 2D reading itself, not a copy of it.
     if (map.count() == 1) return chartLevels(model, sel, floor);
+    return chartLevels3D(model, sel, floor, map.levels().evaluate(floor, z));
+}
 
-    const Evaluation3D e = map.levels().evaluate(floor, z);
+ChartLevels chartLevels3D(const Model& model, const Selection& sel,
+                          const Evaluation& floor, const Evaluation3D& e) {
+    const Map3D& map = model.map3d();
+    if (map.count() == 1) return chartLevels(model, sel, floor);
+
     ChartLevels lv;
     lv.inside = e.inside;
     lv.routed = map.toChannels(e);
@@ -54,6 +60,19 @@ ChartLevels chartLevels3D(const Model& model, const Selection& sel,
 
 DotColumn dotColumn(const Model& model, float top, float bottom,
                     bool listening, const Evaluation& floor, float z) {
+    const Levels& lv = model.map3d().levels();
+    if (lv.count() < 2 || !listening || !floor.inside) {
+        return dotColumn(model, top, bottom, listening, floor, Evaluation3D{},
+                         false);
+    }
+    return dotColumn(model, top, bottom, listening, floor,
+                     lv.evaluate(floor, z),
+                     z > lv.heightAt(lv.count() - 1, floor.weights));
+}
+
+DotColumn dotColumn(const Model& model, float top, float bottom,
+                    bool listening, const Evaluation& floor,
+                    const Evaluation3D& e, bool above) {
     DotColumn c;
     const Map3D& map = model.map3d();
     const std::size_t n = map.count();
@@ -65,14 +84,12 @@ DotColumn dotColumn(const Model& model, float top, float bottom,
     if (!listening || !floor.inside) return c;
 
     c.marked = true;
-    const Evaluation3D e = map.levels().evaluate(floor, z);
     if (e.inside) {
         const float a = c.dots[e.below], b = c.dots[e.below + 1];
         c.mark = a + e.t * (b - a);
         return c;
     }
     c.outside = true;
-    const bool above = z > map.levels().heightAt(n - 1, floor.weights);
     c.mark = above ? c.dots[n - 1] - gap * 0.5f : c.dots[0] + gap * 0.5f;
     return c;
 }
@@ -80,8 +97,13 @@ DotColumn dotColumn(const Model& model, float top, float bottom,
 std::vector<std::pair<std::string, float>>
 valuesAt(const Model& model, const Evaluation& floor, float z) {
     const Map3D& map = model.map3d();
-    const Evaluation3D e = floor.inside ? map.levels().evaluate(floor, z)
-                                        : Evaluation3D{};
+    return valuesAt(model, floor.inside ? map.levels().evaluate(floor, z)
+                                        : Evaluation3D{});
+}
+
+std::vector<std::pair<std::string, float>>
+valuesAt(const Model& model, const Evaluation3D& e) {
+    const Map3D& map = model.map3d();
     std::vector<std::pair<std::string, float>> out;
     for (std::size_t v = 0; v < map.valueSet().size(); ++v) {
         out.emplace_back(map.valueSet()[v].name, map.valueAt(v, e));
@@ -102,9 +124,22 @@ float levelDragTo(const Model& model, LevelID k, float pixels, float gap) {
     const Levels& lv = model.map3d().levels();
     const float base = lv.base(k);
     float nb = std::round((base - pixels / gap * 0.25f) / 0.01f) * 0.01f;
-    const auto room = lv.room(k, model.manifold().nodeCount());
-    if (nb >= base + room.second) nb = base + room.second - 0.01f;
-    if (nb <= base - room.first)  nb = base - room.first + 0.01f;
+    // Stopped AT a neighbour, touching (3B-2d) -- or a step short of it,
+    // where the touch, in float, would not land: letting go always lands.
+    const std::size_t nodes = model.manifold().nodeCount();
+    const auto room = lv.room(k, nodes);
+    auto lands = [&](float at) {
+        Levels trial = lv;
+        return trial.moveLevel(k, at - base, nodes);
+    };
+    if (nb >= base + room.second) {
+        nb = base + room.second;
+        if (!lands(nb)) nb -= 0.01f;
+    }
+    if (nb <= base - room.first) {
+        nb = base - room.first;
+        if (!lands(nb)) nb += 0.01f;
+    }
     return nb;
 }
 

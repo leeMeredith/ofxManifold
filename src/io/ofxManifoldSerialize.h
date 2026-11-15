@@ -110,9 +110,9 @@ inline std::string saveManifold(const Manifold2D& m) {
 
 namespace detail {
 
-// The floor plan, from a map file of any version up to `maxVersion`. Version
-// 3 is a 3D map: its nodes and regions are read here, its levels and values
-// by loadMap3D (ofxManifoldSerialize3D.h).
+// The floor plan, from a map file of any version up to `maxVersion`. Versions
+// 3 and 4 are a 3D map (4: its levels touch): its nodes and regions are read
+// here, its levels and values by loadMap3D (ofxManifoldSerialize3D.h).
 inline LoadResult loadFloor(const std::string& text, Manifold2D& out,
                             int maxVersion) {
     LoadResult res;
@@ -131,10 +131,12 @@ inline LoadResult loadFloor(const std::string& text, Manifold2D& out,
     }
     const int v = static_cast<int>(root["version"].asNumber());
     if (v < 1 || v > maxVersion) {
-        // Version 3 is a 3D map. Read as a flat one, its levels, bends and
-        // values would be dropped without a word, so it is refused here.
+        // Versions 3 and 4 are a 3D map. Read as a flat one, its levels,
+        // bends and values would be dropped without a word, so it is refused
+        // here.
         res.error = "unsupported version " + std::to_string(v)
-                  + (v == 3 ? ": a 3D map, opened with loadMap3D" : "");
+                  + ((v == 3 || v == 4) && maxVersion < 3
+                     ? ": a 3D map, opened with loadMap3D" : "");
         return res;
     }
     if (root.has("space") && root["space"].asString() != "normalized") {

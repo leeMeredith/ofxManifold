@@ -15,17 +15,16 @@ serialization the standard library's own JSON parser against a hand-written one.
 |---|---|---|
 | `core` | 31 + 48 | triangle solve, bias, degeneracy, affine invariance, containment, topology, inverse evaluation, node movement, evaluator hint |
 | `core` (regions) | 113 | polygons of N ≥ 3 by mean-value coordinates, non-convex regions, batch moves, removal |
-| `core` (levels) | 152 | the 3D map's geometry: levels copied from the floor plan, bending, no crossing, weights at (x, y, z) that reproduce the point; height in levels -- a level position riding the bends, held or carried past the ends, and back; what it drives: bindings and node values per level, a rig used on every level, a whole level moved, values renamed, re-ranged and removed; its files, version 1 outputs files included |
+| `core` (levels) | 204 | the 3D map's geometry: levels copied from the floor plan, bending, touching but no crossing -- the octahedron's pinch shared --, weights at (x, y, z) that reproduce the point; height in levels -- a level position riding the bends, held or carried past the ends, and back; what it drives: bindings and node values per level, a rig used on every level, a whole level moved, values renamed, re-ranged and removed; its files, version 1 outputs files included |
 | `interpretation` | 69 | curves, spread, blend, interpolate, coverage, smoothing, negative weights |
 | `mapping` | 35 + 130 | bindings, aggregators, dense output, blending by name; outputs with channel and trim, silence, fill, derived outputs before or after the fader, rigs, blending any number of maps, the agreement check |
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
 | `sources` | 82 + 52 | trajectories, real-time replay, velocity, the touring case, paths with height; movement (3B-2): splitmix64 against its published outputs, random walks -- jump and glide -- asked in and out of order, bounds, the map's inside test, straight paths, steps on a timer, on clicks and in a pattern, recordings held and looped, the seconds and phase clocks, motion files |
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
-| `ofxManifoldEditor` (logic) | 67 scripts, 873 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line, rings, blocks and triangles laid out in one step, c and C for a node's own output or silence, L and F to lay out nodes and join the grid's whole cells, the nodes in line |
+| `ofxManifoldEditor` (logic) | 70 scripts, 901 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line, rings, blocks and triangles laid out in one step, c and C for a node's own output or silence, L and F to lay out nodes and join the grid's whole cells, the nodes in line |
+| `ofxManifoldPlayer` | 39 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
 
-| `ofxManifoldPlayer` | 35 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
-
-**1016 vectors, 467 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**1070 vectors, 490 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 

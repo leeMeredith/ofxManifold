@@ -129,6 +129,13 @@ public:
     // in all. Made the way an editor user would: the floor, then n twice
     // with auto-output on. The floor is current.
     void loadRoom();
+    // The octahedron (round 3B-2d): a diamond rim N E S W and its centre C,
+    // on two levels -- the bottom starting at -0.5, the top at 0.5, C at
+    // those starts, the apexes, and the rim at 0 on both, where the levels
+    // TOUCH: a closed shape, taller than a regular one. Each level's nodes on
+    // outputs of their own (N ... C, N-2 ... C-2), ten in all. The bottom is
+    // current.
+    void loadOctahedron();
     void newEmpty();
 
     // Take over a map and outputs read from files: a 2D pair, as one level,
@@ -258,7 +265,7 @@ public:
     // n and N: a new level above or below the current one, a COPY of it --
     // heights, bindings, values. Halfway to the next level, or a quarter of
     // the map beyond the end one. It becomes current. Refused, naming the
-    // nodes, if any copy would reach a level next to it.
+    // nodes, if any copy would pass a level next to it.
     Result newLevel(bool above);
 
     // The node whose own output this is: the node of that name, else the
@@ -269,7 +276,8 @@ public:
     // y and h: each selected node's height on the current level steps by
     // 0.05, or 0.01 when `fine`, landing on the next multiple of the step
     // above the level's start, as fill does. All or nothing: refused, naming
-    // the nodes, if any would reach the level above or below.
+    // the nodes, if any would pass the level above or below. Reaching it is a
+    // touch, and allowed (3B-2d).
     Result raise(const Selection& sel, int direction, bool fine);
 
     // A click on a level's dot (round 3A-6b): that level becomes current.
@@ -278,8 +286,9 @@ public:
 
     // Move a whole level -- its start and every node on it, bends kept -- so
     // that it starts at `base`; it becomes current. Dragging its dot ends in
-    // this. All or nothing: refused, naming the nodes, if any would reach the
+    // this. All or nothing: refused, naming the nodes, if any would pass the
     // level above or below, or if its start would pass a neighbour's.
+    // Reaching either is a touch, and allowed (3B-2d).
     Result moveLevel(LevelID k, float base);
 
     // i and k: the current level's start steps by 0.05, or 0.01 when
@@ -289,7 +298,7 @@ public:
     // m (round 3A-6c): the selected nodes take the height, on the current
     // level, of the node selected FIRST -- so click the one to match, then
     // the others. A box has no first node and is refused. All or nothing:
-    // refused, naming them, if any would reach a level next to it.
+    // refused, naming them, if any would pass a level next to it.
     Result matchHeights(const Selection& sel);
 
     // M: the selected nodes back to the current level's start, unbent. All

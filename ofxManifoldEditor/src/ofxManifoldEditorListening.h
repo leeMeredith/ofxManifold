@@ -44,6 +44,10 @@ float glide(float z, int direction, bool fine, float seconds);
 // With one level, exactly chartLevels(): z changes nothing.
 ChartLevels chartLevels3D(const Model& model, const Selection& sel,
                           const Evaluation& floor, float z);
+// The same from 3D weights worked out already (3B-2d) -- by level position,
+// as a player riding the levels has them (Levels::evaluateAtPosition).
+ChartLevels chartLevels3D(const Model& model, const Selection& sel,
+                          const Evaluation& floor, const Evaluation3D& e);
 
 // The column of dots at the side of the plan view: one dot per level, the
 // top level at the top, EVENLY spaced -- not by height, so two levels close
@@ -64,6 +68,11 @@ struct DotColumn {
 
 DotColumn dotColumn(const Model& model, float top, float bottom,
                     bool listening, const Evaluation& floor, float z);
+// The same from 3D weights worked out already (3B-2d); `above` says which
+// end the mark goes past when they are outside.
+DotColumn dotColumn(const Model& model, float top, float bottom,
+                    bool listening, const Evaluation& floor,
+                    const Evaluation3D& e, bool above);
 
 // Every node value at the listening point (round 3A-7), in the order the
 // values were made: read through the 3D weights, so it blends as the point
@@ -71,6 +80,9 @@ DotColumn dotColumn(const Model& model, float top, float bottom,
 // fallback.
 std::vector<std::pair<std::string, float>>
 valuesAt(const Model& model, const Evaluation& floor, float z);
+// The same from 3D weights worked out already (3B-2d).
+std::vector<std::pair<std::string, float>>
+valuesAt(const Model& model, const Evaluation3D& e);
 
 // Where the column sits in a map viewport: this far in from its top and its
 // bottom, as a fraction of its height; 15 pixels right of it. The view draws
@@ -84,8 +96,9 @@ int dotAt(const DotColumn& c, float columnX, float x, float y);
 
 // Where dragging level k's dot by `pixels` (down positive) would put the
 // level's start, with `gap` pixels between neighbouring dots: a gap is a
-// quarter of the map, in steps of 0.01, stopping 0.01 short of where a node
-// or its start would reach a neighbour -- so letting go always lands.
+// quarter of the map, in steps of 0.01, stopping where a node or its start
+// reaches a neighbour, touching (3B-2d) -- or a step short of it where that
+// touch would not land in float -- so letting go always lands.
 float levelDragTo(const Model& model, LevelID k, float pixels, float gap);
 
 } // namespace editor

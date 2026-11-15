@@ -1050,20 +1050,30 @@ replace:                 (void)0;
 
 # ---- round 3A-4: the 3D map's geometry ----
 
-gate: A node may touch the level below
+gate: A node may pass the level below
 file: src/core/ofxManifoldLevels.h
-find:         if (k > 0 && !(h > height(k - 1, n))) return false;
-replace:         if (k > 0 && h < height(k - 1, n)) return false;
-
-gate: A node may reach the level above
-file: src/core/ofxManifoldLevels.h
-find:         if (k + 1 < levels_.size() && !(h < height(k + 1, n))) return false;
+find:         if (k > 0 && !(h >= height(k - 1, n))) return false;
 replace:         if (false) return false;
+
+gate: Touching the level below refused
+file: src/core/ofxManifoldLevels.h
+find:         if (k > 0 && !(h >= height(k - 1, n))) return false;
+replace:         if (k > 0 && !(h > height(k - 1, n))) return false;
+
+gate: A node may pass the level above
+file: src/core/ofxManifoldLevels.h
+find:         if (k + 1 < levels_.size() && !(h <= height(k + 1, n))) return false;
+replace:         if (false) return false;
+
+gate: Touching the level above refused
+file: src/core/ofxManifoldLevels.h
+find:         if (k + 1 < levels_.size() && !(h <= height(k + 1, n))) return false;
+replace:         if (k + 1 < levels_.size() && !(h < height(k + 1, n))) return false;
 
 gate: Raising is not all or nothing
 file: src/core/ofxManifoldLevels.h
-find:         if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }\n        for (NodeID n : nodes) set(k, n, height(k, n) + dz);
-replace:         for (NodeID n : nodes) if (std::find(bad.begin(), bad.end(), n) == bad.end()) set(k, n, height(k, n) + dz);\n        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }
+find:         if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }\n        for (NodeID n : nodes) set(k, n, settle(k, n, height(k, n) + dz));
+replace:         for (NodeID n : nodes) if (std::find(bad.begin(), bad.end(), n) == bad.end()) set(k, n, settle(k, n, height(k, n) + dz));\n        if (!bad.empty()) {\n            if (blocked) *blocked = bad;\n            return false;\n        }
 nl: yes
 
 gate: A copied level loses its bends
@@ -1083,8 +1093,13 @@ replace:             (void)l;
 
 gate: A copy is not checked against the level below
 file: src/core/ofxManifoldLevels.h
-find:             const bool overLower = (at == 0) || h > height(at - 1, i);
+find:             const bool overLower = (at == 0) || h >= height(at - 1, i);
 replace:             const bool overLower = true;
+
+gate: A copy may not touch the level below
+file: src/core/ofxManifoldLevels.h
+find:             const bool overLower = (at == 0) || h >= height(at - 1, i);
+replace:             const bool overLower = (at == 0) || h > height(at - 1, i);
 
 gate: A point above the top level is inside
 file: src/core/ofxManifoldLevels.h
@@ -1128,8 +1143,13 @@ replace:         const float onLevel = 0.0f;
 
 gate: A copy is not checked against the level above
 file: src/core/ofxManifoldLevels.h
-find:             const bool underUpper = (at == levels_.size()) || h < height(at, i);
+find:             const bool underUpper = (at == levels_.size()) || h <= height(at, i);
 replace:             const bool underUpper = true;
+
+gate: A copy may not touch the level above
+file: src/core/ofxManifoldLevels.h
+find:             const bool underUpper = (at == levels_.size()) || h <= height(at, i);
+replace:             const bool underUpper = (at == levels_.size()) || h < height(at, i);
 
 # ---- round 3A-4b: what the 3D map drives ----
 
@@ -1288,12 +1308,17 @@ nl: yes
 
 gate: Levels that cross accepted from a file
 file: src/core/ofxManifoldLevels.h
-find:                 if (!(at(k, i) > at(k - 1, i))) {
+find:                 if (!(at(k, i) >= at(k - 1, i))) {
 replace:                 if (false) {
+
+gate: Touching levels refused from a file
+file: src/core/ofxManifoldLevels.h
+find:                 if (!(at(k, i) >= at(k - 1, i))) {
+replace:                 if (!(at(k, i) > at(k - 1, i))) {
 
 gate: Level starting heights out of order accepted
 file: src/core/ofxManifoldLevels.h
-find:             if (!(bases[k] > bases[k - 1])) {
+find:             if (!(bases[k] >= bases[k - 1])) {
 replace:             if (false) {
 
 # ---- round 3A-5: the editor, after the fader, rigs, the chart handed its levels ----
@@ -1409,15 +1434,15 @@ find:     level_ = at;\n    std::string msg = "new level "
 replace:     std::string msg = "new level "
 nl: yes
 
-gate: Lowering may reach the level below
+gate: A raise ignores the levels around it
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:                        || mv.second > lv.height(level_ - 1, mv.first);
-replace:                        || true;
+find:         if (!lv.fits(level_, mv.first, mv.second)) {
+replace:         if (false) {
 
 gate: A raise is not all or nothing
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     if (!blocked.empty()) {\n        return refusal(blocked + " would reach the level "
-replace:     if (!blocked.empty() && moves.size() == 1) {\n        return refusal(blocked + " would reach the level "
+find:     if (!blocked.empty()) {\n        return refusal(blocked + " would pass the level "
+replace:     if (!blocked.empty() && moves.size() == 1) {\n        return refusal(blocked + " would pass the level "
 nl: yes
 
 gate: Heights step by whole steps, not to the next multiple
@@ -1449,8 +1474,9 @@ replace:         const Mapping& mp = model.mapping();
 
 gate: The chart ignores the listening height
 file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
-find:     if (map.count() == 1) return chartLevels(model, sel, floor);
-replace:     return chartLevels(model, sel, floor);
+find:     if (map.count() == 1) return chartLevels(model, sel, floor);\n    return chartLevels3D(model, sel, floor, map.levels().evaluate(floor, z));
+replace:     (void)z;\n    return chartLevels(model, sel, floor);
+nl: yes
 
 gate: The listening mark sticks to the level below
 file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
@@ -1459,8 +1485,8 @@ replace:         c.mark = a;
 
 gate: Outside is always above
 file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
-find:     const bool above = z > map.levels().heightAt(n - 1, floor.weights);
-replace:     const bool above = true;
+find:                      z > lv.heightAt(lv.count() - 1, floor.weights));
+replace:                      true);
 
 gate: Audition starts at the level's start, not under the point
 file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
@@ -1491,13 +1517,18 @@ replace:             (void)i;
 
 gate: A moved level's start may pass a neighbour's
 file: src/core/ofxManifoldLevels.h
-find:             (k == 0 || nb > levels_[k - 1].base)
+find:             (k == 0 || nb >= levels_[k - 1].base)
 replace:             (true)
+
+gate: A moved level may not start where its neighbour does
+file: src/core/ofxManifoldLevels.h
+find:             && (k + 1 >= levels_.size() || nb <= levels_[k + 1].base);
+replace:             && (k + 1 >= levels_.size() || nb < levels_[k + 1].base);
 
 gate: A moved level leaves its bends behind
 file: src/core/ofxManifoldLevels.h
-find:         for (float& h : l.heights) h += dz;   // unbent stay equal to the base
-replace:         (void)l.heights;
+find:         for (NodeID i = 0; i < n; ++i) moved[i] = settle(k, i, height(k, i) + dz);
+replace:         for (NodeID i = 0; i < n; ++i) moved[i] = height(k, i);
 
 gate: A level's room upward ignores its nodes
 file: src/core/ofxManifoldLevels.h
@@ -1522,10 +1553,11 @@ find:     if (k >= map_.count()) return Result{};\n    level_ = k;
 replace:     if (k >= map_.count()) return Result{};
 nl: yes
 
-gate: A dragged level may land on a neighbour
+gate: A dragged level stops short of a neighbour it could touch
 file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
-find:     if (nb >= base + room.second) nb = base + room.second - 0.01f;
-replace:     if (nb > base + room.second) nb = base + room.second;
+find:         nb = base + room.second;\n        if (!lands(nb)) nb -= 0.01f;
+replace:         nb = base + room.second - 0.01f;
+nl: yes
 
 gate: A dragged dot moves a level a whole map per gap
 file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
@@ -2164,8 +2196,8 @@ nl: yes
 
 gate: The room is made with auto-output as the user left it
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     autoOutput_ = true;\n    newLevel(true);
-replace:     newLevel(true);
+find:     autoOutput_ = true;\n    newLevel(true);\n    newLevel(true);
+replace:     newLevel(true);\n    newLevel(true);
 nl: yes
 
 gate: The room leaves auto-output on
@@ -2176,8 +2208,8 @@ nl: yes
 
 gate: The room opens on the top level
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:     goToLevel(0);\n    selectOnlyOutput(first);
-replace:     selectOnlyOutput(first);
+find:     autoOutput_ = wasAuto;\n    goToLevel(0);\n    selectOnlyOutput(first);
+replace:     autoOutput_ = wasAuto;\n    selectOnlyOutput(first);
 nl: yes
 
 gate: The room has two levels
@@ -2188,8 +2220,9 @@ nl: yes
 
 gate: The room's outputs share a channel
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
-find:         const TargetID t = map_.addOutput(manifold_.node(id).name, ch++);
-replace:         const TargetID t = map_.addOutput(manifold_.node(id).name, ch);
+find:     for (NodeID id : {FL, FR, RL, RR}) {\n        const TargetID t = map_.addOutput(manifold_.node(id).name, ch++);
+replace:     for (NodeID id : {FL, FR, RL, RR}) {\n        const TargetID t = map_.addOutput(manifold_.node(id).name, ch);
+nl: yes
 
 gate: The output smoother never quite arrives
 file: ofxManifoldPlayer/src/ofxManifoldOutputSmoother.cpp
@@ -2489,11 +2522,102 @@ nl: yes
 
 gate: A height is always read in the bottom cell
 file: src/core/ofxManifoldLevels.h
-find:         while (k + 2 < n && !(z < h[k + 1])) ++k;\n        return float(k) + (z - h[k]) / (h[k + 1] - h[k]);
-replace:         return float(k) + (z - h[k]) / (h[k + 1] - h[k]);
+find:         while (k + 2 < n && z > h[k + 1]) ++k;\n        const float gap = h[k + 1] - h[k];
+replace:         const float gap = h[k + 1] - h[k];
 nl: yes
 
 gate: The level position is not sent
 file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
 find:         if (f.hasLevelPosition) msgs.back().args.push_back(OscArg::number(f.levelPosition));
 replace:         (void)f.hasLevelPosition;
+
+# ---- round 3B-2d: levels that touch ----
+
+gate: A pinch divided by its zero gap
+file: src/core/ofxManifoldLevels.h
+find:         if (!(gap > 0.0f)) {\n            t = 0.5f;\n        } else if
+replace:         if (false) {\n            t = 0.5f;\n        } else if
+nl: yes
+
+gate: A pinch given to the upper level alone
+file: src/core/ofxManifoldLevels.h
+find:         if (!(gap > 0.0f)) {\n            t = 0.5f;
+replace:         if (!(gap > 0.0f)) {\n            t = 1.0f;
+nl: yes
+
+gate: A pinch just below the cell not shared
+file: src/core/ofxManifoldLevels.h
+find:         } else if (k > 0 && !(z > h[k]) && !(h[k] > h[k - 1])) {
+replace:         } else if (false) {
+
+gate: positionAt takes the highest level at a pinch
+file: src/core/ofxManifoldLevels.h
+find:         while (k + 2 < n && z > h[k + 1]) ++k;
+replace:         while (k + 2 < n && z >= h[k + 1]) ++k;
+
+gate: positionAt divides through a pinch past the end
+file: src/core/ofxManifoldLevels.h
+find:         if (!(gap > 0.0f)) return float(z > h[k] ? k + 1 : k);
+replace:         (void)gap;
+
+gate: A level position past the ends read inside
+file: src/core/ofxManifoldLevels.h
+find:         if (!(u >= 0.0f && u <= float(n - 1))) return out;
+replace:         (void)n;
+
+gate: A level position's fraction read from the top
+file: src/core/ofxManifoldLevels.h
+find:         return share(floor, k, u - float(k));
+replace:         return share(floor, k, 1.0f - (u - float(k)));
+
+gate: A level position off the floor plan read inside
+file: src/core/ofxManifoldLevels.h
+find:         if (!floor.inside) return out;\n        const std::size_t n = levels_.size();\n        if (n == 1) return evaluate(floor, 0.0f);
+replace:         const std::size_t n = levels_.size();\n        if (n == 1) return evaluate(floor, 0.0f);
+nl: yes
+
+gate: touches() misses a node that touches
+file: src/core/ofxManifoldLevels.h
+find:                 if (!(height(k, i) > height(k - 1, i))) return true;
+replace:                 if (false) return true;
+
+gate: Touching levels written at version 3
+file: src/io/ofxManifoldSerialize3D.h
+find:     return map.levels().touches(nodeCount) ? 4 : 3;
+replace:     return 3;
+
+gate: A touch read from a version 3 file
+file: src/io/ofxManifoldSerialize3D.h
+find:         && geometry.touches(floor.nodeCount())) {
+replace:         && false) {
+
+gate: Version 4 map files refused by the 3D reader
+file: src/io/ofxManifoldSerialize3D.h
+find:         const LoadResult fr = detail::loadFloor(mapText, floor, 4);
+replace:         const LoadResult fr = detail::loadFloor(mapText, floor, 3);
+
+gate: A height settles on a level a step away
+file: src/core/ofxManifoldLevels.h
+find:     static constexpr float kTouch = 1e-6f;
+replace:     static constexpr float kTouch = 0.25f;
+
+gate: A height a float's width past a level does not settle
+file: src/core/ofxManifoldLevels.h
+find:             return edge;\n        }\n        return h;
+replace:             return h;\n        }\n        return h;
+nl: yes
+
+gate: The octahedron's rim does not touch on the top
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         map_.setHeight(1, id, 0.0f);
+replace:         (void)id;
+
+gate: The octahedron's top starts at a quarter
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     map_.moveLevel(1, 0.25f, n);
+replace:     (void)n;
+
+gate: The octahedron's bottom apex half as deep
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     map_.moveLevel(0, -0.5f, n);
+replace:     map_.moveLevel(0, -0.25f, n);

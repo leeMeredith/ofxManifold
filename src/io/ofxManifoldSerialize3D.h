@@ -8,7 +8,8 @@
 //                                  map has them, "values" (the value set) and
 //                                  "levels": each level's starting height,
 //                                  the heights of its bent nodes, its node
-//                                  values. That makes it version 3.
+//                                  values. That makes it version 3 --
+//                                  version 4 when levels touch (3B-2d).
 //   the outputs file               outputs and derived outputs, as always;
 //   (name-outputs.json)            each binding on a level other than the
 //                                  first carries "level": k. That makes it
@@ -17,6 +18,12 @@
 // The rule of D-022 holds: the lowest version that reloads exactly. A map
 // with one flat level at 0 and no values -- every map made before 3D -- saves
 // byte-identical to saveManifold() and saveMapping(), checked by vector.
+//
+// Levels that touch (round 3B-2d) are written at version 4, and only they:
+// an ofxManifold from before then reads levels as strictly apart, and would
+// refuse a touch as a crossing -- by version it refuses plainly instead. A
+// version 3 file with a touch is refused here for the same reason, as levels
+// in a version 2 file are.
 //
 // Each file refuses the other's reader rather than being half-read:
 // loadManifold() refuses a version 3 map file, loadMapping() a binding with a
@@ -48,6 +55,11 @@ inline bool needs3D(const Map3D& map, std::size_t nodeCount) {
     return false;
 }
 
+// The map file's version for a 3D map: 4 only where levels touch.
+inline int map3Version(const Map3D& map, std::size_t nodeCount) {
+    return map.levels().touches(nodeCount) ? 4 : 3;
+}
+
 } // namespace detail
 
 inline std::string saveManifold3D(const Manifold2D& m, const Map3D& map) {
@@ -55,7 +67,7 @@ inline std::string saveManifold3D(const Manifold2D& m, const Map3D& map) {
 
     std::ostringstream o;
     o << "{\n";
-    o << "  \"version\": 3,\n";
+    o << "  \"version\": " << detail::map3Version(map, m.nodeCount()) << ",\n";
     detail::writeFloor(o, m, true);
     o << "  ],\n";
 
@@ -151,7 +163,8 @@ inline std::string saveMapping3D(const Map3D& map, const Manifold2D& m) {
 //
 // Refused, with the reason, and leaving `m` and `out` untouched, if either
 // file is refused on its own, if the outputs file binds on a level the map
-// file does not have, if levels cross or touch, if a value is set that was
+// file does not have, if levels cross -- or touch in a file older than
+// version 4 --, if a value is set that was
 // never declared or declared twice, or if a height or value names a node the
 // floor plan does not have.
 inline LoadResult loadMap3D(const std::string& mapText,
@@ -160,7 +173,7 @@ inline LoadResult loadMap3D(const std::string& mapText,
     LoadResult res;
     Manifold2D floor;
     {
-        const LoadResult fr = detail::loadFloor(mapText, floor, 3);
+        const LoadResult fr = detail::loadFloor(mapText, floor, 4);
         if (!fr.ok) { res.error = fr.error; return res; }
     }
     const json::ParseResult pr = json::parse(mapText);
@@ -228,6 +241,11 @@ inline LoadResult loadMap3D(const std::string& mapText,
             res.error = why;
             return res;
         }
+    }
+    if (static_cast<int>(root["version"].asNumber()) < 4
+        && geometry.touches(floor.nodeCount())) {
+        res.error = "levels that touch need version 4";
+        return res;
     }
 
     // ---- bindings, per level ---------------------------------------------------

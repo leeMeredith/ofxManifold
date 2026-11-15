@@ -115,6 +115,16 @@ int main() {
     frame("up past the top: silent, the bend's gap carried on");
     key('k');                      frame("k: in plain units -- no jump");
     key('k');                      frame("k: on the levels again -- held to the top");
+    // The octahedron (3B-2d): two levels meeting at the rim. Riding u up by
+    // the rim, the faces are one height there, but u still says how far up
+    // the point is: heard half on each level, not taken for either.
+    key('x');                      frame("x: the octahedron -- two levels meeting at the rim");
+    a.mousePressed(222, 149, 0);   // by E, just inside the rim
+    run(2);                        frame("by the rim at E: on the bottom face");
+    a.keyPressed(OF_KEY_UP); run(30); a.keyReleased(OF_KEY_UP);
+    frame("up half a level by the rim: the height barely moves, both levels heard");
+    a.mousePressed(149, 149, 0);   // over the centre
+    run(2);                        frame("over the centre: the same u, half way between the apexes");
     key('?');                      frame("?: every key");
     a.mousePressed(300, 300, 0); frame("a click: back to the map");
     key('b');                  frame("b: SuperCollider's bars -- no phase heard");

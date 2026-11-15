@@ -13,6 +13,9 @@
 NODES square 0:0.1,0.1 1:0.9,0.1 2:0.9,0.9 3:0.1,0.9
 TRIS square 0,1,2 0,2,3
 
+NODES diamond 0:0.5,0.8 1:0.8,0.5 2:0.5,0.2 3:0.2,0.5 4:0.5,0.5
+TRIS diamond 4,0,1 4,1,2 4,2,3 4,3,0
+
 # one level: today's map. z is ignored.
 STACK flat NODES square OPS 
 HEIGHTS heights_flat ANALYTIC flat L0 0,0,0,0
@@ -46,9 +49,12 @@ STACK moved NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 0.3 2 =OK ; R
 HEIGHTS heights_moved ANALYTIC moved L0 -0.25,-0.25,-0.25,-0.25 L1 0.2,0.2,0.5,0.2 L2 1.5,1.5,1.5,1.5
 # node 0 bent down to 0.2 on the upper level: moving that level
 # down 0.25 would put node 0 below the ground -- refused, naming
-# it; the ground up 0.25 likewise; down 0.2 touches -- refused
-STACK moved_refused NODES square OPS COPY 0 0.5 =1 ; RAISE 1 -0.3 0 =OK ; MOVE 1 -0.25 =REFUSED:0 ; MOVE 0 0.25 =REFUSED:0 ; MOVE 1 -0.2 =REFUSED:0
-HEIGHTS heights_moved_refused ANALYTIC moved_refused L0 0,0,0,0 L1 0.2,0.5,0.5,0.5
+# it; the ground up 0.25 likewise; down 0.2 reaches the ground
+# -- refused before 3B-2d, a touch now, and allowed. In float
+# 0.5 - 0.3 - 0.2 lands 1.5e-8 below the ground: within kTouch,
+# it settles on it exactly
+STACK moved_refused NODES square OPS COPY 0 0.5 =1 ; RAISE 1 -0.3 0 =OK ; MOVE 1 -0.25 =REFUSED:0 ; MOVE 0 0.25 =REFUSED:0 ; MOVE 1 -0.2 =OK
+HEIGHTS heights_moved_refused ANALYTIC moved_refused L0 0,0,0,0 L1 0,0.3,0.3,0.3
 # every node of the upper level raised to 0.8: the ground can
 # rise 0.6 without a node touching, but its start would pass the
 # upper level's start (0.5) -- refused, naming no node; 0.4 fits
@@ -56,14 +62,15 @@ STACK moved_bases NODES square OPS COPY 0 0.5 =1 ; RAISE 1 0.3 0,1,2,3 =OK ; MOV
 HEIGHTS heights_moved_bases ANALYTIC moved_bases L0 0.4,0.4,0.4,0.4 L1 0.8,0.8,0.8,0.8
 
 # REFUSED, changing nothing, and naming the nodes:
-# raising the middle level's node 2 by 0.5 would TOUCH the top
-# level (1.0): touching is refused, not just crossing. Then
+# raising the middle level's node 2 by 0.6 would PASS the top
+# level (1.0): refused. (By 0.5 it would touch, refused before
+# 3B-2d and allowed now: see `touch`.) Then
 # nodes 1 and 2 by 0.6: both refused, so neither moves -- all
 # or nothing. Lowering node 0 below the ground: refused.
 # Then node 2 up 0.3 (to 0.8, fine), and nodes 1 and 2 up 0.3
 # more: node 1 would fit, node 2 would cross the top. Refused,
 # and node 1 stays at 0.5 -- HEIGHTS shows it.
-STACK refuse_reach NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 0.5 2 =REFUSED:2 ; RAISE 1 0.6 1,2 =REFUSED:1,2 ; RAISE 1 -0.6 0 =REFUSED:0 ; RAISE 1 0.3 2 =OK ; RAISE 1 0.3 1,2 =REFUSED:2
+STACK refuse_reach NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 0.6 2 =REFUSED:2 ; RAISE 1 0.6 1,2 =REFUSED:1,2 ; RAISE 1 -0.6 0 =REFUSED:0 ; RAISE 1 0.3 2 =OK ; RAISE 1 0.3 1,2 =REFUSED:2
 HEIGHTS heights_refuse_reach ANALYTIC refuse_reach L0 0,0,0,0 L1 0.5,0.5,0.8,0.5 L2 1,1,1,1
 # copying the ground to 0.7 puts the new level above the middle
 # one -- but the middle level's node 3 was raised to 0.9, and
@@ -83,10 +90,50 @@ HEIGHTS heights_refuse_last ANALYTIC refuse_last L0 0,0,0,0
 STACK remove_middle NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 0.3 2 =OK ; REMOVE 1 =OK
 HEIGHTS heights_remove_middle ANALYTIC remove_middle L0 0,0,0,0 L1 1,1,1,1
 # set one node's height, as a file does: 1.5 fits; 0.0 on
-# level 1 touches the ground and is refused; -0.25 on the
-# ground fits
-STACK set_heights NODES square OPS COPY 0 1 =1 ; SET 1 2 1.5 =OK ; SET 1 0 0 =REFUSED ; SET 0 1 -0.25 =OK
-HEIGHTS heights_set_heights ANALYTIC set_heights L0 0,-0.25,0,0 L1 1,1,1.5,1
+# level 1 touches the ground -- refused before 3B-2d, allowed
+# now; -0.25 on the ground fits. Then node 0 on level 1 below
+# the ground, and the ground's node 0 above level 1's: both
+# cross, both refused
+STACK set_heights NODES square OPS COPY 0 1 =1 ; SET 1 2 1.5 =OK ; SET 1 0 0 =OK ; SET 0 1 -0.25 =OK ; SET 1 0 -0.25 =REFUSED ; SET 0 0 0.25 =REFUSED
+HEIGHTS heights_set_heights ANALYTIC set_heights L0 0,-0.25,0,0 L1 0,1,1.5,1
+
+# Round 3B-2d: LEVELS THAT TOUCH. Reaching the next level is a
+# touch, allowed; passing it is still refused, all or nothing.
+# the upper level's node 2 lowered by 0.5 to the ground: a
+# touch, allowed. Lowered 0.25 more it would pass the ground:
+# refused. Moving the whole level down: node 2 would pass,
+# refused; its room down is 0. A copy of the ground at 0.25
+# would put node 2 above itself on the level over it: refused.
+# Up 0.25, and the room down is 0.25
+STACK touch NODES square OPS COPY 0 0.5 =1 ; RAISE 1 -0.5 2 =OK ; RAISE 1 -0.25 2 =REFUSED:2 ; MOVE 1 -0.25 =REFUSED:2 ; ROOM 1 =0,inf ; COPY 0 0.25 =REFUSED:2 ; MOVE 1 0.25 =OK ; ROOM 1 =0.25,inf
+HEIGHTS heights_touch ANALYTIC touch L0 0,0,0,0 L1 0.75,0.75,0.25,0.75
+# the ground moved up to the level above: every node and the
+# start touch -- allowed, room 0 up. Further would pass every
+# node: refused, naming all four
+STACK touch_bases NODES square OPS COPY 0 0.5 =1 ; MOVE 0 0.5 =OK ; ROOM 0 =inf,0 ; MOVE 0 0.25 =REFUSED:0,1,2,3 ; ROOM 1 =0,inf
+HEIGHTS heights_touch_bases ANALYTIC touch_bases L0 0.5,0.5,0.5,0.5 L1 0.5,0.5,0.5,0.5
+# a copy may touch the level below it: the upper level copied
+# to 0.25 meets the ground's node 1, raised to 0.25
+STACK copy_touch_below NODES square OPS COPY 0 0.5 =1 ; RAISE 0 0.25 1 =OK ; COPY 1 0.25 =1
+HEIGHTS heights_copy_touch_below ANALYTIC copy_touch_below L0 0,0.25,0,0 L1 0.25,0.25,0.25,0.25 L2 0.5,0.5,0.5,0.5
+# and the level above it: the ground copied to 0.25 meets the
+# upper level's node 2, lowered to 0.25
+STACK copy_touch_above NODES square OPS COPY 0 0.5 =1 ; RAISE 1 -0.25 2 =OK ; COPY 0 0.25 =1
+HEIGHTS heights_copy_touch_above ANALYTIC copy_touch_above L0 0,0,0,0 L1 0.25,0.25,0.25,0.25 L2 0.5,0.5,0.25,0.5
+# three levels, the middle one's node 2 down on the ground: a
+# pinch between the lower two there, the top still above
+STACK pinch3 NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 -0.5 2 =OK
+HEIGHTS heights_pinch3 ANALYTIC pinch3 L0 0,0,0,0 L1 0.5,0.5,0,0.5 L2 1,1,1,1
+# three levels all at 0 over node 3: where more than two meet,
+# the top two share the point
+STACK pinch_all NODES square OPS COPY 0 0.5 =1 ; COPY 1 1 =2 ; RAISE 1 -0.5 3 =OK ; RAISE 2 -1 3 =OK
+HEIGHTS heights_pinch_all ANALYTIC pinch_all L0 0,0,0,0 L1 0.5,0.5,0.5,0 L2 1,1,1,0
+# THE OCTAHEDRON on the diamond: the bottom level starts at
+# -0.5, the top at 0.5; the rim N E S W raised on the bottom and
+# lowered on the top to 0, where the two meet. The centre stays
+# at the starts, the apexes. Taller than a regular one.
+STACK octa NODES diamond OPS COPY 0 0.5 =1 ; MOVE 0 -0.5 =OK ; RAISE 0 0.5 0,1,2,3 =OK ; RAISE 1 -0.5 0,1,2,3 =OK
+HEIGHTS heights_octa ANALYTIC octa L0 0,0,0,0,-0.5 L1 0,0,0,0,0.5
 
 #--------------------------------------------------------------------
 # WEIGHTS for given floor-plan weights. Every record is also
@@ -207,6 +254,82 @@ EVALXYZ xyz_near_raised CROSS bent SQUARE P 0.85 0.85 0.75 EXPECT 0@0=0.0025 0@1
 EVALXYZ xyz_outside_floor ANALYTIC three SQUARE P 0.05 0.5 0.5 EXPECT OUTSIDE
 EVALXYZ xyz_top_by_rounding ANALYTIC three SQUARE P 0.108 0.124 1 EXPECT 0@2=0.97 2@2=0.01 3@2=0.02
 EVALXYZ xyz_above ANALYTIC bent SQUARE P 0.85 0.85 1.2 EXPECT OUTSIDE
+
+#--------------------------------------------------------------------
+# PINCHES (round 3B-2d). Where two levels are one height at the
+# point, a point there is on both: shared equally, t = 0.5. Where
+# more meet, the top two. A gap shrinking toward a pinch is
+# still divided, never by 0.
+#--------------------------------------------------------------------
+# over node 2 the middle level is on the ground: z = 0 is on
+# both, shared equally -- not given to the middle level alone
+EVAL3 pinch_on_ground ANALYTIC pinch3 W 2=1 Z 0 EXPECT 2@0=0.5 2@1=0.5
+# above the pinch, the upper cell, as anywhere
+EVAL3 pinch_above_it ANALYTIC pinch3 W 2=1 Z 0.25 EXPECT 2@1=0.75 2@2=0.25
+# half way to node 1 the middle level is at 0.25: a gap, divided
+EVAL3 pinch_beside CROSS pinch3 W 1=0.5 2=0.5 Z 0.125 EXPECT 1@0=0.25 1@1=0.25 2@0=0.25 2@1=0.25
+# three levels meeting at node 3: the top two share it
+EVAL3 pinch_three ANALYTIC pinch_all W 3=1 Z 0 EXPECT 3@1=0.5 3@2=0.5
+# two levels touching everywhere: every point between them is
+# on both
+EVAL3 touch_bases_on ANALYTIC touch_bases W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.5 EXPECT 0@0=0.125 0@1=0.125 1@0=0.125 1@1=0.125 2@0=0.125 2@1=0.125 3@0=0.125 3@1=0.125
+# the octahedron's rim, at node E: on both faces, shared
+EVAL3 octa_rim_vertex ANALYTIC octa W 1=1 Z 0 EXPECT 1@0=0.5 1@1=0.5
+# just inside the rim the faces are 0.02 apart: still divided
+EVAL3 octa_near_rim CROSS octa W 1=0.98 4=0.02 Z 0.005 EXPECT 1@0=0.245 1@1=0.735 4@0=0.005 4@1=0.015
+# over the rim nothing is above the faces: outside
+EVAL3 octa_above_rim ANALYTIC octa W 1=1 Z 0.01 EXPECT OUTSIDE
+# The octahedron, through the C++ floor plan: each point is
+# inside exactly when the solid's own faces hold it
+EVALXYZ octa_centre ANALYTIC octa diamond P 0.5 0.5 0 EXPECT 4@0=0.5 4@1=0.5
+EVALXYZ octa_under_apex ANALYTIC octa diamond P 0.5 0.5 0.4 EXPECT 4@0=0.1 4@1=0.9
+EVALXYZ octa_past_apex ANALYTIC octa diamond P 0.5 0.5 0.55 EXPECT OUTSIDE
+EVALXYZ octa_half_out CROSS octa diamond P 0.65 0.5 0.2 EXPECT 1@0=0.05 1@1=0.45 4@0=0.05 4@1=0.45
+EVALXYZ octa_half_on_face CROSS octa diamond P 0.65 0.5 -0.25 EXPECT 1@0=0.5 4@0=0.5
+EVALXYZ octa_half_past CROSS octa diamond P 0.65 0.5 0.3 EXPECT OUTSIDE
+EVALXYZ octa_rim_edge CROSS octa diamond P 0.65 0.65 0 EXPECT 0@0=0.25 0@1=0.25 1@0=0.25 1@1=0.25
+EVALXYZ octa_beyond_rim ANALYTIC octa diamond P 0.75 0.75 0 EXPECT OUTSIDE
+EVALXYZ octa_lower_quarter CROSS octa diamond P 0.4 0.45 -0.2 EXPECT 2@0=0.15 2@1=0.01666666667 3@0=0.3 3@1=0.03333333333 4@0=0.45 4@1=0.05
+
+# EVALU: weights by level position u (3B-2d), as the player
+# rides: the cell floor(u), t its fraction -- no division, so
+# a pinch is like anywhere else. Away from pinches it must
+# agree with EVAL3 at the height u gives.
+EVALU u_eval_half CROSS three W 0=0.25 1=0.25 2=0.25 3=0.25 U 0.5 EXPECT 0@0=0.125 0@1=0.125 1@0=0.125 1@1=0.125 2@0=0.125 2@1=0.125 3@0=0.125 3@1=0.125
+EVALU u_eval_upper CROSS bent W 2=1 U 1.5 EXPECT 2@1=0.5 2@2=0.5
+EVALU u_eval_partial CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 U 0.7 EXPECT 0@0=0.06 0@1=0.14 1@0=0.09 1@1=0.21 2@0=0.12 2@1=0.28 3@0=0.03 3@1=0.07
+EVALU u_eval_on_level CROSS three W 0=0.25 1=0.25 2=0.25 3=0.25 U 1 EXPECT 0@1=0.25 1@1=0.25 2@1=0.25 3@1=0.25
+EVALU u_eval_top CROSS bent W 2=1 U 2 EXPECT 2@2=1
+EVALU u_eval_bottom CROSS three W 0=0.25 1=0.25 2=0.25 3=0.25 U 0 EXPECT 0@0=0.25 1@0=0.25 2@0=0.25 3@0=0.25
+# one level: u ignored, as z is
+EVALU u_eval_one_level ANALYTIC flat W 0=0.25 1=0.25 2=0.25 3=0.25 U 1.7 EXPECT 0@0=0.25 1@0=0.25 2@0=0.25 3@0=0.25
+# past the top: outside, as above it by z
+EVALU u_eval_past_top ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U 2.4 EXPECT OUTSIDE
+EVALU u_eval_below ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U -0.1 EXPECT OUTSIDE
+# off the floor plan: outside
+EVALU u_eval_off_plan ANALYTIC three W - U 0.5 EXPECT OUTSIDE
+# on the octahedron's rim, a quarter of the way: a quarter on the
+# top level -- by height it would be ambiguous, by u it is not
+EVALU u_eval_rim ANALYTIC octa W 1=1 U 0.25 EXPECT 1@0=0.75 1@1=0.25
+# half way from apex to apex: the centre, shared
+EVALU u_eval_apexes ANALYTIC octa W 4=1 U 0.5 EXPECT 4@0=0.5 4@1=0.5
+EVALU u_eval_pinch3 ANALYTIC pinch3 W 2=1 U 0.5 EXPECT 2@0=0.5 2@1=0.5
+
+# AT A PINCH many positions have one height: positionAt gives
+# the lowest. Extrapolated through an end cell with no gap,
+# there is no slope: the nearer level.
+ZPOS z_pinch_lowest ANALYTIC pinch3 W 2=1 Z 0 R EXPECT 0
+ZPOS z_pinch_lowest_x ANALYTIC pinch3 W 2=1 Z 0 X EXPECT 0
+ZPOS z_pinch_above ANALYTIC pinch3 W 2=1 Z 0.5 R EXPECT 1.5
+# three levels at one height: the lowest of them all
+ZPOS z_pinch_all ANALYTIC pinch_all W 3=1 Z 0 X EXPECT 0
+ZPOS z_octa_rim ANALYTIC octa W 1=1 Z 0 R EXPECT 0
+ZPOS z_octa_rim_above_x ANALYTIC octa W 1=1 Z 0.3 X EXPECT 1
+ZPOS z_octa_rim_below_x ANALYTIC octa W 1=1 Z -0.3 X EXPECT 0
+ZPOS z_octa_centre ANALYTIC octa W 4=1 Z 0.25 R EXPECT 0.75
+# anywhere on the rim is the rim's height
+UPOS u_octa_rim ANALYTIC octa W 1=1 U 0.6 R EXPECT 0
+UPOS u_pinch_all ANALYTIC pinch_all W 3=1 U 1.5 R EXPECT 0
 
 # CONTINUITY: sweeping across the square's diagonal -- from one
 # triangle into the other -- while rising through the bent
@@ -378,6 +501,13 @@ SAVE3 save3_two_flat ANALYTIC twoflat MAPV 3 OUTV 3
 # it starts.
 MAP3 lowered NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 -0.5 =0 ; REMOVELEVEL 1 =OK
 SAVE3 save3_lowered ANALYTIC lowered MAPV 3 OUTV 2
+# levels that touch (3B-2d): the map file at version 4, and only
+# then -- an older reader refuses it by its version, plainly,
+# not by a height it took for crossing
+MAP3 touching NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 1 =1 ; SETH 1 2 0 =OK
+SAVE3 save3_touching ANALYTIC touching MAPV 4 OUTV 3
+FILE3 file3_touching ANALYTIC map3_touching.json map3_touching-outputs.json AS touching
+REFUSEOLD refuseold_touching ANALYTIC map3_touching.json unsupported version 4
 
 # REFUSED, each for its own reason, leaving nothing half-read
 # a binding on level 3 of a three-level map
@@ -394,6 +524,8 @@ REFUSE3 bad3_twice__map3_forest-outputs ANALYTIC bad3_twice.json map3_forest-out
 REFUSE3 bad3_unknown_node__map3_forest-outputs ANALYTIC bad3_unknown_node.json map3_forest-outputs.json unknown node
 # levels in a version 2 map file
 REFUSE3 bad3_levels_v2__map3_forest-outputs ANALYTIC bad3_levels_v2.json map3_forest-outputs.json version 3
+# levels that touch in a version 3 map file
+REFUSE3 bad3_touch_v3__map3_touching-outputs ANALYTIC bad3_touch_v3.json map3_touching-outputs.json need version 4
 # a binding to an output the file never declared
 REFUSE3 map3_forest__bad3_undeclared_output-outputs ANALYTIC map3_forest.json bad3_undeclared_output-outputs.json undeclared
 # a binding with a level in a version 2 outputs file
@@ -404,3 +536,4 @@ REFUSE3 map3_forest__bad3_level_v2-outputs ANALYTIC map3_forest.json bad3_level_
 # first binding with a level
 REFUSE2D refuse2d_mapfile ANALYTIC MAP map3_forest.json loadMap3D
 REFUSE2D refuse2d_outputs ANALYTIC OUTPUTS map3_forest-outputs.json loadMap3D
+REFUSE2D refuse2d_touching ANALYTIC MAP map3_touching.json loadMap3D

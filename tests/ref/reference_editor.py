@@ -83,10 +83,25 @@ class Editor:
         else:
             lv["heights"][name] = h
 
+    def settle_height(self, k, name, h):
+        """3B-2d: within TOUCH past the level next to it, a height is on it."""
+        if k > 0:
+            lo = self.height(k - 1, name)
+            if lo - TOUCH <= h < lo:
+                h = lo
+        if k + 1 < len(self.levels):
+            hi = self.height(k + 1, name)
+            if hi < h <= hi + TOUCH:
+                h = hi
+        return h
+
     def fits(self, k, name, h):
-        if k > 0 and not h > self.height(k - 1, name):
+        """At or above the level below, at or below the level above: since
+        3B-2d levels may touch, never pass."""
+        h = self.settle_height(k, name, h)
+        if k > 0 and not h >= self.height(k - 1, name):
             return False
-        if k + 1 < len(self.levels) and not h < self.height(k + 1, name):
+        if k + 1 < len(self.levels) and not h <= self.height(k + 1, name):
             return False
         return True
 
@@ -921,12 +936,12 @@ class Editor:
         shift = base - b
         made = {nm: self.height(k, nm) + shift for nm in self.names()}
         blocked = [nm for nm in self.names()
-                   if not ((at == 0 or made[nm] > self.height(at - 1, nm))
-                           and (at == n or made[nm] < self.height(at, nm)))]
+                   if not ((at == 0 or made[nm] >= self.height(at - 1, nm))
+                           and (at == n or made[nm] <= self.height(at, nm)))]
         if blocked or any(lv["base"] == base for lv in self.levels):
             return (0, 1, f"no room for a new level {where} -- "
                     + (", ".join(blocked) or "a level starts there")
-                    + " would reach the level next to it")
+                    + " would pass the level next to it")
         level = dict(base=base, heights={}, links=copy.deepcopy(self.links),
                      values=copy.deepcopy(self.levels[k]["values"]))
         for nm, h in made.items():
@@ -996,9 +1011,10 @@ class Editor:
             new[nm] = base + nxt * unit
         blocked = [nm for nm in sel if not self.fits(k, nm, new[nm])]
         if blocked:
-            return (0, 1, ", ".join(blocked) + " would reach the level "
+            return (0, 1, ", ".join(blocked) + " would pass the level "
                     + ("above" if direction > 0 else "below"))
         for nm in sel:
+            new[nm] = self.settle_height(k, nm, new[nm])
             self.set_height(k, nm, new[nm])
         offs = [new[nm] - base for nm in sel]
         lo, hi = f"{min(offs):+.3g}", f"{max(offs):+.3g}"
@@ -1155,7 +1171,7 @@ class Editor:
 
     def level_room(self, k):
         """How far level k can move, down and up, before a node or its start
-        would reach a neighbour."""
+        would pass a neighbour: it may go that far, and touch."""
         inf = float("inf")
         down = up = inf
         lv = self.levels
@@ -1180,15 +1196,19 @@ class Editor:
         bad = [n for n in self.names()
                if not self.fits(k, n, self.height(k, n) + dz)]
         nb = lv["base"] + dz
-        bases_fit = ((k == 0 or nb > self.levels[k - 1]["base"])
+        bases_fit = ((k == 0 or nb >= self.levels[k - 1]["base"])
                      and (k + 1 >= len(self.levels)
-                          or nb < self.levels[k + 1]["base"]))
+                          or nb <= self.levels[k + 1]["base"]))
         if bad or not bases_fit:
             return (0, 1, f"level {k + 1} cannot start at {fmt(new_base)} -- "
-                    + (", ".join(bad) + " would reach the level " + where
+                    + (", ".join(bad) + " would pass the level " + where
                        if bad else "it would pass the level " + where))
+        moved = {n: self.settle_height(k, n, self.height(k, n) + dz)
+                 for n in self.names()}
         lv["base"] = nb
-        lv["heights"] = {n: h + dz for n, h in lv["heights"].items()}
+        lv["heights"] = {}
+        for n, h in moved.items():
+            self.set_height(k, n, h)
         self.cur = k
         return (1, 0, f"level {k + 1} now starts at {fmt(new_base)}")
 
@@ -1206,16 +1226,31 @@ class Editor:
 
     def level_drag_to(self, k, pixels, gap):
         """Where a dot dragged `pixels` down (negative: up) puts its level:
-        a gap between dots is a quarter of the map, steps of 0.01, and it
-        stops 0.01 short of a neighbour."""
+        a gap between dots is a quarter of the map, steps of 0.01. Since
+        3B-2d it stops AT a neighbour, touching -- or a step short of it, if
+        the touch would not land."""
         base = self.levels[k]["base"]
         nb = round((base - pixels / gap * 0.25) / 0.01) * 0.01
         down, up = self.level_room(k)
         if nb >= base + up:
-            nb = base + up - 0.01
+            nb = base + up
+            if not self.level_lands(k, nb):
+                nb -= 0.01
         if nb <= base - down:
-            nb = base - down + 0.01
+            nb = base - down
+            if not self.level_lands(k, nb):
+                nb += 0.01
         return nb
+
+    def level_lands(self, k, nb):
+        """Would level k, moved to start at nb, be allowed there?"""
+        dz = nb - self.levels[k]["base"]
+        if any(not self.fits(k, n, self.height(k, n) + dz)
+               for n in self.names()):
+            return False
+        return ((k == 0 or nb >= self.levels[k - 1]["base"])
+                and (k + 1 >= len(self.levels)
+                     or nb <= self.levels[k + 1]["base"]))
 
     # ---- round 3A-6c: heights matched to the first node, or flattened ----
 
@@ -1233,12 +1268,12 @@ class Editor:
         bad = [n for n in others if not self.fits(k, n, h0)]
         if bad:
             return (0, 1, ", ".join(bad) + " cannot be at " + first
-                    + "'s height -- it would reach a level next to it")
+                    + "'s height -- it would pass a level next to it")
         moved = [n for n in others if self.height(k, n) != h0]
         if not moved:
             return (0, 0, f"already at the height of {first}")
         for n in moved:
-            self.set_height(k, n, h0)
+            self.set_height(k, n, self.settle_height(k, n, h0))
         off = f"{h0 - self.levels[k]['base']:+.3g}"
         return (1, 0, f"{len(moved)} {'node' if len(moved) == 1 else 'nodes'} to the height of "
                 f"{first} ({off})")
@@ -1252,12 +1287,12 @@ class Editor:
         bad = [n for n in sel if not self.fits(k, n, base)]
         if bad:
             return (0, 1, ", ".join(bad) + " cannot go back to the level's "
-                    "start -- it would reach a level next to it")
+                    "start -- it would pass a level next to it")
         moved = [n for n in sel if self.height(k, n) != base]
         if not moved:
             return (0, 0, "already at the level's start")
         for n in moved:
-            self.set_height(k, n, base)
+            self.set_height(k, n, self.settle_height(k, n, base))
         return (1, 0, f"{len(moved)} {'node' if len(moved) == 1 else 'nodes'} back to the "
                 "level's start")
 
@@ -1300,6 +1335,12 @@ class Editor:
         k = 0
         while k + 2 < n and h[k + 1] <= z:
             k += 1
+        # 3B-2d: at a pinch -- no gap in the cell, or z on its lower level
+        # with the level below at the same height -- shared, t = 0.5
+        if not h[k + 1] - h[k] > 0.0:
+            return True, k, 0.5
+        if k > 0 and not z > h[k] and not h[k] > h[k - 1]:
+            return True, k - 1, 0.5
         t = min(1.0, max(0.0, (z - h[k]) / (h[k + 1] - h[k])))
         return True, k, t
 
@@ -1421,6 +1462,32 @@ class Editor:
         self.auto = was
         self.go_level(0)
         self.select_only("FL")
+
+    def octahedron(self):
+        """The octahedron (3B-2d): a diamond rim and its centre on two levels
+        that touch at the rim. Built here from the finished shape, not by
+        the C++'s steps: the bottom starts at -0.5, the top at 0.5, C at the
+        starts, the rim bent to 0 on both."""
+        self.new_empty()
+        for nm, p in [("N", (0.50, 0.80)), ("E", (0.80, 0.50)),
+                      ("S", (0.50, 0.20)), ("W", (0.20, 0.50)),
+                      ("C", (0.50, 0.50))]:
+            self.nodes.append([nm, p])
+        self.regions = [("C", "N", "E"), ("C", "E", "S"), ("C", "S", "W"),
+                        ("C", "W", "N")]
+        names = ["N", "E", "S", "W", "C"]
+        for i, nm in enumerate(names):
+            self.outputs.append([nm, i, 1.0])
+        for i, nm in enumerate(names):
+            self.outputs.append([nm + "-2", 5 + i, 1.0])
+        rim = {nm: 0.0 for nm in names[:4]}
+        self.levels = [
+            dict(base=-0.5, heights=dict(rim), values={},
+                 links={nm: [("out", nm, 1.0)] for nm in names}),
+            dict(base=0.5, heights=dict(rim), values={},
+                 links={nm: [("out", nm + "-2", 1.0)] for nm in names})]
+        self.cur = 0
+        self.select_only("N")
 
     # ---- files -----------------------------------------------------------
     # A pair on "disk" is a snapshot of the map and, depending on the case, of
@@ -1608,7 +1675,7 @@ class Editor:
             ("undo", nd and can_undo), ("redo", nd and can_redo),
             ("save", nd), ("saveas", nd), ("open", nd),
             ("userig", nd), ("saverig", nd and outs > 0), ("empty", nd),
-            ("example", nd), ("fullscreen", True), ("textsize", True),
+            ("example", nd), ("octahedron", nd), ("fullscreen", True), ("textsize", True),
             ("keysheet", True),
         ]
         return rules, preview
@@ -1750,6 +1817,7 @@ class Editor:
 # ---------------------------------------------------------------------------
 
 S = 0.05
+TOUCH = 1e-6        # 3B-2d: Levels::kTouch
 
 
 LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
@@ -1758,7 +1826,7 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "bindall": "bind to every output", "fill": "fill",
           "clear": "back to own output", "silence": "silence", "trim": "trim",
           "removeoutput": "remove output", "example": "example map",
-          "room": "room example",
+          "room": "room example", "octahedron": "octahedron example",
           "empty": "new map", "move": "move", "openpair": "open",
           "derivedafter": "derived output", "userig": "use rig",
           "newlevel": "new level", "raise": "height",
@@ -1862,6 +1930,7 @@ class Script:
             "steplevel": lambda: e.step_level(args[0], args[1]),
             "example":  lambda: (e.example(), (1, 0, ""))[1],
             "room":     lambda: (e.room(), (1, 0, ""))[1],
+            "octahedron": lambda: (e.octahedron(), (1, 0, ""))[1],
             "empty":    lambda: (e.new_empty(), (1, 0, ""))[1],
         }[op]()
         argtxt = ""
@@ -2817,7 +2886,8 @@ def build_levels(out):
                "y and h raise and lower the selected nodes on the current "
                "level, 0.05 a step or 0.01 fine, each landing on the next "
                "multiple of its step as fill does. Refused, all or nothing, "
-               "naming the nodes, at the level above or below")
+               "naming the nodes, past the level above or below -- reaching "
+               "it is a touch, allowed since 3B-2d")
     t.do("example")
     t.select("O")
     t.keys()
@@ -2828,12 +2898,12 @@ def build_levels(out):
     t.do("leveldown")
     t.do("raise", 1, True); t.do("raise", 1, False)
     t.do("raise", 1, False); t.do("raise", 1, False); t.do("raise", 1, False)
-    out.append("# O now at 0.2, and the next coarse step would touch 0.25")
+    out.append("# O now at 0.2: the next coarse step reaches the level at 0.25,")
+    out.append("# a touch, allowed; a fine step more would pass it, refused")
     t.do("raise", 1, False)
-    t.do("raise", 1, True); t.do("raise", 1, True); t.do("raise", 1, True)
     t.do("raise", 1, True)
     t.select("O", "N", "E")
-    out.append("# O at 0.24, N and E at the start: O refuses, nobody moves")
+    out.append("# O touching, N and E at the start: O refuses, nobody moves")
     t.do("raise", 1, True)
     t.do("raise", -1, False)
     t.do("levelup")
@@ -2844,7 +2914,7 @@ def build_levels(out):
 
     t = Script(out, "levels_new_level_blocked",
                "a new level is a copy of the current one, bends and all; one "
-               "that would reach a level next to it is refused, naming the "
+               "that would pass a level next to it is refused, naming the "
                "nodes")
     t.do("example")
     t.do("newlevel", 1)
@@ -3004,7 +3074,8 @@ def build_levels_b(out):
                "a click on a dot goes to that level (not an undo step); "
                "moving a level moves its start and every node on it, bends "
                "kept, and makes it current -- one undo step, refused where a "
-               "node or its start would reach a neighbour")
+               "node or its start would pass a neighbour; reaching one is a "
+               "touch, allowed since 3B-2d")
     t.do("example")
     t.keys()
     t.do("newlevel", 1); t.do("newlevel", 1)
@@ -3012,7 +3083,9 @@ def build_levels_b(out):
     t.do("golevel", 0)
     t.do("golevel", 1)
     t.select("O"); t.do("raise", 1, False); t.do("raise", 1, False)
-    out.append("# O at 0.35 on the middle level; the top starts at 0.5")
+    out.append("# O at 0.35 on the middle level; the top starts at 0.5: at 0.45")
+    out.append("# O would pass the top's O, refused; at 0.4 it touches it")
+    t.do("movelevel", 1, 0.45)
     t.do("movelevel", 1, 0.4)
     t.do("movelevel", 1, 0.3)
     t.do("movelevel", 1, 0.1)
@@ -3043,8 +3116,8 @@ def build_levels_b(out):
 
     t = Script(out, "levels_drag",
                "dragging a dot: a gap between dots is a quarter of the map, "
-               "in steps of 0.01, stopping 0.01 short of a neighbour; and "
-               "which dot a click is on")
+               "in steps of 0.01, stopping AT a neighbour, touching (0.01 "
+               "short of it before 3B-2d); and which dot a click is on")
     t.do("example")
     t.do("newlevel", 1); t.do("newlevel", 1)
     t.select("O"); t.do("raise", -1, False)
@@ -3053,7 +3126,7 @@ def build_levels_b(out):
     t.drag_level(1, -13.0, 60.0)
     t.drag_level(1, 200.0, 60.0)
     out.append("# up a whole gap: O on the top level is only 0.2 above, so it")
-    out.append("# stops at 0.44, 0.01 short")
+    out.append("# stops at 0.45, where O touches the top's O")
     t.drag_level(1, -60.0, 60.0)
     t.drag_level(2, 70.0, 60.0)
     t.drag_level(2, -500.0, 60.0)
@@ -3075,8 +3148,9 @@ def build_levels_c(out):
     t = Script(out, "levels_match",
                "m gives the selected nodes the height, on the current level, "
                "of the node selected FIRST; M puts them back at the level's "
-               "start. All or nothing, refused where a node would reach a "
-               "level next to it. A box has no first node")
+               "start. All or nothing, refused where a node would pass a "
+               "level next to it -- touching it is allowed. A box has no "
+               "first node")
     t.do("example")
     t.do("newlevel", 1); t.do("newlevel", 1)
     t.do("leveldown")
@@ -3099,7 +3173,8 @@ def build_levels_c(out):
     t.do("flatten")
     t.do("flatten")
     out.append("# N and E at 0.4 on the middle; the top's N lowered to 0.45, and")
-    out.append("# E raised to 0.45 here: N matched to E would touch the top's N")
+    out.append("# E raised to 0.45 here: N matched to E touches the top's N --")
+    out.append("# allowed since 3B-2d")
     t.do("levelup")
     t.select("N"); t.do("raise", -1, False)
     t.do("leveldown")
@@ -3564,6 +3639,61 @@ def build_cells(out):
     out.append("# auto-output is still off: a node placed now starts unbound")
     t.do("place", (0.5, 0.5))
     t.do("undo"); t.do("undo"); t.do("redo")
+    t.end()
+
+    out.append("# ROUND 3B-2d: LEVELS THAT TOUCH, AND THE OCTAHEDRON")
+    t = Script(out, "levels_touch",
+               "a node may be raised or lowered onto the level next to it -- a "
+               "touch -- never past it; a level moved onto a node of its "
+               "neighbour likewise; where they touch, a point is on both and "
+               "the chart hears it shared equally")
+    t.do("example")
+    t.do("newlevel", 1)
+    t.do("leveldown")
+    t.select("O")
+    for _ in range(5):
+        t.do("raise", 1, False)
+    out.append("# O on the ground at 0.25 touches O on the level above")
+    t.do("raise", 1, True)
+    t.do("levelup")
+    t.do("raise", -1, False)
+    t.do("raise", 1, False)
+    t.do("raise", -1, False)
+    out.append("# O touching again; the whole top level down 0.05 would put")
+    out.append("# O past the ground's: refused, naming it")
+    t.do("movelevel", 1, 0.2)
+    w = [("O", 1.0)]
+    out.append("# at O, z = 0.25 is on both levels: shared, the mark half way")
+    t.hear(w, 0.25)
+    t.hear(w, 0.26)
+    out.append("# beside O the gap opens: divided as anywhere")
+    t.hear([("O", 0.5), ("E", 0.5)], 0.2)
+    t.end()
+
+    t = Script(out, "octahedron",
+               "shift-cmd-e: the octahedron -- a diamond rim N E S W and its "
+               "centre C on two levels, the bottom starting at -0.5 and the "
+               "top at 0.5, C at the starts and the rim at 0 on both, where "
+               "the levels touch. Each level's nodes on outputs of their own")
+    t.do("octahedron")
+    t.keys()
+    out.append("# at the rim the two faces meet: a point there is on both")
+    t.hear([("E", 1.0)], 0.0)
+    t.hear([("E", 1.0)], 0.01)
+    out.append("# at the centre, between the apexes")
+    t.hear([("C", 1.0)], 0.0)
+    t.hear([("C", 1.0)], 0.25)
+    t.hear([("C", 0.5), ("E", 0.5)], -0.25)
+    out.append("# the rim cannot go below on the top, nor above on the bottom")
+    t.select("E")
+    t.do("raise", 1, True)
+    t.do("levelup")
+    t.do("raise", -1, True)
+    t.do("raise", 1, True)
+    out.append("# saved and opened again: the touch survives the files")
+    t.do("savepair", "octahedron")
+    t.do("empty")
+    t.do("openpair", "octahedron.json")
     t.end()
 
 if __name__ == "__main__":

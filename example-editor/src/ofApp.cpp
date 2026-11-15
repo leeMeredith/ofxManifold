@@ -522,7 +522,9 @@ std::string ofApp::keyId(int key) const {
         }
         if (key == 'o' || key == 'O' || key == 15) return "open";
         if (key == 'n' || key == 'N' || key == 14) return "empty";
-        if (key == 'e' || key == 'E' || key == 5)  return "example";
+        if (key == 'e' || key == 'E' || key == 5) {
+            return (key == 'E' || shift) ? "octahedron" : "example";
+        }
         if (key == '3' || key == '#') return "view3d";
         if (key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) return "removelevel";
         return "";
@@ -675,11 +677,15 @@ void ofApp::keyPressed(int key) {
         adopt();
         return;
     }
-    if (id == "example") {
+    if (id == "example" || id == "octahedron") {
         const std::string before = currentPath;
-        act("example map", [](Model& m) {
-            m.loadExample();
-            return Result{true, false, "", 0.0f};
+        const bool octa = id == "octahedron";
+        act(octa ? "octahedron example" : "example map", [octa](Model& m) {
+            if (octa) m.loadOctahedron();
+            else      m.loadExample();
+            return Result{true, false,
+                          octa ? "the octahedron: two levels meeting at the rim"
+                               : "", octa ? 3.0f : 0.0f};
         });
         pathMarks.push_back({history.undoCount(), before});
         currentPath.clear();

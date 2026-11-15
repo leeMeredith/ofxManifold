@@ -230,6 +230,7 @@ private:
     bool        recordedInLevels = false;
     std::vector<ofxManifold::WeightedNode> floorWeights() const;
     float       topLevel() const;        // count() - 1: u's top
+    ofxManifold::Evaluation3D heardAt() const;   // by u on the levels, z in units
     ofxManifold::RandomWalk heightWalk;  // x and y held: only its height is used
     double      heightFrom = 0.0;
 
