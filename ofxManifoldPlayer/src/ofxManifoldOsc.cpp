@@ -230,6 +230,7 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
         msgs.push_back({p + "/position", {OscArg::number(f.position.x),
                                           OscArg::number(f.position.y),
                                           OscArg::number(f.position.z)}});
+        if (f.hasLevelPosition) msgs.back().args.push_back(OscArg::number(f.levelPosition));
     }
     return msgs;
 }

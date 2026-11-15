@@ -2465,3 +2465,35 @@ gate: /beat not read
 file: ofxManifoldPlayer/src/ofxManifoldClocks.h
 find:     if (m.address != "/beat" || m.args.empty() || m.args[0].type != 'i') return false;
 replace:     if (m.address != "/beats" || m.args.empty() || m.args[0].type != 'i') return false;
+
+gate: A level position is not held to the levels
+file: src/core/ofxManifoldLevels.h
+find:         if (!extrapolate) u = std::min(std::max(u, 0.0f), float(n - 1));
+replace:         (void)extrapolate;
+
+gate: A level position rounds to its cell instead of flooring
+file: src/core/ofxManifoldLevels.h
+find:         const float f = std::floor(u);
+replace:         const float f = std::round(u);
+
+gate: Off the floor plan the levels are not flat
+file: src/core/ofxManifoldLevels.h
+find:         return w.empty() ? levels_[k].base : heightAt(k, w);
+replace:         return heightAt(k, w);
+
+gate: A height past the levels is not held
+file: src/core/ofxManifoldLevels.h
+find:             if (z <= h[0]) return 0.0f;\n            if (z >= h[n - 1]) return float(n - 1);
+replace:             (void)0;
+nl: yes
+
+gate: A height is always read in the bottom cell
+file: src/core/ofxManifoldLevels.h
+find:         while (k + 2 < n && !(z < h[k + 1])) ++k;\n        return float(k) + (z - h[k]) / (h[k + 1] - h[k]);
+replace:         return float(k) + (z - h[k]) / (h[k + 1] - h[k]);
+nl: yes
+
+gate: The level position is not sent
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         if (f.hasLevelPosition) msgs.back().args.push_back(OscArg::number(f.levelPosition));
+replace:         (void)f.hasLevelPosition;

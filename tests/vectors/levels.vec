@@ -123,6 +123,78 @@ EVAL3 copybent_mid CROSS copybent W 0=0.5 2=0.5 Z 0.95 EXPECT 0@1=0.15 0@2=0.35 
 EVAL3 between_inserted ANALYTIC between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.2 EXPECT 0@0=0.125 0@1=0.125 1@0=0.125 1@1=0.125 2@0=0.125 2@1=0.125 3@0=0.125 3@1=0.125
 
 #--------------------------------------------------------------------
+# HEIGHT IN LEVELS (round 3B-2c). UPOS: level position u to a
+# height at the point; ZPOS: back. Restrained (R) holds u to
+# 0..L-1; extrapolated (X) carries the end cells on. Off the
+# floor plan (W -) the levels are flat, at their bases.
+#--------------------------------------------------------------------
+# one level: u means nothing; the height is that level's
+UPOS u_one_level ANALYTIC flat W 0=0.25 1=0.25 2=0.25 3=0.25 U 1.7 R EXPECT 0
+ZPOS z_one_level ANALYTIC flat W 0=0.25 1=0.25 2=0.25 3=0.25 Z 3 R EXPECT 0
+# flat levels at 0, 0.5, 1: u = 0.5 half way up the first gap
+UPOS u_half_cell ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U 0.5 R EXPECT 0.25
+UPOS u_one_and_half ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U 1.5 R EXPECT 0.75
+UPOS u_top ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U 2 R EXPECT 1
+# restrained: past the top is the top
+UPOS u_held_above ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U 2.4 R EXPECT 1
+# extrapolated: the top gap, 0.5, carried on
+UPOS u_past_top ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U 2.4 X EXPECT 1.2
+UPOS u_held_below ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U -0.5 R EXPECT 0
+UPOS u_past_bottom ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 U -0.5 X EXPECT -0.25
+# at node 2 the middle level is raised to 0.8: on it is 0.8
+UPOS u_on_bend ANALYTIC bent W 2=1 U 1 R EXPECT 0.8
+# half way from the ground to the bent middle level
+UPOS u_under_bend ANALYTIC bent W 2=1 U 0.5 R EXPECT 0.4
+UPOS u_over_bend ANALYTIC bent W 2=1 U 1.5 R EXPECT 0.9
+# at node 0 the middle level is still at 0.5
+UPOS u_away_from_bend ANALYTIC bent W 0=1 U 1 R EXPECT 0.5
+# where the bend is partial: 0.5 + 0.4 x 0.3 = 0.62
+UPOS u_partial_bend CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 U 1 R EXPECT 0.62
+# past the top over the bend: the top gap there is 0.2
+UPOS u_bend_past_top CROSS bent W 2=1 U 2.5 X EXPECT 1.1
+# off the floor plan: the bases, flat -- the bend is not there
+UPOS u_off_plan ANALYTIC bent W - U 1.5 R EXPECT 0.75
+ZPOS z_half_cell ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.25 R EXPECT 0.5
+ZPOS z_upper_cell ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.9 R EXPECT 1.8
+ZPOS z_on_level ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.5 R EXPECT 1
+ZPOS z_held_above ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z 1.2 R EXPECT 2
+ZPOS z_past_top ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z 1.2 X EXPECT 2.4
+ZPOS z_held_below ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z -0.3 R EXPECT 0
+ZPOS z_past_bottom ANALYTIC three W 0=0.25 1=0.25 2=0.25 3=0.25 Z -0.3 X EXPECT -0.6
+ZPOS z_under_bend ANALYTIC bent W 2=1 Z 0.4 R EXPECT 0.5
+ZPOS z_over_bend ANALYTIC bent W 2=1 Z 0.9 R EXPECT 1.5
+ZPOS z_off_plan ANALYTIC bent W - Z 0.75 R EXPECT 1.5
+# round trips, u to z to u, every cell, bent and flat, both modes
+ZPOS round_0_0 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z 0 R EXPECT 0
+ZPOS round_0_0.3 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z 0.186 R EXPECT 0.3
+ZPOS round_0_1 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z 0.62 R EXPECT 1
+ZPOS round_0_1.7 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z 0.886 R EXPECT 1.7
+ZPOS round_0_2 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z 1 R EXPECT 2
+ZPOS round_0_past_-0.4 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z -0.248 X EXPECT -0.4
+ZPOS round_0_past_2.6 CROSS bent W 0=0.2 1=0.3 2=0.4 3=0.1 Z 1.228 X EXPECT 2.6
+ZPOS round_1_0 CROSS copybent W 0=0.5 2=0.5 Z 0 R EXPECT 0
+ZPOS round_1_0.3 CROSS copybent W 0=0.5 2=0.5 Z 0.18 R EXPECT 0.3
+ZPOS round_1_1 CROSS copybent W 0=0.5 2=0.5 Z 0.6 R EXPECT 1
+ZPOS round_1_1.7 CROSS copybent W 0=0.5 2=0.5 Z 0.95 R EXPECT 1.7
+ZPOS round_1_2 CROSS copybent W 0=0.5 2=0.5 Z 1.1 R EXPECT 2
+ZPOS round_1_past_-0.4 CROSS copybent W 0=0.5 2=0.5 Z -0.24 X EXPECT -0.4
+ZPOS round_1_past_2.6 CROSS copybent W 0=0.5 2=0.5 Z 1.4 X EXPECT 2.6
+ZPOS round_2_0 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0 R EXPECT 0
+ZPOS round_2_0.3 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.12 R EXPECT 0.3
+ZPOS round_2_1 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.4 R EXPECT 1
+ZPOS round_2_1.7 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 0.82 R EXPECT 1.7
+ZPOS round_2_2 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 1 R EXPECT 2
+ZPOS round_2_past_-0.4 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z -0.16 X EXPECT -0.4
+ZPOS round_2_past_2.6 CROSS between W 0=0.25 1=0.25 2=0.25 3=0.25 Z 1.36 X EXPECT 2.6
+ZPOS round_3_0 CROSS bent W 2=1 Z 0 R EXPECT 0
+ZPOS round_3_0.3 CROSS bent W 2=1 Z 0.24 R EXPECT 0.3
+ZPOS round_3_1 CROSS bent W 2=1 Z 0.8 R EXPECT 1
+ZPOS round_3_1.7 CROSS bent W 2=1 Z 0.94 R EXPECT 1.7
+ZPOS round_3_2 CROSS bent W 2=1 Z 1 R EXPECT 2
+ZPOS round_3_past_-0.4 CROSS bent W 2=1 Z -0.32 X EXPECT -0.4
+ZPOS round_3_past_2.6 CROSS bent W 2=1 Z 1.12 X EXPECT 2.6
+
+#--------------------------------------------------------------------
 # THE WHOLE PATH: a real point (x, y, z) through the C++ floor
 # plan's own evaluation, then the levels. Here the point
 # reproduced is the query point itself.

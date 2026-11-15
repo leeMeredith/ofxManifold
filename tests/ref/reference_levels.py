@@ -24,6 +24,7 @@ the weights reproduce the point. Sum over (node, level) of weight times
 Writes tests/vectors/levels.vec.
 """
 
+import math
 import os
 import sys
 
@@ -162,6 +163,44 @@ class Stack:
                         out[(i, k + 1)] = w * (1.0 - up)
                 return out
         return None
+
+
+def level_height(st, k, lam):
+    """A level's height under the point; its base off the floor plan."""
+    if not lam:
+        return st.bases[k]
+    return sum(w * st.H[k][i] for i, w in lam.items())
+
+
+def height_at_position(st, lam, u, extrapolate=False):
+    """3B-2c: the height at level position u -- 0 the bottom surface, 1 the
+    next. Restrained: u held to 0..L-1. Extrapolated: the end cells carry on."""
+    L = len(st.H)
+    if L == 1:
+        return level_height(st, 0, lam)
+    if not extrapolate:
+        u = min(max(u, 0.0), float(L - 1))
+    k = min(max(int(math.floor(u)), 0), L - 2)
+    lo, hi = level_height(st, k, lam), level_height(st, k + 1, lam)
+    return lo + (u - k) * (hi - lo)
+
+
+def position_at(st, lam, z, extrapolate=False):
+    """Its inverse, worked out the other way: by walking the cells from the
+    top down, as `weigh` does, and solving within the one that holds z."""
+    L = len(st.H)
+    if L == 1:
+        return 0.0
+    h = [level_height(st, k, lam) for k in range(L)]
+    if not extrapolate:
+        if z <= h[0]:
+            return 0.0
+        if z >= h[-1]:
+            return float(L - 1)
+    for k in range(L - 2, -1, -1):
+        if h[k] <= z or k == 0:
+            return k + (z - h[k]) / (h[k + 1] - h[k])
+    return 0.0
 
 
 def floor_weights(nodes, tris, p):
@@ -396,6 +435,84 @@ def build():
     eval_rec("between_inserted", "ANALYTIC", "between", mid, 0.2,
              ["the level copied to 0.4 sits between 0 and 1.0: z = 0.2 is",
               "halfway between the ground and IT"])
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# HEIGHT IN LEVELS (round 3B-2c). UPOS: level position u to a")
+    out.append("# height at the point; ZPOS: back. Restrained (R) holds u to")
+    out.append("# 0..L-1; extrapolated (X) carries the end cells on. Off the")
+    out.append("# floor plan (W -) the levels are flat, at their bases.")
+    out.append("#" + "-" * 68)
+
+    def upos(name, cls, sname, lam, u, ex, want=None, note=None):
+        for line in note or []:
+            out.append("# " + line)
+        z = height_at_position(stacks[sname], lam, u, ex)
+        if want is not None:
+            assert abs(z - want) < 1e-12, (name, z, want)
+        out.append(f"UPOS {name} {cls} {sname} W {lam_s(lam) if lam else '-'} "
+                   f"U {fmt(u)} {'X' if ex else 'R'} EXPECT {fmt(z)}")
+        return z
+
+    def zpos(name, cls, sname, lam, z, ex, want=None, note=None):
+        for line in note or []:
+            out.append("# " + line)
+        u = position_at(stacks[sname], lam, z, ex)
+        if want is not None:
+            assert abs(u - want) < 1e-12, (name, u, want)
+        out.append(f"ZPOS {name} {cls} {sname} W {lam_s(lam) if lam else '-'} "
+                   f"Z {fmt(z)} {'X' if ex else 'R'} EXPECT {fmt(u)}")
+        return u
+
+    upos("u_one_level", "ANALYTIC", "flat", mid, 1.7, False, 0.0,
+         ["one level: u means nothing; the height is that level's"])
+    zpos("z_one_level", "ANALYTIC", "flat", mid, 3.0, False, 0.0)
+    upos("u_half_cell", "ANALYTIC", "three", mid, 0.5, False, 0.25,
+         ["flat levels at 0, 0.5, 1: u = 0.5 half way up the first gap"])
+    upos("u_one_and_half", "ANALYTIC", "three", mid, 1.5, False, 0.75)
+    upos("u_top", "ANALYTIC", "three", mid, 2.0, False, 1.0)
+    upos("u_held_above", "ANALYTIC", "three", mid, 2.4, False, 1.0,
+         ["restrained: past the top is the top"])
+    upos("u_past_top", "ANALYTIC", "three", mid, 2.4, True, 1.2,
+         ["extrapolated: the top gap, 0.5, carried on"])
+    upos("u_held_below", "ANALYTIC", "three", mid, -0.5, False, 0.0)
+    upos("u_past_bottom", "ANALYTIC", "three", mid, -0.5, True, -0.25)
+    upos("u_on_bend", "ANALYTIC", "bent", {2: 1.0}, 1.0, False, 0.8,
+         ["at node 2 the middle level is raised to 0.8: on it is 0.8"])
+    upos("u_under_bend", "ANALYTIC", "bent", {2: 1.0}, 0.5, False, 0.4,
+         ["half way from the ground to the bent middle level"])
+    upos("u_over_bend", "ANALYTIC", "bent", {2: 1.0}, 1.5, False, 0.9)
+    upos("u_away_from_bend", "ANALYTIC", "bent", {0: 1.0}, 1.0, False, 0.5,
+         ["at node 0 the middle level is still at 0.5"])
+    upos("u_partial_bend", "CROSS", "bent", {0: 0.2, 1: 0.3, 2: 0.4, 3: 0.1}, 1.0,
+         False, 0.62, ["where the bend is partial: 0.5 + 0.4 x 0.3 = 0.62"])
+    upos("u_bend_past_top", "CROSS", "bent", {2: 1.0}, 2.5, True, 1.1,
+         ["past the top over the bend: the top gap there is 0.2"])
+    upos("u_off_plan", "ANALYTIC", "bent", None, 1.5, False, 0.75,
+         ["off the floor plan: the bases, flat -- the bend is not there"])
+    zpos("z_half_cell", "ANALYTIC", "three", mid, 0.25, False, 0.5)
+    zpos("z_upper_cell", "ANALYTIC", "three", mid, 0.9, False, 1.8)
+    zpos("z_on_level", "ANALYTIC", "three", mid, 0.5, False, 1.0)
+    zpos("z_held_above", "ANALYTIC", "three", mid, 1.2, False, 2.0)
+    zpos("z_past_top", "ANALYTIC", "three", mid, 1.2, True, 2.4)
+    zpos("z_held_below", "ANALYTIC", "three", mid, -0.3, False, 0.0)
+    zpos("z_past_bottom", "ANALYTIC", "three", mid, -0.3, True, -0.6)
+    zpos("z_under_bend", "ANALYTIC", "bent", {2: 1.0}, 0.4, False, 0.5)
+    zpos("z_over_bend", "ANALYTIC", "bent", {2: 1.0}, 0.9, False, 1.5)
+    zpos("z_off_plan", "ANALYTIC", "bent", None, 0.75, False, 1.5)
+    out.append("# round trips, u to z to u, every cell, bent and flat, both modes")
+    for i, (sname, lam) in enumerate([("bent", {0: 0.2, 1: 0.3, 2: 0.4, 3: 0.1}),
+                                      ("copybent", {0: 0.5, 2: 0.5}),
+                                      ("between", mid), ("bent", {2: 1.0})]):
+        for u in (0.0, 0.3, 1.0, 1.7, 2.0):
+            z = height_at_position(stacks[sname], lam, u, False)
+            back = position_at(stacks[sname], lam, z, False)
+            assert abs(back - u) < 1e-9, (sname, u, back)
+            zpos(f"round_{i}_{fmt(u)}", "CROSS", sname, lam, z, False, u)
+        for u in (-0.4, 2.6):
+            z = height_at_position(stacks[sname], lam, u, True)
+            assert abs(position_at(stacks[sname], lam, z, True) - u) < 1e-9
+            zpos(f"round_{i}_past_{fmt(u)}", "CROSS", sname, lam, z, True, u)
     out.append("")
 
     out.append("#" + "-" * 68)

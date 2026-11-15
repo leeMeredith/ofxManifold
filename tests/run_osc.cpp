@@ -210,6 +210,7 @@ int main(int argc, char** argv) {
                         std::istringstream ps(f[3]);
                         ps >> fr.position.x >> fr.position.y >> fr.position.z;
                         fr.hasPosition = true;
+                        if (ps >> fr.levelPosition) fr.hasLevelPosition = true;
                     }
                     const std::size_t want = std::stoul(f[4]);
                     const auto msgs = out.frame(now, fr);

@@ -663,6 +663,33 @@ int main(int argc, char** argv) {
                                   st.levels.count() == 1, d);
             record(cls, name, ok, d.str());
 
+        } else if (kind == "UPOS" || kind == "ZPOS") {
+            // Height in levels (3B-2c): a level position to a height at the
+            // point, or back; R restrained, X extrapolated.
+            std::string sn; in >> sn;
+            expectKeyword(in, "W");
+            std::vector<WeightedNode> w;
+            std::string tok;
+            const char* until = kind == "UPOS" ? "U" : "Z";
+            while (in >> tok && tok != until) {
+                if (tok == "-") continue;
+                const std::size_t eq = tok.find('=');
+                w.push_back(WeightedNode{static_cast<NodeID>(std::stoul(tok.substr(0, eq))),
+                                         std::stof(tok.substr(eq + 1))});
+            }
+            float given; std::string mode;
+            in >> given >> mode;
+            expectKeyword(in, "EXPECT");
+            float want; in >> want;
+            const Levels& lv = stacks[sn].levels;
+            const bool ex = mode == "X";
+            const float got = kind == "UPOS" ? lv.heightAtPosition(w, given, ex)
+                                             : lv.positionAt(w, given, ex);
+            const bool ok = close(got, want);
+            if (!ok) d << (kind == "UPOS" ? "height " : "position ") << got
+                       << ", expected " << want;
+            record(cls, name, ok, d.str());
+
         } else if (kind == "EVALXYZ") {
             // The whole path: the C++ floor plan evaluates (x, y) itself.
             std::string sn, fp; in >> sn >> fp;

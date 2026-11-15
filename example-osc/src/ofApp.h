@@ -82,6 +82,8 @@
 //   { }             the step distance shorter / longer (anywhere at the top)
 //   c               when steps happen: a timer, your clicks, the bridge's beats
 //   return          one step (with clicks; a click on the map does the same)
+//   k               the height measured on the levels (riding their bends,
+//                   held between bottom and top), past them, or in units
 //   h               the height: by hand, jumping, gliding -- on its own,
 //                   whatever moves the floor: drag the point while the
 //                   height wanders, or hold up / down while the floor does
@@ -140,6 +142,12 @@ private:
     // recording plays, the heights recorded), or jumping or gliding at
     // random across the map's levels, whatever moves the floor.
     enum class HeightBy { Hand, Jump, Glide };
+    // How the height is measured (3B-2c). On the levels: a level position u
+    // -- 0 on the bottom surface, 1 on the next -- at the point, so it rides
+    // the bends and is held between the bottom and the top. Past the levels:
+    // the same, free to carry on beyond them (silent out there). In units:
+    // the height itself, as before.
+    enum class HeightIn { Levels, Past, Units };
     double count() const;               // the clock's count now
     void   startMoving();               // the walks again, from where the point is
     void   startHeight();               // the height's walk again
@@ -217,6 +225,11 @@ private:
     int         travelAt = 3;            // kTravels[]: 0.4
     int         stepAt = 0;              // kSteps[]: anywhere
     HeightBy    heightBy = HeightBy::Hand;
+    HeightIn    heightIn = HeightIn::Levels;
+    float       u = 0.0f;                // the level position, kept in step with z
+    bool        recordedInLevels = false;
+    std::vector<ofxManifold::WeightedNode> floorWeights() const;
+    float       topLevel() const;        // count() - 1: u's top
     ofxManifold::RandomWalk heightWalk;  // x and y held: only its height is used
     double      heightFrom = 0.0;
 

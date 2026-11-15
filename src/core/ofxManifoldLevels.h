@@ -43,6 +43,7 @@
 #include "ofxManifoldTypes.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <limits>
 #include <string>
@@ -100,6 +101,51 @@ public:
         float h = 0.0f;
         for (const auto& wn : w) h += wn.weight * height(k, wn.id);
         return h;
+    }
+
+    // ---- height measured in levels (round 3B-2c) ----------------------------
+    //
+    // A level position u: 0 on the bottom level's surface, 1 on the next
+    // level's, 1.5 half way between the second and third -- at the point the
+    // floor-plan weights `w` describe, so on bent levels it follows the bends.
+    // Off the floor plan (no weights) the levels are taken flat, at their
+    // bases. One level: u is 0, the height that level's.
+    //
+    // RESTRAINED (the default) holds u to 0..count()-1: the point never leaves
+    // the volume between the bottom and top surfaces. EXTRAPOLATED lets u run
+    // past the ends, the outermost surfaces' spacing carried on -- below the
+    // bottom by the gap from it to the next level, above the top by the gap
+    // below it -- so the bend is followed out there too. Outside is still
+    // outside: evaluate() reads it as silent, as ever.
+
+    // The height at level position u.
+    float heightAtPosition(const std::vector<WeightedNode>& w, float u,
+                           bool extrapolate = false) const {
+        const std::size_t n = levels_.size();
+        if (n == 1) return levelHeight(0, w);
+        if (!extrapolate) u = std::min(std::max(u, 0.0f), float(n - 1));
+        const LevelID k = cellBelow(u, n);
+        const float lo = levelHeight(k, w), hi = levelHeight(k + 1, w);
+        return lo + (u - float(k)) * (hi - lo);
+    }
+
+    // Its inverse: the level position of height z. The levels never cross,
+    // so the surfaces are in order and the two agree both ways.
+    float positionAt(const std::vector<WeightedNode>& w, float z,
+                     bool extrapolate = false) const {
+        const std::size_t n = levels_.size();
+        if (n == 1) return 0.0f;
+        std::vector<float> h(n);
+        for (LevelID k = 0; k < n; ++k) h[k] = levelHeight(k, w);
+        if (!extrapolate) {
+            if (z <= h[0]) return 0.0f;
+            if (z >= h[n - 1]) return float(n - 1);
+        }
+        // The highest level at or below z, never the top one; below the
+        // bottom, the bottom cell, carried on.
+        LevelID k = 0;
+        while (k + 2 < n && !(z < h[k + 1])) ++k;
+        return float(k) + (z - h[k]) / (h[k + 1] - h[k]);
     }
 
     // ---- making levels ----------------------------------------------------
@@ -371,6 +417,18 @@ private:
         std::vector<float> heights;   // by NodeID; past the end, `base`
     };
     std::vector<Level> levels_;
+
+    // A level's height under the point; its base off the floor plan.
+    float levelHeight(LevelID k, const std::vector<WeightedNode>& w) const {
+        return w.empty() ? levels_[k].base : heightAt(k, w);
+    }
+
+    // The cell a level position falls in: the level below it, never the top.
+    static LevelID cellBelow(float u, std::size_t n) {
+        const float f = std::floor(u);
+        if (!(f > 0.0f)) return 0;
+        return std::min(LevelID(f), LevelID(n - 2));
+    }
 
     // Strictly above the level below and strictly below the level above.
     bool fits(LevelID k, NodeID n, float h) const {

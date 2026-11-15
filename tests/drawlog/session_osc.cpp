@@ -6,6 +6,9 @@
 // stand-in's 1024 x 640; ofxOsc is tests/stub's, which sends nowhere.
 
 #include "ofApp.h"
+#include "ofxManifoldEditorFiles.h"
+
+using namespace ofxManifold::editor;
 
 #include <cstdio>
 
@@ -87,7 +90,32 @@ int main() {
     a.keyPressed(OF_KEY_UP); run(40); a.keyReleased(OF_KEY_UP);
     frame("the floor glides; up held: the height rises by hand");
     key('M');
-    key('?');                  frame("?: every key");
+    // Height on the levels (3B-2c), over a bend: the room with its middle
+    // level's FR raised, saved as a pair and opened with o.
+    {
+        Model bent;
+        bent.loadRoom();
+        bent.goToLevel(1);
+        Selection fr;
+        fr.toggle(bent.manifold().findNode("FR"));
+        for (int i = 0; i < 3; ++i) bent.raise(fr, +1, false);
+        savePair(bent, "/tmp/drawlog-bent-room.json");
+        drawlogLoadPath() = "/tmp/drawlog-bent-room.json";
+        key('o');
+        drawlogLoadPath().clear();
+    }
+    a.mousePressed(110, 230, 0);   // by RL, away from the bend
+    frame("the bent room opened: on level 1, away from the bend");
+    a.keyPressed(OF_KEY_UP); run(60); a.keyReleased(OF_KEY_UP);
+    frame("up for a second: one level, onto the middle");
+    a.mousePressed(224, 90, 0);    // by FR, inside, where the middle is raised
+    run(2);                        frame("over FR: the same level position, the height risen with the bend");
+    key('k');                      frame("k: past the levels -- no jump");
+    a.keyPressed(OF_KEY_UP); run(90); a.keyReleased(OF_KEY_UP);
+    frame("up past the top: silent, the bend's gap carried on");
+    key('k');                      frame("k: in plain units -- no jump");
+    key('k');                      frame("k: on the levels again -- held to the top");
+    key('?');                      frame("?: every key");
     a.mousePressed(300, 300, 0); frame("a click: back to the map");
     key('b');                  frame("b: SuperCollider's bars -- no phase heard");
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);

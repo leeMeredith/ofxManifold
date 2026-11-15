@@ -25,6 +25,7 @@ const std::vector<OscKeyGroup>& keyGroups() {
     static const std::vector<OscKeyGroup> groups = {
         {"the point", {{"drag", "move it (with your hand)"},
                        {"up / down", "hold: the height (shift: slowly)"},
+                       {"k", "height on the levels, past them, in units"},
                        {"shift-click", "follow a node; on none: the loudest"},
                        {"click a fader", "that output's nodes ringed"},
                        {"tab", "the next output (shift: the last)"}}},
@@ -61,6 +62,8 @@ const std::vector<OscKeyGroup>& keyGroups() {
 constexpr double kIntervals[] = {0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0};
 constexpr double kTravels[]   = {0.05, 0.1, 0.2, 0.4, 0.8, 1.6};
 constexpr double kSteps[]     = {0.0, 0.5, 0.25, 0.1, 0.05};     // 0: anywhere
+// The arrows on the levels: levels a second (shift: a quarter of that).
+constexpr float kLevelsPerSecond = 1.0f, kLevelsPerSecondFine = 0.25f;
 template <class T, std::size_t N> int stepIn(const T (&)[N], int at, int by) {
     return std::max(0, std::min(int(N) - 1, at + by));
 }
@@ -193,16 +196,26 @@ void ofApp::startHeight() {
     if (!heightWalks()) return;
     WalkSettings s;
     s.seed = SplitMix64((seed ^ 0xA0761D6478BD642FULL) * 0x100000001B3ULL + ++restarts).next();
-    s.start = glm::dvec3(0.5, 0.5, z);
+    s.start = glm::dvec3(0.5, 0.5, 0.0);
     s.steps = steps == Steps::Timer ? StepTiming::every(kIntervals[intervalAt])
                                     : StepTiming::clicks();
     s.travel = heightBy == HeightBy::Jump ? 0.0 : kTravels[travelAt];
     s.easing = Easing::Smooth;
     s.x0 = s.x1 = 0.5;
     s.y0 = s.y1 = 0.5;
-    const Levels& lv = model.map3d().levels();
-    s.zLow = lv.base(0);
-    s.zHigh = lv.base(lv.count() - 1);
+    // On the levels (or past them), it walks the level position across the
+    // levels -- always somewhere real, riding the bends. In units, across the
+    // levels' flat bases, as before.
+    if (heightIn == HeightIn::Units) {
+        const Levels& lv = model.map3d().levels();
+        s.start.z = z;
+        s.zLow = lv.base(0);
+        s.zHigh = lv.base(lv.count() - 1);
+    } else {
+        s.start.z = u;
+        s.zLow = 0.0;
+        s.zHigh = topLevel();
+    }
     heightWalk = RandomWalk(s);
 }
 
@@ -236,6 +249,7 @@ void ofApp::adopt(const std::string& name) {
     renderer = std::make_unique<ofxManifoldRenderer>(model.manifold());
     evaluation = evaluator->evaluate(point);
     z = listenStart(model, evaluation);
+    u = model.map3d().levels().positionAt(floorWeights(), z, heightIn == HeightIn::Past);
     osc.reset();                      // the new map's outputs, described at once
     levelSmoother.reset();            // another map: taken at once, not glided into
     valueSmoother.reset();
@@ -304,14 +318,23 @@ void ofApp::layoutWindow() {
 // The level the point is on or above becomes the current one, so the 3D
 // view brightens it and the column fills its dot. Only for showing: what is
 // sent is worked out from every level at the point's height either way.
+//
+// The level is read from the level position -- from the surfaces under the
+// point, bends and all -- not from the levels' flat bases.
 void ofApp::followLevel() {
-    const Levels& lv = model.map3d().levels();
-    LevelID k = 0;
-    for (LevelID j = 0; j < lv.count(); ++j) {
-        if (lv.base(j) <= z) k = j;
-    }
+    const float top = topLevel();
+    const float at = std::min(std::max(std::floor(u + 1e-6f), 0.0f), top);
+    const LevelID k = LevelID(at);
     if (k != model.currentLevel()) model.goToLevel(k);
 }
+
+// The floor plan's weights at the point; none off it (the levels are then
+// taken flat, at their bases).
+std::vector<WeightedNode> ofApp::floorWeights() const {
+    return evaluation.inside ? evaluation.weights : std::vector<WeightedNode>{};
+}
+
+float ofApp::topLevel() const { return float(model.map3d().count() - 1); }
 
 // The node followed: pinned, while it is on the map, else the loudest at the
 // point; nothing off the map.
@@ -382,6 +405,8 @@ OscFrame ofApp::frameNow(const ChartLevels& lv) const {
     for (const auto& v : heardValues) f.values.push_back({v.first, v.second});
     f.hasPosition = true;
     f.position = {point.x, point.y, z};
+    f.hasLevelPosition = true;        // /position's fourth: where between the levels
+    f.levelPosition = u;
     return f;
 }
 
@@ -392,25 +417,54 @@ void ofApp::update() {
 
     // Moving itself: the floor where its movement says at the count, the
     // height where its own says -- each on its own.
+    bool recordedHeight = false;
+    float recordedValue = 0.0f;
     if (moving == Moving::Recording && hasRecording) {
         const glm::vec3 p = recorded.at(count() - movedFrom);
         point = glm::vec2(p.x, p.y);
-        if (heightBy == HeightBy::Hand) z = p.z;   // the heights recorded
+        recordedHeight = heightBy == HeightBy::Hand;   // the heights recorded
+        recordedValue = p.z;
     } else if (floorWalks()) {
         const glm::vec3 p = walk.at(count() - movedFrom);
         point = glm::vec2(p.x, p.y);
     }
-    if (heightWalks()) {
-        z = heightWalk.at(count() - heightFrom).z;
-    } else if (glideDir != 0 && !(moving == Moving::Recording && hasRecording)) {
-        z = glide(z, glideDir, ofGetKeyPressed(OF_KEY_SHIFT), float(ofGetLastFrameTime()));
+    evaluation = evaluator->evaluate(point);
+
+    // The height. On the levels, u moves and the height follows from the
+    // surfaces under the point; in units, the height moves and u follows.
+    const Levels& lv = model.map3d().levels();
+    const std::vector<WeightedNode> w = floorWeights();
+    const bool past = heightIn == HeightIn::Past;
+    const float dt = float(ofGetLastFrameTime());
+    if (heightIn != HeightIn::Units) {
+        if (heightWalks()) {
+            u = heightWalk.at(count() - heightFrom).z;
+        } else if (recordedHeight) {
+            u = recordedInLevels ? recordedValue : lv.positionAt(w, recordedValue, past);
+        } else if (glideDir != 0) {
+            u += float(glideDir) * (ofGetKeyPressed(OF_KEY_SHIFT) ? kLevelsPerSecondFine
+                                                                  : kLevelsPerSecond) * dt;
+        }
+        if (!past) u = std::min(std::max(u, 0.0f), topLevel());
+        z = lv.heightAtPosition(w, u, past);
+    } else {
+        if (heightWalks()) {
+            z = heightWalk.at(count() - heightFrom).z;
+        } else if (recordedHeight) {
+            z = recordedInLevels ? lv.heightAtPosition(w, recordedValue, true) : recordedValue;
+        } else if (glideDir != 0) {
+            z = glide(z, glideDir, ofGetKeyPressed(OF_KEY_SHIFT), dt);
+        }
+        u = lv.positionAt(w, z, true);
     }
-    // Recording takes the point wherever it is, on the clock running.
-    if (recording) taking.addSample(float(count() - takingFrom), glm::vec3(point.x, point.y, z));
+    // Recording takes the point wherever it is, on the clock running: its
+    // level position on the levels, so it replays riding the shape.
+    if (recording) taking.addSample(float(count() - takingFrom),
+                                    glm::vec3(point.x, point.y,
+                                              heightIn == HeightIn::Units ? z : u));
     followLevel();
     text.fit();
     layoutWindow();
-    evaluation = evaluator->evaluate(point);
 
     follow();
 
@@ -506,9 +560,21 @@ void ofApp::draw() {
         line("no answer yet -- fine: nothing waits for one", dim);
     }
     line("point " + ofToString(point.x, 3) + " " + ofToString(point.y, 3), plain);
-    line("height " + ofToString(z, 3) + " (up / down)   level "
-         + ofToString(model.currentLevel() + 1) + " of " + ofToString(model.map3d().count()),
-         plain);
+    {
+        // Where between the levels, from the surfaces under the point.
+        const int levels = int(model.map3d().count());
+        std::string where = "level 1 of 1";
+        if (levels > 1) {
+            const float at = std::floor(u + 1e-4f);
+            const bool on = std::fabs(u - std::round(u)) < 1e-3f;
+            if (u < -1e-4f || u > topLevel() + 1e-4f) where = "past the levels, silent";
+            else if (on) where = "on level " + ofToString(int(std::round(u)) + 1) + " of " + ofToString(levels);
+            else where = "between " + ofToString(int(at) + 1) + " and " + ofToString(int(at) + 2);
+        }
+        line("height " + ofToString(z, 3) + ", level " + ofToString(u, 2) + " (up / down)", plain);
+        const char* in[] = {"on the levels", "past the levels", "in plain units"};
+        line(where + " -- " + in[int(heightIn)] + " (k)", plain);
+    }
     {
         // Movement.
         line("moving: " + movingName() + ", seed " + ofToString(seed) + " (m n)", plain);
@@ -748,6 +814,7 @@ void ofApp::keyPressed(int key) {
                 recorded = RecordedMotion(taking, RecordedMotion::End::Loop);
                 hasRecording = true;
                 recordedOnPhase = onPhase;
+                recordedInLevels = heightIn != HeightIn::Units;
                 moving = Moving::Recording;
                 startMoving();
                 say("recorded: it loops (m for the others)");
@@ -783,6 +850,17 @@ void ofApp::keyPressed(int key) {
     }
     else if (key == OF_KEY_RETURN) {
         if (steps == Steps::Clicks) step();
+    }
+    else if (key == 'k') {
+        heightIn = heightIn == HeightIn::Levels ? HeightIn::Past
+                 : heightIn == HeightIn::Past ? HeightIn::Units : HeightIn::Levels;
+        // The point stays where it is: u from the height, held when restrained.
+        u = model.map3d().levels().positionAt(floorWeights(), z, heightIn == HeightIn::Past);
+        startHeight();
+        const char* said[] = {"height on the levels: riding their bends, held between bottom and top",
+                              "height on the levels, free to go past them (silent out there)",
+                              "height in plain units"};
+        say(said[int(heightIn)]);
     }
     else if (key == 'h') {
         heightBy = heightBy == HeightBy::Hand ? HeightBy::Jump

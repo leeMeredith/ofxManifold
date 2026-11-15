@@ -11,7 +11,7 @@
 //     /manifold/out/NAME  f                          per output
 //     /manifold/values    M  name0 v0  name1 v1 ...  packed
 //     /manifold/value/NAME f                         per value
-//     /manifold/position  x y z
+//     /manifold/position  x y z [u: where between the levels]
 //     /manifold/describe                             in: describe again
 //     /manifold/hello     [name]                     in: a receiver is there
 //
@@ -76,6 +76,11 @@ struct OscFrame {
     std::vector<OscValue>  values;
     bool                   hasPosition = false;
     glm::vec3              position{0.0f};
+    // Where between the levels the point is (round 3B-2c): 0 on the bottom
+    // level's surface, 1 on the next, at the point. Sent as /position's
+    // fourth number when set; a receiver reading three is unaffected.
+    bool                   hasLevelPosition = false;
+    float                  levelPosition = 0.0f;
 };
 
 class OscOut {

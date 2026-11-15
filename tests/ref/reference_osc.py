@@ -295,6 +295,8 @@ def encode_vectors(out):
         ("float_small", "/manifold/out/front", [("f", 1e-7)]),
         ("float_negative_zero", "/f", [("f", -0.0)]),
         ("position", "/manifold/position", [("f", 0.3), ("f", 0.8), ("f", 0.55)]),
+        ("position_with_level", "/manifold/room/position",
+         [("f", 0.3), ("f", 0.8), ("f", 0.55), ("f", 1.25)]),
         ("values", "/manifold/values",
          [("i", 2), ("s", "brightness"), ("f", 0.75), ("s", "reverb"), ("f", 0.2)]),
         ("hello", "/manifold/hello", [("s", "sclang")]),
@@ -427,6 +429,13 @@ def send_vectors(out):
                "both shapes at once, values and the position", per_output=True)
     t.frame(0.0, two, [("brightness", 0.5), ("reverb", 0.1)], (0.3, 0.8, 0.0))
     t.frame(1 / 60, two, [("brightness", 0.5), ("reverb", 0.2)], (0.31, 0.8, 0.0))
+    t.end()
+
+    t = Script(out, "position_with_level",
+               "3B-2c: where between the levels, /position's fourth number; "
+               "without it, three as before", map_name="room")
+    t.frame(0.0, two, [], (0.3, 0.8, 0.375, 1.5))
+    t.frame(1 / 60, two, [], (0.3, 0.8, 0.375))
     t.end()
 
     t = Script(out, "rate_and_late_frames",

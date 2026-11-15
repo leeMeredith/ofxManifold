@@ -175,7 +175,14 @@ public:
     bool bSuccess = false;
 };
 inline ofFileDialogResult ofSystemSaveDialog(const std::string&, const std::string&) { return {}; }
-inline ofFileDialogResult ofSystemLoadDialog(const std::string& = "", bool = false, const std::string& = "") { return {}; }
+// A session may set the file the load dialog "chooses"; empty: cancelled.
+inline std::string& drawlogLoadPath() { static std::string p; return p; }
+inline ofFileDialogResult ofSystemLoadDialog(const std::string& = "", bool = false, const std::string& = "") {
+    ofFileDialogResult r;
+    r.filePath = drawlogLoadPath();
+    r.bSuccess = !r.filePath.empty();
+    return r;
+}
 // The arrows and the 3D view (round 3A-6). The camera is recorded where it
 // begins and ends; inside, 3D lines and spheres are recorded with their
 // world coordinates.

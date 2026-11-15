@@ -14,6 +14,7 @@ ENCODE int_large | /manifold/n | ,i | 2147483647 | 2f6d616e69666f6c642f6e002c690
 ENCODE float_small | /manifold/out/front | ,f | 1.00000001e-07 | 2f6d616e69666f6c642f6f75742f66726f6e74002c66000033d6bf95
 ENCODE float_negative_zero | /f | ,f | -0 | 2f6600002c66000080000000
 ENCODE position | /manifold/position | ,fff | 0.300000012 0.800000012 0.550000012 | 2f6d616e69666f6c642f706f736974696f6e00002c666666000000003e99999a3f4ccccd3f0ccccd
+ENCODE position_with_level | /manifold/room/position | ,ffff | 0.300000012 0.800000012 0.550000012 1.25 | 2f6d616e69666f6c642f726f6f6d2f706f736974696f6e002c666666660000003e99999a3f4ccccd3f0ccccd3fa00000
 ENCODE values | /manifold/values | ,isfsf | 2 "brightness" 0.75 "reverb" 0.200000003 | 2f6d616e69666f6c642f76616c756573000000002c69736673660000000000026272696768746e65737300003f40000072657665726200003e4ccccd
 ENCODE hello | /manifold/hello | ,s | "sclang" | 2f6d616e69666f6c642f68656c6c6f002c73000073636c616e670000
 ENCODE describe | /manifold/describe | , |  | 2f6d616e69666f6c642f646573637269626500002c000000
@@ -107,6 +108,17 @@ MSG /manifold/untitled/levels ,ff 0.75 0.25
 MSG /manifold/untitled/values ,isfsf 2 "brightness" 0.5 "reverb" 0.200000003
 MSG /manifold/untitled/value/reverb ,f 0.200000003
 MSG /manifold/untitled/position ,fff 0.310000002 0.800000012 0
+END
+# 3B-2c: where between the levels, /position's fourth number; without it, three as before
+SEND position_with_level prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0.375 1.5 | 4
+MSG /manifold/map ,siii "/manifold/room" 0 2 2
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,ffff 0.300000012 0.800000012 0.375 1.5
+FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0.375 | 2
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0.375
 END
 # at 30 a second: frames between sends send nothing; a late frame sends once, then the rate carries on from it -- no burst
 SEND rate_and_late_frames prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=30

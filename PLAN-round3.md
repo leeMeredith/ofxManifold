@@ -1963,6 +1963,41 @@ go for x". So the height moves on its own:
 - **By hand, while a recording plays**, means the heights you recorded; the
   arrows move the height in every other case.
 
+### 3B-2c: height on the levels -- riding the bends
+
+Built as specified (2026-11-14), every recommendation taken ("next", after
+"yes all recommended covers all three").
+
+- **`Levels::heightAtPosition(w, u, extrapolate)` and `positionAt(w, z,
+  extrapolate)`** in the kernel, with `levelHeight` (a level's base off the
+  floor plan) and `cellBelow`. Restrained by default. The Python reference
+  (`reference_levels.py`) works `positionAt` the other way round -- walking
+  the cells from the top down, as its `weigh` does. 54 vectors (UPOS, ZPOS):
+  one level; flat cells; on, under, over and away from the bend; a partial
+  bend; past the top over the bend; off the floor plan; held and carried on
+  at both ends; round trips u -> z -> u in every cell, bent and flat, both
+  modes. 5 gates; one anchor line reworded (`!(z < h[k + 1])`) so it is not
+  the same text as `evaluate`'s.
+- **`/position`'s fourth number**, u: `OscFrame::hasLevelPosition`,
+  `levelPosition`; an encoding vector against python-osc and a send script,
+  with and without it. 1 gate (467).
+- **example-osc**: `k` -- on the levels (default), past them, in units --
+  keeping the point where it is (u from the height, held when restrained).
+  On the levels the arrows move u, one level a second (shift a quarter), and
+  the height follows from the surfaces under the point; the random height
+  walks u across 0..L-1; recordings keep u (`recordedInLevels`) and replay
+  riding the shape; the floor's evaluation now comes before the height, since
+  the height needs it. The panel: "height 0.379, level 1.00" and "on level 2
+  of 3", "between 2 and 3", or "past the levels, silent". The level dot and
+  the 3D view's bright level follow u, not the flat bases.
+- **The drawlog session** opens a room whose middle level is raised at FR
+  (saved by the editor's model, opened through the stand-in's load dialog,
+  which a session can now point at a file): on level 2 by RL the height is
+  0.252; by FR, at the same u, 0.379 -- risen with the bend; past the top
+  there, 0.561, the bend's gap carried on; `k` to units and back without a
+  jump.
+- **Not done**: the editor's own listening point still moves in units.
+
 ---
 
 ## Answered

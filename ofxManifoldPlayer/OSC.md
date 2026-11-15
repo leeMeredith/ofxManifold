@@ -46,7 +46,7 @@ stopped.
 | `/manifold/room/out/NAME` | `f` | per output, if that is on: what changed, at every send; all of them every 0.1 s |
 | `/manifold/room/values` | `i` M, then M pairs of `s` name, `f` value | every send, if packed is on and the map has values |
 | `/manifold/room/value/NAME` | `f` | per value, as per output |
-| `/manifold/room/position` | `f` x, `f` y, `f` z | every send |
+| `/manifold/room/position` | `f` x, `f` y, `f` z, and optionally `f` u | every send |
 
 - **Levels are in the order `outputs` lists the outputs**, which is channel
   order. The channel numbers say where each would go on a device; they need
@@ -55,7 +55,11 @@ stopped.
   output's trim -- what the editor's faders show. Outside the map every level
   is 0. The sender smooths it (below).
 - **x and y are on the map, 0 to 1**, y up. **z is the height** in the map's
-  own units -- its levels' heights.
+  own units -- its levels' heights. **u, when sent, is where between the
+  levels**: 0 on the bottom level's surface at the point, 1 on the next, 1.5
+  half way between the second and third -- measured against the levels as
+  they bend there. Past 0 or the top level, the point is outside: silent.
+  A receiver reading three numbers is unaffected.
 - **Per-output addresses use the output's name** cleaned as map names are.
   The `outputs` message has the name as written.
 - **Sends happen at a rate, 60 a second by default** (settable from 1 to

@@ -207,7 +207,10 @@ your clicks, or on the beats of Lee's
 [ofxScPhaseBridge](https://github.com/leeMeredith/ofxScPhaseBridge) (`c`).
 Every movement counts in the clock's units: the app's own seconds, or bars
 from SuperCollider's `/phase` on port 9001 (`b`), so a step every 1/16 lands
-on SuperCollider's sixteenths and stretches with its tempo. `?` shows every
+on SuperCollider's sixteenths and stretches with its tempo. The height can be measured on the levels (`k`): a level position that rides
+the levels' bends and stays between the bottom and the top, so moving
+sideways over a raised node rises with it, and a random height never drops
+out of the map. `?` shows every
 key on one page. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
@@ -329,7 +332,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-960 vectors across fifteen suites, plus 461 mutation gates that introduce known
+1016 vectors across fifteen suites, plus 467 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite
