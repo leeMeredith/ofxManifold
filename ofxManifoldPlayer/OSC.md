@@ -143,5 +143,5 @@ against an independent OSC library (python-osc) in the tests.
 6. Optionally say the map's `hello` to its answer port once a second.
 
 The SuperCollider patch beside `example-osc` is exactly this, and decides
-what the shape sounds like in settings at its top: `\registers`,
-`\progression` or `\series`, brightness, the span.
+what the shape sounds like in settings at its top: `\progression`,
+`\somber`, `\registers` or `\series`, brightness, the span.

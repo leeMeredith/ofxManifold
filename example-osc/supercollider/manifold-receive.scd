@@ -14,15 +14,22 @@
 // its shape (/manifold/<map>/shape): how many levels, each output's level,
 // and where its node is. The settings just below choose what to make of it:
 //
-//   ~manifold[\music] = \registers   each level a chord in its own register,
-//                                    each of its outputs a chord note: 3 a
-//                                    triad, 4 a seventh, then 9, #11, 13.
+//   ~manifold[\music] = \progression each level a chord in one key -- I, IV,
+//                                    V, vi, ii, iii -- each of its outputs a
+//                                    chord note: 3 a triad, 4 a seventh, on
+//                                    up the scale in thirds. Every chord sits
+//                                    in ONE register, the octave above the
+//                                    root, as close together as it goes: going
+//                                    up the levels changes the harmony, not
+//                                    how high it is. More than seven outputs
+//                                    on a level: the rest an octave up.
+//   ~manifold[\music] = \somber      the same in a minor key: i, iv, VI, v,
+//                                    III, VII.
+//   ~manifold[\music] = \registers   each level the same chord in its own
+//                                    register, rising: 1 3 5 7 9 #11 13.
 //                                    ~manifold[\fit] = true: the levels share
 //                                    ~manifold[\span] semitones -- more levels
 //                                    sit closer; false: an octave each.
-//   ~manifold[\music] = \progression each level a chord in one key -- I, IV,
-//                                    V, vi, ii, iii -- so rising through the
-//                                    levels moves through the progression.
 //   ~manifold[\music] = \series      each level the next overtone over one
 //                                    root, its outputs the notes within it:
 //                                    wide at the bottom, close at the top.
@@ -51,8 +58,8 @@
 ~manifold[\ports] = 16;
 ~manifold[\silentAfter] = 5;      // seconds without a roll call: the map has gone
 ~manifold[\sound] = \tone;        // \tone: a note per output; \noise: a noise band
-~manifold[\music] = \registers;   // \registers, \progression or \series
-~manifold[\span] = 30;            // \registers, fit: the semitones the levels share
+~manifold[\music] = \progression; // \progression, \somber, \registers or \series
+~manifold[\span] = 12;            // \registers, fit: the semitones the levels share
 ~manifold[\fit] = true;           // \registers: share the span (true) or an octave each
 ~manifold[\bright] = true;        // the point's height opens each voice
 ~manifold[\quiet] = 0.4;          // a shared or unfed output's voice, against 1
@@ -68,16 +75,21 @@
 ~manifold[\stack] = [0, 4, 7, 11, 14, 18, 21];
 ~manifold[\major] = [0, 2, 4, 5, 7, 9, 11];
 ~manifold[\degrees] = [0, 3, 4, 5, 1, 2];     // I IV V vi ii iii
+~manifold[\minor] = [0, 2, 3, 5, 7, 8, 10];   // natural minor
+~manifold[\somberDegrees] = [0, 3, 5, 4, 2, 6];  // i iv VI v III VII
 
 // The i-th chord tone of the stack, i from 0.
 ~manifold[\stackTone] = { |i|
     var st = ~manifold[\stack];
     st[i % st.size] + (24 * (i div: st.size));
 };
-// The j-th step of the major scale from 0, as semitones.
-~manifold[\majorStep] = { |j|
-    var mj = ~manifold[\major];
-    mj[j % mj.size] + (12 * (j div: mj.size));
+// A progression's chord note, as semitones above the root: the level's
+// chord, `at` thirds up the scale from its degree, brought into the octave
+// above the root -- every chord in one register; the eighth note on, an
+// octave higher.
+~manifold[\chordNote] = { |scale, degrees, k, at|
+    var d = degrees[k % degrees.size] + (2 * at);
+    scale[d % scale.size] + (12 * (at div: scale.size));
 };
 
 // Every output's voice, from the shape and the map's root (MIDI): an Array,
@@ -116,17 +128,25 @@
                 at = members[k].indexOf(i);
                 freq = switch (~manifold[\music])
                 { \progression } {
-                    (lowest + (12 * (k div: 6))
-                     + ~manifold[\majorStep].(~manifold[\degrees][k % 6] + (2 * at))).midicps
+                    (lowest + ~manifold[\chordNote].(~manifold[\major],
+                        ~manifold[\degrees], k, at)).midicps
+                }
+                { \somber } {
+                    (lowest + ~manifold[\chordNote].(~manifold[\minor],
+                        ~manifold[\somberDegrees], k, at)).midicps
                 }
                 { \series } {
                     lowest.midicps * ((k + 1) + (at / members[k].size))
                 }
-                {   // \registers, and anything unknown
+                { \registers } {
                     root = if (~manifold[\fit]) {
                         lowest + (~manifold[\span] * k div: levels)
                     } { lowest + (12 * k) };
                     (root + ~manifold[\stackTone].(at)).midicps
+                }
+                {   // anything unknown: \progression
+                    (lowest + ~manifold[\chordNote].(~manifold[\major],
+                        ~manifold[\degrees], k, at)).midicps
                 };
             } {
                 freq = lowest.midicps;      // shared, or fed by none

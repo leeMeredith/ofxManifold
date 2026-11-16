@@ -11,8 +11,9 @@ Worked out here another way than the patch:
 
   - \\registers' chord tones come from a written-out table of the stack,
     1 3 5 7 9 #11 13 and two octaves up, not from an index into seven;
-  - \\progression's chords are spelled as scale degrees counted in thirds
-    over the whole keyboard, not as a step function;
+  - \\progression's and \\somber's chords are spelled as scale degrees
+    counted in thirds up the whole keyboard, as written, then folded down by
+    octaves into the octave above the root -- not taken as pitch classes;
   - \\series is a list of harmonics of the root divided by the members, not
     a level plus a fraction.
 """
@@ -22,12 +23,22 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "vectors", "music.vec")
 
-SPAN, QUIET = 30, 0.4
+SPAN, QUIET = 12, 0.4
 SCALE = [0, 2, 4, 7, 9]
 STACK = [0, 4, 7, 11, 14, 18, 21]
-DEGREES = [0, 3, 4, 5, 1, 2]
-# The major scale over many octaves, so a degree is an index into it.
+DEGREES = [0, 3, 4, 5, 1, 2]              # I IV V vi ii iii
+SOMBER = [0, 3, 5, 4, 2, 6]               # i iv VI v III VII
+# The scales over many octaves, so a degree is an index into them.
 MAJOR_KEYS = [12 * o + s for o in range(8) for s in (0, 2, 4, 5, 7, 9, 11)]
+MINOR_KEYS = [12 * o + s for o in range(8) for s in (0, 2, 3, 5, 7, 8, 10)]
+
+
+def one_register(written, at):
+    """A chord note as written, brought down by octaves into the octave above
+    the root; from the eighth note on, an octave higher."""
+    while written >= 12:
+        written -= 12
+    return written + 12 * (at // 7)
 
 
 def cps(m):
@@ -66,10 +77,11 @@ def voicing(shape, lowest, count, music, fit):
             out.append((cps(lowest), pan, QUIET))
             continue
         at = own[k].index(i)
-        if music == "progression":
-            first = DEGREES[k % 6]
-            key = MAJOR_KEYS[first + 2 * at]
-            freq = cps(lowest + 12 * (k // 6) + key)
+        if music in ("progression", "somber"):
+            degrees, keys = ((DEGREES, MAJOR_KEYS) if music == "progression"
+                             else (SOMBER, MINOR_KEYS))
+            written = keys[degrees[k % 6] + 2 * at]
+            freq = cps(lowest + one_register(written, at))
         elif music == "series":
             m = len(own[k])
             harmonics = [(k + 1) * m + j for j in range(m)]   # of root / m
@@ -140,11 +152,12 @@ def main():
     n = 0
     cases = []
     for shape in SHAPES:
-        for music, fit in (("registers", 1), ("registers", 0), ("progression", 1),
-                           ("series", 1)):
+        for music, fit in (("progression", 1), ("somber", 1), ("registers", 1),
+                           ("registers", 0), ("series", 1)):
             cases.append((f"{shape}_{music}{'' if fit else '_spread'}", shape,
                           len(SHAPES[shape][1]), music, fit, 48))
-    cases += [("room_second_map", "room", 12, "registers", 1, 55),
+    cases += [("room_second_map", "room", 12, "progression", 1, 55),
+              ("room_second_map_registers", "room", 12, "registers", 1, 55),
               ("climb_five", None, 5, "registers", 1, 48),
               ("climb_twelve", None, 12, "series", 1, 55),
               ("climb_one", None, 1, "registers", 1, 48)]

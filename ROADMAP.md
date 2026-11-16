@@ -23,7 +23,7 @@ serialization the standard library's own JSON parser against a hand-written one.
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
 | `ofxManifoldEditor` (logic) | 73 scripts, 916 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line, rings, blocks and triangles laid out in one step, c and C for a node's own output or silence, L and F to lay out nodes and join the grid's whole cells, the nodes in line |
 | `ofxManifoldPlayer` | 43 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
-| example-osc's SuperCollider patch | 40 + 7 | its musical behaviours in sclang against a Python reference, and the whole patch on a server, OSC in, synths read back (3B-2b) -- `make sc`, `make sc-live`; need SuperCollider, so not in CI |
+| example-osc's SuperCollider patch | 48 + 7 | its musical behaviours in sclang against a Python reference, and the whole patch on a server, OSC in, synths read back (3B-2b) -- `make sc`, `make sc-live`; need SuperCollider, so not in CI |
 
 **1077 vectors, 503 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing

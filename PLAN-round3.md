@@ -2150,6 +2150,30 @@ unfed outputs, brightness on, the node's name on the map.
 - **The sound itself is Lee's to hear.** Whether \registers' #11 and 13
   sit well, and whether the span suits, are settings to try.
 
+### 3B-2b, after: a somber progression; chords out of the levels' height
+
+Lee, having heard it: "a somber progression as well as this one ... and on
+both of them, take them out of the levels and not equally divide them --
+I have 3 to 4 levels, and by the time we make it to the top level it's
+very high." What was high was `\registers`, the default: 30 semitones
+shared equally, so four levels' top chord reached A5. Agreed (2026-11-15,
+"yes all recommended"), built the same day, the patch alone:
+
+- **`\somber`**: the progression in a natural minor key, i iv VI v III VII.
+- **Both progressions in one register**: each chord note brought into the
+  octave above the root -- the chord as close together as it goes -- so
+  going up the levels changes the harmony, not the height; the eighth note
+  on a level and after, an octave up. The octave lift every six levels is
+  gone too. The room's three levels: C E G B, then F A C E, then G B D F,
+  all within C3 to B3.
+- **`\progression` is the default**; `\registers` stays, rising, its span
+  now 12 -- three levels start on C3, E3, G#3; four top out at G#4.
+- **Checked**: `music.vec` 46 (the five behaviours over seven shapes, the
+  second map in two), `make sc` 48. The reference spells each chord as
+  written up the keyboard and folds it down by octaves; the patch takes
+  pitch classes. Undoing the one-register rule turns 9 red, the somber
+  degrees swapped for the major ones 3.
+
 ---
 
 ## Answered

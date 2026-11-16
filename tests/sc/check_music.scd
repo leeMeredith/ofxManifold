@@ -22,7 +22,7 @@ var check = { |name, ok, why|
 ~manifold = ();
 // The patch's settings, as it sets them at its top.
 ~manifold[\scale] = [0, 2, 4, 7, 9];
-~manifold[\span] = 30;
+~manifold[\span] = 12;
 ~manifold[\quiet] = 0.4;
 patch[from..(to - 1)].interpret;
 

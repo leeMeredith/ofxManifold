@@ -217,10 +217,11 @@ key on one page. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 Each map also tells its shape -- its levels, and where each output sits --
-and the patch decides what that sounds like, in settings at its top: each
-level a chord in its own register (`\registers`, the default), a chord
-progression up the levels (`\progression`), or the overtone series
-(`\series`); the point's height opening each voice; each output panned by
+and the patch decides what that sounds like, in settings at its top: a
+chord progression up the levels, every chord in one register so only the
+harmony changes (`\progression`, the default; `\somber` in a minor key),
+each level the same chord a step higher (`\registers`), or the overtone
+series (`\series`); the point's height opening each voice; each output panned by
 its node's place. openFrameworks decides none of it. With SuperCollider
 installed, `make sc` checks the patch's music in sclang and `make sc-live`
 runs it whole on your sound card for a second.
