@@ -644,6 +644,17 @@ int main(int argc, char** argv) {
                     why << "chartLevels outside the map is not empty";
                 }
             }
+        } else if (kind == "REACH") {
+            // 3B-2e: the level the listening point has reached at a height.
+            const Evaluation floor = readWeights(in, md, "Z");
+            float z; std::string kw; long want;
+            in >> z >> kw >> want;                                  // EXPECT
+            const LevelID got = levelReached(md, floor, z);
+            if (ok && long(got) != want) {
+                ok = false;
+                why << "REACH after step " << step << " at z " << z
+                    << ": want level " << want << ", got " << got;
+            }
         } else if (kind == "HEAR") {
             // Round 3A-6: the listening point at the floor weights and a
             // height; what the chart is handed there, and the column of dots.
@@ -683,7 +694,7 @@ int main(int argc, char** argv) {
                     why << "one level, but the 3D chart differs from the 2D";
                 }
             }
-        } else if (kind == "PLACES" || kind == "OWN") {
+        } else if (kind == "PLACES" || kind == "OWN" || kind == "LABELS") {
             // Round 3B-2b: each output's place (the shape message), and each
             // node's own output on the current level (its name's colour).
             std::string kw, want, tok;
@@ -702,6 +713,10 @@ int main(int argc, char** argv) {
                     add(num(pl[t].position.x));
                     add(num(pl[t].position.y));
                     add(num(pl[t].position.z));
+                }
+            } else if (kind == "LABELS") {
+                for (NodeID n = 0; n < md.manifold().nodeCount(); ++n) {
+                    add(md.levelLabel(n));
                 }
             } else {
                 for (NodeID n = 0; n < md.manifold().nodeCount(); ++n) {

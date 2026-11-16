@@ -231,7 +231,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               !drag, dragging),
         entry("fullscreen", "ctrl-cmd-f", "full screen", true, ""),
         entry("textsize", "cmd-+ cmd--", "text size", true, ""),
-        entry("keysheet", "?", "every key, over the whole window", true, ""),
+        entry("keysheet", "?", "every key; again: hide keys; again: back", true, ""),
     }});
     return g;
 }
@@ -451,6 +451,24 @@ EditorLayout layoutEditor(float width, float height, float cw, float lh,
         L.levelsKeysY = 24.0f + L.plan + 16.0f + lh;
         L.levelsKeysWidth = L.plan;
     }
+    return L;
+}
+
+EditorLayout layoutEditorBare(float width, float height, bool levels,
+                              bool show3D) {
+    EditorLayout L;
+    // The faders' band as with the panel; above it, everything for the views.
+    const float chartH = std::max(130.0f, height * 0.2f);
+    const float side = std::max(160.0f, height - 48.0f - chartH);
+    L.column = levels ? 64.0f : 0.0f;
+    L.view3D = show3D;
+    const float across = width - 48.0f - L.column - (show3D ? 16.0f : 0.0f);
+    L.plan = std::max(160.0f, std::min(side, show3D ? across * 0.5f : across));
+    L.chartTop = 24.0f + side + 16.0f;
+    L.chartRight = width - 24.0f;
+    L.panelLeft = width;                 // no panel
+    L.panelBottom = 0.0f;
+    if (show3D) L.view3DX = 24.0f + L.plan + L.column + 16.0f;
     return L;
 }
 

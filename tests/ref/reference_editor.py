@@ -2188,6 +2188,29 @@ class Script:
         self.out.append("OWN EXPECT " + " ".join(
             f"{nm} {self.ed.own_output_here(nm) or '-'}" for nm in self.ed.names()))
 
+    def reach(self, weights, z):
+        """3B-2e: the level the listening point has reached at height z --
+        found here from `where`: the cell and how far up it, the upper
+        level once at it."""
+        L = len(self.ed.levels)
+        if L < 2:
+            k = 0
+        else:
+            inside, cell, t = self.ed.where(weights, z)
+            if not inside:
+                hs = self.ed.heights_at(weights)
+                k = 0 if z < hs[0] else L - 1
+            else:
+                k = min(cell + 1, L - 1) if t >= 1.0 - 1e-6 else cell
+        self.out.append("REACH " + " ".join(f"{n}={fmt(w)}" for n, w in weights)
+                        + f" Z {fmt(z)} EXPECT {k}")
+
+    def labels(self):
+        """3B-2e: each node as the map names it on the current level -- its
+        own output there, else its own name."""
+        self.out.append("LABELS EXPECT " + " ".join(
+            self.ed.own_output_here(nm) or nm for nm in self.ed.names()))
+
     def drag_level(self, k, pixels, gap):
         """Where dragging level k's dot puts it (round 3A-6b)."""
         nb = self.ed.level_drag_to(k, pixels, gap)
@@ -3794,6 +3817,52 @@ def build_cells(out):
     t.own()
     t.do("levelup")
     t.own()
+    t.end()
+
+    out.append("# 3B-2e: THE MAP NAMES EACH NODE AS ON THE LEVEL SHOWN")
+    t = Script(out, "labels_by_level",
+               "each node named on the map, and in the point's readout, by "
+               "its own output on the current level -- FL-2 on level 2 -- or "
+               "its own name where it has none there")
+    t.do("room")
+    t.labels()
+    t.do("levelup")
+    t.labels()
+    t.do("levelup")
+    t.labels()
+    out.append("# RL silenced on the top: no output of its own there, its name")
+    t.select("RL")
+    t.do("silence")
+    t.labels()
+    t.do("example")
+    t.labels()
+    t.end()
+
+    t = Script(out, "level_reached",
+               "3B-2e: the level the editor's listening point has reached as "
+               "it glides -- the one it is on or above, by the surfaces under "
+               "it, held to the bottom and the top -- which becomes the one "
+               "shown")
+    t.do("room")
+    corner = [("FL", 1.0)]
+    for z in (-0.1, 0.0, 0.1, 0.25, 0.3, 0.5, 0.7):
+        t.reach(corner, z)
+    out.append("# the middle's FR raised to 0.5, touching the top: at FR,")
+    out.append("# 0.3 is still below the middle; 0.5 is the top")
+    t.do("levelup")
+    t.select("FR")
+    for _ in range(5):
+        t.do("raise", 1, False)
+    t.reach([("FR", 1.0)], 0.3)
+    t.reach([("FR", 1.0)], 0.5)
+    t.reach([("FR", 0.5), ("RR", 0.5)], 0.3)
+    out.append("# the octahedron's rim, where its levels meet: the bottom")
+    t.do("octahedron")
+    t.reach([("E", 1.0)], 0.0)
+    t.reach([("C", 1.0)], 0.0)
+    t.reach([("C", 1.0)], 0.5)
+    t.do("example")
+    t.reach([("O", 1.0)], 3.0)
     t.end()
 
 if __name__ == "__main__":

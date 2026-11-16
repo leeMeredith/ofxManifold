@@ -294,6 +294,11 @@ public:
     // else InvalidTarget. Its name on the map is drawn in that colour.
     TargetID ownOutput(NodeID node) const;
 
+    // How the node is named on the map and in the point's readout: by its own
+    // output on the current level -- FL-2 on level 2 -- or, with none there,
+    // its own name.
+    std::string levelLabel(NodeID node) const;
+
     // y and h: each selected node's height on the current level steps by
     // 0.05, or 0.01 when `fine`, landing on the next multiple of the step
     // above the level's start, as fill does. All or nothing: refused, naming

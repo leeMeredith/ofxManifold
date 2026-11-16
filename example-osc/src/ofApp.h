@@ -158,7 +158,12 @@ private:
     std::string movingName() const;
     void drawPaths() const;             // the path being recorded, or playing
     void drawKeySheet() const;          // ? : every key on one page
-    bool keySheet = false;
+    // What ? shows, in turn (3B-2e): the panel beside the maps; every key
+    // on one page; nothing -- the maps as large as the window allows, for
+    // recording, only a small "?" left.
+    enum class Keys { Panel, Sheet, Hidden };
+    Keys keys = Keys::Panel;
+    bool keySheet() const { return keys == Keys::Sheet; }
 
     ofxManifold::editor::Model                    model;
     std::unique_ptr<ofxManifold::Evaluator>       evaluator;

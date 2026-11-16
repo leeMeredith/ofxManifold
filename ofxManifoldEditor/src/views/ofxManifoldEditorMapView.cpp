@@ -429,7 +429,9 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
     // auditioning; otherwise just the point, quieter, so it is there without
     // competing with editing.
     if (s.auditioning) {
-        renderer->drawEvaluation(evaluation, s.listeningPoint);
+        const Model& model = *s.model;
+        renderer->drawEvaluation(evaluation, s.listeningPoint,
+                                 [&model](NodeID n) { return model.levelLabel(n); });
     } else {
         const glm::vec2 lp = renderer->toScreen(s.listeningPoint);
         ofPushStyle();

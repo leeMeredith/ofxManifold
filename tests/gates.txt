@@ -2516,7 +2516,7 @@ replace:         return heightAt(k, w);
 
 gate: A height past the levels is not held
 file: src/core/ofxManifoldLevels.h
-find:             if (z <= h[0]) return 0.0f;\n            if (z >= h[n - 1]) return float(n - 1);
+find:             if (z <= h[0]) return 0.0f;\n            if (z > h[n - 1]) return float(n - 1);
 replace:             (void)0;
 nl: yes
 
@@ -2689,5 +2689,28 @@ gate: A node's own output read on the floor, whatever the level
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 find: TargetID Model::ownOutput(NodeID node) const {\n    const Mapping& m = mapping();
 replace: TargetID Model::ownOutput(NodeID node) const {\n    const Mapping& m = map_.level(0);
+nl: yes
+
+# ---- round 3B-2e: labels by level, the level reached ----
+
+gate: positionAt gives the top where the top touches the level under it
+file: src/core/ofxManifoldLevels.h
+find:             if (z > h[n - 1]) return float(n - 1);
+replace:             if (z >= h[n - 1]) return float(n - 1);
+
+gate: The level reached is the one nearest, not the one at or below
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     const float at = std::floor(u + 1e-6f);
+replace:     const float at = std::floor(u + 0.5f);
+
+gate: The level reached is never the top
+file: ofxManifoldEditor/src/ofxManifoldEditorListening.cpp
+find:     return std::min(LevelID(at), LevelID(n - 1));
+replace:     return std::min(LevelID(at), LevelID(n - 2));
+
+gate: A node on a level is named by its floor output
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     return own == InvalidTarget ? manifold_.node(node).name\n                                : mapping().targetName(own);
+replace:     return own == InvalidTarget ? manifold_.node(node).name\n                                : manifold_.node(node).name;
 nl: yes
 

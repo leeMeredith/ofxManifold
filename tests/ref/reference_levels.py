@@ -240,7 +240,7 @@ def position_at(st, lam, z, extrapolate=False):
     if not extrapolate:
         if z <= h[0]:
             return 0.0
-        if z >= h[-1]:
+        if z > h[-1]:
             return float(L - 1)
     held = [k for k in range(L - 1) if h[k] <= z <= h[k + 1]]
     k = min(held) if held else (0 if z < h[0] else L - 2)
@@ -502,6 +502,10 @@ def build():
               [("COPY", 0, 0.5), ("COPY", 1, 1.0), ("RAISE", 1, -0.5, [2])],
               ["three levels, the middle one's node 2 down on the ground: a",
                "pinch between the lower two there, the top still above"])
+    stack_rec("pinch_top",
+              [("COPY", 0, 0.5), ("COPY", 1, 1.0), ("RAISE", 1, 0.5, [2])],
+              ["three levels, the middle one's node 2 up at the top: a pinch",
+               "between the upper two there"])
     stack_rec("pinch_all",
               [("COPY", 0, 0.5), ("COPY", 1, 1.0), ("RAISE", 1, -0.5, [3]),
                ("RAISE", 2, -1.0, [3])],
@@ -768,6 +772,13 @@ def build():
     zpos("z_pinch_lowest", "ANALYTIC", "pinch3", {2: 1.0}, 0.0, False, 0.0)
     zpos("z_pinch_lowest_x", "ANALYTIC", "pinch3", {2: 1.0}, 0.0, True, 0.0)
     zpos("z_pinch_above", "ANALYTIC", "pinch3", {2: 1.0}, 0.5, False, 1.5)
+    zpos("z_pinch_top", "ANALYTIC", "pinch_top", {2: 1.0}, 1.0, False, 1.0,
+         ["on the top surface where it touches the middle: the lowest, the",
+          "middle -- not the top, as a shortcut for 'at or above the top'",
+          "gave until 3B-2e"])
+    zpos("z_pinch_top_x", "ANALYTIC", "pinch_top", {2: 1.0}, 1.0, True, 1.0)
+    zpos("z_top_plain", "ANALYTIC", "pinch_top", {0: 1.0}, 1.0, False, 2.0,
+         ["on the top where nothing touches it: the top"])
     zpos("z_pinch_all", "ANALYTIC", "pinch_all", {3: 1.0}, 0.0, True, 0.0,
          ["three levels at one height: the lowest of them all"])
     zpos("z_octa_rim", "ANALYTIC", "octa", {1: 1.0}, 0.0, False, 0.0)

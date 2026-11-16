@@ -213,7 +213,11 @@ sideways over a raised node rises with it, and a random height never drops
 out of the map. Levels may touch: `x` opens an octahedron, a bottom and a
 top level meeting at the rim, and riding up by the rim the point is heard on
 both. `?` shows every
-key on one page. With it a SuperCollider patch
+key on one page; `?` again hides every key and the status, leaving the map
+and the 3D view as large as the window allows -- for screen recordings, or
+when you know the keys -- and a third `?` brings them back. The editor does
+the same, and in both the map names each node as on the level shown (FL-2
+on level 2), as does the readout beside the point, its numbers first. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
 Each map also tells its shape -- its levels, and where each output sits --
@@ -345,7 +349,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-1077 vectors across fifteen suites, plus 503 mutation gates that introduce known
+1083 vectors across fifteen suites, plus 507 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

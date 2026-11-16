@@ -11,6 +11,17 @@ float listenStart(const Model& model, const Evaluation& floor) {
     return floor.inside ? lv.heightAt(k, floor.weights) : lv.base(k);
 }
 
+LevelID levelReached(const Model& model, const Evaluation& floor, float z) {
+    const Levels& lv = model.map3d().levels();
+    const std::size_t n = lv.count();
+    if (n < 2) return 0;
+    const float u = lv.positionAt(floor.inside ? floor.weights
+                                               : std::vector<WeightedNode>{}, z);
+    const float at = std::floor(u + 1e-6f);
+    if (!(at > 0.0f)) return 0;
+    return std::min(LevelID(at), LevelID(n - 1));
+}
+
 float glide(float z, int direction, bool fine, float seconds) {
     return z + float(direction)
              * (fine ? kGlidePerSecondFine : kGlidePerSecond) * seconds;

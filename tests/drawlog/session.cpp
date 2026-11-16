@@ -329,6 +329,14 @@ int main() {
     release(OF_KEY_SHIFT); release(OF_KEY_COMMAND);
     frame("shift-cmd-e: the octahedron -- two levels meeting at the rim");
 
+    // round 3B-2e: ? three ways -- every key, none (the views larger), back
+    key('?');
+    frame("?: every key");
+    key('?');
+    frame("? again: no keys, the views as large as the window allows");
+    key('?');
+    frame("? a third time: the panel back");
+
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;
 }

@@ -298,7 +298,8 @@ void drawKeySheet(const Scene& s, const KeyContext& keys) {
     ofDrawRectangle(0.0f, 0.0f, float(ofGetWidth()), float(ofGetHeight()));
     ofSetColor(255, 214, 90);
     const float top = 24.0f + lh;
-    s.text->draw("every key -- any key or click closes", 24.0f, top);
+    s.text->draw("every key -- ? again hides them all; any other key or a click closes",
+                 24.0f, top);
     const std::vector<KeyGroup> groups = keyMap(keys);
     const float first = top + 2.0f * (lh + 1.0f);
     const KeyFlow flow = flowKeys(groups, 24.0f, float(ofGetWidth()) - 24.0f,

@@ -132,6 +132,12 @@ TargetID Model::ownOutput(NodeID node) const {
     return InvalidTarget;
 }
 
+std::string Model::levelLabel(NodeID node) const {
+    const TargetID own = ownOutput(node);
+    return own == InvalidTarget ? manifold_.node(node).name
+                                : mapping().targetName(own);
+}
+
 // ---------------------------------------------------------------------------
 // whole maps
 // ---------------------------------------------------------------------------

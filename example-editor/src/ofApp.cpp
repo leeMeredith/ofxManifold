@@ -62,18 +62,23 @@ void ofApp::update() {
     // The window laid out by the package (3A-10): the map, the level dots,
     // the 3D view, the panel above the faders. If the keys do not fit, the
     // views give up width to the panel.
-    const EditorLayout L = layoutEditor(ofGetWidth(), ofGetHeight(),
-                                        text.charWidth(), text.lineHeight(),
-                                        model.map3d().count() > 1, show3D,
-                                        !model.map3d().valueSet().empty(),
-                                        keyMap(keyContext()));
+    // With the keys hidden (? twice), no panel: the views take its room.
+    const EditorLayout L = keys == Keys::Hidden
+        ? layoutEditorBare(ofGetWidth(), ofGetHeight(),
+                           model.map3d().count() > 1, show3D)
+        : layoutEditor(ofGetWidth(), ofGetHeight(),
+                       text.charWidth(), text.lineHeight(),
+                       model.map3d().count() > 1, show3D,
+                       !model.map3d().valueSet().empty(),
+                       keyMap(keyContext()));
     const float plan = L.plan;
     renderer->setViewport(ofRectangle(24, 24, plan, plan));
     if (show3D) {
         view3D = ofRectangle(L.view3DX, 24.0f, plan, plan);
         if (!aimed) { aimLevelView(cam, view3D); aimed = true; }
         cam.setControlArea(view3D);
-        levelsKeysAt = glm::vec2(L.levelsKeysX, L.levelsKeysY);
+        levelsKeysAt = keys == Keys::Hidden ? glm::vec2(-1.0f, -1.0f)
+                                            : glm::vec2(L.levelsKeysX, L.levelsKeysY);
         levelsKeysWidth = L.levelsKeysWidth;
     } else {
         levelsKeysAt = glm::vec2(-1.0f, -1.0f);
@@ -105,6 +110,11 @@ void ofApp::update() {
         zFree = true;
         message = "listening at " + ofToString(auditionZ, 2);
         messageTime = 1.0f;
+        // The level the point reaches becomes the one shown -- its names,
+        // colours and bends on the map -- and stays when audition ends
+        // (3B-2e), as example-osc follows its point.
+        const LevelID reached = levelReached(model, evaluation, auditionZ);
+        if (reached != model.currentLevel()) model.goToLevel(reached);
     }
     if (!zFree) auditionZ = listenStart(model, evaluation);
     if (refusedFlash > 0.0f) refusedFlash -= 1.0f / 60.0f;
@@ -198,8 +208,23 @@ void ofApp::draw() {
     // What reaches the room at the listening point, height included; with
     // one level exactly the 2D reading.
     drawChart(sc, chart, chartLevels3D(model, selection, evaluation, auditionZ));
-    drawPanel(sc, look, st, keyContext());
-    if (keySheet) drawKeySheet(sc, keyContext());
+    if (keys == Keys::Hidden) {
+        // Only a "?" to come back by -- and a message, while it lasts, along
+        // the bottom of the map, so a refusal is still said.
+        const ofRectangle map = renderer->viewport();
+        ofSetColor(150, 156, 170);
+        text.draw("?", float(ofGetWidth()) - 20.0f, 20.0f);
+        if (st.messageShown && !st.message.empty()) {
+            ofSetColor(30, 30, 34);
+            ofDrawRectangle(map.getX(), map.getBottom() - text.lineHeight() - 6.0f,
+                            map.getWidth(), text.lineHeight() + 6.0f);
+            if (st.warning) ofSetColor(255, 150, 120); else ofSetColor(255, 214, 90);
+            text.draw(st.message, map.getX() + 6.0f, map.getBottom() - 6.0f);
+        }
+    } else {
+        drawPanel(sc, look, st, keyContext());
+    }
+    if (keySheet()) drawKeySheet(sc, keyContext());
 }
 
 // ===========================================================================
@@ -307,7 +332,7 @@ void ofApp::mousePressed(int x, int y, int) {
     previewLayout = false;
     // A click that closes the key sheet does nothing else, nor do its drag
     // and release.
-    if (keySheet) { keySheet = false; sheetClick = true; return; }
+    if (keySheet()) { keys = Keys::Panel; sheetClick = true; return; }
 
     // The 3D view's area belongs to its camera: a press there turns the view
     // and never reaches the map.
@@ -635,8 +660,10 @@ void ofApp::keyPressed(int key) {
         return;
     }
     // The key sheet (3A-10): any key closes it, and does nothing else.
-    if (keySheet) {
-        if (key != OF_KEY_SHIFT && key != OF_KEY_COMMAND) keySheet = false;
+    // ? again (3B-2e) hides every key, the views larger.
+    if (keySheet()) {
+        if (key == '?' || key == '/') keys = Keys::Hidden;
+        else if (key != OF_KEY_SHIFT && key != OF_KEY_COMMAND) keys = Keys::Panel;
         return;
     }
     // Every key asks the key map first: a dim key does not act, it says why.
@@ -651,7 +678,10 @@ void ofApp::keyPressed(int key) {
 
     // ---- window ----
     if (id == "fullscreen") { ofToggleFullscreen(); return; }
-    if (id == "keysheet") { keySheet = true; return; }
+    if (id == "keysheet") {
+        keys = keys == Keys::Hidden ? Keys::Panel : Keys::Sheet;
+        return;
+    }
     if (id == "textsize") {
         setTextSize(text.size() + ((key == '-' || key == '_') ? -1 : 1));
         return;

@@ -144,8 +144,10 @@ public:
         std::vector<float> h(n);
         for (LevelID k = 0; k < n; ++k) h[k] = levelHeight(k, w);
         if (!extrapolate) {
+            // On the top surface itself, the walk below: where the top
+            // touches the level under it, the lowest (3B-2e found this).
             if (z <= h[0]) return 0.0f;
-            if (z >= h[n - 1]) return float(n - 1);
+            if (z > h[n - 1]) return float(n - 1);
         }
         // The lowest cell whose top is at or above z, never past the top
         // one; below the bottom, the bottom cell, carried on.

@@ -102,7 +102,8 @@ void ofxManifoldRenderer::draw(RegionID activeRegion) const {
 }
 
 void ofxManifoldRenderer::drawEvaluation(const Evaluation& e,
-                                         const glm::vec2& point) const {
+                                         const glm::vec2& point,
+                                         const NodeLabel& label) const {
     ofPushStyle();
 
     const glm::vec2 s = toScreen(point);
@@ -142,11 +143,12 @@ void ofxManifoldRenderer::drawEvaluation(const Evaluation& e,
     }
 
     ofPopStyle();
-    drawWeights(e, glm::vec2(s.x + 14.0f, s.y + 14.0f));
+    drawWeights(e, glm::vec2(s.x + 14.0f, s.y + 14.0f), label);
 }
 
 void ofxManifoldRenderer::drawWeights(const Evaluation& e,
-                                      const glm::vec2& at) const {
+                                      const glm::vec2& at,
+                                      const NodeLabel& label) const {
     if (!e.inside) return;
 
     ofPushStyle();
@@ -154,11 +156,16 @@ void ofxManifoldRenderer::drawWeights(const Evaluation& e,
     for (const auto& wn : e.weights) {
         // Text only. A bar drawn behind the number overlapped it, and the
         // number is the truth -- magnitude is already carried by the
-        // thickness of the line from the point to the node.
-        const std::string label = manifold_->node(wn.id).name + "  "
-                                + ofToString(wn.weight, 3);
+        // thickness of the line from the point to the node. The number
+        // first: it is always one width, so the column stays put while the
+        // names change length.
+        const std::string name = label ? label(wn.id) : manifold_->node(wn.id).name;
+        // A negative weight (non-convex regions) has a sign: the others get
+        // a space in its place, so the column stays straight.
+        const std::string line = (wn.weight < 0.0f ? "" : " ")
+                               + ofToString(wn.weight, 3) + "  " + name;
         ofSetColor(style.nodeLabel);
-        ofDrawBitmapString(label, at.x, y);
+        ofDrawBitmapString(line, at.x, y);
         y += 15.0f;
     }
     ofPopStyle();

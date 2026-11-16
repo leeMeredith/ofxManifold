@@ -27,6 +27,9 @@
 
 #include "ofMain.h"
 
+#include <functional>
+#include <string>
+
 class ofxManifoldRenderer {
 public:
     // Colours and toggles. Every one is a presentation decision and none of
@@ -113,9 +116,16 @@ public:
     void draw(ofxManifold::RegionID activeRegion =
                   ofxManifold::InvalidRegion) const;
 
-    // The control point, plus a weight readout beside it.
+    // How a node is named in the weight readout: its own name unless set.
+    // The editor names each node by its output on the level shown (FL-2).
+    using NodeLabel = std::function<std::string(ofxManifold::NodeID)>;
+
+    // The control point, plus a weight readout beside it: each weight, then
+    // its node's name -- the numbers first, so they stay in one column
+    // however long the names are.
     void drawEvaluation(const ofxManifold::Evaluation& e,
-                        const glm::vec2& point) const;
+                        const glm::vec2& point,
+                        const NodeLabel& label = nullptr) const;
 
     // Faults drawn where they are, rather than listed somewhere else. A
     // T-junction is a position on an edge, and reading a node name out of a
@@ -125,7 +135,8 @@ public:
     // Weight readout at an arbitrary screen position, for layouts that want it
     // somewhere other than beside the point.
     void drawWeights(const ofxManifold::Evaluation& e,
-                     const glm::vec2& at) const;
+                     const glm::vec2& at,
+                     const NodeLabel& label = nullptr) const;
 
     Style style;
 

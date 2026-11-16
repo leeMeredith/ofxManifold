@@ -158,6 +158,12 @@ EditorLayout layoutEditor(float width, float height, float cw, float lh,
                           bool levels, bool show3D, bool values,
                           const std::vector<KeyGroup>& groups);
 
+// The window with the keys hidden (3B-2e, ? twice): no panel, no levels keys
+// -- the map and the 3D view as large as the window allows above the
+// faders, side by side; the faders across the window.
+EditorLayout layoutEditorBare(float width, float height, bool levels,
+                              bool show3D);
+
 // The groups the panel shows: all of them, or with the 3D view open all but
 // levels, which go beneath it.
 std::vector<KeyGroup> panelGroups(const std::vector<KeyGroup>& groups,

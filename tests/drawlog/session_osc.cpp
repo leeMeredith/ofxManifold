@@ -126,6 +126,8 @@ int main() {
     a.mousePressed(149, 149, 0);   // over the centre
     run(2);                        frame("over the centre: the same u, half way between the apexes");
     key('?');                      frame("?: every key");
+    key('?');                      frame("? again: no keys, the map and the 3D view larger");
+    key('?');                      frame("? a third time: the panel back");
     a.mousePressed(300, 300, 0); frame("a click: back to the map");
     key('b');                  frame("b: SuperCollider's bars -- no phase heard");
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);

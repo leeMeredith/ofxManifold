@@ -34,6 +34,13 @@ constexpr float kGlidePerSecondFine = 0.05f;   // with shift
 // starting height.
 float listenStart(const Model& model, const Evaluation& floor);
 
+// The level the listening point has reached at height z (3B-2e): the one it
+// is on or above, read from the surfaces under it, bends and all -- held to
+// the bottom below the levels and the top above them. Gliding the point in
+// audition, that level becomes the one shown, as example-osc follows its
+// point.
+LevelID levelReached(const Model& model, const Evaluation& floor, float z);
+
 // The listening point's height after holding up (+1) or down (-1) for
 // `seconds`. Nothing special happens at a level: the point glides through.
 float glide(float z, int direction, bool fine, float seconds);

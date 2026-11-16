@@ -112,7 +112,9 @@ void drawNode(const Scene& s, NodeID id) {
     // the same colour you hear on this level.
     const TargetID own = model.ownOutput(id);
     if (own != InvalidTarget) ofSetColor(outputColour(mapping, own));
-    text(n.name, p.x + r + 6.0f, p.y - 6.0f);
+    // Named as on this level: FL-2 on level 2, its own output there.
+    text(own == InvalidTarget ? n.name : mapping.targetName(own),
+         p.x + r + 6.0f, p.y - 6.0f);
     ofPopStyle();
 }
 

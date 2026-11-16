@@ -2174,6 +2174,41 @@ shared equally, so four levels' top chord reached A5. Agreed (2026-11-15,
   pitch classes. Undoing the one-register rule turns 9 red, the somber
   degrees swapped for the major ones 3.
 
+### 3B-2e: names by level, the level followed, ? three ways
+
+Lee (2026-11-16), seeing the editor listen on the room's middle level with
+FL, FR, RL, RR on the corners and in the readout: "even though I'm at what
+should be FL-2, FR-2". That reverses 3B-2b's question 4 (the node's name on
+every level), answered before it could be seen. Agreed, "yes all
+recommended", built the same day:
+
+- **Names by level**: `Model::levelLabel(node)` -- its own output on the
+  current level, else its name. The node glyph's label and the point's
+  readout both use it. `ofxManifoldRenderer::drawEvaluation` and
+  `drawWeights` take an optional `NodeLabel` (node names without one, so
+  every other example is unchanged) and put the number first --
+  ` 0.250  FL-2`, a space for a sign -- so the column stays put while the
+  names change length.
+- **The editor follows its listening point**: `levelReached(model, floor,
+  z)` -- the level it is on or above, by the surfaces under it, held to the
+  bottom and top. Gliding in audition, that level becomes current and stays,
+  as example-osc already followed its point.
+- **Found doing it**: `Levels::positionAt`, restrained, answered the top
+  where the top touches the level under it -- its "at or above the top"
+  shortcut ran before 3B-2d's lowest-at-a-pinch rule. The shortcut is now
+  "above the top"; on the top surface itself the walk decides. A stack,
+  `pinch_top`, three positions on it, and a gate.
+- **? three ways, both apps**: the panel; every key over the window; none --
+  no panel, no status, no levels keys, a "?" in the corner and any message
+  along the bottom of the map. On the page, ? goes on to none; any other key
+  or a click goes back. The editor's bare layout is `layoutEditorBare()`,
+  checked by `make panel` at every window and text size: the views never
+  smaller than with the panel, inside the window, apart, above the faders,
+  which run across. In the drawlog's window the editor's views go from 177
+  to 448 pixels; example-osc's map and 3D view grow likewise.
+- **Vectors**: levels 4, editor 2 (`labels_by_level`, `level_reached`):
+  1083. **Gates**: 4 new, 1 re-anchored: 507.
+
 ---
 
 ## Answered

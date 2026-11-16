@@ -187,7 +187,12 @@ private:
     int      triStage  = 3;
     int  layoutSize() const;
     bool previewLayout = false;
-    bool keySheet = false;              // ? shows every key (3A-10)
+    // What ? shows, in turn (3B-2e): the panel; every key over the window
+    // (3A-10); nothing -- the views as large as the window allows, for
+    // recording, a "?" left to come back by.
+    enum class Keys { Panel, Sheet, Hidden };
+    Keys keys = Keys::Panel;
+    bool keySheet() const { return keys == Keys::Sheet; }
     bool sheetClick = false;            // the press that closed it         // after [ or ], until l or another key
     float    deadZone = 0.25f;          // fraction of grid spacing
 

@@ -49,7 +49,7 @@ const std::vector<OscKeyGroup>& keyGroups() {
                        {"shift - =", "a hundredth of a second"}}},
         {"showing", {{"3", "the 3D view (drag in it to turn it)"},
                      {"l", "links: followed, heard, all, none"},
-                     {"?", "this page (again, or a click: away)"}}},
+                     {"?", "this page; again: hide keys; again: back"}}},
         {"maps", {{"o", "open a map you saved in the editor"},
                   {"e", "the room: three levels"},
                   {"x", "the octahedron: two levels touching"},
@@ -308,7 +308,9 @@ void ofApp::layoutWindow() {
     const float band = std::max(kChartMin, std::min(kChartMax, H * kChartShare));
     chartTop = H - band;
     float side = chartTop - 24.0f - 16.0f;
-    const float room = W - 24.0f - column - 24.0f - kOscPanelWidth;
+    // With the keys hidden, the panel's room goes to the maps.
+    const float panel = keys == Keys::Hidden ? 0.0f : kOscPanelWidth;
+    const float room = W - 24.0f - column - 24.0f - panel;
     side = std::min(side, show3D ? (room - 24.0f) / 2.0f : room);
     side = std::max(side, 160.0f);
     mapArea = ofRectangle(24.0f, 24.0f, side, side);
@@ -549,6 +551,21 @@ void ofApp::draw() {
         drawLevelView(sc, cam, view3D);
     }
 
+    if (keys == Keys::Hidden) {
+        // Nothing but the maps and the faders -- and a "?" to come back by,
+        // and a message, while it lasts, along the bottom of the map.
+        ofSetColor(150, 156, 170);
+        ofDrawBitmapString("?", float(ofGetWidth()) - 20.0f, 20.0f);
+        if (!message.empty() && ofGetElapsedTimef() < messageUntil) {
+            ofSetColor(30, 30, 34);
+            ofDrawRectangle(mapArea.getX(), mapArea.getBottom() - 18.0f,
+                            mapArea.getWidth(), 18.0f);
+            ofSetColor(255, 214, 90);
+            ofDrawBitmapString(message, mapArea.getX() + 6.0f, mapArea.getBottom() - 5.0f);
+        }
+        return;
+    }
+
     const double now = ofGetElapsedTimef();
     std::size_t bytes = 0;
     for (const auto& e : sentLog) bytes += e.second;
@@ -561,7 +578,7 @@ void ofApp::draw() {
         y += 16.0f;
     };
     const ofColor plain(200, 205, 215), dim(130, 136, 150);
-    line("? for every key", ofColor(255, 214, 90));
+    line("? for every key; ?? hides them", ofColor(255, 214, 90));
     line("OSC to " + host + ":" + ofToString(sendPort), ofColor(235, 238, 245));
     line(listenPort ? "answers on " + ofToString(listenPort)
                     : "no answer port free (" + ofToString(kFirstAnswerPort) + " on)",
@@ -656,7 +673,7 @@ void ofApp::draw() {
         line(message, ofColor(255, 214, 90));
         y = keep;
     }
-    if (keySheet) drawKeySheet();
+    if (keySheet()) drawKeySheet();
 }
 
 // The path being recorded, bright, as it grows; the recording playing, dim,
@@ -693,7 +710,7 @@ void ofApp::drawKeySheet() const {
     ofDrawRectangle(0.0f, 0.0f, W, H);
     float x = 40.0f, y = 50.0f;
     ofSetColor(255, 214, 90);
-    ofDrawBitmapString("every key -- ? again, or a click, to go back", x, y);
+    ofDrawBitmapString("every key -- ? again hides them all, a click goes back", x, y);
     y += 32.0f;
     const float top = y, column = 480.0f;   // the longest line is 464 pixels
     for (const OscKeyGroup& g : keyGroups()) {
@@ -714,7 +731,7 @@ void ofApp::drawKeySheet() const {
 }
 
 void ofApp::mousePressed(int x, int y, int) {
-    if (keySheet) { keySheet = false; return; }    // a click: back to the map
+    if (keySheet()) { keys = Keys::Panel; return; }  // a click: back to the map
     // A fader picks its output: its nodes ringed in its colour on the map.
     const TargetID hit = chart.outputAt(float(x), float(y));
     if (hit != InvalidTarget) { model.pickOutput(hit); return; }
@@ -753,8 +770,14 @@ void ofApp::keyPressed(int key) {
         message = t;
         messageUntil = ofGetElapsedTimef() + 2.5f;
     };
-    if (key == '?' || key == '/') { keySheet = !keySheet; return; }
-    if (keySheet) return;             // the page is up: keys wait for it to go
+    if (key == '?' || key == '/') {
+        // The panel, every key, none -- and round again.
+        keys = keys == Keys::Panel ? Keys::Sheet
+             : keys == Keys::Sheet ? Keys::Hidden : Keys::Panel;
+        layoutWindow();
+        return;
+    }
+    if (keySheet()) return;           // the page is up: keys wait for it to go
     if (key == OF_KEY_UP || key == OF_KEY_DOWN) {
         if (heightWalks()) say("the height is moving itself -- h for by hand");
         glideDir = key == OF_KEY_UP ? +1 : -1;

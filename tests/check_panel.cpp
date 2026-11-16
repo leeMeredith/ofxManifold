@@ -228,6 +228,21 @@ int main() {
                             + " cols " + std::to_string(L.keys.columns) + "/" + std::to_string(onTop.columns)
                             + " plan " + std::to_string(L.plan));
                     }
+                    // The keys hidden (3B-2e): the views no smaller than with
+                    // the panel, inside the window, side by side, above the
+                    // faders, which run across it.
+                    {
+                        const EditorLayout B = layoutEditorBare(w.w, w.h, true, view == 1);
+                        const float right = view ? B.view3DX + B.plan : 24.0f + B.plan + B.column;
+                        if (B.plan < L.plan - 0.5f) fail(where, "the views shrink with the keys hidden");
+                        if (right > w.w - 24.0f + 0.5f) fail(where, "a view past the window, keys hidden");
+                        if (24.0f + B.plan > B.chartTop + 0.5f) fail(where, "a view over the faders, keys hidden");
+                        if (view && B.view3DX < 24.0f + B.plan + B.column - 0.5f)
+                            fail(where, "the views overlap, keys hidden");
+                        if (std::fabs(B.chartRight - (w.w - 24.0f)) > 0.5f)
+                            fail(where, "the faders not across the window, keys hidden");
+                        ++configs;
+                    }
                     // The key sheet over the whole window.
                     const float first = 24.0f + f.lh + 2.0f * (f.lh + 1.0f);
                     const KeyFlow sheet = flowKeys(all, 24.0f, w.w - 24.0f, first,
