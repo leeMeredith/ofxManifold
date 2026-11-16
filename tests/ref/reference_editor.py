@@ -1463,6 +1463,34 @@ class Editor:
         self.go_level(0)
         self.select_only("FL")
 
+    # ---- round 3B-2b: where each output sits ------------------------------
+    def output_places(self):
+        """[(name, level, levels, placed, x, y, z)] in output order: the
+        levels feeding each output, counted over every level's links, and
+        its owner node's place and height on the lowest of them."""
+        out = []
+        for o in self.outputs:
+            on = [k for k, lv in enumerate(self.levels)
+                  if any(l[0] == "out" and l[1] == o[0]
+                         for ls in lv["links"].values() for l in ls)]
+            level = on[0] if on else -1
+            owner = self.owner(o[0])
+            if owner is None:
+                out.append((o[0], level, len(on), False, 0.0, 0.0, 0.0))
+            else:
+                x, y = dict(self.nodes)[owner]
+                out.append((o[0], level, len(on), True, x, y,
+                            self.height(max(level, 0), owner)))
+        return out
+
+    def own_output_here(self, name):
+        """The node's own output on the current level, or None: the first
+        it feeds here that is its own."""
+        for l in self.levels[self.cur]["links"].get(name, []):
+            if l[0] == "out" and self.owner(l[1]) == name:
+                return l[1]
+        return None
+
     def octahedron(self):
         """The octahedron (3B-2d): a diamond rim and its centre on two levels
         that touch at the rim. Built here from the finished shape, not by
@@ -2147,6 +2175,18 @@ class Script:
             + f" SILENCE {fmt(sil)} SEL "
             + ("-" if mine is None else (" ".join(fmt(x) for x in mine) or "-"))
             + f" DOTS {dots}")
+
+    def places(self):
+        """3B-2b: each output's place, as the shape message says it."""
+        self.out.append("PLACES EXPECT " + " ".join(
+            f"{n} {lv} {lvs} {int(pl)} {fmt(x)} {fmt(y)} {fmt(z)}"
+            for n, lv, lvs, pl, x, y, z in self.ed.output_places()))
+
+    def own(self):
+        """3B-2b: each node's own output on the current level -- the colour
+        of its name on the map."""
+        self.out.append("OWN EXPECT " + " ".join(
+            f"{nm} {self.ed.own_output_here(nm) or '-'}" for nm in self.ed.names()))
 
     def drag_level(self, k, pixels, gap):
         """Where dragging level k's dot puts it (round 3A-6b)."""
@@ -3699,6 +3739,61 @@ def build_cells(out):
     t.do("savepair", "octahedron")
     t.do("empty")
     t.do("openpair", "octahedron.json")
+    t.end()
+
+    out.append("# ROUND 3B-2b: THE MAP'S SHAPE, AND NAMES ON THE LEVEL YOU ARE ON")
+    t = Script(out, "output_places",
+               "each output's place, as the shape message tells SuperCollider: "
+               "the lowest level feeding it and how many do, and its owner "
+               "node's place and height there; and each node's own output "
+               "on the current level, the colour of its name on the map")
+    t.do("room")
+    t.places()
+    t.own()
+    t.do("levelup")
+    t.own()
+    t.do("levelup")
+    t.own()
+    out.append("# the middle's FR raised: FR-2 rides up with it")
+    t.do("leveldown")
+    t.select("FR")
+    t.do("raise", 1, False)
+    t.places()
+    out.append("# FL moved: every output of its own moves with it")
+    t.select("FL"); t.do("move", "FL", (0.25, 0.75))
+    t.places()
+    out.append("# the middle's FL sent to the floor's FL as well: FL fed by two")
+    out.append("# levels, and FL on the middle has two outputs of its own --")
+    out.append("# the first it feeds is its colour")
+    t.do("pick", "FL")
+    t.do("bind")
+    t.places()
+    t.own()
+    out.append("# RL silenced on the floor: RL fed by no level, still placed,")
+    out.append("# at its height on the ground")
+    t.do("leveldown")
+    t.select("RL")
+    t.do("silence")
+    t.places()
+    t.own()
+    t.end()
+
+    t = Script(out, "output_places_unplaced",
+               "the flat example: one level, its outputs named after no node, "
+               "so unplaced -- and no node has an own output to colour it")
+    t.do("example")
+    t.places()
+    t.own()
+    t.end()
+
+    t = Script(out, "output_places_octahedron",
+               "the octahedron: each level's own outputs, placed at the "
+               "apexes and the rim")
+    t.do("octahedron")
+    t.places()
+    t.own()
+    t.do("levelup")
+    t.own()
     t.end()
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-ofxManifold -- example-osc's receiver in plain Python (round 3B-1, protocol
-2: several maps at once).
+ofxManifold -- example-osc's receiver in plain Python (round 3B-2b,
+protocol 3: several maps at once, each telling its shape).
 
 No dependencies. Listens for the roll call, /manifold/map, and follows every
-map it hears: prints each map's outputs as it describes them, and its levels
-as numbers -- a line per map when they change, at most twice a second, so it
+map it hears: prints each map's outputs as it describes them, its shape --
+its levels, and each output's level and place -- when that changes, and its
+levels as numbers -- a line per map when they change, at most twice a second, so it
 is quiet while nothing moves. Says hello to each map once a second, at the
 port its roll call gives, so example-osc shows it answered; asks every map to
 describe itself when it starts; lets a map go when its roll call has been
@@ -77,7 +78,7 @@ def main():
                 elif m["port"]:
                     sock.sendto(encode(prefix + "/hello", "python"), ("127.0.0.1", m["port"]))
         try:
-            data, _ = sock.recvfrom(4096)
+            data, _ = sock.recvfrom(65536)
         except socket.timeout:
             continue
         address, args = decode(data)
@@ -86,7 +87,7 @@ def main():
             m = maps.get(prefix)
             if m is None:
                 maps[prefix] = m = dict(port=port, names=[], seen=now, shown=None,
-                                        printed=0.0, warned=False)
+                                        printed=0.0, warned=False, shape=None)
                 print(f"{prefix} playing, answers on port {port}")
             elif m["port"] != port and not m["warned"]:
                 print(f"two maps called {prefix} (answering on {m['port']} and {port})"
@@ -104,6 +105,21 @@ def main():
             if new != m["names"]:
                 m["names"] = new
                 print(f"{prefix}: {n} outputs: {', '.join(new)}")
+        elif what == "shape" and args != m["shape"]:
+            # i L, L heights, i N, then per output: s name, i channel,
+            # i level, i levels, i placed, f x, f y, f z
+            m["shape"] = args
+            L = args[0]
+            heights = args[1:1 + L]
+            print(f"{prefix}: {L} level{'s' if L != 1 else ''} starting at "
+                  + ", ".join(f"{h:g}" for h in heights))
+            at = 2 + L
+            for i in range(args[1 + L]):
+                name, _, level, levels, placed, x, y, z = args[at + 8 * i:at + 8 * i + 8]
+                where = ("on no level" if level < 0 else
+                         f"on level {level + 1}" + (f" and {levels - 1} more" if levels > 1 else ""))
+                place = f", at ({x:.2f}, {y:.2f}) height {z:.2f}" if placed else ""
+                print(f"    {name} {where}{place}")
         elif what == "levels" and now - m["printed"] >= 0.5:
             shown = [round(v, 2) for v in args]
             if shown != m["shown"]:

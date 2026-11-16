@@ -2100,6 +2100,56 @@ Built as specified (2026-11-14), every recommendation taken ("next").
 - **Not done**: the one drag branch that backs off a step when a touch would
   not land has no vector -- no drag found makes float miss.
 
+### 3B-2b: the map's shape for SuperCollider; one name per node
+
+Built as specified (2026-11-15), every recommendation taken ("yes all
+recommended"): a 30-semitone span from C3, a quiet root for shared and
+unfed outputs, brightness on, the node's name on the map.
+
+- **`Model::outputPlaces()`**: per output, the lowest level feeding it, how
+  many do, and its owner node's place and height on that level (the ground
+  when none feeds it). **`Model::ownOutput(node)`**: the first output the
+  node feeds on the current level that `ownerOf` says is its own.
+- **The player**: `OscOutput` gains `firstLevel`, `levelCount`, `placed`,
+  `place` (not `level`: that was already the sound level); `OscFrame` gains
+  `hasShape` and `levelHeights`. `OscOut` sends `<prefix>/shape` right after
+  each description and on its own whenever its bytes change -- not when only
+  the sound levels move, not at all without `hasShape`. `kProtocol` is 3.
+  The heights are each level's start.
+- **example-osc** fills the shape from the model every frame; turns the
+  renderer's own nodes off, so each name is drawn once (the drawlog shows
+  it); names take their own output's colour on the current level, in both
+  apps (FL in FL-2's colour on level 2, matching its fader).
+- **The patch** (`manifold-receive.scd`): the musical rules are plain
+  functions between `// ---- music` and `// ---- end of music`, read by
+  key from settings at the top -- `\music` (`\registers`, `\progression`,
+  `\series`), `\span`, `\fit`, `\bright`, `\quiet`. Voices are built when
+  the outputs change and RETUNED, not rebuilt, when the shape changes --
+  freq and pan lag, so dragging a level glides rather than clicks. The tone
+  has five partials under a low-pass that `bright` opens (by u when sent,
+  else by z between the lowest and highest level). The post window names
+  each output's note and which behaviour. Also fixed: a map answering on
+  port 0 made the patch throw sending it `/describe`.
+- **Checked in sclang, not only by reading**: `make sc` runs the patch's own
+  music functions against `tests/vectors/music.vec`, written by
+  `tests/ref/reference_music.py` (chord tables written out, the series as
+  harmonics of root/m) -- 38 vectors over seven shapes and four behaviours,
+  plus the whole patch compiling and the shape message read as sent: 40.
+  Breaking the chord stack turns 7 red, the quiet level 4. `make sc-live`
+  runs the whole patch on a server -- here on a silent JACK server, on a
+  Mac on the sound card for a second -- sends it a roll call, outputs, the
+  shape, levels and a position, and reads the synths back: the climb before
+  the shape, retuned not rebuilt, levels and brightness followed. 7.
+  Neither is in `make test` or CI: they need SuperCollider.
+- **receive.py** prints the shape when it changes; checked against the
+  real C++ sender over UDP. The live UDP run (`make osc-live`) carries a
+  shape, including one sent alone when a level moves.
+- **Vectors**: editor 3 scripts (`output_places`, `..._unplaced`,
+  `..._octahedron`: PLACES and OWN records); OSC 2 encodings and 2 send
+  scripts. 1077. **Gates**: 13 new; every player gate run again. 503.
+- **The sound itself is Lee's to hear.** Whether \registers' #11 and 13
+  sit well, and whether the span suits, are settings to try.
+
 ---
 
 ## Answered

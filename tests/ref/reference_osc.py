@@ -171,7 +171,7 @@ class Sender:
     REFRESH_EVERY = 0.1
     HELLO_LASTS = 3.0
     CHANGED = 1e-6
-    PROTOCOL = 2
+    PROTOCOL = 3        # 3B-2b: the shape message
 
     def __init__(self, prefix="/manifold", map_name="untitled", answer_port=0,
                  packed=True, per_output=False, rate=60.0):
@@ -195,6 +195,7 @@ class Sender:
         self.last_refresh = None
         self.sent_out = {}             # name -> level last sent per output
         self.sent_value = {}
+        self.sent_shape = None         # the shape last sent, as bytes
 
     def set_map(self, name):
         """Another map's name: new addresses, so everything again."""
@@ -215,10 +216,12 @@ class Sender:
     def connected(self, now):
         return self.last_hello is not None and now - self.last_hello < self.HELLO_LASTS
 
-    def frame(self, now, outputs, values, position):
+    def frame(self, now, outputs, values, position, shape=None):
         """outputs: [(name, channel, level)] in channel order; values:
-        [(name, value)]; position: (x, y, z) or None. The messages to send
-        now, as (address, args)."""
+        [(name, value)]; position: (x, y, z) or None; shape (3B-2b): None,
+        or (heights, {name: (level, levels, placed, x, y, z)}) -- an output
+        not in it on no level, unplaced. The messages to send now, as
+        (address, args)."""
         if self.next_send is not None and now < self.next_send - 1e-9:
             return []
         period = 1.0 / self.rate
@@ -246,6 +249,22 @@ class Sender:
             self.described = layout
             self.describe_asked = False
             self.last_describe = now
+            self.sent_shape = None     # a description is followed by the shape
+        if shape is not None:
+            heights, places = shape
+            args = [("i", len(heights))] + [("f", h) for h in heights]
+            args.append(("i", len(outputs)))
+            for n, c, _ in outputs:
+                lv, lvs, placed, x, y, z = places.get(n, (-1, 0, 0, 0, 0, 0))
+                if not placed:
+                    x = y = z = 0.0
+                args += [("s", n), ("i", c), ("i", lv), ("i", lvs),
+                         ("i", 1 if placed else 0),
+                         ("f", x), ("f", y), ("f", z)]
+            data = encode(p + "/shape", args)
+            if data != self.sent_shape:
+                msgs.append((p + "/shape", args))
+                self.sent_shape = data
         if self.packed:
             msgs.append((p + "/levels", [("f", lv) for _, _, lv in outputs]))
         refresh = (self.last_refresh is None
@@ -304,6 +323,18 @@ def encode_vectors(out):
         ("roll_call", "/manifold/map",
          [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 2)]),
         ("utf8_name", "/manifold/out/café", [("f", 0.5)]),
+        ("roll_call_protocol_3", "/manifold/map",
+         [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 3)]),
+        # 3B-2b: two levels; FL on the floor, placed; FL-2 on the upper
+        # level, placed over the same node; a send fed by none, unplaced
+        ("shape", "/manifold/room/shape",
+         [("i", 2), ("f", 0.0), ("f", 0.25), ("i", 3),
+          ("s", "FL"), ("i", 0), ("i", 0), ("i", 1), ("i", 1),
+          ("f", 0.2), ("f", 0.8), ("f", 0.0),
+          ("s", "FL-2"), ("i", 1), ("i", 1), ("i", 1), ("i", 1),
+          ("f", 0.2), ("f", 0.8), ("f", 0.25),
+          ("s", "verb"), ("i", 2), ("i", -1), ("i", 0), ("i", 0),
+          ("f", 0.0), ("f", 0.0), ("f", 0.0)]),
     ]
     for name, address, args in cases:
         data = encode(address, args)
@@ -362,11 +393,26 @@ class Script:
                    f"port={self.s.answer_port} packed={int(self.s.packed)} "
                    f"per_output={int(self.s.per_output)} rate={self.s.rate:g}")
 
+    def shape(self, heights, places):
+        """3B-2b: the map's shape for the frames after this, until another
+        or none."""
+        self.shape_now = (list(heights), dict(places))
+        self.out.append("SHAPE " + (" ".join(fmtf(h) for h in heights) or "-")
+                        + " | " + (",".join(
+                            f"{n}:{lv}:{lvs}:{int(pl)}:{fmtf(x)}:{fmtf(y)}:{fmtf(z)}"
+                            for n, (lv, lvs, pl, x, y, z) in places.items())
+                            or "-"))
+
+    def no_shape(self):
+        self.shape_now = None
+        self.out.append("NOSHAPE")
+
     def frame(self, now, outputs, values=(), position=None):
         o = ",".join(f"{n}:{c}:{fmtf(lv)}" for n, c, lv in outputs) or "-"
         v = ",".join(f"{n}:{fmtf(x)}" for n, x in values) or "-"
         pos = " ".join(fmtf(c) for c in position) if position else "-"
-        msgs = self.s.frame(now, list(outputs), list(values), position)
+        msgs = self.s.frame(now, list(outputs), list(values), position,
+                            getattr(self, "shape_now", None))
         self.out.append(f"FRAME {now!r} | {o} | {v} | {pos} | {len(msgs)}")
         for address, args in msgs:
             self.out.append(f"MSG {address} {tags(args)} {argtext(args)}".rstrip())
@@ -474,6 +520,48 @@ def send_vectors(out):
     t.recv(4.2, "/other/hello", [("s", "pd")])
     t.conn(7.1)
     t.frame(7.2, [])
+    t.end()
+
+    # ---- round 3B-2b: the shape message ----
+    room = [("FL", 0, 0.5), ("FR", 1, 0.25), ("FL-2", 2, 0.0), ("mix", 3, 0.0)]
+    placed = {"FL": (0, 1, True, 0.2, 0.8, 0.0),
+              "FR": (0, 1, True, 0.8, 0.8, 0.0),
+              "FL-2": (1, 1, True, 0.2, 0.8, 0.25)}
+    t = Script(out, "shape_with_description",
+               "the shape follows every description -- the first send, when "
+               "asked, every two seconds -- and is sent alone whenever it "
+               "changes: a level's height, an owner's height, a feeding "
+               "level; not when only the sound levels move", map_name="room")
+    t.shape([0.0, 0.25], placed)
+    t.frame(0.0, room)
+    t.frame(1 / 60, [("FL", 0, 0.25), ("FR", 1, 0.5), ("FL-2", 2, 0.25),
+                     ("mix", 3, 0.0)])
+    t.shape([0.0, 0.3], placed)
+    t.frame(2 / 60, room)
+    moved = dict(placed)
+    moved["FL-2"] = (1, 1, True, 0.2, 0.8, 0.4)
+    t.shape([0.0, 0.3], moved)
+    t.frame(3 / 60, room)
+    shared = dict(moved)
+    shared["FR"] = (0, 2, True, 0.8, 0.8, 0.0)
+    t.shape([0.0, 0.3], shared)
+    t.frame(4 / 60, room)
+    t.frame(5 / 60, room)
+    t.recv(0.09, "/manifold/room/describe")
+    t.frame(6 / 60, room)
+    t.frame(2.1, room)
+    t.no_shape()
+    t.frame(2.12, room)
+    t.end()
+
+    t = Script(out, "shape_unplaced_and_new_outputs",
+               "an output the shape does not place: on no level, unplaced, "
+               "0 0 0; an output added: described again, the shape with it",
+               map_name="room")
+    t.shape([0.5], {"FL": (0, 1, True, 0.2, 0.8, 0.5),
+                    "mix": (-1, 0, False, 0.9, 0.9, 0.9)})
+    t.frame(0.0, room[:2] + [("mix", 3, 0.0)])
+    t.frame(1 / 60, room)
     t.end()
 
     t = Script(out, "maps_named_and_announced",

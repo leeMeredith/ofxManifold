@@ -248,6 +248,9 @@ void ofApp::adopt(const std::string& name) {
     osc.setMapName(name);             // its addresses, /manifold/<name>/...
     evaluator = std::make_unique<Evaluator>(model.manifold());
     renderer = std::make_unique<ofxManifoldRenderer>(model.manifold());
+    // Nodes are drawn here, by the editor's glyphs -- not the renderer too,
+    // or every name is drawn twice, a hair apart (3B-2b).
+    renderer->style.drawNodes = false;
     evaluation = evaluator->evaluate(point);
     z = listenStart(model, evaluation);
     u = model.map3d().levels().positionAt(floorWeights(), z, heightIn == HeightIn::Past);
@@ -401,10 +404,18 @@ OscFrame ofApp::frameNow(const ChartLevels& lv) const {
         return (ch >= 0 && std::size_t(ch) < lv.levels.size()) ? lv.levels[std::size_t(ch)]
                                                                : 0.0f;
     };
+    // Where each output sits (round 3B-2b): the shape message says it, and
+    // SuperCollider decides what it sounds like.
+    const std::vector<OutputPlace> places = model.outputPlaces();
     for (TargetID t = 0; t < mp.targetCount(); ++t) {
         const int ch = mp.targetChannel(t);
         if (ch == NoChannel) continue;
-        outs.push_back({mp.targetName(t), ch, level(ch)});
+        OscOutput o{mp.targetName(t), ch, level(ch)};
+        o.firstLevel = places[t].level;
+        o.levelCount = places[t].levels;
+        o.placed = places[t].placed;
+        o.place = places[t].position;
+        outs.push_back(o);
     }
     for (const Aggregator& ag : mp.aggregators()) {
         if (ag.channel == NoChannel) continue;
@@ -419,6 +430,9 @@ OscFrame ofApp::frameNow(const ChartLevels& lv) const {
     f.position = {point.x, point.y, z};
     f.hasLevelPosition = true;        // /position's fourth: where between the levels
     f.levelPosition = u;
+    f.hasShape = true;                // /shape: the levels' starts, each output's place
+    const Levels& lv3 = model.map3d().levels();
+    for (LevelID k = 0; k < lv3.count(); ++k) f.levelHeights.push_back(lv3.base(k));
     return f;
 }
 

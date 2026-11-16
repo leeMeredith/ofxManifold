@@ -23,12 +23,24 @@
 #include "mapping/ofxManifoldMap3D.h"
 #include "mapping/ofxManifoldMapping.h"
 
+#include <glm/vec3.hpp>
+
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace ofxManifold {
 namespace editor {
+
+// Where an output sits in the map (round 3B-2b) -- what the shape message
+// tells a receiver. Nothing musical: only what the map already says.
+struct OutputPlace {
+    int       level = -1;       // the lowest level whose nodes feed it; -1 none
+    int       levels = 0;       // how many levels feed it
+    bool      placed = false;   // has an owner node (ownerOf)
+    glm::vec3 position{0.0f};   // the owner's place on the floor plan, and its
+                                // height on `level` (the ground when -1)
+};
 
 struct Result {
     bool        changed = false;   // the map or its outputs changed
@@ -272,6 +284,15 @@ public:
     // node it is named after (P for P-2, P-3_2), else InvalidNode. Link lines
     // land on it, and a new level redirects links to it (3A-9).
     NodeID ownerOf(const std::string& output) const;
+
+    // Round 3B-2b. Each output's place, by TargetID: which levels feed it,
+    // and where its owner node is. The shape message carries it.
+    std::vector<OutputPlace> outputPlaces() const;
+
+    // The node's own output on the current level: of the outputs it feeds
+    // here, the first that is its own (ownerOf) -- FL-2 for FL on level 2 --
+    // else InvalidTarget. Its name on the map is drawn in that colour.
+    TargetID ownOutput(NodeID node) const;
 
     // y and h: each selected node's height on the current level steps by
     // 0.05, or 0.01 when `fine`, landing on the next multiple of the step

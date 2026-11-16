@@ -68,7 +68,20 @@ std::string oscName(const std::string& name);
 
 // One frame's state: the outputs in channel order with their levels, the
 // node values, and where the point is.
-struct OscOutput { std::string name; int channel = 0; float level = 0.0f; };
+struct OscOutput {
+    std::string name;
+    int         channel = 0;
+    float       level = 0.0f;       // what it sounds, 0..1
+    // Where it sits in the map (round 3B-2b), said by the shape message
+    // when the frame has a shape: the lowest level whose nodes feed it (-1:
+    // none), how many levels feed it, and whether it has an owner node --
+    // the node of its name, or the one it is named after -- and if so that
+    // node's place on the floor plan and its height there.
+    int         firstLevel = -1;
+    int         levelCount = 0;
+    bool        placed = false;
+    glm::vec3   place{0.0f};
+};
 struct OscValue  { std::string name; float value = 0.0f; };
 
 struct OscFrame {
@@ -81,6 +94,12 @@ struct OscFrame {
     // fourth number when set; a receiver reading three is unaffected.
     bool                   hasLevelPosition = false;
     float                  levelPosition = 0.0f;
+    // The map's shape (round 3B-2b): the levels' heights, lowest first,
+    // and each output's firstLevel, levelCount, placed and place. Sent as
+    // root/<map>/shape with every description and whenever it changes;
+    // not at all when unset -- a receiver then hears what it always did.
+    bool                   hasShape = false;
+    std::vector<float>     levelHeights;
 };
 
 class OscOut {
@@ -90,8 +109,8 @@ public:
     static constexpr double kHelloLasts    = 3.0;
     static constexpr float  kChanged       = 1e-6f;
     // The protocol, in every roll call (OSC.md): 2 puts the map's name in
-    // every address and adds the roll call.
-    static constexpr int    kProtocol      = 2;
+    // every address and adds the roll call; 3 adds the shape message.
+    static constexpr int    kProtocol      = 3;
 
     // ---- settings ----
     // The root every sender shares, "/manifold". Each map's messages go
@@ -121,7 +140,9 @@ public:
     // changed by more than kChanged, and everything every kRefreshEvery. The
     // outputs are described on the first send, when they change, when asked,
     // and every kDescribeEvery; each description is led by the roll call,
-    // root/map: s prefix, i answer port, i outputs, i protocol.
+    // root/map: s prefix, i answer port, i outputs, i protocol. When the
+    // frame has a shape, root/<map>/shape follows each description, and is
+    // sent on its own whenever it alone changes.
     std::vector<OscMessage> frame(double now, const OscFrame& f);
 
     // A message from a receiver: describe, or hello, on this map's prefix
@@ -154,6 +175,7 @@ private:
     bool   refreshedYet_ = false;
     double lastRefresh_ = 0.0;
     std::map<std::string, float> sentOut_, sentValue_;   // last sent, by name
+    std::vector<std::uint8_t> sentShape_;              // encoded; empty: none
     std::string peer_;
     bool   helloYet_ = false;
     double lastHello_ = 0.0;

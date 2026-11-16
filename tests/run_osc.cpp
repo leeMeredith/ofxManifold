@@ -180,6 +180,11 @@ int main(int argc, char** argv) {
                 else if (k == "rate") out.setRate(std::stod(v));
             }
             std::string why;
+            // Round 3B-2b: the shape the frames after a SHAPE line carry,
+            // by output name; none after NOSHAPE.
+            bool shaped = false;
+            std::vector<float> heights;
+            std::map<std::string, OscOutput> places;
             std::size_t j = i + 1;
             for (; j < lines.size() && lines[j] != "END"; ++j) {
                 const std::string& s = lines[j];
@@ -212,6 +217,18 @@ int main(int argc, char** argv) {
                         fr.hasPosition = true;
                         if (ps >> fr.levelPosition) fr.hasLevelPosition = true;
                     }
+                    if (shaped) {
+                        fr.hasShape = true;
+                        fr.levelHeights = heights;
+                        for (OscOutput& o : fr.outputs) {
+                            const auto it = places.find(o.name);
+                            if (it == places.end()) continue;
+                            o.firstLevel = it->second.firstLevel;
+                            o.levelCount = it->second.levelCount;
+                            o.placed = it->second.placed;
+                            o.place = it->second.place;
+                        }
+                    }
                     const std::size_t want = std::stoul(f[4]);
                     const auto msgs = out.frame(now, fr);
                     if (msgs.size() != want) {
@@ -228,6 +245,35 @@ int main(int argc, char** argv) {
                         }
                     }
                     j += want;
+                } else if (s.rfind("SHAPE ", 0) == 0) {
+                    const auto f = fields(s.substr(6));
+                    shaped = true;
+                    heights.clear();
+                    places.clear();
+                    if (f[0] != "-") {
+                        std::istringstream hs(f[0]);
+                        for (float h; hs >> h;) heights.push_back(h);
+                    }
+                    if (f[1] != "-") {
+                        std::stringstream ps(f[1]);
+                        for (std::string item; std::getline(ps, item, ',');) {
+                            // name:level:levels:placed:x:y:z, the name may
+                            // hold no colon
+                            std::vector<std::string> part;
+                            std::stringstream is(item);
+                            for (std::string x; std::getline(is, x, ':');) part.push_back(x);
+                            OscOutput o;
+                            o.name = part[0];
+                            o.firstLevel = std::stoi(part[1]);
+                            o.levelCount = std::stoi(part[2]);
+                            o.placed = part[3] == "1";
+                            o.place = {std::stof(part[4]), std::stof(part[5]),
+                                       std::stof(part[6])};
+                            places[o.name] = o;
+                        }
+                    }
+                } else if (s.rfind("NOSHAPE", 0) == 0) {
+                    shaped = false;
                 } else if (s.rfind("MAP ", 0) == 0) {
                     out.setMapName(s.substr(4));
                 } else if (s.rfind("RECV ", 0) == 0) {

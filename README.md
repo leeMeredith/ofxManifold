@@ -197,7 +197,7 @@ messages go under its own name -- `/manifold/room/levels` -- with a roll call
 on `/manifold/map`, and each copy of the app hears answers on the first port
 free from 57121, so several copies with different maps play at once and the
 receivers (the SuperCollider patch, `receive.py`) follow every one
-(protocol 2, `ofxManifoldPlayer/OSC.md`). The point can also move itself
+(protocol 3, `ofxManifoldPlayer/OSC.md`). The point can also move itself
 (`m`): a recording of your hand (`r`, its path drawn as you go), looped;
 random jumps; random glides -- and the height on its own (`h`): by hand with
 ↑ ↓, jumping or gliding, whatever moves the floor, so you can drag the point
@@ -216,6 +216,14 @@ both. `?` shows every
 key on one page. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
+Each map also tells its shape -- its levels, and where each output sits --
+and the patch decides what that sounds like, in settings at its top: each
+level a chord in its own register (`\registers`, the default), a chord
+progression up the levels (`\progression`), or the overtone series
+(`\series`); the point's height opening each voice; each output panned by
+its node's place. openFrameworks decides none of it. With SuperCollider
+installed, `make sc` checks the patch's music in sclang and `make sc-live`
+runs it whole on your sound card for a second.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
 (beside `src/`, copied into `addons/` like the editor's), `ofxManifoldEditor`
 for opening maps, and openFrameworks' own `ofxOsc`.
@@ -336,7 +344,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-1070 vectors across fifteen suites, plus 490 mutation gates that introduce known
+1077 vectors across fifteen suites, plus 503 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

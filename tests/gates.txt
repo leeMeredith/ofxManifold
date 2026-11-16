@@ -2621,3 +2621,73 @@ gate: The octahedron's bottom apex half as deep
 file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
 find:     map_.moveLevel(0, -0.5f, n);
 replace:     map_.moveLevel(0, -0.25f, n);
+
+# ---- round 3B-2b: the map's shape for SuperCollider ----
+
+gate: The roll call still says protocol 2
+file: ofxManifoldPlayer/src/ofxManifoldOsc.h
+find:     static constexpr int    kProtocol      = 3;
+replace:     static constexpr int    kProtocol      = 2;
+
+gate: The shape is never sent
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     if (f.hasShape) {
+replace:     if (false) {
+
+gate: The shape is sent at every frame
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         if (bytes != sentShape_) {
+replace:         if (true) {
+
+gate: A change in the shape alone is not sent
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         if (bytes != sentShape_) {
+replace:         if (sentShape_.empty()) {
+
+gate: The shape does not follow a description
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         sentShape_.clear();              // the shape follows every description
+replace:         // (not cleared)
+
+gate: The levels' heights left out of the shape
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         for (float h : f.levelHeights) m.args.push_back(OscArg::number(h));
+replace:         (void)0;
+
+gate: An unplaced output's place sent anyway
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:             m.args.push_back(OscArg::number(o.placed ? o.place.x : 0.0f));
+replace:             m.args.push_back(OscArg::number(o.place.x));
+
+gate: How many levels feed an output, counted as one
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             ++out[t].levels;
+replace:             out[t].levels = 1;
+
+gate: An output's level is the highest feeding it
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:             if (out[t].level < 0) out[t].level = int(k);
+replace:             out[t].level = int(k);
+
+gate: No output is ever placed
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (o == InvalidNode) continue;\n        OutputPlace& p = out[t];
+replace:         if (true) continue;\n        OutputPlace& p = out[t];
+nl: yes
+
+gate: An output's owner height read on the current level
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         p.position = {xy.x, xy.y, map_.levels().height(k, o)};
+replace:         p.position = {xy.x, xy.y, map_.levels().height(level_, o)}; (void)k;
+
+gate: A node's own output is any it feeds
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:         if (l.kind == DestKind::Output && ownerOf(m.targetName(l.id)) == node) {
+replace:         if (l.kind == DestKind::Output) {
+
+gate: A node's own output read on the floor, whatever the level
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find: TargetID Model::ownOutput(NodeID node) const {\n    const Mapping& m = mapping();
+replace: TargetID Model::ownOutput(NodeID node) const {\n    const Mapping& m = map_.level(0);
+nl: yes
+

@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
     // than Python's two roundings. Sixteenths round the same either way.
     OscOut osc;
     osc.setPerOutput(true);
-    osc.setMapName("room");             // protocol 2: named, with a roll call
+    osc.setMapName("room");             // named, with a roll call (protocol 2 on)
     osc.setAnswerPort(listenPort);
     int packets = 0;
     for (int k = 0; k < 10; ++k) {
@@ -57,6 +57,16 @@ int main(int argc, char** argv) {
         f.values.push_back({"brightness", 0.5f});
         f.hasPosition = true;
         f.position = {step, 0.5f, 0.0f};
+        // The shape (3B-2b): two levels, front placed on the lower; the
+        // upper one rising from the seventh frame -- the shape sent alone.
+        f.hasShape = true;
+        f.levelHeights = {0.0f, k >= 6 ? 0.5f : 0.25f};
+        f.outputs[0].firstLevel = 0;
+        f.outputs[0].levelCount = 1;
+        f.outputs[0].placed = true;
+        f.outputs[0].place = {0.25f, 0.75f, 0.0f};
+        f.outputs[1].firstLevel = 1;
+        f.outputs[1].levelCount = 2;
         for (const OscMessage& m : osc.frame(now, f)) {
             const auto bytes = encode(m);
             sendto(out, bytes.data(), bytes.size(), 0,

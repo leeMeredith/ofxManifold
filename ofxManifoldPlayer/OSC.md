@@ -10,8 +10,12 @@ there are**, nor **how many maps are playing.** The sender tells it, and
 tells it again when that changes, so the messages grow and shrink with the
 maps.
 
-This is **protocol 2**. Protocol 1 (the first 3B-1) sent everything under
-`/manifold` alone, with no map's name and no roll call; one map at a time.
+This is **protocol 3**: protocol 2 and a `shape` message, saying how the map
+is built -- its levels, and where each output sits -- so a receiver can
+decide what each output sounds like. Protocol 2 had the map's name in every
+address and the roll call; protocol 1 (the first 3B-1) sent everything under
+`/manifold` alone, one map at a time. A receiver written for 2 reads 3
+unchanged: it ignores the message it does not know.
 
 ## Maps and their prefixes
 
@@ -29,7 +33,7 @@ Two maps with the same name cannot be told apart; give one another name.
 
 | Address | Arguments | When |
 |---|---|---|
-| `/manifold/map` | `s` prefix, `i` answer port, `i` N outputs, `i` protocol (2) | just before every `outputs` message (below): the first send, every change, when asked, every 2 seconds |
+| `/manifold/map` | `s` prefix, `i` answer port, `i` N outputs, `i` protocol (3) | just before every `outputs` message (below): the first send, every change, when asked, every 2 seconds |
 
 The roll call is always on the root, whatever the map's name, so a receiver
 listens to one address to find every map playing: what it is called, where
@@ -42,6 +46,7 @@ stopped.
 | Address | Arguments | When |
 |---|---|---|
 | `/manifold/room/outputs` | `i` N, then N pairs of `s` name, `i` channel | with the roll call: the first send; whenever an output is added or removed or its channel changes; when asked; every 2 seconds |
+| `/manifold/room/shape` | `i` L, then L × `f` level heights; `i` N, then N × (`s` name, `i` channel, `i` level, `i` levels, `i` placed, `f` x, `f` y, `f` z) | right after every `outputs` message, and on its own whenever it changes -- a level moved, a node moved or raised, a binding |
 | `/manifold/room/levels` | N × `f` | every send, if packed is on (the default) |
 | `/manifold/room/out/NAME` | `f` | per output, if that is on: what changed, at every send; all of them every 0.1 s |
 | `/manifold/room/values` | `i` M, then M pairs of `s` name, `f` value | every send, if packed is on and the map has values |
@@ -60,6 +65,16 @@ stopped.
   half way between the second and third -- measured against the levels as
   they bend there. Past 0 or the top level, the point is outside: silent.
   A receiver reading three numbers is unaffected.
+- **The shape says what the map already knows, and nothing musical.**
+  The **level heights** are where each level starts, lowest first. Then,
+  for each output in the `outputs` order: its **level**, the lowest level
+  whose nodes feed it (-1: none does); **levels**, how many levels feed it
+  (1 for a level's own output, more for one shared across levels, 0 for
+  none); and **placed**, whether it has an owner node -- the node of its
+  name, or the one it is named after (FL for FL-2). If it has, **x y** are
+  that node's place on the map and **z** its height on that level; if not,
+  all 0. A map with one level has L = 1. What to do with any of it -- chords
+  by level, panning by place -- is the receiver's to decide.
 - **Per-output addresses use the output's name** cleaned as map names are.
   The `outputs` message has the name as written.
 - **Sends happen at a rate, 60 a second by default** (settable from 1 to
@@ -117,11 +132,16 @@ against an independent OSC library (python-osc) in the tests.
    note the time; forget a map silent for a few seconds.
 3. On a map's `outputs`, if the list differs from the one you have, rebuild:
    one voice, light, parameter or channel per output.
-4. On its `levels`, set each from its argument, in order. Smoothing over
+4. On its `shape`, if it differs from the last, retune what you built --
+   no need to rebuild: the outputs are the same ones, in the same order.
+   No `shape` at all: an older sender; place things by order.
+5. On its `levels`, set each from its argument, in order. Smoothing over
    about 20 ms hides the steps between sends. The sender smooths jumps
    itself -- a click across the map, the point leaving it -- so a receiver
    needs no more than that (`OutputSmoother`, half-life 0.05 s in
    example-osc).
-5. Optionally say the map's `hello` to its answer port once a second.
+6. Optionally say the map's `hello` to its answer port once a second.
 
-The SuperCollider patch beside `example-osc` is exactly this.
+The SuperCollider patch beside `example-osc` is exactly this, and decides
+what the shape sounds like in settings at its top: `\registers`,
+`\progression` or `\series`, brightness, the span.

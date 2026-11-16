@@ -21,10 +21,11 @@ serialization the standard library's own JSON parser against a hand-written one.
 | `io` | 55 | JSON round trip, rejection, diagnosis, the outputs file versions |
 | `sources` | 82 + 52 | trajectories, real-time replay, velocity, the touring case, paths with height; movement (3B-2): splitmix64 against its published outputs, random walks -- jump and glide -- asked in and out of order, bounds, the map's inside test, straight paths, steps on a timer, on clicks and in a pattern, recordings held and looped, the seconds and phase clocks, motion files |
 | `authoring` | 102 | grids: free, lattice, polar; nearest-point snapping, hysteresis |
-| `ofxManifoldEditor` (logic) | 70 scripts, 901 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line, rings, blocks and triangles laid out in one step, c and C for a node's own output or silence, L and F to lay out nodes and join the grid's whole cells, the nodes in line |
-| `ofxManifoldPlayer` | 39 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
+| `ofxManifoldEditor` (logic) | 73 scripts, 916 steps | editing operations, selection, undo, files, fader layout, link lines, keys, derived outputs after the fader, rigs, levels, heights, listening in 3D, the column of dots, moving a level, matching heights, each level's own outputs, node values and the typing line, rings, blocks and triangles laid out in one step, c and C for a node's own output or silence, L and F to lay out nodes and join the grid's whole cells, the nodes in line |
+| `ofxManifoldPlayer` | 43 | OSC out (3B-1): every message's bytes against python-osc, malformed packets refused, the sender frame by frame -- packed, per output, the rate, describing as outputs come and go, hello -- and the same over a real UDP socket |
+| example-osc's SuperCollider patch | 40 + 7 | its musical behaviours in sclang against a Python reference, and the whole patch on a server, OSC in, synths read back (3B-2b) -- `make sc`, `make sc-live`; need SuperCollider, so not in CI |
 
-**1070 vectors, 490 mutation gates**, on Linux x86_64 and macOS arm64 every push.
+**1077 vectors, 503 mutation gates**, on Linux x86_64 and macOS arm64 every push.
 `make door` checks the editor's one door; `make drawlog` records every drawing
 call of a scripted editing session (DECISIONS.md D-024).
 

@@ -683,6 +683,38 @@ int main(int argc, char** argv) {
                     why << "one level, but the 3D chart differs from the 2D";
                 }
             }
+        } else if (kind == "PLACES" || kind == "OWN") {
+            // Round 3B-2b: each output's place (the shape message), and each
+            // node's own output on the current level (its name's colour).
+            std::string kw, want, tok;
+            in >> kw;
+            while (in >> tok) want += (want.empty() ? "" : " ") + tok;
+            std::string got;
+            auto add = [&](const std::string& t) { got += (got.empty() ? "" : " ") + t; };
+            const Mapping& mp = md.mapping();
+            if (kind == "PLACES") {
+                const auto pl = md.outputPlaces();
+                for (TargetID t = 0; t < pl.size(); ++t) {
+                    add(mp.targetName(t));
+                    add(std::to_string(pl[t].level));
+                    add(std::to_string(pl[t].levels));
+                    add(pl[t].placed ? "1" : "0");
+                    add(num(pl[t].position.x));
+                    add(num(pl[t].position.y));
+                    add(num(pl[t].position.z));
+                }
+            } else {
+                for (NodeID n = 0; n < md.manifold().nodeCount(); ++n) {
+                    add(md.manifold().node(n).name);
+                    const TargetID t = md.ownOutput(n);
+                    add(t == InvalidTarget ? std::string("-") : mp.targetName(t));
+                }
+            }
+            if (ok && !sameState(want, got)) {
+                ok = false;
+                why << kind << " after step " << step << ":\n      want "
+                    << want << "\n      got  " << got;
+            }
         } else if (kind == "DRAGLEVEL") {
             LevelID k; float px, gap, want; std::string kw;
             in >> k >> px >> gap >> kw >> want;

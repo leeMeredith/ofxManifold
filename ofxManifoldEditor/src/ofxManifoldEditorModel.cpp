@@ -91,6 +91,47 @@ NodeID Model::ownerOf(const std::string& output) const {
     return InvalidNode;
 }
 
+std::vector<OutputPlace> Model::outputPlaces() const {
+    const std::size_t T = mapping().targetCount();
+    std::vector<OutputPlace> out(T);
+    for (LevelID k = 0; k < map_.count(); ++k) {
+        const Mapping& m = map_.level(k);
+        std::vector<char> fed(T, 0);
+        for (NodeID n = 0; n < manifold_.nodeCount(); ++n) {
+            for (std::size_t i = 0; i < m.linkCount(n); ++i) {
+                const Link& l = m.link(n, i);
+                if (l.kind == DestKind::Output && l.id < T) fed[l.id] = 1;
+            }
+        }
+        for (TargetID t = 0; t < T; ++t) {
+            if (!fed[t]) continue;
+            if (out[t].level < 0) out[t].level = int(k);
+            ++out[t].levels;
+        }
+    }
+    for (TargetID t = 0; t < T; ++t) {
+        const NodeID o = ownerOf(mapping().targetName(t));
+        if (o == InvalidNode) continue;
+        OutputPlace& p = out[t];
+        p.placed = true;
+        const glm::vec2 xy = manifold_.node(o).position;
+        const LevelID k = p.level < 0 ? 0 : LevelID(p.level);
+        p.position = {xy.x, xy.y, map_.levels().height(k, o)};
+    }
+    return out;
+}
+
+TargetID Model::ownOutput(NodeID node) const {
+    const Mapping& m = mapping();
+    for (std::size_t i = 0; i < m.linkCount(node); ++i) {
+        const Link& l = m.link(node, i);
+        if (l.kind == DestKind::Output && ownerOf(m.targetName(l.id)) == node) {
+            return l.id;
+        }
+    }
+    return InvalidTarget;
+}
+
 // ---------------------------------------------------------------------------
 // whole maps
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
-// ofxManifold -- example-osc's receiver for SuperCollider (round 3B-1,
-// protocol 2: several maps at once).
+// ofxManifold -- example-osc's receiver for SuperCollider (round 3B-2b,
+// protocol 3: several maps at once, each telling its shape).
 //
 // Run the whole block: put the cursor inside the outer parentheses and press
 // cmd-return. Then start example-osc -- one copy, or several with different
@@ -7,22 +7,40 @@
 //
 // It listens for the roll call, /manifold/map, and starts a map for each
 // prefix it hears (/manifold/room, /manifold/forest ...): one voice per
-// output, as many as that map's outputs message says, built again when that
-// changes, placed evenly from left to right. A voice's volume follows its
+// output, built again when the outputs change. A voice's volume follows its
 // level with a 20 ms lag, so sixty updates a second sound smooth.
 //
-// Each voice is a tone of its own -- a soft sine with two quiet overtones --
-// on the steps of a major pentatonic scale, so any outputs sounding together
-// stay consonant and each can be picked out by pitch: on the room, FL FR RL
-// RR on the floor, then the middle's four, then the top's, climbing. The post
-// window lists each output's note. Each map starts a fifth higher than the
-// last, so maps can be told apart too. Set ~manifold[\sound] = \noise below for
-// the first version's pink noise bands instead.
+// WHAT IT SOUNDS LIKE IS DECIDED HERE, not in openFrameworks. The map tells
+// its shape (/manifold/<map>/shape): how many levels, each output's level,
+// and where its node is. The settings just below choose what to make of it:
+//
+//   ~manifold[\music] = \registers   each level a chord in its own register,
+//                                    each of its outputs a chord note: 3 a
+//                                    triad, 4 a seventh, then 9, #11, 13.
+//                                    ~manifold[\fit] = true: the levels share
+//                                    ~manifold[\span] semitones -- more levels
+//                                    sit closer; false: an octave each.
+//   ~manifold[\music] = \progression each level a chord in one key -- I, IV,
+//                                    V, vi, ii, iii -- so rising through the
+//                                    levels moves through the progression.
+//   ~manifold[\music] = \series      each level the next overtone over one
+//                                    root, its outputs the notes within it:
+//                                    wide at the bottom, close at the top.
+//   ~manifold[\bright] = true        the point's height opens each voice.
+//
+// A placed output pans by its node's place on the map, left to right. An
+// output fed by no level, or shared by several, is not any level's chord: a
+// quiet tone at the root (~manifold[\quiet]). A map that sends no shape (an
+// older example-osc) climbs a pentatonic scale in channel order, as before.
+// Each map starts a fifth higher than the last, so maps can be told apart.
+// Change a setting and run the block again. ~manifold[\sound] = \noise gives
+// the first version's pink noise bands instead of tones. The post window
+// lists each output's note.
 //
 // It says hello to each map once a second, at the port its roll call gives,
 // so example-osc shows it answered; it asks every map to describe itself when
-// it starts, so it need not wait for the roll call; and it lets a map go --
-// voices freed -- when its roll call has been silent for five seconds.
+// it starts; and it lets a map go -- voices freed -- when its roll call has
+// been silent for five seconds.
 //
 // cmd-period stops the sound and the hellos; run the block again to restart.
 
@@ -33,19 +51,135 @@
 ~manifold[\ports] = 16;
 ~manifold[\silentAfter] = 5;      // seconds without a roll call: the map has gone
 ~manifold[\sound] = \tone;        // \tone: a note per output; \noise: a noise band
-~manifold[\scale] = [0, 2, 4, 7, 9];  // major pentatonic, in semitones
-~manifold[\lowest] = 48;          // the first map's first note: C3, as MIDI
+~manifold[\music] = \registers;   // \registers, \progression or \series
+~manifold[\span] = 30;            // \registers, fit: the semitones the levels share
+~manifold[\fit] = true;           // \registers: share the span (true) or an octave each
+~manifold[\bright] = true;        // the point's height opens each voice
+~manifold[\quiet] = 0.4;          // a shared or unfed output's voice, against 1
+~manifold[\scale] = [0, 2, 4, 7, 9];  // no shape: major pentatonic, in semitones
+~manifold[\lowest] = 48;          // the first map's root: C3, as MIDI
+
+// ---- music: what each output sounds, from the map's shape -----------------
+// Plain functions, no server: tests/sc/check_music.scd runs them in sclang
+// and checks them against tests/ref/reference_music.py (make sc).
+
+// The chord tones above a chord's root, for \registers: 1 3 5 7 9 #11 13,
+// then the same two octaves up.
+~manifold[\stack] = [0, 4, 7, 11, 14, 18, 21];
+~manifold[\major] = [0, 2, 4, 5, 7, 9, 11];
+~manifold[\degrees] = [0, 3, 4, 5, 1, 2];     // I IV V vi ii iii
+
+// The i-th chord tone of the stack, i from 0.
+~manifold[\stackTone] = { |i|
+    var st = ~manifold[\stack];
+    st[i % st.size] + (24 * (i div: st.size));
+};
+// The j-th step of the major scale from 0, as semitones.
+~manifold[\majorStep] = { |j|
+    var mj = ~manifold[\major];
+    mj[j % mj.size] + (12 * (j div: mj.size));
+};
+
+// Every output's voice, from the shape and the map's root (MIDI): an Array,
+// in the outputs' order, of (freq:, pan:, gain:). `shape` is (heights: [...],
+// outputs: [(name:, level:, levels:, placed:, x:, y:, z:) ...]), or nil --
+// then the climb, by order.
+~manifold[\voicing] = { |shape, lowest, count|
+    var outs, n, levels, members, panOf;
+    if (shape.isNil) {
+        count.collect { |i|
+            var steps = ~manifold[\scale].size;
+            var note = lowest + ~manifold[\scale][i % steps] + (12 * (i div: steps));
+            (freq: note.midicps,
+             pan: if (count > 1) { i.linlin(0, count - 1, -0.9, 0.9) } { 0 },
+             gain: 1)
+        };
+    } {
+        outs = shape[\outputs];
+        n = outs.size;
+        levels = shape[\heights].size.max(1);
+        // Each level's own outputs, in order: fed by that level alone.
+        members = Array.fill(levels, { List.new });
+        outs.do { |o, i|
+            if (o[\levels] == 1 and: { o[\level] >= 0 } and: { o[\level] < levels }) {
+                members[o[\level]].add(i);
+            };
+        };
+        panOf = { |o, i|
+            if (o[\placed]) { o[\x].linlin(0, 1, -0.9, 0.9) } {
+                if (n > 1) { i.linlin(0, n - 1, -0.9, 0.9) } { 0 }
+            };
+        };
+        outs.collect { |o, i|
+            var k = o[\level], at, freq, gain = 1, root;
+            if (o[\levels] == 1 and: { k >= 0 } and: { k < levels }) {
+                at = members[k].indexOf(i);
+                freq = switch (~manifold[\music])
+                { \progression } {
+                    (lowest + (12 * (k div: 6))
+                     + ~manifold[\majorStep].(~manifold[\degrees][k % 6] + (2 * at))).midicps
+                }
+                { \series } {
+                    lowest.midicps * ((k + 1) + (at / members[k].size))
+                }
+                {   // \registers, and anything unknown
+                    root = if (~manifold[\fit]) {
+                        lowest + (~manifold[\span] * k div: levels)
+                    } { lowest + (12 * k) };
+                    (root + ~manifold[\stackTone].(at)).midicps
+                };
+            } {
+                freq = lowest.midicps;      // shared, or fed by none
+                gain = ~manifold[\quiet];
+            };
+            (freq: freq, pan: panOf.(o, i), gain: gain)
+        };
+    };
+};
+
+// How bright, 0 to 1, from /position x y z [u] and the shape's heights: by
+// the level position u where sent, else by z between the lowest and highest
+// level; half way when there is nothing to go by.
+~manifold[\brightness] = { |shape, z, u|
+    var hs = if (shape.notNil) { shape[\heights] } { [] };
+    case
+    { u.notNil and: { hs.size > 1 } } { (u / (hs.size - 1)).clip(0, 1) }
+    { hs.size > 1 and: { hs.last > hs.first } } { z.linlin(hs.first, hs.last, 0, 1) }
+    { 0.5 };
+};
+
+// /manifold/<map>/shape as sent: i L, L heights, i N, then per output
+// s name, i channel, i level, i levels, i placed, f x, f y, f z.
+~manifold[\readShape] = { |msg|
+    var at = 1, nl = msg[at], heights, no, outs;
+    heights = msg[(at + 1)..(at + nl)];
+    at = at + nl + 1;
+    no = msg[at];
+    at = at + 1;
+    outs = no.collect { |i|
+        var b = at + (8 * i);
+        (name: msg[b].asString, channel: msg[b + 1], level: msg[b + 2],
+         levels: msg[b + 3], placed: msg[b + 4] == 1,
+         x: msg[b + 5], y: msg[b + 6], z: msg[b + 7])
+    };
+    (heights: heights, outputs: outs)
+};
+// ---- end of music ----------------------------------------------------------
 
 s.waitForBoot {
-    SynthDef(\manifoldVoice, { |out = 0, pan = 0, amp = 0, centre = 440|
+    SynthDef(\manifoldVoice, { |out = 0, pan = 0, amp = 0, gain = 1, centre = 440|
         var sig = BPF.ar(PinkNoise.ar, centre, 0.4) * 2;
-        sig = sig * Lag.kr(amp, 0.02);
-        Out.ar(out, Pan2.ar(sig, pan));
+        sig = sig * Lag.kr(amp * gain, 0.02);
+        Out.ar(out, Pan2.ar(sig, Lag.kr(pan, 0.1)));
     }).add;
-    SynthDef(\manifoldTone, { |out = 0, pan = 0, amp = 0, freq = 220|
-        var sig = SinOsc.ar(freq) + (SinOsc.ar(freq * 2) * 0.25) + (SinOsc.ar(freq * 3) * 0.08);
-        sig = sig * 0.3 * Lag.kr(amp, 0.02);
-        Out.ar(out, Pan2.ar(sig, pan));
+    // A soft tone: a sine and quiet overtones. `bright` 0 keeps little but
+    // the sine; 1 lets every overtone through.
+    SynthDef(\manifoldTone, { |out = 0, pan = 0, amp = 0, gain = 1, freq = 220, bright = 1|
+        var f = Lag.kr(freq, 0.05);
+        var sig = SinOsc.ar(f * [1, 2, 3, 4, 5], 0, [1, 0.25, 0.08, 0.05, 0.03]).sum;
+        sig = LPF.ar(sig, (f * Lag.kr(bright, 0.05).linexp(0, 1, 1.2, 6)).clip(20, 20000));
+        sig = sig * 0.3 * Lag.kr(amp * gain, 0.02);
+        Out.ar(out, Pan2.ar(sig, Lag.kr(pan, 0.1)));
     }).add;
     s.sync;
 
@@ -74,45 +208,55 @@ s.waitForBoot {
     ~manifold[\maps] = Dictionary.new;
     ~manifold[\count] = 0;
 
-    // The i-th step up the scale from a map's lowest note, as MIDI.
-    ~manifold[\note] = { |m, i|
-        var steps = ~manifold[\scale].size;
-        m[\lowest] + ~manifold[\scale][i % steps] + (12 * (i div: steps));
-    };
     // A MIDI note as a name: 60 is C4.
     ~manifold[\noteName] = { |n|
+        n = n.round.asInteger;
         ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][n % 12]
         ++ ((n div: 12) - 1);
     };
 
-    // A map's voices: one per output, spread from left to right, each a step
-    // higher -- a note up the scale, or a noise band.
-    ~manifold[\build] = { |m, names|
-        var notes = names.collect { |name, i| ~manifold[\note].(m, i) };
-        m[\voices].do(_.free);
-        m[\voices] = names.collect { |name, i|
-            var pan = if (names.size > 1) { i.linlin(0, names.size - 1, -0.9, 0.9) } { 0 };
+    // The shape only counts for the outputs it names, in their order.
+    ~manifold[\shapeFor] = { |m|
+        var sh = m[\shape];
+        if (sh.notNil and: { sh[\outputs].collect(_[\name]) == m[\names] }) { sh } { nil };
+    };
+
+    // Tune a map's voices to its shape -- or the climb, without one -- and
+    // say so in the post window.
+    ~manifold[\tune] = { |m|
+        var sh = ~manifold[\shapeFor].(m);
+        var vs = ~manifold[\voicing].(sh, m[\lowest], m[\names].size);
+        m[\voices].do { |v, i|
             if (~manifold[\sound] == \noise) {
-                Synth(\manifoldVoice, [\pan, pan, \centre, 200 * (1.5 ** i)]);
+                v.set(\pan, vs[i][\pan], \gain, vs[i][\gain], \centre, vs[i][\freq] * 2);
             } {
-                Synth(\manifoldTone, [\pan, pan, \freq, notes[i].midicps]);
+                v.set(\pan, vs[i][\pan], \gain, vs[i][\gain], \freq, vs[i][\freq],
+                      \bright, if (~manifold[\bright]) { m[\bright] } { 1 });
             };
         };
-        "manifold: % -- % outputs:".format(m[\prefix], names.size).postln;
-        names.do { |name, i|
-            if (~manifold[\sound] == \noise) {
-                "  %".format(name).postln;
-            } {
-                "  %  %".format(name, ~manifold[\noteName].(notes[i])).postln;
-            };
+        "manifold: % -- % outputs, %:".format(m[\prefix], m[\names].size,
+            if (sh.notNil) { ~manifold[\music] } { "no shape: the climb" }).postln;
+        m[\names].do { |name, i|
+            "  %  %%".format(name, ~manifold[\noteName].(vs[i][\freq].cpsmidi),
+                if (vs[i][\gain] < 1) { " (quiet)" } { "" }).postln;
         };
     };
 
-    // A map heard for the first time: listen on its outputs and levels, and
-    // ask it to describe itself now.
+    // A map's voices: one per output, tuned.
+    ~manifold[\build] = { |m|
+        m[\voices].do(_.free);
+        m[\voices] = m[\names].collect {
+            if (~manifold[\sound] == \noise) { Synth(\manifoldVoice) } { Synth(\manifoldTone) };
+        };
+        ~manifold[\tune].(m);
+    };
+
+    // A map heard for the first time: listen on its outputs, shape, levels
+    // and position, and ask it to describe itself now.
     ~manifold[\start] = { |prefix, port|
         var m = (prefix: prefix, port: port, app: NetAddr("127.0.0.1", port),
-                 names: nil, voices: [], seen: Main.elapsedTime, warned: false,
+                 names: nil, shape: nil, shapeMsg: nil, bright: 0.5,
+                 voices: [], seen: Main.elapsedTime, warned: false,
                  lowest: ~manifold[\lowest] + (7 * (~manifold[\count] % 4)));
         ~manifold[\count] = ~manifold[\count] + 1;
         m[\funcs] = [
@@ -122,20 +266,37 @@ s.waitForBoot {
                 var names = Array.fill(n, { |i| msg[2 + (2 * i)].asString });
                 if (names != m[\names]) {
                     m[\names] = names;
-                    ~manifold[\build].(m, names);
+                    ~manifold[\build].(m);
                 };
             }, (prefix ++ "/outputs").asSymbol),
+            // .../shape -- retuned, not rebuilt, when only it changes
+            OSCFunc({ |msg|
+                var raw = msg[1..];
+                if (raw != m[\shapeMsg]) {
+                    m[\shapeMsg] = raw;
+                    m[\shape] = ~manifold[\readShape].(msg);
+                    if (m[\names].notNil) { ~manifold[\tune].(m) };
+                };
+            }, (prefix ++ "/shape").asSymbol),
             // .../levels f0 f1 ... in the order the outputs were described
             OSCFunc({ |msg|
                 msg[1..].do { |level, i|
                     var v = m[\voices][i];
                     if (v.notNil) { v.set(\amp, level) };
                 };
-            }, (prefix ++ "/levels").asSymbol)
+            }, (prefix ++ "/levels").asSymbol),
+            // .../position x y z [u]: how bright
+            OSCFunc({ |msg|
+                m[\bright] = ~manifold[\brightness].(m[\shape], msg[3], msg[4]);
+                if (~manifold[\bright] and: { ~manifold[\sound] != \noise }) {
+                    m[\voices].do(_.set(\bright, m[\bright]));
+                };
+            }, (prefix ++ "/position").asSymbol)
         ];
         ~manifold[\maps][prefix] = m;
         "manifold: % playing, answers on port %".format(prefix, port).postln;
-        m[\app].sendMsg(prefix ++ "/describe");
+        // Port 0: the map hears no answers -- nothing to send to.
+        if (port > 0) { m[\app].sendMsg(prefix ++ "/describe") };
         m;
     };
 

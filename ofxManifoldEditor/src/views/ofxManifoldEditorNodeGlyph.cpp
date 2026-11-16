@@ -106,10 +106,11 @@ void drawNode(const Scene& s, NodeID id) {
         ofDrawLine(a.x, a.y, b.x, b.y);
     }
     ofSetColor(180, 186, 200);
-    // A node with an output of its own -- one named after it -- has its name
-    // in that output's colour, so a line's colour leads to its node, and on
-    // to the fader of the same colour.
-    const TargetID own = mapping.findTarget(n.name);
+    // A node with an output of its own on this level -- one named after it,
+    // FL-2 for FL on level 2 (3B-2b) -- has its name in that output's
+    // colour, so a line's colour leads to its node, and on to the fader of
+    // the same colour you hear on this level.
+    const TargetID own = model.ownOutput(id);
     if (own != InvalidTarget) ofSetColor(outputColour(mapping, own));
     text(n.name, p.x + r + 6.0f, p.y - 6.0f);
     ofPopStyle();

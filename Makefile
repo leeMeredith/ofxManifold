@@ -98,7 +98,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion headers workflow wrapper vectors clean
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion headers workflow wrapper vectors clean sc sc-live
 
 all: test
 
@@ -317,6 +317,29 @@ vectors:
 	@python3 tests/ref/reference_osc.py
 	@python3 tests/ref/reference_smooth.py
 	@python3 tests/ref/reference_motion.py
+	@python3 tests/ref/reference_music.py
+
+# example-osc's SuperCollider patch (round 3B-2b). `sc`: its musical
+# behaviours, run in sclang without a server, against tests/vectors/music.vec.
+# `sc-live`: the whole patch on a server -- OSC in, synths read back; on a Mac
+# it sounds, quietly, for about a second. Neither is part of `make test`:
+# they need SuperCollider. sclang is looked for on the PATH, then in the app.
+SCLANG ?= $(shell command -v sclang 2>/dev/null || echo /Applications/SuperCollider.app/Contents/MacOS/sclang)
+MUSIC_VEC = tests/vectors/music.vec
+$(MUSIC_VEC): tests/ref/reference_music.py
+	@python3 tests/ref/reference_music.py
+
+sc: $(MUSIC_VEC)
+	@test -x "$(SCLANG)" || { echo "  sclang not found -- install SuperCollider, or make sc SCLANG=/path/to/sclang"; exit 1; }
+	@out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_music.scd 2>&1); \
+	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
+	  echo "$$out" | grep -q GREEN
+
+sc-live:
+	@test -x "$(SCLANG)" || { echo "  sclang not found -- install SuperCollider, or make sc-live SCLANG=/path/to/sclang"; exit 1; }
+	@out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_patch_live.scd 2>&1); \
+	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
+	  echo "$$out" | grep -q GREEN
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)
 	@mkdir -p $(BUILD)

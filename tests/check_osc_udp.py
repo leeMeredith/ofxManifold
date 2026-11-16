@@ -34,8 +34,12 @@ def expected(listen_port):
         outs = [("front", 0, 1.0 - step), ("left", 1, step)]
         if k >= 4:
             outs.append(("rear", 3, 0.0))
+        # The shape (3B-2b), as osc_udp.cpp gives it.
+        shape = ([0.0, 0.5 if k >= 6 else 0.25],
+                 {"front": (0, 1, True, 0.25, 0.75, 0.0),
+                  "left": (1, 2, False, 0.0, 0.0, 0.0)})
         msgs += s.frame(now, outs, [("brightness", 0.5)],
-                        (step, 0.5, 0.0))
+                        (step, 0.5, 0.0), shape)
     return [(a, [(t, R.f32(v) if t == "f" else v) for t, v in args]) for a, args in msgs]
 
 

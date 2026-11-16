@@ -153,6 +153,7 @@ void OscOut::reset() {
     refreshedYet_ = false;
     sentOut_.clear();
     sentValue_.clear();
+    // sentShape_ needs no clearing: the description that follows clears it.
 }
 
 std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
@@ -187,6 +188,30 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
         describedYet_ = true;
         describeAsked_ = false;
         lastDescribe_ = now;
+        sentShape_.clear();              // the shape follows every description
+    }
+    if (f.hasShape) {
+        // i L, L heights; i N, then per output: s name, i channel, i level,
+        // i levels, i placed, f x, f y, f z.
+        OscMessage m{p + "/shape",
+                     {OscArg::integer(std::int32_t(f.levelHeights.size()))}};
+        for (float h : f.levelHeights) m.args.push_back(OscArg::number(h));
+        m.args.push_back(OscArg::integer(std::int32_t(f.outputs.size())));
+        for (const OscOutput& o : f.outputs) {
+            m.args.push_back(OscArg::text(o.name));
+            m.args.push_back(OscArg::integer(o.channel));
+            m.args.push_back(OscArg::integer(o.firstLevel));
+            m.args.push_back(OscArg::integer(o.levelCount));
+            m.args.push_back(OscArg::integer(o.placed ? 1 : 0));
+            m.args.push_back(OscArg::number(o.placed ? o.place.x : 0.0f));
+            m.args.push_back(OscArg::number(o.placed ? o.place.y : 0.0f));
+            m.args.push_back(OscArg::number(o.placed ? o.place.z : 0.0f));
+        }
+        std::vector<std::uint8_t> bytes = encode(m);
+        if (bytes != sentShape_) {
+            msgs.push_back(std::move(m));
+            sentShape_ = std::move(bytes);
+        }
     }
     if (packed_) {
         OscMessage m{p + "/levels", {}};
