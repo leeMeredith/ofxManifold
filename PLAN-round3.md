@@ -1104,6 +1104,115 @@ Open questions, each with a recommendation:
 
 ---
 
+#### 3B-2f: points moved from outside (spec, 2026-11-16)
+
+Lee (2026-11-16): "having a way to send open sound control to that point
+from outside of the app ... keeping the boundaries between what controls the
+points inside ... being able to address them equally as they are built ... a
+coherent addressing system for several controls within the player app, and
+without hurting the communication with SuperCollider." And, the same day,
+with his SuperCollider Audio Engine (github.com/leeMeredith/
+SuperColliderAudioEngine, "SAE") and its panel (sae-control-panel): make
+sure this adapts easily when brought into the engine.
+
+**What SAE does with OSC, read 2026-11-16** (SAE 0.46.0, OSC v4). External
+OSC becomes bounded data at the boundary (its slice 009): one adapter per
+fixed path or set of paths, fixed when it is built -- no name the sender
+chooses ever picks a target; exact argument counts; finite numbers only;
+loopback senders only; every rejection counted and kept for inspection.
+Commands carry a request id and are answered: `/sae/v1/reply id accepted
+command reason`, then state. Versions live in the path (`/sae/v1/...` to
+`/sae/v4/...`); capabilities are listed by name. Ports: commands in on
+sclang's 57120, replies out to the panel on 9002; ofxScPhaseBridge's
+`/phase` and `/beat` on 9001, which the panel listens to. The engine owns
+the server, managed exclusive stereo output (its slice 014), and checks for
+leaked nodes.
+
+**Where ofxManifold meets it.** No clash in addresses (`/sae/...` and
+`/manifold/...` share 57120 by path) or in ports, but one: **9001**, which
+example-osc and the panel both listen on, unshared -- whichever starts second
+has no bridge (example-osc says so on its panel, "port 9001 taken"). And
+`manifold-receive.scd` is a standalone patch: it boots the server, writes to
+output 0, and cmd-period frees everything -- the engine's, too. Its musical
+rules are already plain functions with no server (3B-2b), which is what
+moves into SAE later; the voices would become an SAE source on an
+engine-owned bus. Not this slice: recorded in ROADMAP's Later.
+
+##### This slice: one point, moved from outside, to SAE's rules
+
+- **Addresses, the same for every point.** Points are numbered from 1 under
+  the map's prefix. Point 1 is example-osc's point today; later points, and
+  flocks as declared groups of points, are 2, 3 ... up to a fixed cap
+  (`kMaxPoints`, 16) -- never grown by a sender. This slice has one.
+- **In on the map's answer port** -- where `hello` and `describe` already
+  come in, and which the roll call already says -- so nothing new to set up,
+  and nothing going to SuperCollider changes.
+- **Commands, answered (SAE's shape):**
+
+  | Address | Arguments | Does |
+  |---|---|---|
+  | `<prefix>/point/<n>/take` | `i` request id, `i` reply port (0: the sender's own) | the point is driven from outside, by this sender |
+  | `<prefix>/point/<n>/release` | `i` request id | back to what drove it before |
+  | reply: `<prefix>/point/<n>/reply` | `i` request id, `i` accepted, `s` command, `s` reason | to the sender's IP, at the reply port |
+
+  A second take by another sender while held is refused ("held by
+  127.0.0.1:57120"); by the holder, accepted again (a retry). Request ids
+  are positive int32; a repeat of the last id gets the same answer again,
+  not a second action.
+- **Moves, not answered** (a 60-a-second stream, like SAE's meter
+  traffic): `<prefix>/point/<n>/xy f x f y`, `/z f`, `/u f`, `/xyz f f f`
+  -- the map's own units, as `/position` sends them. Taken only from the
+  holder; from anyone else, counted and dropped.
+- **The same limits as inside.** z and u are held to the levels as the hand
+  holds them; an xy off the floor plan is refused and counted, the point
+  staying where it was -- nothing from outside can put a point where its own
+  movement could not.
+- **Boundaries.** One driver per point: the hand, its own movement (a walk
+  or a recording), or outside. Taking it from outside stops its movement;
+  releasing gives it back. Silent for 5 seconds, a held point goes back by
+  itself. The hand always wins: grabbing the point with the mouse takes it
+  back, and the holder is told -- `<prefix>/point/<n>/lost s reason`.
+- **Checked at the edge, as SAE checks.** Exact argument counts, int32 ids,
+  finite floats, a point number in 1..count, loopback senders only. Every
+  refusal counted by reason, the last one kept.
+- **Seen.** example-osc's panel: "point 1: from outside, 127.0.0.1:57120",
+  its accepted and refused counts, and the last refusal's reason.
+- **The roll call** gains a fifth argument, `i points` -- 1 now -- and the
+  protocol is 4. Every receiver here reads only the first two, so none
+  changes.
+- **The bridge port** becomes a setting at the top of example-osc's
+  `ofApp.cpp` (`kBridgePort`, 9001), and the panel says which it is and
+  whether it is taken -- so it can sit beside the SAE panel on another port.
+  Sending the bridge to two ports at once is ofxScPhaseBridge's to add.
+
+**Where it lives**: `ofxManifoldPlayer/src/ofxManifoldPointControl.h`,
+header-only and with no networking -- `PointControl`: `receive(now, message,
+from)` returns what to apply and what to answer; it keeps the holders, the
+timeouts, the request ids and the counts. example-osc owns the socket and
+applies the moves through the same bounds as its walks.
+
+**Tested by**: a Python reference and vectors (a new suite, `control`):
+takes, releases, retries, a second sender refused, moves from the holder
+and from others, timeouts, the hand taking back, every malformed message
+refused with its reason; mutation gates on each rule; `make osc-live` sends
+the real messages over UDP to the real receiver; the drawlog session takes
+the point from outside, moves it, and lets it go.
+
+Open questions, each with a recommendation:
+
+1. **Must a sender take a point before moving it**, or does a move take an
+   idle point by itself? Recommended: take first -- the boundary is then
+   always explicit, as SAE's connect is.
+2. **Where answers go**: a reply port given in the take, 0 meaning the
+   sender's own port. Recommended -- sclang answers to 57120 by itself;
+   an app like the panel, sending from a passing port, names its own.
+3. **An xy off the floor plan**: refused and counted, the point staying.
+   Recommended -- SAE refuses rather than clamps.
+4. **Silence before a held point goes back**: 5 seconds. Recommended.
+5. **The hand always wins**, the holder told. Recommended.
+6. **Senders on other machines**: not in this slice -- loopback only, as
+   SAE. Recommended.
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
@@ -2249,6 +2358,8 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2b** | The map's shape for SuperCollider: `/shape` (levels, each output's level and place), `Model::outputPlaces`, protocol 3; the patch's musical behaviours, chosen in SuperCollider; each node's name once on the map, in its own output's colour on the current level | editor and OSC vectors, gates, sclang logic run |
 | **3B-2c** | Height on the levels: `Levels::heightAtPosition` / `positionAt`, riding the bends, restrained or extrapolated; example-osc's `k`; u on `/position` | levels vectors, OSC vectors, gates, drawlog session |
 | **3B-2d** | Levels that touch: `fits` at-or-beyond, a pinch shared at t = 0.5, `evaluateAtPosition`, the editor allowing touches, files versioned when they touch; the octahedron example | levels and editor vectors, gates, drawlog session |
+| **3B-2e** | Names by level (`Model::levelLabel`), the readout's numbers first; the editor follows its listening point (`levelReached`); `?` three ways, the views larger with no keys (`layoutEditorBare`) | editor and levels vectors, `make panel`, gates, drawlog session |
+| **3B-2f** | Points moved from outside: `PointControl`, take and release answered, moves from the holder, the same bounds as inside, loopback, counted refusals; protocol 4; the bridge port a setting | control vectors, gates, `make osc-live`, drawlog session |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

@@ -115,6 +115,18 @@ one dimension up. The kernel is the easy part; the editor -- placing and
 joining nodes in 3D, seeing inside -- is a round of its own. Asked for by Lee
 (2026-11-14), not yet planned.
 
+**ofxManifold in the SuperCollider Audio Engine.** Lee's engine (SAE,
+github.com/leeMeredith/SuperColliderAudioEngine) owns the server, its buses
+and a managed stereo output, and takes external OSC only through adapters
+fixed when they are built. To bring ofxManifold in: an SAE adapter built for
+one map's prefix and one allowed sender, turning `outputs`, `shape`,
+`levels` and `position` into checked data; `manifold-receive.scd`'s musical
+functions (plain functions, no server) moved over as they are; the voices an
+SAE source writing to an engine-owned bus, through its routing, gain and
+mute. The standalone patch stays as the simple example. Read 2026-11-16
+(SAE 0.46.0, OSC v4); the inbound control of 3B-2f follows SAE's boundary
+rules so either side can drive the other.
+
 **Trajectory curve format.** Sampled points were the right first choice: it is
 what recording produces, it preserves timing exactly including pauses, and it
 needed no decision about curve families. A parametric format can be added later
