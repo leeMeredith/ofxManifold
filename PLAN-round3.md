@@ -1236,14 +1236,191 @@ the same day:
   for is refused ("this player has 1 point"). Adding points with a key --
   and what a second point sends and sounds like -- is 3B-2g.
 
-#### 3B-2g: more than one point (to be specced)
+#### 3B-2g: more than one point, and sections with headers (spec, 2026-11-18)
 
-A key in the player to add and remove points, up to 16; what each point
-sends -- its own position and levels, under `<prefix>/point/<n>/`, with
-today's `/position` and `/levels` staying point 1's -- and how the patch
-voices more than one point (SuperCollider's choice, by its settings). To be
-written and answered before any code; split from 3B-2f on 2026-11-17 so
-that a second point's sound is decided, not improvised.
+Lee (2026-11-17), on what a second point should be: "carrier signals as
+what the second one creates, and/or it just playing another note that is
+there." And (2026-11-18): "differentiation between each one of the controls
+with a header -- right now they're blending together in one block, so it's
+hard to tell what key bindings do what -- so as we expand capability, things
+will have a place to live and will be easily recognizable by a user."
+
+Two parts, built together because the second point is the first new thing
+that needs a place to live on the panel.
+
+##### Part 1: sections with headers
+
+**What blends now.** example-osc's panel is one run of about twenty lines:
+where it sends, the answer port, the rate, the point, the height, the
+movement, smoothing, links, the clock, with the keys in brackets at the end
+of lines ("(s, - =, shift)"). Its `?` page has group titles, but in the
+rows' font and colour weight with little room between, so they read as
+rows. The editor's panel already flows coloured groups into columns
+(3A-10, 3A-12); its titles are as faint.
+
+Answered 2026-11-18, "yes, recommended to all":
+
+- **One list of sections, as data.** Each section: a title, a colour, its
+  state lines (what is true now) and its keys (what changes it). The panel
+  and the `?` page draw the same list, in the same order -- the panel the
+  state and the keys that act now, the `?` page every key. New capability
+  adds a section, never lines in someone else's.
+- **example-osc's sections**, in order:
+
+  | Section | State | Keys |
+  |---|---|---|
+  | **sending** | OSC to host:port, the prefix, the rate, packed, per output, messages and bytes a second, paused | space p i [ ] |
+  | **points** (Part 2) | how many; each point's number, name, colour and who drives it -- yours, moving, from outside | a A, left / right, click a point |
+  | **the point** | the chosen point's x y, height and level, how height is measured | drag, up / down, k, shift-click, tab, click a fader |
+  | **movement** | what moves the chosen point, step timing, the clock, the recording | m M r , . < > { } c return h n b |
+  | **smoothing** | on or off, the half-life | s - = (shift) |
+  | **from outside** | the answer port, the chosen point's addresses, accepted and refused, the last reason | -- (OSC, not keys) |
+  | **showing** | the 3D view, links | 3 l ? |
+  | **maps** | the map's name, its control file | o e x C E |
+
+  The message flash stays where it is, under the sections, belonging to
+  none.
+- **A header that stands out**, with the bitmap font's one size: room above
+  it, its title in the section's colour, and a thin rule in that colour
+  across the column under it. Rows: the key in the section's colour on the
+  left, in a fixed column; what it does, or its state now, on the right.
+  State lines in white, keys' descriptions in grey -- so the panel reads as
+  the `?` page does, not as sentences.
+- **A colour per section**, fixed by the section, the same wherever the
+  section appears; a section the editor and the player share by name
+  (none yet) shares its colour.
+- **Out of room: flow, never fold.** Sections go on in the next column, a
+  section split across columns keeps its title with "(more)" -- the
+  editor's flow (`flowKeys`), reused rather than written twice.
+- **All three screens alike.** The editor's panel and `?` page get the same
+  header (room, colour, rule); its groups and colours are unchanged. `??`
+  (keys hidden) is unchanged in both apps.
+- **Where it lives.** `KeyGroup` (ofxManifoldEditor's keys, no
+  openFrameworks) gains a colour and state lines; the colour moves from the
+  key panel's view into the data. One drawing function draws a flowed list
+  of groups with headers, for both apps' panels and `?` pages. example-osc
+  builds its sections each frame from its state.
+
+##### Part 2: more than one point
+
+**In the player.**
+
+- **Points 1 to 16** (`kMaxPoints`). Point 1 always exists. `a` adds a
+  point at the mouse if it is over the map, else in the middle, at the
+  chosen point's height; the new one is chosen. `A` removes the last point
+  -- only the last, so no point's number ever changes under a receiver.
+- **One chosen point.** Left / right choose the previous / next; a press on
+  a point's dot (within 12 pixels) chooses it, and dragging moves it; a
+  press elsewhere moves the chosen point there, as today. The keys of "the
+  point" and "movement" act on the chosen point.
+- **Each point is a whole point**: its own x y, height and level, its own
+  movement (hand, recording, jump, glide) and height-by, its own walk
+  (seeded by the seed and its number) and its own recording. The clock and
+  the step timing are shared: a beat steps every walking point.
+- **Drawn** in its own colour, with its number beside its dot, on the map
+  and in the 3D view; the chosen one ringed. The faders show the chosen
+  point's levels, in its colour; the node followed is the chosen point's.
+- **The control file decides how many a map opens with.** A map whose
+  control file declares three points opens with three -- the map's maker
+  decides, the player's user needs to know nothing. Without a file: one.
+  `C` writes as many as there are. The refusal "this player has 1 point"
+  goes; past 16 is still refused.
+- **From outside, each point on its own.** `PointControl` already holds
+  sixteen; each point is taken, moved, released and timed out on its own,
+  and the hand takes back only the point it grabs.
+
+**What it sends: facts, the same for every point.**
+
+| Address | Arguments | When |
+|---|---|---|
+| `<prefix>/levels`, `/out/NAME`, `/values`, `/position` | as now | point 1, unchanged |
+| `<prefix>/point/<n>/levels` | N × `f`, in the outputs' order | every send, points 2 and up, packed always |
+| `<prefix>/point/<n>/position` | `f` x, `f` y, `f` z, and `f` u when sent | every send, points 2 and up |
+| `<prefix>/points` | as 3B-2f | on every description, and whenever a point is added or removed |
+
+- **Point 1 stays where it is**, so every receiver written so far hears
+  point 1 unchanged and ignores the rest. A receiver for many points reads
+  point 1 from the bare addresses and the others from `/point/<n>/`.
+- **Smoothed per point**, each with its own smoothers, the same half-life.
+- **A point removed** is sent once more with every level 0, then dropped
+  from `/points` -- so whatever it fed fades rather than sticks.
+- **Node values** stay point 1's in this slice; points 2 and up send levels
+  and position only. Per-point values, if a patch needs them, later.
+- **Out and in share a tree, not a port**: `/point/<n>/levels` and
+  `/position` go out to SuperCollider; `/point/<n>/take`, `/xy` ... come in
+  on the answer port. No address is both.
+- **Protocol 5**: the roll call's last argument is the number of points now,
+  not always 1. A receiver for 4 reads 5 unchanged.
+
+**What the patch does with it: SuperCollider decides.** A setting at the
+top of `manifold-receive.scd`, as the musical behaviours are:
+
+- `~manifold[\points] = \together` -- **every point plays.** Shared voices,
+  one per output: an output's gain is the sum of the points' levels there,
+  held to 1 -- one instrument, two hands, louder where they overlap. Its
+  brightness follows the point loudest there.
+- `~manifold[\points] = \carrier` -- **the first points play, the rest
+  shape them.** `~manifold[\players]` (default 1) points play, as
+  `\together`; every point after them makes no sound of its own: its level
+  at each output is that output's **modulation index**, summed over the
+  shaping points and held to `~manifold[\depth]`. The modulator's ratio is
+  set by the level the loudest shaping point is on -- 1 on the first level,
+  2 on the second, 3 on the third -- harmonic, so going up a level changes
+  the character, not the tuning.
+- `~manifold[\carrier] = \fm` (the default) or `\ring`: frequency
+  modulation of each voice -- pure to bright to bell-like -- or ring
+  modulation, the bolder, metallic one, at the same ratio and depth.
+- One SynthDef gains a modulator, index 0 by default, so with one point
+  every sound is as today.
+
+**Where it lives**: example-osc's point state becomes a `PlayerPoint` --
+position, height, movement, walk, recording, smoothers -- held sixteen at
+most, in `ofApp`; OscOut sends a frame's further points; the patch's role
+and modulation rules are plain functions beside its musical ones (3B-2b), so
+they move into SAE unchanged. No new `.cpp` in the addons; if example-osc's
+point state is split into its own file, the slice says so and a Project
+Generator Update comes before the build.
+
+**Tested by**: OSC vectors -- several points' frames, an added point
+described, a removed point zeroed then dropped, point 1's addresses
+unchanged; control vectors -- a file of three opens three, a point taken
+while another is held, the hand taking back only its own; music vectors in
+Python and sclang -- `\together` sums and holds, `\carrier` index, depth and
+ratio by level, `\ring`, one point sounding as before; mutation gates on
+each; `make panel` checks the sections flow at many window sizes, headers
+never alone at a column's foot; `make osc-live` with three points;
+`make sc-live` with `\carrier`; the drawlog session adds two points, moves
+each, removes one, and shows the sections.
+
+##### Open questions, with recommendations
+
+1. **The default role**: `\together` or `\carrier`? *Recommended:
+   `\together`* -- a point you add is heard at once and plainly, and it
+   proves each point's stream; `\carrier` is one line away.
+2. **Playing points: shared voices or separate?** *Recommended: shared* --
+   one instrument, two hands, louder where they meet; separate voices (a
+   second point an interval above) would double the synths and can come
+   later as a third role.
+3. **The carrier: FM, ring, or both?** *Recommended: both, FM the
+   default* -- the synth change is a few lines either way; FM is gentler
+   across a chord, ring the bolder choice.
+4. **Three or more points under `\carrier`**: *Recommended: a count of
+   players* (`\players`, default 1) -- the first that many play, every
+   later one shapes them all. With shared voices, pairing (2 shapes 1, 4
+   shapes 3) would make no difference to what is heard, so a count says
+   it more plainly.
+5. **A point's name choosing its role** (a point named `fm` shapes):
+   *Recommended: not yet* -- the role is the patch's setting in this
+   slice; names stay labels until a patch needs more than one rule at once.
+6. **Removing a point**: only the last (`A`), or the chosen one, numbers
+   closing up? *Recommended: only the last* -- numbers never shift under
+   a receiver or a sender holding a point.
+7. **Where `a` puts a new point**: *Recommended: at the mouse over the
+   map, else the middle, at the chosen point's height* -- on top of the
+   chosen point it would be hidden and sound the same.
+8. **Each point's own movement**, or movement for point 1 only?
+   *Recommended: each its own* -- point 2 gliding while your hand drives
+   point 1 is the reason to have two.
 
 ## Done
 
