@@ -171,7 +171,8 @@ class Sender:
     REFRESH_EVERY = 0.1
     HELLO_LASTS = 3.0
     CHANGED = 1e-6
-    PROTOCOL = 4        # 3B-2b: the shape message; 3B-2f: points from outside
+    PROTOCOL = 5        # 3B-2b: the shape message; 3B-2f: points from outside;
+                        # 3B-2g: points 2 and up, each its own levels and position
 
     def __init__(self, prefix="/manifold", map_name="untitled", answer_port=0,
                  packed=True, per_output=False, rate=60.0):
@@ -185,6 +186,8 @@ class Sender:
         self.peer = ""
         self.last_hello = None
         self.points = []               # 3B-2f: [(number, name, inlets)], kept across starts
+        self.sent_more = []            # 3B-2g: the further points last sent, by number;
+                                       # kept across starts, not across a new prefix
         self.start_again()
 
     def start_again(self):
@@ -205,6 +208,7 @@ class Sender:
         prefix = self.root + "/" + self.map_name
         if prefix != self.prefix:
             self.prefix = prefix
+            self.sent_more = []        # another map's points: nothing to zero here
             self.start_again()
 
     def receive(self, now, address, args):
@@ -218,12 +222,13 @@ class Sender:
     def connected(self, now):
         return self.last_hello is not None and now - self.last_hello < self.HELLO_LASTS
 
-    def frame(self, now, outputs, values, position, shape=None):
+    def frame(self, now, outputs, values, position, shape=None, more=()):
         """outputs: [(name, channel, level)] in channel order; values:
         [(name, value)]; position: (x, y, z) or None; shape (3B-2b): None,
         or (heights, {name: (level, levels, placed, x, y, z)}) -- an output
-        not in it on no level, unplaced. The messages to send now, as
-        (address, args)."""
+        not in it on no level, unplaced; more (3B-2g): points 2 and up, as
+        (number, [levels in the outputs' order], (x, y, z[, u])). The
+        messages to send now, as (address, args)."""
         if self.next_send is not None and now < self.next_send - 1e-9:
             return []
         period = 1.0 / self.rate
@@ -253,6 +258,13 @@ class Sender:
             self.last_describe = now
             self.sent_shape = None     # a description is followed by the shape
             self.sent_points = None    # and by the points
+        # 3B-2g: a point gone since the last send says every level 0 once,
+        # before the list without it -- what it fed fades, never sticks.
+        numbers = [n for n, _, _ in more]
+        for n in self.sent_more:
+            if n not in numbers:
+                msgs.append((p + "/point/%d/levels" % n, [("f", 0.0) for _ in outputs]))
+        self.sent_more = numbers
         if shape is not None:
             heights, places = shape
             args = [("i", len(heights))] + [("f", h) for h in heights]
@@ -301,6 +313,11 @@ class Sender:
             self.last_refresh = now
         if position is not None:
             msgs.append((p + "/position", [("f", c) for c in position]))
+        # 3B-2g: points 2 and up, after point 1's: always packed, in number
+        # order -- their levels, then their position.
+        for n, levels, pos in sorted(more, key=lambda m: m[0]):
+            msgs.append((p + "/point/%d/levels" % n, [("f", lv) for lv in levels]))
+            msgs.append((p + "/point/%d/position" % n, [("f", c) for c in pos]))
         return msgs
 
 
@@ -338,6 +355,13 @@ def encode_vectors(out):
          [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 3)]),
         ("roll_call_protocol_4", "/manifold/map",
          [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 4), ("i", 1)]),
+        ("roll_call_protocol_5", "/manifold/map",
+         [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 5), ("i", 3)]),
+        # 3B-2g: a further point's levels and position
+        ("point_levels", "/manifold/room/point/2/levels",
+         [("f", 0.5), ("f", 0.0), ("f", 0.125)]),
+        ("point_position", "/manifold/room/point/12/position",
+         [("f", 0.3), ("f", 0.8), ("f", 0.55), ("f", 1.25)]),
         # 3B-2f: a point named, a point not, their inlets as words
         ("points", "/manifold/room/points",
          [("i", 2), ("i", 1), ("s", "lead"), ("s", "xy z"),
@@ -427,6 +451,14 @@ class Script:
         self.out.append("POINTS " + (",".join(
             f"{n}:{name}:{inlets.replace(' ', '_')}" for n, name, inlets in points) or "-"))
 
+    def more(self, points):
+        """3B-2g: points 2 and up for the frames after this: [(number,
+        [levels], (x, y, z[, u]))]."""
+        self.more_now = [(n, list(lv), tuple(pos)) for n, lv, pos in points]
+        self.out.append("MORE " + (" ".join(
+            f"{n}=" + ",".join(fmtf(x) for x in lv) + "@" + ",".join(fmtf(c) for c in pos)
+            for n, lv, pos in points) or "-"))
+
     def no_shape(self):
         self.shape_now = None
         self.out.append("NOSHAPE")
@@ -436,7 +468,8 @@ class Script:
         v = ",".join(f"{n}:{fmtf(x)}" for n, x in values) or "-"
         pos = " ".join(fmtf(c) for c in position) if position else "-"
         msgs = self.s.frame(now, list(outputs), list(values), position,
-                            getattr(self, "shape_now", None))
+                            getattr(self, "shape_now", None),
+                            getattr(self, "more_now", []))
         self.out.append(f"FRAME {now!r} | {o} | {v} | {pos} | {len(msgs)}")
         for address, args in msgs:
             self.out.append(f"MSG {address} {tags(args)} {argtext(args)}".rstrip())
@@ -444,6 +477,12 @@ class Script:
     def map(self, name):
         self.s.set_map(name)
         self.out.append(f"MAP {name}")
+
+    def reset(self):
+        """The app starting again on the same map (the same name opened
+        again, or p or i): everything said again; a point gone still zeroed."""
+        self.s.start_again()
+        self.out.append("RESET")
 
     def recv(self, now, address, args=()):
         self.s.receive(now, address, list(args))
@@ -603,6 +642,62 @@ def send_vectors(out):
     t.frame(4 / 60, room)
     t.set_points([])
     t.frame(5 / 60, room)
+    t.end()
+
+    # ---- round 3B-2g: points 2 and up ----
+    t = Script(out, "points_more",
+               "points 2 and up: each its levels and position after point 1's, "
+               "in number order, always packed; point 1's addresses as before; "
+               "the roll call counts them all", map_name="room")
+    t.set_points([(1, "", "xy z u xyz"), (2, "", "xy z u xyz"), (3, "fm", "xy")])
+    t.more([(3, [0.0, 0.5], (0.2, 0.2, 0.0, 0.0)),
+            (2, [0.75, 0.25], (0.6, 0.4, 0.125, 0.5))])
+    t.frame(0.0, two, [("brightness", 0.5)], (0.3, 0.8, 0.0, 0.0))
+    t.frame(1 / 60, two, [("brightness", 0.5)], (0.3, 0.8, 0.0, 0.0))
+    t.more([(2, [0.5, 0.5], (0.6, 0.45, 0.125))])
+    t.frame(2 / 60, two, [], (0.3, 0.8, 0.0, 0.0))
+    t.end()
+
+    t = Script(out, "points_more_per_output",
+               "per output on, packed off: point 1 per output as before; points "
+               "2 and up still packed", map_name="room", packed=False,
+               per_output=True)
+    t.set_points([(1, "", "xy"), (2, "", "xy")])
+    t.more([(2, [0.25, 0.75], (0.5, 0.5, 0.0))])
+    t.frame(0.0, two, [], (0.3, 0.8, 0.0))
+    t.frame(1 / 60, two, [], (0.3, 0.8, 0.0))
+    t.end()
+
+    t = Script(out, "point_removed_zeroed",
+               "a point removed says every level 0 once, before the list "
+               "without it, then nothing; one added later is sent again; "
+               "starting again on the same map still zeroes it; a new map "
+               "starts with nothing to zero", map_name="room")
+    t.set_points([(1, "", "xy"), (2, "", "xy"), (3, "", "xy")])
+    t.more([(2, [0.5, 0.5], (0.5, 0.5, 0.0)), (3, [0.25, 1.0], (0.1, 0.9, 0.0))])
+    t.frame(0.0, two, [], (0.3, 0.8, 0.0))
+    t.set_points([(1, "", "xy"), (2, "", "xy")])
+    t.more([(2, [0.5, 0.5], (0.5, 0.5, 0.0))])
+    t.frame(1 / 60, two, [], (0.3, 0.8, 0.0))
+    t.frame(2 / 60, two, [], (0.3, 0.8, 0.0))
+    t.set_points([(1, "", "xy")])
+    t.more([])
+    t.frame(3 / 60, [("front", 0, 0.75), ("left", 1, 0.25), ("rear", 3, 0.5)],
+            [], (0.3, 0.8, 0.0))
+    t.set_points([(1, "", "xy"), (2, "", "xy")])
+    t.more([(2, [0.0, 0.0], (0.5, 0.5, 0.0))])
+    t.frame(4 / 60, two, [], (0.3, 0.8, 0.0))
+    t.reset()
+    t.set_points([(1, "", "xy")])
+    t.more([])
+    t.frame(5 / 60, two, [], (0.3, 0.8, 0.0))
+    t.set_points([(1, "", "xy"), (2, "", "xy")])
+    t.more([(2, [0.0, 0.0], (0.5, 0.5, 0.0))])
+    t.frame(6 / 60, two, [], (0.3, 0.8, 0.0))
+    t.map("kitchen")
+    t.set_points([(1, "", "xy")])
+    t.more([])
+    t.frame(7 / 60, two, [], (0.3, 0.8, 0.0))
     t.end()
 
     t = Script(out, "maps_named_and_announced",

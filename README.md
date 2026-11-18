@@ -173,7 +173,7 @@ a clean fan, a deliberately broken T-junction, two overlapping regions where the
 answer depends on which side you entered from, and a 144-node grid for looking
 at the renderer at density.
 
-**`example-osc`** — the smallest player: one map, one point, and OSC out
+**`example-osc`** — the smallest player: one map, its points, and OSC out
 that grows and shrinks with the map, for SuperCollider, Max, Pd,
 TouchDesigner or a script. The receiver needn't know how many outputs there
 are; the app describes them, and again when they change. It opens on a room
@@ -197,7 +197,7 @@ messages go under its own name -- `/manifold/room/levels` -- with a roll call
 on `/manifold/map`, and each copy of the app hears answers on the first port
 free from 57121, so several copies with different maps play at once and the
 receivers (the SuperCollider patch, `receive.py`) follow every one
-(protocol 3, `ofxManifoldPlayer/OSC.md`). The point can also move itself
+(`ofxManifoldPlayer/OSC.md`). The point can also move itself
 (`m`): a recording of your hand (`r`, its path drawn as you go), looped;
 random jumps; random glides -- and the height on its own (`h`): by hand with
 ↑ ↓, jumping or gliding, whatever moves the floor, so you can drag the point
@@ -232,7 +232,20 @@ controller app -- by taking it over OSC (`/manifold/<map>/point/1/take`,
 then `xy`, `z`, `u`), answered as the SuperCollider Audio Engine answers;
 the `?` page shows the addresses and the port, the hand can always take the
 point back, and `C` writes the map's control file to narrow what a point
-takes (ofxManifoldPlayer/OSC.md). With SuperCollider
+takes (ofxManifoldPlayer/OSC.md). A map can have more than one point: `a`
+adds one at the mouse, up to sixteen, `A` removes the last; ← → or a press on
+its dot chooses which the keys act on, each keeping its own movement -- point
+2 gliding while your hand drives point 1 -- and the control file says how
+many a map opens with. Each sends its own levels and position (point 1 as
+always, the others under `/point/2/` ...), and the patch decides what they
+are: every point playing the same voices, louder where they meet
+(`\together`), or the first playing and the rest shaping it by FM or ring
+modulation (`\carrier`) -- the level a shaping point is on setting the
+modulator's ratio (protocol 5). The panel and the `?` page are in sections,
+each under its own coloured header -- sending, points, the point, movement,
+smoothing, from outside, showing, maps -- the panel what is true now with
+the key that changes it, the `?` page every key; the editor's headers are
+drawn the same way. With SuperCollider
 installed, `make sc` checks the patch's music in sclang and `make sc-live`
 runs it whole on your sound card for a second.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
@@ -355,7 +368,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-1187 vectors across sixteen suites, plus 540 mutation gates that introduce known
+1230 vectors across sixteen suites, plus 557 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

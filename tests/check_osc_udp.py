@@ -38,8 +38,19 @@ def expected(listen_port):
         shape = ([0.0, 0.5 if k >= 6 else 0.25],
                  {"front": (0, 1, True, 0.25, 0.75, 0.0),
                   "left": (1, 2, False, 0.0, 0.0, 0.0)})
+        # Points 2 and 3 from the third frame (3B-2g), the third removed
+        # at the ninth, as osc_udp.cpp gives them.
+        s.points = [(1, "", "xy z u xyz")]
+        more = []
+        if k >= 2:
+            s.points.append((2, "", "xy z u xyz"))
+            more.append((2, [step if o == 0 else 1.0 - step if o == 1 else 0.5
+                             for o in range(len(outs))], (0.25, step, 0.0, 1.0)))
+        if 2 <= k < 8:
+            s.points.append((3, "fm", "xy"))
+            more.append((3, [0.5] * len(outs), (0.75, 0.75, 0.0)))
         msgs += s.frame(now, outs, [("brightness", 0.5)],
-                        (step, 0.5, 0.0), shape)
+                        (step, 0.5, 0.0), shape, more)
     return [(a, [(t, R.f32(v) if t == "f" else v) for t, v in args]) for a, args in msgs]
 
 

@@ -22,6 +22,9 @@ ENCODE roll_call | /manifold/map | ,siii | "/manifold/room" 57121 12 2 | 2f6d616
 ENCODE utf8_name | /manifold/out/café | ,f | 0.5 | 2f6d616e69666f6c642f6f75742f636166c3a9002c6600003f000000
 ENCODE roll_call_protocol_3 | /manifold/map | ,siii | "/manifold/room" 57121 12 3 | 2f6d616e69666f6c642f6d61700000002c736969690000002f6d616e69666f6c642f726f6f6d00000000df210000000c00000003
 ENCODE roll_call_protocol_4 | /manifold/map | ,siiii | "/manifold/room" 57121 12 4 1 | 2f6d616e69666f6c642f6d61700000002c736969696900002f6d616e69666f6c642f726f6f6d00000000df210000000c0000000400000001
+ENCODE roll_call_protocol_5 | /manifold/map | ,siiii | "/manifold/room" 57121 12 5 3 | 2f6d616e69666f6c642f6d61700000002c736969696900002f6d616e69666f6c642f726f6f6d00000000df210000000c0000000500000003
+ENCODE point_levels | /manifold/room/point/2/levels | ,fff | 0.5 0 0.125 | 2f6d616e69666f6c642f726f6f6d2f706f696e742f322f6c6576656c730000002c666666000000003f000000000000003e000000
+ENCODE point_position | /manifold/room/point/12/position | ,ffff | 0.300000012 0.800000012 0.550000012 1.25 | 2f6d616e69666f6c642f726f6f6d2f706f696e742f31322f706f736974696f6e000000002c666666660000003e99999a3f4ccccd3f0ccccd3fa00000
 ENCODE points | /manifold/room/points | ,iississ | 2 1 "lead" "xy z" 2 "" "xy z u xyz" | 2f6d616e69666f6c642f726f6f6d2f706f696e74730000002c696973736973730000000000000002000000016c656164000000007879207a0000000000000002000000007879207a20752078797a0000
 ENCODE shape | /manifold/room/shape | ,iffisiiiifffsiiiifffsiiiifff | 2 0 0.25 3 "FL" 0 0 1 1 0.200000003 0.800000012 0 "FL-2" 1 1 1 1 0.200000003 0.800000012 0.25 "verb" 2 -1 0 0 0 0 0 | 2f6d616e69666f6c642f726f6f6d2f7368617065000000002c6966666973696969696666667369696969666666736969696966666600000000000002000000003e80000000000003464c0000000000000000000000000001000000013e4ccccd3f4ccccd00000000464c2d3200000000000000010000000100000001000000013e4ccccd3f4ccccd3e800000766572620000000000000002ffffffff0000000000000000000000000000000000000000
 # DECODE name | hex | address | tags | args
@@ -41,7 +44,7 @@ REFUSE padding_not_zero | 2f6d00782c000000
 # packed: the outputs described on the first send, then every level at every send, 60 a second; nothing between sends
 SEND packed_every_send prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=60
 FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 2 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 2 5 0
 MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.005 | front:0:0.75,left:1:0.25 | - | - | 0
@@ -53,36 +56,36 @@ END
 # described again when an output is added -- the messages grow -- when one goes, when asked, and every two seconds
 SEND described_again prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=60
 FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 2 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 2 5 0
 MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.1 | front:0:0.75,left:1:0.25,rear:3:0 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 3 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 3 5 0
 MSG /manifold/untitled/outputs ,isisisi 3 "front" 0 "left" 1 "rear" 3
 MSG /manifold/untitled/levels ,fff 0.75 0.25 0
 FRAME 0.2 | front:0:0.75,left:1:0.25,rear:3:0 | - | - | 1
 MSG /manifold/untitled/levels ,fff 0.75 0.25 0
 FRAME 0.3 | front:0:1 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 1 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 1 5 0
 MSG /manifold/untitled/outputs ,isi 1 "front" 0
 MSG /manifold/untitled/levels ,f 1
 RECV 0.31 /manifold/describe ,
 FRAME 0.4 | front:0:1 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 1 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 1 5 0
 MSG /manifold/untitled/outputs ,isi 1 "front" 0
 MSG /manifold/untitled/levels ,f 1
 FRAME 2.3 | front:0:1 | - | - | 1
 MSG /manifold/untitled/levels ,f 1
 FRAME 2.31 | front:0:1 | - | - | 0
 FRAME 4.31 | front:0:1 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 1 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 1 5 0
 MSG /manifold/untitled/outputs ,isi 1 "front" 0
 MSG /manifold/untitled/levels ,f 1
 END
 # per output: only what changed at each send, everything every tenth of a second
 SEND per_output_changes prefix=/manifold map=untitled port=0 packed=0 per_output=1 rate=60
 FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/untitled" 0 2 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 2 5 0
 MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/untitled/out/front ,f 0.75
 MSG /manifold/untitled/out/left ,f 0.25
@@ -98,7 +101,7 @@ END
 # both shapes at once, values and the position
 SEND both_shapes_and_values prefix=/manifold map=untitled port=0 packed=1 per_output=1 rate=60
 FRAME 0.0 | front:0:0.75,left:1:0.25 | brightness:0.5,reverb:0.100000001 | 0.300000012 0.800000012 0 | 9
-MSG /manifold/map ,siiii "/manifold/untitled" 0 2 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 2 5 0
 MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/untitled/levels ,ff 0.75 0.25
 MSG /manifold/untitled/out/front ,f 0.75
@@ -116,7 +119,7 @@ END
 # 3B-2c: where between the levels, /position's fourth number; without it, three as before
 SEND position_with_level prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
 FRAME 0.0 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0.375 1.5 | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 2 4 0
+MSG /manifold/map ,siiii "/manifold/room" 0 2 5 0
 MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/room/levels ,ff 0.75 0.25
 MSG /manifold/room/position ,ffff 0.300000012 0.800000012 0.375 1.5
@@ -127,7 +130,7 @@ END
 # at 30 a second: frames between sends send nothing; a late frame sends once, then the rate carries on from it -- no burst
 SEND rate_and_late_frames prefix=/manifold map=untitled port=0 packed=1 per_output=0 rate=30
 FRAME 0.0 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 2 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 2 5 0
 MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/untitled/levels ,ff 0.75 0.25
 FRAME 0.02 | front:0:0.75,left:1:0.25 | - | - | 0
@@ -142,7 +145,7 @@ END
 # a prefix of its own; names cleaned for an address
 SEND prefix_and_names prefix=/room2/ map=untitled port=0 packed=0 per_output=1 rate=60
 FRAME 0.0 | front left:0:0.5,sub#1:5:0.5 | hue/a:0.25 | - | 5
-MSG /room2/map ,siiii "/room2/untitled" 0 2 4 0
+MSG /room2/map ,siiii "/room2/untitled" 0 2 5 0
 MSG /room2/untitled/outputs ,isisi 2 "front left" 0 "sub#1" 5
 MSG /room2/untitled/out/front_left ,f 0.5
 MSG /room2/untitled/out/sub_1 ,f 0.5
@@ -153,7 +156,7 @@ MSG /room2/untitled/out/front_left ,f 0.5
 MSG /room2/untitled/out/sub_1 ,f 0.5
 RECV 0.11 /room2/describe ,
 FRAME 0.2 | front left:0:0.5,sub#1:5:0.5 | - | - | 4
-MSG /room2/map ,siiii "/room2/untitled" 0 2 4 0
+MSG /room2/map ,siiii "/room2/untitled" 0 2 5 0
 MSG /room2/untitled/outputs ,isisi 2 "front left" 0 "sub#1" 5
 MSG /room2/untitled/out/front_left ,f 0.5
 MSG /room2/untitled/out/sub_1 ,f 0.5
@@ -170,7 +173,7 @@ CONN 4.1 1 ""
 RECV 4.2 /other/hello ,s "pd"
 CONN 7.1 0 ""
 FRAME 7.2 | - | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 0 0 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 0 0 5 0
 MSG /manifold/untitled/outputs ,i 0
 MSG /manifold/untitled/levels ,
 END
@@ -178,7 +181,7 @@ END
 SEND shape_with_description prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
 SHAPE 0 0.25 | FL:0:1:1:0.200000003:0.800000012:0,FR:0:1:1:0.800000012:0.800000012:0,FL-2:1:1:1:0.200000003:0.800000012:0.25
 FRAME 0.0 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 4 4 0
+MSG /manifold/map ,siiii "/manifold/room" 0 4 5 0
 MSG /manifold/room/outputs ,isisisisi 4 "FL" 0 "FR" 1 "FL-2" 2 "mix" 3
 MSG /manifold/room/shape ,iffisiiiifffsiiiifffsiiiifffsiiiifff 2 0 0.25 4 "FL" 0 0 1 1 0.200000003 0.800000012 0 "FR" 1 0 1 1 0.800000012 0.800000012 0 "FL-2" 2 1 1 1 0.200000003 0.800000012 0.25 "mix" 3 -1 0 0 0 0 0
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
@@ -200,12 +203,12 @@ FRAME 0.08333333333333333 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 1
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
 RECV 0.09 /manifold/room/describe ,
 FRAME 0.1 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 4 4 0
+MSG /manifold/map ,siiii "/manifold/room" 0 4 5 0
 MSG /manifold/room/outputs ,isisisisi 4 "FL" 0 "FR" 1 "FL-2" 2 "mix" 3
 MSG /manifold/room/shape ,iffisiiiifffsiiiifffsiiiifffsiiiifff 2 0 0.300000012 4 "FL" 0 0 1 1 0.200000003 0.800000012 0 "FR" 1 0 2 1 0.800000012 0.800000012 0 "FL-2" 2 1 1 1 0.200000003 0.800000012 0.400000006 "mix" 3 -1 0 0 0 0 0
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
 FRAME 2.1 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 4 4 0
+MSG /manifold/map ,siiii "/manifold/room" 0 4 5 0
 MSG /manifold/room/outputs ,isisisisi 4 "FL" 0 "FR" 1 "FL-2" 2 "mix" 3
 MSG /manifold/room/shape ,iffisiiiifffsiiiifffsiiiifffsiiiifff 2 0 0.300000012 4 "FL" 0 0 1 1 0.200000003 0.800000012 0 "FR" 1 0 2 1 0.800000012 0.800000012 0 "FL-2" 2 1 1 1 0.200000003 0.800000012 0.400000006 "mix" 3 -1 0 0 0 0 0
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
@@ -217,12 +220,12 @@ END
 SEND shape_unplaced_and_new_outputs prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
 SHAPE 0.5 | FL:0:1:1:0.200000003:0.800000012:0.5,mix:-1:0:0:0.899999976:0.899999976:0.899999976
 FRAME 0.0 | FL:0:0.5,FR:1:0.25,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 3 4 0
+MSG /manifold/map ,siiii "/manifold/room" 0 3 5 0
 MSG /manifold/room/outputs ,isisisi 3 "FL" 0 "FR" 1 "mix" 3
 MSG /manifold/room/shape ,ifisiiiifffsiiiifffsiiiifff 1 0.5 3 "FL" 0 0 1 1 0.200000003 0.800000012 0.5 "FR" 1 -1 0 0 0 0 0 "mix" 3 -1 0 0 0 0 0
 MSG /manifold/room/levels ,fff 0.5 0.25 0
 FRAME 0.016666666666666666 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 4 4 0
+MSG /manifold/map ,siiii "/manifold/room" 0 4 5 0
 MSG /manifold/room/outputs ,isisisisi 4 "FL" 0 "FR" 1 "FL-2" 2 "mix" 3
 MSG /manifold/room/shape ,ifisiiiifffsiiiifffsiiiifffsiiiifff 1 0.5 4 "FL" 0 0 1 1 0.200000003 0.800000012 0.5 "FR" 1 -1 0 0 0 0 0 "FL-2" 2 -1 0 0 0 0 0 "mix" 3 -1 0 0 0 0 0
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
@@ -231,7 +234,7 @@ END
 SEND points_listed prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
 POINTS 1::xy_z_u_xyz
 FRAME 0.0 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 4 4 1
+MSG /manifold/map ,siiii "/manifold/room" 0 4 5 1
 MSG /manifold/room/outputs ,isisisisi 4 "FL" 0 "FR" 1 "FL-2" 2 "mix" 3
 MSG /manifold/room/points ,iiss 1 1 "" "xy z u xyz"
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
@@ -245,7 +248,7 @@ FRAME 0.05 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 1
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
 RECV 0.06 /manifold/room/describe ,
 FRAME 0.06666666666666667 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 0 4 4 1
+MSG /manifold/map ,siiii "/manifold/room" 0 4 5 1
 MSG /manifold/room/outputs ,isisisisi 4 "FL" 0 "FR" 1 "FL-2" 2 "mix" 3
 MSG /manifold/room/points ,iiss 1 1 "lead" "xy z"
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
@@ -253,10 +256,134 @@ POINTS -
 FRAME 0.08333333333333333 | FL:0:0.5,FR:1:0.25,FL-2:2:0,mix:3:0 | - | - | 1
 MSG /manifold/room/levels ,ffff 0.5 0.25 0 0
 END
+# points 2 and up: each its levels and position after point 1's, in number order, always packed; point 1's addresses as before; the roll call counts them all
+SEND points_more prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
+POINTS 1::xy_z_u_xyz,2::xy_z_u_xyz,3:fm:xy
+MORE 3=0,0.5@0.200000003,0.200000003,0,0 2=0.75,0.25@0.600000024,0.400000006,0.125,0.5
+FRAME 0.0 | front:0:0.75,left:1:0.25 | brightness:0.5 | 0.300000012 0.800000012 0 0 | 10
+MSG /manifold/map ,siiii "/manifold/room" 0 2 5 3
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/points ,iissississ 3 1 "" "xy z u xyz" 2 "" "xy z u xyz" 3 "fm" "xy"
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/values ,isf 1 "brightness" 0.5
+MSG /manifold/room/position ,ffff 0.300000012 0.800000012 0 0
+MSG /manifold/room/point/2/levels ,ff 0.75 0.25
+MSG /manifold/room/point/2/position ,ffff 0.600000024 0.400000006 0.125 0.5
+MSG /manifold/room/point/3/levels ,ff 0 0.5
+MSG /manifold/room/point/3/position ,ffff 0.200000003 0.200000003 0 0
+FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | brightness:0.5 | 0.300000012 0.800000012 0 0 | 7
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/values ,isf 1 "brightness" 0.5
+MSG /manifold/room/position ,ffff 0.300000012 0.800000012 0 0
+MSG /manifold/room/point/2/levels ,ff 0.75 0.25
+MSG /manifold/room/point/2/position ,ffff 0.600000024 0.400000006 0.125 0.5
+MSG /manifold/room/point/3/levels ,ff 0 0.5
+MSG /manifold/room/point/3/position ,ffff 0.200000003 0.200000003 0 0
+MORE 2=0.5,0.5@0.600000024,0.449999988,0.125
+FRAME 0.03333333333333333 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 0 | 5
+MSG /manifold/room/point/3/levels ,ff 0 0
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,ffff 0.300000012 0.800000012 0 0
+MSG /manifold/room/point/2/levels ,ff 0.5 0.5
+MSG /manifold/room/point/2/position ,fff 0.600000024 0.449999988 0.125
+END
+# per output on, packed off: point 1 per output as before; points 2 and up still packed
+SEND points_more_per_output prefix=/manifold map=room port=0 packed=0 per_output=1 rate=60
+POINTS 1::xy,2::xy
+MORE 2=0.25,0.75@0.5,0.5,0
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 8
+MSG /manifold/map ,siiii "/manifold/room" 0 2 5 2
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/points ,iississ 2 1 "" "xy" 2 "" "xy"
+MSG /manifold/room/out/front ,f 0.75
+MSG /manifold/room/out/left ,f 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0.25 0.75
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 3
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0.25 0.75
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+END
+# a point removed says every level 0 once, before the list without it, then nothing; one added later is sent again; starting again on the same map still zeroes it; a new map starts with nothing to zero
+SEND point_removed_zeroed prefix=/manifold map=room port=0 packed=1 per_output=0 rate=60
+POINTS 1::xy,2::xy,3::xy
+MORE 2=0.5,0.5@0.5,0.5,0 3=0.25,1@0.100000001,0.899999976,0
+FRAME 0.0 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 9
+MSG /manifold/map ,siiii "/manifold/room" 0 2 5 3
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/points ,iissississ 3 1 "" "xy" 2 "" "xy" 3 "" "xy"
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0.5 0.5
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+MSG /manifold/room/point/3/levels ,ff 0.25 1
+MSG /manifold/room/point/3/position ,fff 0.100000001 0.899999976 0
+POINTS 1::xy,2::xy
+MORE 2=0.5,0.5@0.5,0.5,0
+FRAME 0.016666666666666666 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 6
+MSG /manifold/room/point/3/levels ,ff 0 0
+MSG /manifold/room/points ,iississ 2 1 "" "xy" 2 "" "xy"
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0.5 0.5
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+FRAME 0.03333333333333333 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 4
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0.5 0.5
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+POINTS 1::xy
+MORE -
+FRAME 0.05 | front:0:0.75,left:1:0.25,rear:3:0.5 | - | 0.300000012 0.800000012 0 | 6
+MSG /manifold/map ,siiii "/manifold/room" 0 3 5 1
+MSG /manifold/room/outputs ,isisisi 3 "front" 0 "left" 1 "rear" 3
+MSG /manifold/room/point/2/levels ,fff 0 0 0
+MSG /manifold/room/points ,iiss 1 1 "" "xy"
+MSG /manifold/room/levels ,fff 0.75 0.25 0.5
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+POINTS 1::xy,2::xy
+MORE 2=0,0@0.5,0.5,0
+FRAME 0.06666666666666667 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 7
+MSG /manifold/map ,siiii "/manifold/room" 0 2 5 2
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/points ,iississ 2 1 "" "xy" 2 "" "xy"
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0 0
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+RESET
+POINTS 1::xy
+MORE -
+FRAME 0.08333333333333333 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 6
+MSG /manifold/map ,siiii "/manifold/room" 0 2 5 1
+MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/room/point/2/levels ,ff 0 0
+MSG /manifold/room/points ,iiss 1 1 "" "xy"
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+POINTS 1::xy,2::xy
+MORE 2=0,0@0.5,0.5,0
+FRAME 0.1 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 5
+MSG /manifold/room/points ,iississ 2 1 "" "xy" 2 "" "xy"
+MSG /manifold/room/levels ,ff 0.75 0.25
+MSG /manifold/room/position ,fff 0.300000012 0.800000012 0
+MSG /manifold/room/point/2/levels ,ff 0 0
+MSG /manifold/room/point/2/position ,fff 0.5 0.5 0
+MAP kitchen
+POINTS 1::xy
+MORE -
+FRAME 0.11666666666666667 | front:0:0.75,left:1:0.25 | - | 0.300000012 0.800000012 0 | 5
+MSG /manifold/map ,siiii "/manifold/kitchen" 0 2 5 1
+MSG /manifold/kitchen/outputs ,isisi 2 "front" 0 "left" 1
+MSG /manifold/kitchen/points ,iiss 1 1 "" "xy"
+MSG /manifold/kitchen/levels ,ff 0.75 0.25
+MSG /manifold/kitchen/position ,fff 0.300000012 0.800000012 0
+END
 # protocol 2: the map's name in every address; the roll call on root/map leading every description, with the answer port; describe and hello heard on the map's prefix or the root, not another map's; a new name says everything again at once
 SEND maps_named_and_announced prefix=/manifold map=room port=57122 packed=1 per_output=0 rate=60
 FRAME 0.0 | front:0:0.75,left:1:0.25 | brightness:0.5 | - | 4
-MSG /manifold/map ,siiii "/manifold/room" 57122 2 4 0
+MSG /manifold/map ,siiii "/manifold/room" 57122 2 5 0
 MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/room/levels ,ff 0.75 0.25
 MSG /manifold/room/values ,isf 1 "brightness" 0.5
@@ -267,12 +394,12 @@ FRAME 0.03333333333333333 | front:0:0.75,left:1:0.25 | - | - | 1
 MSG /manifold/room/levels ,ff 0.75 0.25
 RECV 0.04 /manifold/room/describe ,
 FRAME 0.05 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/room" 57122 2 4 0
+MSG /manifold/map ,siiii "/manifold/room" 57122 2 5 0
 MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/room/levels ,ff 0.75 0.25
 RECV 0.06 /manifold/describe ,
 FRAME 0.06666666666666667 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/room" 57122 2 4 0
+MSG /manifold/map ,siiii "/manifold/room" 57122 2 5 0
 MSG /manifold/room/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/room/levels ,ff 0.75 0.25
 RECV 0.07 /manifold/kitchen/hello ,s "pd"
@@ -283,7 +410,7 @@ RECV 0.11 /manifold/hello ,s "python"
 CONN 0.12 1 "python"
 MAP my room
 FRAME 0.13 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/my_room" 57122 2 4 0
+MSG /manifold/map ,siiii "/manifold/my_room" 57122 2 5 0
 MSG /manifold/my_room/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/my_room/levels ,ff 0.75 0.25
 FRAME 0.14 | front:0:0.75,left:1:0.25 | - | - | 0
@@ -292,7 +419,7 @@ FRAME 0.15 | front:0:0.75,left:1:0.25 | - | - | 1
 MSG /manifold/my_room/levels ,ff 0.75 0.25
 MAP 
 FRAME 0.2 | front:0:0.75,left:1:0.25 | - | - | 3
-MSG /manifold/map ,siiii "/manifold/untitled" 57122 2 4 0
+MSG /manifold/map ,siiii "/manifold/untitled" 57122 2 5 0
 MSG /manifold/untitled/outputs ,isisi 2 "front" 0 "left" 1
 MSG /manifold/untitled/levels ,ff 0.75 0.25
 END

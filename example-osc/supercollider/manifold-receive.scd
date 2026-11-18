@@ -1,5 +1,6 @@
 // ofxManifold -- example-osc's receiver for SuperCollider (round 3B-2b,
-// protocol 3: several maps at once, each telling its shape).
+// protocol 5: several maps at once, each telling its shape; several points
+// on a map, each its own levels -- round 3B-2g).
 //
 // Run the whole block: put the cursor inside the outer parentheses and press
 // cmd-return. Then start example-osc -- one copy, or several with different
@@ -35,6 +36,31 @@
 //                                    wide at the bottom, close at the top.
 //   ~manifold[\bright] = true        the point's height opens each voice.
 //
+// A map may have several points (example-osc's a key). What they do is
+// decided here too:
+//
+//   ~manifold[\points] = \together   every point plays the same voices: an
+//                                    output as loud as the points there
+//                                    together, held to 1 -- one instrument,
+//                                    two hands; its brightness the loudest
+//                                    point's there.
+//   ~manifold[\points] = \carrier    the first ~manifold[\players] points
+//                                    play, as \together; every point after
+//                                    them makes no sound of its own but shapes
+//                                    theirs: its level at an output is that
+//                                    voice's modulation, ~manifold[\depth] at
+//                                    full, held there. The modulator's ratio
+//                                    is the level the loudest shaping point
+//                                    there is on: 1, 2, 3 -- harmonic, so going
+//                                    up a level changes the character, not the
+//                                    tuning.
+//   ~manifold[\carrier] = \fm        frequency modulation: pure to bright to
+//                                    bell-like. \ring: ring modulation, the
+//                                    bolder, metallic one, mixed in by the
+//                                    same amount.
+//
+// With one point, every setting sounds as before.
+//
 // A placed output pans by its node's place on the map, left to right. An
 // output fed by no level, or shared by several, is not any level's chord: a
 // quiet tone at the root (~manifold[\quiet]). A map that sends no shape (an
@@ -65,6 +91,11 @@
 ~manifold[\quiet] = 0.4;          // a shared or unfed output's voice, against 1
 ~manifold[\scale] = [0, 2, 4, 7, 9];  // no shape: major pentatonic, in semitones
 ~manifold[\lowest] = 48;          // the first map's root: C3, as MIDI
+~manifold[\points] = \together;   // several points: \together, or \carrier
+~manifold[\players] = 1;          // \carrier: how many points play; the rest shape them
+~manifold[\carrier] = \fm;        // \carrier: \fm or \ring
+~manifold[\depth] = 3;            // \carrier: the modulation at a shaping point's full level
+~manifold[\maxPoints] = 16;       // the most points a map has (example-osc's kMaxPoints)
 
 // ---- music: what each output sounds, from the map's shape -----------------
 // Plain functions, no server: tests/sc/check_music.scd runs them in sclang
@@ -168,6 +199,36 @@
     { 0.5 };
 };
 
+// The level a point is on, from its level position u, as its modulator's
+// ratio: 1 on the first level, 2 on the second ... nil (no u sent): 1.
+~manifold[\ratioFor] = { |u| if (u.isNil) { 1 } { u.max(0).floor + 1 } };
+
+// What every voice does, from every point (round 3B-2g): `pts` an Array of
+// (number:, levels: [...], bright:, u:), any order; `n` outputs. An Array of
+// n Events (amp:, bright:, fm:, ring:, ratio:) -- \together every point
+// playing; \carrier the first ~manifold[\players] by number playing, the
+// rest shaping.
+~manifold[\mix] = { |pts, n|
+    var sorted = pts.copy.sort { |a, b| a[\number] < b[\number] };
+    var carrier = ~manifold[\points] == \carrier;
+    var count = if (carrier) { ~manifold[\players].max(1) } { sorted.size };
+    var players = sorted.keep(count), shapers = sorted.drop(count);
+    var depth = ~manifold[\depth], ring = ~manifold[\carrier] == \ring;
+    n.collect { |i|
+        var at = { |p| p[\levels][i] ? 0 };
+        var amp = players.sum(at).min(1);
+        var loud = players.maxItem(at);
+        var shaped = shapers.sum(at);
+        var lead = shapers.maxItem(at);
+        var amount = (shaped * depth).min(depth);
+        (amp: amp,
+         bright: if (loud.notNil) { loud[\bright] } { 0.5 },
+         fm: if (ring) { 0 } { amount },
+         ring: if (ring and: { depth > 0 }) { amount / depth } { 0 },
+         ratio: if (lead.notNil and: { shaped > 0 }) { ~manifold[\ratioFor].(lead[\u]) } { 1 })
+    };
+};
+
 // /manifold/<map>/shape as sent: i L, L heights, i N, then per output
 // s name, i channel, i level, i levels, i placed, f x, f y, f z.
 ~manifold[\readShape] = { |msg|
@@ -193,11 +254,19 @@ s.waitForBoot {
         Out.ar(out, Pan2.ar(sig, Lag.kr(pan, 0.1)));
     }).add;
     // A soft tone: a sine and quiet overtones. `bright` 0 keeps little but
-    // the sine; 1 lets every overtone through.
-    SynthDef(\manifoldTone, { |out = 0, pan = 0, amp = 0, gain = 1, freq = 220, bright = 1|
+    // the sine; 1 lets every overtone through. A modulator at `ratio` times
+    // the note (3B-2g): `fm` its index, `ring` how much ring modulation is
+    // mixed in -- both 0 unless another point shapes this one.
+    SynthDef(\manifoldTone, { |out = 0, pan = 0, amp = 0, gain = 1, freq = 220, bright = 1,
+                               fm = 0, ring = 0, ratio = 1|
         var f = Lag.kr(freq, 0.05);
-        var sig = SinOsc.ar(f * [1, 2, 3, 4, 5], 0, [1, 0.25, 0.08, 0.05, 0.03]).sum;
+        var mf = f * Lag.kr(ratio, 0.05);
+        var mod = SinOsc.ar(mf);
+        var car = f + (mod * Lag.kr(fm, 0.05) * mf);
+        var rm = Lag.kr(ring, 0.05);
+        var sig = SinOsc.ar(car * [1, 2, 3, 4, 5], 0, [1, 0.25, 0.08, 0.05, 0.03]).sum;
         sig = LPF.ar(sig, (f * Lag.kr(bright, 0.05).linexp(0, 1, 1.2, 6)).clip(20, 20000));
+        sig = (sig * (1 - rm)) + (sig * mod * rm);
         sig = sig * 0.3 * Lag.kr(amp * gain, 0.02);
         Out.ar(out, Pan2.ar(sig, Lag.kr(pan, 0.1)));
     }).add;
@@ -262,6 +331,35 @@ s.waitForBoot {
         };
     };
 
+    // Every voice from every point (3B-2g): ~manifold[\mix] over the points
+    // heard. Once per burst -- a frame's messages arrive together, so the
+    // voices are set once, a few milliseconds after the first of them.
+    ~manifold[\apply] = { |m|
+        var mx = ~manifold[\mix].(m[\pts].values.asArray, m[\voices].size);
+        m[\voices].do { |v, i|
+            if (~manifold[\sound] == \noise) { v.set(\amp, mx[i][\amp]) } {
+                v.set(\amp, mx[i][\amp], \fm, mx[i][\fm], \ring, mx[i][\ring],
+                      \ratio, mx[i][\ratio],
+                      \bright, if (~manifold[\bright]) { mx[i][\bright] } { 1 });
+            };
+        };
+    };
+    ~manifold[\soon] = { |m|
+        if (m[\due].not) {
+            m[\due] = true;
+            SystemClock.sched(0.004, { m[\due] = false; ~manifold[\apply].(m); nil });
+        };
+    };
+    // A point heard: its entry, made when first heard.
+    ~manifold[\point] = { |m, n|
+        var p = m[\pts][n];
+        if (p.isNil) {
+            p = (number: n, levels: [], bright: 0.5, u: nil);
+            m[\pts][n] = p;
+        };
+        p;
+    };
+
     // A map's voices: one per output, tuned.
     ~manifold[\build] = { |m|
         m[\voices].do(_.free);
@@ -276,9 +374,11 @@ s.waitForBoot {
     ~manifold[\start] = { |prefix, port|
         var m = (prefix: prefix, port: port, app: NetAddr("127.0.0.1", port),
                  names: nil, shape: nil, shapeMsg: nil, bright: 0.5,
-                 voices: [], seen: Main.elapsedTime, warned: false,
+                 voices: [], seen: Main.elapsedTime, warned: false, due: false,
+                 pts: Dictionary.new,
                  lowest: ~manifold[\lowest] + (7 * (~manifold[\count] % 4)));
         ~manifold[\count] = ~manifold[\count] + 1;
+        ~manifold[\point].(m, 1);
         m[\funcs] = [
             // .../outputs N name0 ch0 name1 ch1 ...
             OSCFunc({ |msg|
@@ -298,21 +398,41 @@ s.waitForBoot {
                     if (m[\names].notNil) { ~manifold[\tune].(m) };
                 };
             }, (prefix ++ "/shape").asSymbol),
-            // .../levels f0 f1 ... in the order the outputs were described
+            // .../levels f0 f1 ... in the order the outputs were described:
+            // point 1's
             OSCFunc({ |msg|
-                msg[1..].do { |level, i|
-                    var v = m[\voices][i];
-                    if (v.notNil) { v.set(\amp, level) };
-                };
+                ~manifold[\point].(m, 1)[\levels] = msg[1..];
+                ~manifold[\soon].(m);
             }, (prefix ++ "/levels").asSymbol),
-            // .../position x y z [u]: how bright
+            // .../position x y z [u]: point 1's -- how bright
             OSCFunc({ |msg|
-                m[\bright] = ~manifold[\brightness].(m[\shape], msg[3], msg[4]);
-                if (~manifold[\bright] and: { ~manifold[\sound] != \noise }) {
-                    m[\voices].do(_.set(\bright, m[\bright]));
-                };
-            }, (prefix ++ "/position").asSymbol)
-        ];
+                var p = ~manifold[\point].(m, 1);
+                p[\u] = msg[4];
+                p[\bright] = ~manifold[\brightness].(m[\shape], msg[3], msg[4]);
+                m[\bright] = p[\bright];
+                ~manifold[\soon].(m);
+            }, (prefix ++ "/position").asSymbol),
+            // .../points P, then per point i number, s name, s inlets: the
+            // points there are -- one removed is let go (its levels came at
+            // 0 just before)
+            OSCFunc({ |msg|
+                var numbers = msg[1].collect { |k| msg[2 + (3 * k)] };
+                m[\pts].keys.copy.do { |n| if (n != 1 and: { numbers.includes(n).not }) { m[\pts].removeAt(n) } };
+                ~manifold[\soon].(m);
+            }, (prefix ++ "/points").asSymbol)
+        ] ++ (2..~manifold[\maxPoints]).collect { |n|
+            // .../point/<n>/levels and /position: points 2 and up (3B-2g)
+            [OSCFunc({ |msg|
+                ~manifold[\point].(m, n)[\levels] = msg[1..];
+                ~manifold[\soon].(m);
+             }, (prefix ++ "/point/" ++ n ++ "/levels").asSymbol),
+             OSCFunc({ |msg|
+                var p = ~manifold[\point].(m, n);
+                p[\u] = msg[4];
+                p[\bright] = ~manifold[\brightness].(m[\shape], msg[3], msg[4]);
+                ~manifold[\soon].(m);
+             }, (prefix ++ "/point/" ++ n ++ "/position").asSymbol)]
+        }.flatten;
         ~manifold[\maps][prefix] = m;
         "manifold: % playing, answers on port %".format(prefix, port).postln;
         // Port 0: the map hears no answers -- nothing to send to.

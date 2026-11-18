@@ -1,5 +1,5 @@
 // Round 3B-2b: example-osc's SuperCollider patch, its musical behaviours
-// checked without a server. Runs the patch's own functions -- the part
+// checked without a server -- and (3B-2g) what several points do. Runs the patch's own functions -- the part
 // between "// ---- music" and "// ---- end of music" -- against
 // tests/vectors/music.vec, written by tests/ref/reference_music.py.
 //
@@ -58,6 +58,36 @@ vec.split($\n).do { |line|
                     or: { close.(g[\gain], w[2]).not } }) {
                     why = "voice %: % % %, want % % %".format(i, g[\freq], g[\pan], g[\gain],
                         w[0], w[1], w[2]);
+                };
+            };
+        };
+        check.(name, why.isEmpty, why);
+    }
+    { line.beginsWith("MIX ") } {
+        // 3B-2g: MIX name n mode players carrier depth | points EXPECT ...
+        var name = words[1], n = words[2].asInteger;
+        var bar = line.find(" | "), ex = line.find(" EXPECT ");
+        var pts = line[(bar + 3)..(ex - 1)].split($;).collect { |item|
+            var p = item.split($ ).reject(_.isEmpty).first.split($:);
+            (number: p[0].asInteger, bright: p[1].asFloat,
+             u: if (p[2] == "-") { nil } { p[2].asFloat },
+             levels: p[3].split($,).collect(_.asFloat))
+        };
+        var want = line[(ex + 8)..].split($;).collect { |v|
+            v.split($ ).reject(_.isEmpty).collect(_.asFloat)
+        };
+        var got, why = "";
+        ~manifold[\points] = words[3].asSymbol;
+        ~manifold[\players] = words[4].asInteger;
+        ~manifold[\carrier] = words[5].asSymbol;
+        ~manifold[\depth] = words[6].asFloat;
+        got = ~manifold[\mix].(pts, n);
+        if (got.size != want.size) { why = "% voices, want %".format(got.size, want.size) } {
+            got.do { |g, i|
+                var w = want[i];
+                var have = [g[\amp], g[\bright], g[\fm], g[\ring], g[\ratio]];
+                if (why.isEmpty and: { have.every { |x, k| close.(x, w[k]) }.not }) {
+                    why = "voice %: %, want %".format(i, have, w);
                 };
             };
         };

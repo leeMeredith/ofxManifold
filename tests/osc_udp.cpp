@@ -67,6 +67,29 @@ int main(int argc, char** argv) {
         f.outputs[0].place = {0.25f, 0.75f, 0.0f};
         f.outputs[1].firstLevel = 1;
         f.outputs[1].levelCount = 2;
+        // Points 2 and 3 from the third frame (3B-2g); the third removed
+        // at the ninth -- its levels sent at 0 once.
+        std::vector<OscOut::PointInfo> pts{{1, "", "xy z u xyz"}};
+        if (k >= 2) {
+            pts.push_back({2, "", "xy z u xyz"});
+            OscPoint two;
+            two.number = 2;
+            for (std::size_t o = 0; o < f.outputs.size(); ++o)
+                two.levels.push_back(o == 0 ? step : o == 1 ? 1.0f - step : 0.5f);
+            two.position = {0.25f, step, 0.0f};
+            two.hasLevelPosition = true;
+            two.levelPosition = 1.0f;
+            f.more.push_back(two);
+        }
+        if (k >= 2 && k < 8) {
+            pts.push_back({3, "fm", "xy"});
+            OscPoint three;
+            three.number = 3;
+            three.levels.assign(f.outputs.size(), 0.5f);
+            three.position = {0.75f, 0.75f, 0.0f};
+            f.more.push_back(three);
+        }
+        osc.setPoints(pts);
         for (const OscMessage& m : osc.frame(now, f)) {
             const auto bytes = encode(m);
             sendto(out, bytes.data(), bytes.size(), 0,

@@ -38,6 +38,14 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
 // closes it.
 void drawKeySheet(const Scene& s, const KeyContext& keys);
 
+// Sections where flowKeys put them (3B-2g): each header in its colour with a
+// rule under it, then its rows -- keys, or state lines; and the note of what
+// did not fit, "+ N " and `more`. The editor's panel and ? page draw with
+// it, and so does a player's.
+void drawKeyGroups(const Text& text, const std::vector<KeyGroup>& groups,
+                   const KeyFlow& flow,
+                   const std::string& more = "more -- ? shows every key");
+
 // keyGroupHeight, panelTop, panelKeysTop and the window's layout are in
 // ofxManifoldEditorKeys.h: arithmetic, checked without openFrameworks.
 

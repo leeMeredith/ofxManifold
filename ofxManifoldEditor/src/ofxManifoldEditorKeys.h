@@ -49,12 +49,36 @@ struct KeyEntry {
     std::string action;      // what it does -- for b, what it WOULD do now
     bool        available = false;
     std::string why;         // why not, when unavailable
+    // A state line (round 3B-2g): `action` says what is true now, and
+    // `keys` the key that changes it, or nothing. A player's panel shows
+    // its sections' state lines; its ? page their keys.
+    bool        state = false;
 };
 
+// A section's colour (3A-12, moved into the data in 3B-2g): its header, its
+// rule and its keys, the same wherever the section is drawn.
+struct KeyColour {
+    unsigned char r = 185, g = 190, b = 205;
+};
+
+// A section (round 3B-2g): a header, and under it its rows -- keys, state
+// lines, or both. New capability gets a section of its own.
 struct KeyGroup {
     std::string           title;
     std::vector<KeyEntry> entries;
+    KeyColour             colour;
 };
+
+// The room above each section's header: a section is told apart by the
+// space before it, its title in its colour, and the rule under the title.
+inline float keyGroupGap(float lh) { return lh * 0.75f; }
+
+// The sections with only their state lines (state true) or only their keys;
+// a section left with nothing is dropped.
+std::vector<KeyGroup> keyRows(const std::vector<KeyGroup>& groups, bool state);
+
+// The editor's sections' colours, by title.
+KeyColour editorGroupColour(const std::string& title);
 
 std::vector<KeyGroup> keyMap(const KeyContext& ctx);
 

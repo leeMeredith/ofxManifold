@@ -2,7 +2,8 @@
 // the wiring, not the music: a roll call, outputs, the shape, levels and a
 // position sent to sclang as example-osc sends them, and the synths read
 // back. Before the shape the voices climb; once it comes they are retuned,
-// not rebuilt; volumes follow /levels and brightness /position.
+// not rebuilt; volumes follow /levels and brightness /position. And (3B-2g)
+// a second point: together, or shaping the first.
 //
 //     sclang tests/sc/check_patch_live.scd     (make sc-live runs it)
 //
@@ -30,7 +31,7 @@ fork {
     read = {
         var got = m[\voices].collect { () };
         m[\voices].do { |v, i|
-            [\freq, \amp, \pan, \bright, \gain].do { |k| v.get(k, { |x| got[i][k] = x }) };
+            [\freq, \amp, \pan, \bright, \gain, \fm, \ring, \ratio].do { |k| v.get(k, { |x| got[i][k] = x }) };
         };
         0.5.wait;
         got;
@@ -69,6 +70,36 @@ fork {
             close.(after[0][\amp], 0.05) and: { close.(after[1][\amp], 0.025) }, after.asString);
         check.("brightness_by_u",
             after.every { |g| close.(g[\bright], 0.8) }, after.asString);
+
+        // 3B-2g: a second point. Together, the voices as loud as both
+        // points there; as a carrier, point 1 plays and point 2 shapes --
+        // its levels the FM index, its level the ratio; removed, nothing.
+        me.sendMsg("/manifold/check/points", 2, 1, "", "xy", 2, "", "xy");
+        me.sendMsg("/manifold/check/point/2/levels", 0.5, 0.5, 0.25);
+        me.sendMsg("/manifold/check/point/2/position", 0.5, 0.5, 0.2, 1.25);
+        0.3.wait;
+        after = read.();
+        check.("two_points_together",
+            close.(after[0][\amp], 0.55) and: { close.(after[1][\amp], 0.525) }
+            and: { close.(after[2][\amp], 0.25) } and: { after.every { |g| close.(g[\fm], 0) } },
+            after.asString);
+        ~manifold[\points] = \carrier;
+        me.sendMsg("/manifold/check/levels", 0.05, 0.025, 0.0);
+        0.3.wait;
+        after = read.();
+        check.("second_point_shapes",
+            close.(after[0][\amp], 0.05) and: { close.(after[2][\amp], 0.0) }
+            and: { close.(after[0][\fm], 1.5) } and: { close.(after[2][\fm], 0.75) }
+            and: { after.every { |g| close.(g[\ratio], 2) } },
+            after.asString);
+        me.sendMsg("/manifold/check/point/2/levels", 0.0, 0.0, 0.0);
+        me.sendMsg("/manifold/check/points", 1, 1, "", "xy");
+        0.3.wait;
+        after = read.();
+        check.("point_removed_shapes_nothing",
+            after.every { |g| close.(g[\fm], 0) and: { close.(g[\ratio], 1) } }
+            and: { m[\pts].keys.asArray == [1] }, after.asString);
+        ~manifold[\points] = \together;
     };
     ~manifold[\drop].("/manifold/check");
     "\n%/%  %".format(pass, pass + fail, if (fail == 0) { "GREEN" } { "RED" }).postln;

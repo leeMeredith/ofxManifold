@@ -96,6 +96,83 @@ void checkFlow(const std::string& where, const std::vector<KeyGroup>& groups,
     if (f.hidden > 0 && (f.moreY < 0.0f || f.moreY > bottom + 0.5f)) {
         fail(where, "keys left out, and no note of it in the panel");
     }
+    // A header is never alone at a column's foot (3B-2g): the next line in
+    // its column is one of its own rows, and so is the line below it.
+    for (std::size_t i = 0; i < f.lines.size(); ++i) {
+        const KeyLine& h = f.lines[i];
+        if (h.entry >= 0) continue;
+        if (groups[h.group].entries.empty()) continue;   // nothing to put under it
+        const bool next = i + 1 < f.lines.size() && f.lines[i + 1].entry >= 0
+            && f.lines[i + 1].group == h.group && std::fabs(f.lines[i + 1].x - h.x) < 0.5f;
+        if (!next) { fail(where, "a header alone at a column's foot"); return; }
+    }
+    // The room above every header but a column's first (3B-2g): a section is
+    // told apart by the space before it.
+    for (std::size_t i = 1; i < f.lines.size(); ++i) {
+        const KeyLine& h = f.lines[i];
+        const KeyLine& before = f.lines[i - 1];
+        if (h.entry >= 0 || std::fabs(before.x - h.x) > 0.5f) continue;
+        if (h.y - before.y < row + keyGroupGap(lh) - 0.01f) {
+            fail(where, "a header without room above it");
+            return;
+        }
+    }
+}
+
+// A player's sections (3B-2g), made up as example-osc makes them: each with
+// state lines (what is true now, with the key that changes it) and keys.
+std::vector<KeyGroup> playerSections() {
+    const int state[] = {4, 3, 4, 5, 1, 3, 1, 2};
+    const int keys[]  = {4, 5, 6, 11, 3, 6, 3, 5};
+    const char* titles[] = {"sending", "points", "the point", "movement",
+                            "smoothing", "from outside", "showing", "maps"};
+    std::vector<KeyGroup> g;
+    for (int s = 0; s < 8; ++s) {
+        KeyGroup k{titles[s], {}, KeyColour{static_cast<unsigned char>(100 + 10 * s), 200, 150}};
+        for (int i = 0; i < state[s] + keys[s]; ++i) {
+            KeyEntry e;
+            e.keys = i % 3 ? "k" : "";
+            e.action = std::string(titles[s]) + " " + std::to_string(i);
+            e.available = true;
+            e.state = i < state[s];
+            k.entries.push_back(e);
+        }
+        g.push_back(k);
+    }
+    return g;
+}
+
+// keyRows: only the rows asked for, in order, each section's title and
+// colour kept, a section left with none dropped.
+void checkRows() {
+    std::vector<KeyGroup> g = playerSections();
+    g.push_back(KeyGroup{"keys only", {}, KeyColour{}});
+    KeyEntry e;
+    e.keys = "q";
+    e.action = "a key";
+    e.available = true;
+    g.back().entries.push_back(e);
+    for (bool state : {true, false}) {
+        const std::vector<KeyGroup> r = keyRows(g, state);
+        if (r.size() != (state ? 8u : 9u)) { fail("keyRows", "the wrong sections kept"); return; }
+        for (std::size_t s = 0; s < r.size(); ++s) {
+            const KeyGroup& from = g[s];
+            if (r[s].title != from.title || r[s].colour.r != from.colour.r) {
+                fail("keyRows", "a section's title or colour lost");
+                return;
+            }
+            std::size_t k = 0;
+            for (const KeyEntry& x : from.entries) {
+                if (x.state != state) continue;
+                if (k >= r[s].entries.size() || r[s].entries[k].action != x.action) {
+                    fail("keyRows", "rows lost, added or out of order");
+                    return;
+                }
+                ++k;
+            }
+            if (k != r[s].entries.size()) { fail("keyRows", "rows of the other kind kept"); return; }
+        }
+    }
 }
 
 }  // namespace
@@ -122,6 +199,57 @@ int main() {
     fonts.push_back({0.0f, 8.0f, 13.0f});
 
     std::size_t configs = 0;
+    checkRows();
+    // Every editor section in its own colour, carried by the data (3B-2g):
+    // the same wherever it is drawn, no two alike.
+    {
+        KeyContext ctx;
+        ctx.model = &m;
+        ctx.selection = &sel;
+        const std::vector<KeyGroup> all = keyMap(ctx);
+        for (std::size_t a = 0; a < all.size(); ++a) {
+            const KeyColour c = editorGroupColour(all[a].title);
+            if (all[a].colour.r != c.r || all[a].colour.g != c.g || all[a].colour.b != c.b)
+                fail("colours", all[a].title + " not in its own colour");
+            for (std::size_t b = 0; b < a; ++b) {
+                if (all[a].colour.r == all[b].colour.r && all[a].colour.g == all[b].colour.g
+                    && all[a].colour.b == all[b].colour.b)
+                    fail("colours", all[a].title + " and " + all[b].title + " alike");
+            }
+        }
+    }
+    // A player's panel and ? page (3B-2g): its sections' state lines in a
+    // strip beside the views, its keys over the window -- the flow's
+    // promises, headers never alone, at every size.
+    {
+        const std::vector<KeyGroup> all = playerSections();
+        const std::vector<KeyGroup> state = keyRows(all, true), keysOnly = keyRows(all, false);
+        for (const Win& w : wins) {
+            for (const Font& f : fonts) {
+                for (float strip : {44.0f, 72.0f, 120.0f}) {
+                    const std::string where = "player " + std::to_string(int(w.w)) + "x"
+                        + std::to_string(int(w.h)) + " text "
+                        + (f.size > 0 ? std::to_string(int(f.size)) : "bitmap")
+                        + " strip " + std::to_string(int(strip));
+                    const float x = std::max(24.0f, w.w - 16.0f - strip * f.cw);
+                    const float top = 40.0f + f.lh + keyGroupGap(f.lh);
+                    const float bottom = w.h - std::max(130.0f, std::min(220.0f, w.h * 0.24f))
+                                       - 12.0f - f.lh - 8.0f;
+                    const KeyFlow p = flowKeys(state, x, w.w - 16.0f, top, top, bottom,
+                                               f.cw, f.lh, true, false);
+                    checkFlow(where, state, p, x, w.w - 16.0f, top, top, bottom, f.cw, f.lh);
+                    const float first = 50.0f + 2.0f * (f.lh + 1.0f);
+                    const KeyFlow s = flowKeys(keysOnly, 40.0f, w.w - 40.0f, first, first,
+                                               w.h - 30.0f, f.cw, f.lh, true, false);
+                    checkFlow(where + " sheet", keysOnly, s, 40.0f, w.w - 40.0f, first,
+                              first, w.h - 30.0f, f.cw, f.lh);
+                    if (s.hidden > 0 && w.w >= 1280 && w.h >= 800 && f.size > 0 && f.size <= 16)
+                        fail(where + " sheet", "the player's ? page leaves keys out");
+                    configs += 2;
+                }
+            }
+        }
+    }
     std::printf("  lit keys the panel leaves out / keys the ? sheet leaves out,\n"
                 "  a busy editor, views at least half their size:\n");
     std::printf("  %-11s", "window");

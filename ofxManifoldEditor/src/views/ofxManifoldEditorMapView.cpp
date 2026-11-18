@@ -446,6 +446,27 @@ void drawMap(const Scene& s, const GridLook& look, const MapOverlay& o) {
         ofPopStyle();
     }
 
+    // A player's points (3B-2g): each a dot in its colour with its number
+    // beside it; the chosen one ringed.
+    if (!s.points.empty()) {
+        ofPushStyle();
+        for (const PointMark& p : s.points) {
+            const glm::vec2 at = renderer->toScreen(p.position);
+            ofFill();
+            ofSetColor(p.colour);
+            ofDrawCircle(at.x, at.y, 5.0f);
+            if (p.chosen) {
+                ofNoFill();
+                ofSetLineWidth(2.0f);
+                ofSetColor(255, 214, 90);
+                ofDrawCircle(at.x, at.y, 11.0f);
+            }
+            ofSetColor(p.colour);
+            s.text->draw(std::to_string(p.number), at.x + 9.0f, at.y - 8.0f);
+        }
+        ofPopStyle();
+    }
+
     drawLevelColumn(s);
 }
 

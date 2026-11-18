@@ -84,6 +84,18 @@ struct OscOutput {
 };
 struct OscValue  { std::string name; float value = 0.0f; };
 
+// A point after the first (round 3B-2g): its number (2 and up), its levels
+// in the outputs' order, and where it is -- x y z, and u when set -- sent
+// as <prefix>/point/<n>/levels and /position. Point 1 is the frame's own
+// levels and position, under the addresses it always had.
+struct OscPoint {
+    int                number = 2;
+    std::vector<float> levels;
+    glm::vec3          position{0.0f};
+    bool               hasLevelPosition = false;
+    float              levelPosition = 0.0f;
+};
+
 struct OscFrame {
     std::vector<OscOutput> outputs;
     std::vector<OscValue>  values;
@@ -100,6 +112,10 @@ struct OscFrame {
     // not at all when unset -- a receiver then hears what it always did.
     bool                   hasShape = false;
     std::vector<float>     levelHeights;
+    // Points 2 and up (round 3B-2g), any order: sent in number order after
+    // point 1's position, always packed. A number sent before and missing
+    // now is sent once more with every level 0, then not at all.
+    std::vector<OscPoint>  more;
 };
 
 class OscOut {
@@ -111,8 +127,9 @@ public:
     // The protocol, in every roll call (OSC.md): 2 puts the map's name in
     // every address and adds the roll call; 3 adds the shape message; 4 the
     // points a sender may move from outside -- counted in the roll call,
-    // listed in <prefix>/points (round 3B-2f).
-    static constexpr int    kProtocol      = 4;
+    // listed in <prefix>/points (round 3B-2f); 5 points 2 and up, each its
+    // own levels and position under <prefix>/point/<n>/ (round 3B-2g).
+    static constexpr int    kProtocol      = 5;
 
     // ---- settings ----
     // The root every sender shares, "/manifold". Each map's messages go
@@ -187,6 +204,8 @@ private:
     std::vector<std::uint8_t> sentShape_;              // encoded; empty: none
     std::vector<PointInfo>    points_;
     std::vector<std::uint8_t> sentPoints_;             // encoded; empty: none
+    std::vector<int>          sentMore_;               // points 2 and up last sent;
+                                                       // kept by reset, not by a new prefix
     std::string peer_;
     bool   helloYet_ = false;
     double lastHello_ = 0.0;

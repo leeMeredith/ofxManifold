@@ -1,6 +1,7 @@
 #include "ofxManifoldEditorKeys.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ofxManifold {
 namespace editor {
@@ -88,7 +89,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("no nodes yet")),
         entry("none", "esc", "clear the selection", !drag && !sel.empty(),
               unlessDrag("nothing is selected")),
-    }});
+    }, {}});
 
     g.push_back({"shape the map", {
         entry("move", "drag a node", "move the selection",
@@ -107,7 +108,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("no region is made only of selected nodes")),
         entry("remove", "delete", "remove nodes", !drag && !sel.empty(),
               unlessDrag("select the nodes to remove")),
-    }});
+    }, {}});
 
     g.push_back({"grid", {
         entry("gridkind", "1 2 3 4", "free square triangle polar (again: straight)",
@@ -128,7 +129,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("the grid is off (1)")),
         entry("layoutnodes", "L", "the nodes only (then F)", !drag && gridOn,
               unlessDrag("the grid is off (1)")),
-    }});
+    }, {}});
 
     g.push_back({"outputs", {
         entry("newoutput", "o", "new output", !drag, dragging),
@@ -168,7 +169,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("autooutput", "p",
               std::string("auto-output ") + (m.autoOutput() ? "on" : "off"),
               !drag, dragging),
-    }});
+    }, {}});
 
     // Round 3A-6. While auditioning, up and down move the listening point
     // through the levels and past them -- so they work with one level too.
@@ -190,7 +191,7 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("removelevel", "cmd-delete", "remove the level",
               !drag && levels > 1, unlessDrag("the only level")),
         entry("view3d", "cmd-3", "3D view on or off", true, ""),
-    }});
+    }, {}});
 
     // Round 3A-7: node values, named numbers each node carries per level.
     const std::size_t values = m.map3d().valueSet().size();
@@ -207,12 +208,12 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               !drag && values > 0, unlessDrag(noValues)),
         entry("removevalue", "G", "remove the value",
               !drag && values > 0, unlessDrag(noValues)),
-    }});
+    }, {}});
 
     g.push_back({"listen", {
         entry("audition", "space", "hold to audition", !drag, dragging),
         entry("lock", "v", "lock audition on or off", !drag, dragging),
-    }});
+    }, {}});
 
     g.push_back({"file", {
         entry("undo", "cmd-z", "undo", !drag && ctx.canUndo,
@@ -232,7 +233,8 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
         entry("fullscreen", "ctrl-cmd-f", "full screen", true, ""),
         entry("textsize", "cmd-+ cmd--", "text size", true, ""),
         entry("keysheet", "?", "every key; again: hide keys; again: back", true, ""),
-    }});
+    }, {}});
+    for (KeyGroup& k : g) k.colour = editorGroupColour(k.title);
     return g;
 }
 
@@ -334,7 +336,7 @@ KeyFlow flowPass(const std::vector<KeyGroup>& groups, float x, float right,
             }
         }
         if (full) f.hidden += shown.size() - e;
-        y += lh * 0.5f;
+        y += keyGroupGap(lh);
     }
     if (f.hidden > 0) {
         // The last line becomes the note of what did not fit: the entry it
@@ -346,6 +348,14 @@ KeyFlow flowPass(const std::vector<KeyGroup>& groups, float x, float right,
             f.moreX = last.x;
             f.moreY = last.y;
             if (last.entry >= 0) break;
+        }
+        // A header the note would leave alone at the foot goes too: the
+        // note takes its place (3B-2g).
+        if (!f.lines.empty() && f.lines.back().entry < 0
+            && std::fabs(f.lines.back().x - f.moreX) < 0.5f) {
+            f.moreX = f.lines.back().x;
+            f.moreY = f.lines.back().y;
+            f.lines.pop_back();
         }
     }
     return f;
@@ -371,7 +381,30 @@ KeyFlow panelKeys(const std::vector<KeyGroup>& groups, float x, float right,
 }
 
 float keyGroupHeight(const KeyGroup& g, float lh) {
-    return (1.0f + float(g.entries.size())) * (lh + 1.0f) + lh * 0.5f;
+    return (1.0f + float(g.entries.size())) * (lh + 1.0f) + keyGroupGap(lh);
+}
+
+std::vector<KeyGroup> keyRows(const std::vector<KeyGroup>& groups, bool state) {
+    std::vector<KeyGroup> out;
+    for (const KeyGroup& g : groups) {
+        KeyGroup k{g.title, {}, g.colour};
+        for (const KeyEntry& e : g.entries) {
+            if (e.state == state) k.entries.push_back(e);
+        }
+        if (!k.entries.empty()) out.push_back(std::move(k));
+    }
+    return out;
+}
+
+KeyColour editorGroupColour(const std::string& title) {
+    if (title == "place and select") return {120, 190, 255};
+    if (title == "shape the map")    return {120, 215, 170};
+    if (title == "grid")             return {190, 170, 255};
+    if (title == "outputs")          return {255, 190, 110};
+    if (title == "levels")           return {110, 215, 225};
+    if (title == "values")           return {235, 150, 210};
+    if (title == "listen")           return {240, 220, 120};
+    return {185, 190, 205};          // file
 }
 
 float panelTop(float lh) { return 24.0f + lh; }

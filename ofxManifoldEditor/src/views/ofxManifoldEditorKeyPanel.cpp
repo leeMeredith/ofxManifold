@@ -22,41 +22,57 @@ namespace editor {
 // gives any one's details.
 namespace {
 
-// Each group's colour (3A-12): its title and its keys in it, so a key's
-// group shows at a glance; what the key does in near-white, drawn a hair
-// bolder than the key.
-ofColor groupColour(const std::string& title) {
-    if (title == "place and select") return ofColor(120, 190, 255);
-    if (title == "shape the map")    return ofColor(120, 215, 170);
-    if (title == "grid")             return ofColor(190, 170, 255);
-    if (title == "outputs")          return ofColor(255, 190, 110);
-    if (title == "levels")           return ofColor(110, 215, 225);
-    if (title == "values")           return ofColor(235, 150, 210);
-    if (title == "listen")           return ofColor(240, 220, 120);
-    return ofColor(185, 190, 205);   // file
+ofColor groupColour(const KeyGroup& g) {
+    return ofColor(g.colour.r, g.colour.g, g.colour.b);
 }
 
-// One key line: the key in its group's colour, what it does bolder. Dim
-// (the key sheet's keys that would not act now) both in grey.
-// `pad`: the keys' width in this column -- its longest key -- so every key
-// is whole and the column's actions line up.
-void drawKeyLine(const Scene& s, const KeyGroup& grp, const KeyEntry& e,
+// One row: the key in its section's colour, then what it does -- bolder,
+// in near-white -- or, for a state line, what is true now, in white. Dim
+// (the key sheet's keys that would not act now) both in grey. `pad`: the
+// keys' width in this column -- its longest key -- so every key is whole
+// and the column's words line up.
+void drawKeyLine(const Text& text, const KeyGroup& grp, const KeyEntry& e,
                  float x, float y, std::size_t width, std::size_t pad) {
-    const float cw = s.text->charWidth();
+    const float cw = text.charWidth();
     std::string what = e.action;
     const std::size_t room = width > pad + 1 ? width - pad - 1 : 0;
     if (what.size() > room) what = room > 3 ? what.substr(0, room - 3) + "..." : "";
-    ofSetColor(e.available ? groupColour(grp.title) : ofColor(82, 88, 100));
-    s.text->draw(e.keys, x, y);
+    ofSetColor(e.available ? groupColour(grp) : ofColor(82, 88, 100));
+    text.draw(e.keys, x, y);
     const float ax = x + float(pad + 1) * cw;
+    if (e.state) {
+        ofSetColor(e.available ? ofColor(255, 255, 255) : ofColor(130, 136, 150));
+        text.draw(what, ax, y);
+        return;
+    }
     ofSetColor(e.available ? ofColor(240, 242, 248) : ofColor(82, 88, 100));
-    s.text->draw(what, ax, y);
-    if (e.available) s.text->draw(what, ax + 0.75f, y);   // a hair bolder
+    text.draw(what, ax, y);
+    if (e.available) text.draw(what, ax + 0.75f, y);   // a hair bolder
 }
 
-// The keys where flowKeys put them; and the note of what did not fit.
-void drawKeyLines(const Scene& s, const std::vector<KeyGroup>& groups,
-                  const KeyFlow& flow) {
+// A section's header (3B-2g): its title in its colour, and a thin rule in
+// that colour under it, across the column -- with the room flowKeys leaves
+// above it, what tells one section from the next.
+void drawKeyHeader(const Text& text, const KeyGroup& grp, bool more, float x,
+                   float y, std::size_t width) {
+    std::string t = grp.title + (more ? " (more)" : "");
+    if (t.size() > width) t = t.substr(0, width);
+    const ofColor c = groupColour(grp);
+    ofSetColor(c);
+    text.draw(t, x, y);
+    text.draw(t, x + 0.75f, y);                        // a hair bolder
+    ofPushStyle();
+    ofSetLineWidth(1.0f);
+    ofSetColor(c, 120);
+    const float ry = y + text.lineHeight() * 0.3f;
+    ofDrawLine(x, ry, x + float(width) * text.charWidth(), ry);
+    ofPopStyle();
+}
+
+} // namespace
+
+void drawKeyGroups(const Text& text, const std::vector<KeyGroup>& groups,
+                   const KeyFlow& flow, const std::string& more) {
     const std::size_t width = flow.chars;
     std::map<int, std::size_t> pads;            // by column
     for (const KeyLine& kl : flow.lines) {
@@ -67,24 +83,19 @@ void drawKeyLines(const Scene& s, const std::vector<KeyGroup>& groups,
     for (const KeyLine& kl : flow.lines) {
         const KeyGroup& grp = groups[kl.group];
         if (kl.entry < 0) {
-            std::string t = grp.title + (kl.more ? " (more)" : "");
-            if (t.size() > width) t = t.substr(0, width);
-            ofSetColor(groupColour(grp.title));
-            s.text->draw(t, kl.x, kl.y);
+            drawKeyHeader(text, grp, kl.more, kl.x, kl.y, width);
             continue;
         }
-        drawKeyLine(s, grp, grp.entries[std::size_t(kl.entry)], kl.x, kl.y, width,
+        drawKeyLine(text, grp, grp.entries[std::size_t(kl.entry)], kl.x, kl.y, width,
                     pads[int(std::lround(kl.x))]);
     }
     if (flow.hidden > 0) {
-        std::string t = "+ " + ofToString(flow.hidden) + " more -- ? shows every key";
+        std::string t = "+ " + ofToString(flow.hidden) + " " + more;
         if (t.size() > width) t = t.substr(0, width - 3) + "...";
         ofSetColor(232, 170, 88);
-        s.text->draw(t, flow.moreX, flow.moreY);
+        text.draw(t, flow.moreX, flow.moreY);
     }
 }
-
-} // namespace
 
 void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
                const KeyContext& keys) {
@@ -127,8 +138,7 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
             const std::size_t chars =
                 std::size_t(std::max(12.0f, s.levelsKeysWidth / cw));
             float yy = s.levelsKeysAt.y;
-            ofSetColor(groupColour(lv.title));
-            text(lv.title, s.levelsKeysAt.x, yy);
+            drawKeyHeader(*s.text, lv, false, s.levelsKeysAt.x, yy, chars);
             yy += lh + 1.0f;
             std::size_t pad = 1;
             for (const KeyEntry& e : lv.entries) {
@@ -136,7 +146,7 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
             }
             for (const KeyEntry& e : lv.entries) {
                 if (!e.available) continue;
-                drawKeyLine(s, lv, e, s.levelsKeysAt.x, yy, chars, pad);
+                drawKeyLine(*s.text, lv, e, s.levelsKeysAt.x, yy, chars, pad);
                 yy += lh + 1.0f;
             }
         }
@@ -287,7 +297,7 @@ void drawPanel(const Scene& s, const GridLook& look, const PanelStatus& st,
     // Grouped by intention; lit when the key would act, dim when it would
     // not -- drawn from the same key map that keyPressed() asks, so lit and
     // working cannot drift apart. b's line says what it WOULD do now.
-    drawKeyLines(s, groups, flow);
+    drawKeyGroups(*s.text, groups, flow);
 }
 
 void drawKeySheet(const Scene& s, const KeyContext& keys) {
@@ -305,7 +315,7 @@ void drawKeySheet(const Scene& s, const KeyContext& keys) {
     const KeyFlow flow = flowKeys(groups, 24.0f, float(ofGetWidth()) - 24.0f,
                                   first, first, float(ofGetHeight()) - 16.0f,
                                   cw, lh);
-    drawKeyLines(s, groups, flow);
+    drawKeyGroups(*s.text, groups, flow);
     ofPopStyle();
 }
 

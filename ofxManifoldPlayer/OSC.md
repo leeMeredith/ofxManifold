@@ -10,15 +10,19 @@ there are**, nor **how many maps are playing.** The sender tells it, and
 tells it again when that changes, so the messages grow and shrink with the
 maps.
 
-This is **protocol 4**: protocol 3 and **points moved from outside** -- a
-receiver, or anything else on this machine, may take a map's point and move
-it, by the messages under "Points moved from outside" below; the roll call
-counts the points and each description lists them. Protocol 3 added the
+This is **protocol 5**: protocol 4 and **several points on a map** -- point
+1 under the addresses it always had, points 2 and up each sending its own
+levels and position under `/point/<n>/`; the roll call counts them all.
+Protocol 4 added **points moved from outside** -- a receiver, or anything
+else on this machine, may take a map's point and move it, by the messages
+under "Points moved from outside" below; the roll call counts the points and
+each description lists them. Protocol 3 added the
 `shape` message, saying how the map is built -- its levels, and where each
 output sits; protocol 2, the map's name in every address and the roll call;
 protocol 1 (the first 3B-1) sent everything under `/manifold` alone. A
-receiver written for 2 or 3 reads 4 unchanged: it ignores what it does not
-know, and the roll call's new last argument with it.
+receiver written for 2, 3 or 4 reads 5 unchanged: it ignores what it does
+not know -- the roll call's last argument, and points after the first -- and
+hears point 1 as it always did.
 
 ## Maps and their prefixes
 
@@ -36,7 +40,7 @@ Two maps with the same name cannot be told apart; give one another name.
 
 | Address | Arguments | When |
 |---|---|---|
-| `/manifold/map` | `s` prefix, `i` answer port, `i` N outputs, `i` protocol (4), `i` points | just before every `outputs` message (below): the first send, every change, when asked, every 2 seconds |
+| `/manifold/map` | `s` prefix, `i` answer port, `i` N outputs, `i` protocol (5), `i` points | just before every `outputs` message (below): the first send, every change, when asked, every 2 seconds |
 
 The roll call is always on the root, whatever the map's name, so a receiver
 listens to one address to find every map playing: what it is called, where
@@ -50,12 +54,14 @@ stopped.
 |---|---|---|
 | `/manifold/room/outputs` | `i` N, then N pairs of `s` name, `i` channel | with the roll call: the first send; whenever an output is added or removed or its channel changes; when asked; every 2 seconds |
 | `/manifold/room/shape` | `i` L, then L × `f` level heights; `i` N, then N × (`s` name, `i` channel, `i` level, `i` levels, `i` placed, `f` x, `f` y, `f` z) | right after every `outputs` message, and on its own whenever it changes -- a level moved, a node moved or raised, a binding |
-| `/manifold/room/points` | `i` P, then P × (`i` number, `s` name, `s` inlets) | after the shape on every description, and on its own when it changes: the points a sender may move, their names ("" if none) and the inlets each takes, as words -- `xy z u xyz` |
+| `/manifold/room/points` | `i` P, then P × (`i` number, `s` name, `s` inlets) | after the shape on every description, and on its own when it changes -- a point added or removed: the points there are, which a sender may move, their names ("" if none) and the inlets each takes, as words -- `xy z u xyz` |
 | `/manifold/room/levels` | N × `f` | every send, if packed is on (the default) |
 | `/manifold/room/out/NAME` | `f` | per output, if that is on: what changed, at every send; all of them every 0.1 s |
 | `/manifold/room/values` | `i` M, then M pairs of `s` name, `f` value | every send, if packed is on and the map has values |
 | `/manifold/room/value/NAME` | `f` | per value, as per output |
 | `/manifold/room/position` | `f` x, `f` y, `f` z, and optionally `f` u | every send |
+| `/manifold/room/point/2/levels` | N × `f` | every send, for each point after the first: its levels, in the outputs' order -- always packed |
+| `/manifold/room/point/2/position` | `f` x, `f` y, `f` z, and optionally `f` u | every send, for each point after the first |
 
 - **Levels are in the order `outputs` lists the outputs**, which is channel
   order. The channel numbers say where each would go on a device; they need
@@ -86,6 +92,14 @@ stopped.
   the rate carries on from it.
 - **A map that changes its name** -- another file opened -- says everything
   again at once under the new prefix: roll call, outputs, levels.
+- **Points 2 and up** (round 3B-2g) come after point 1's `position`, in
+  number order, each its `levels` then its `position`, read as point 1's
+  are. Point 1 is always `levels` and `position` with no `/point/1/`, so a
+  receiver for one point needs nothing new. Node values (`values`) are point
+  1's. **A point removed** -- only ever the last, so no number changes --
+  sends its `levels` once more, every one 0, just before the `points` list
+  without it; then nothing. So whatever it fed fades rather than sticks,
+  and a receiver can let it go when `points` no longer lists it.
 
 ## Messages in
 
@@ -135,12 +149,18 @@ twice -- so a lost reply can simply be asked again.
 | Answer, to your IP at the reply port | Arguments |
 |---|---|
 | `/manifold/room/point/1/reply` | `i` request id, `i` accepted (1 or 0), `s` command, `s` reason ("" when accepted; else e.g. `held by 127.0.0.1:57120`, `not held`, `not the holder`, `wrong arguments`) |
-| `/manifold/room/point/1/lost` | `s` reason: `hand` (taken back on the player) or `silent` |
+| `/manifold/room/point/1/lost` | `s` reason: `hand` (taken back on the player), `silent`, or `removed` (the point itself removed on the player) |
+
+Every point is taken the same way, by its number -- `/manifold/room/point/2/take`
+-- and held, moved, released and timed out on its own: holding point 2
+says nothing about point 1, and the player's hand takes back only the point
+it grabs.
 
 **The control file.** Nothing to set up: every map has point 1, taking
 every inlet. A map may have a control file beside it, `room-control.json`
-next to `room.json` -- the player writes it with `C` -- which narrows what a
-point takes, and never widens it:
+next to `room.json` -- the player writes it with `C` -- which says **how many
+points the map opens with** (one per entry, up to 16), and narrows what a
+point takes, never widening it:
 
 ```json
 {
@@ -157,8 +177,9 @@ point takes, and never widens it:
 `range` is what a controller sends on an axis, mapped onto the map -- x and
 y onto 0..1, z onto the lowest to highest level, u onto 0 to the top level;
 `silence`, the seconds before a silent hold ends, 0 for never. A file it
-cannot read, it refuses, saying why, and keeps the defaults. This version of
-example-osc has one point; more are to come.
+cannot read, it refuses, saying why, and keeps the defaults. example-osc adds
+points with `a` (at the mouse, up to 16) and removes the last with `A`; a
+point added takes every inlet, and `C` writes as many as there are.
 
 ## A clock from SuperCollider (example-osc)
 
@@ -201,6 +222,14 @@ against an independent OSC library (python-osc) in the tests.
    example-osc).
 6. Optionally say the map's `hello` to its answer port once a second.
 
+7. With several points (protocol 5): listen on `point/<n>/levels` and
+   `/position` as on point 1's, for n from 2 to 16; let a point go when
+   `points` no longer lists it.
+
 The SuperCollider patch beside `example-osc` is exactly this, and decides
 what the shape sounds like in settings at its top: `\progression`,
-`\somber`, `\registers` or `\series`, brightness, the span.
+`\somber`, `\registers` or `\series`, brightness, the span -- and what
+several points do: `\together` (every point plays the same voices, louder
+where they meet) or `\carrier` (the first `\players` points play; the rest
+shape them, by FM or ring modulation, `\fm` or `\ring`, their level at an
+output its depth, the level they are on its ratio).

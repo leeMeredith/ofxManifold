@@ -2624,10 +2624,10 @@ replace:     map_.moveLevel(0, -0.25f, n);
 
 # ---- round 3B-2b: the map's shape for SuperCollider ----
 
-gate: The roll call still says protocol 3
+gate: The roll call still says protocol 4
 file: ofxManifoldPlayer/src/ofxManifoldOsc.h
-find:     static constexpr int    kProtocol      = 4;
-replace:     static constexpr int    kProtocol      = 3;
+find:     static constexpr int    kProtocol      = 5;
+replace:     static constexpr int    kProtocol      = 4;
 
 gate: The shape is never sent
 file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
@@ -2885,3 +2885,90 @@ gate: A control file's own form loses its ranges
 file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
 find:         if (!ranges.empty()) o += ", \"range\": { " + ranges + " }";
 replace:         (void)ranges;
+
+# ---- round 3B-2g: more than one point, and sections with headers ----
+
+gate: Points after the first are never sent
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     for (const OscPoint* q : more) {
+replace:     for (const OscPoint* q : std::vector<const OscPoint*>{}) {
+
+gate: Points after the first go out in the order given
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:                      [](const OscPoint* a, const OscPoint* b) { return a->number < b->number; });
+replace:                      [](const OscPoint*, const OscPoint*) { return false; });
+
+gate: A further point's position loses its level position
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         if (q->hasLevelPosition) pos.args.push_back(OscArg::number(q->levelPosition));
+replace:         (void)q->hasLevelPosition;
+
+gate: A removed point is never zeroed
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:             if (std::find(numbers.begin(), numbers.end(), n) != numbers.end()) continue;
+replace:             continue;
+
+gate: A removed point is zeroed at every send
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         sentMore_ = std::move(numbers);
+replace:         (void)numbers;
+
+gate: A new map zeroes the last map's points
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     sentMore_.clear();                   // another map's points: nothing to zero here
+replace:     // sentMore_ kept
+
+gate: Starting again forgets the points to zero
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:     // sentShape_ needs no clearing: the description that follows clears it.
+replace:     sentMore_.clear();
+
+gate: A point is added past sixteen
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (count() >= kMaxPoints) return false;
+replace:         if (count() >= kMaxPoints + 1) return false;
+
+gate: Adding a point drops every hold
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         state_.push_back(Hold{});
+replace:         state_.assign(spec_.points.size(), Hold{});
+
+gate: Point 1 can be removed
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (count() <= 1) return false;
+replace:         if (count() <= 0) return false;
+
+gate: A removed point's holder is not told
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (held(count())) lose(count(), "removed");
+replace:         (void)0;
+
+gate: The panel keeps state lines and keys alike
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:             if (e.state == state) k.entries.push_back(e);
+replace:             k.entries.push_back(e);
+
+gate: A section left with no rows keeps its header
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         if (!k.entries.empty()) out.push_back(std::move(k));
+replace:         out.push_back(std::move(k));
+
+gate: Sections run together with no room between
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         y += keyGroupGap(lh);
+replace:         y += 0.0f;
+
+gate: The note of what did not fit leaves a header alone
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:         if (!f.lines.empty() && f.lines.back().entry < 0
+replace:         if (false && !f.lines.empty() && f.lines.back().entry < 0
+
+gate: The editor's sections lose their colours
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:     for (KeyGroup& k : g) k.colour = editorGroupColour(k.title);
+replace:     (void)g;
+
+gate: Two of the editor's sections share a colour
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:     if (title == "values")           return {235, 150, 210};
+replace:     if (title == "values")           return {240, 220, 120};

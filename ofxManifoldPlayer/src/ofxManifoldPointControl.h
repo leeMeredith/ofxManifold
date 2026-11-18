@@ -19,6 +19,7 @@
 //     <prefix>/point/<n>/xyz      f x, f y, f z        from the holder
 //     <prefix>/point/<n>/reply    i id, i accepted, s command, s reason   out
 //     <prefix>/point/<n>/lost     s reason                                out
+//                                 ("hand", "silent", or "removed": 3B-2g)
 //
 // <n> is the point's number, from 1, or its name if the control file gives it
 // one. A reply goes to the sender's IP at the port its take named, or its own
@@ -123,6 +124,26 @@ public:
     }
     const ControlSpec& spec() const { return spec_; }
     int count() const { return int(spec_.points.size()); }
+
+    // A point added after the last (round 3B-2g: a in the player), taking
+    // every inlet unless told otherwise. Every hold is kept. False at
+    // kMaxPoints.
+    bool addPoint(const PointSpec& p = PointSpec{}) {
+        if (count() >= kMaxPoints) return false;
+        spec_.points.push_back(p);
+        state_.push_back(Hold{});
+        return true;
+    }
+    // The last point removed -- only the last, so no point's number changes
+    // under a sender. Its holder, if any, is told ("removed"); the others
+    // keep theirs. False when only point 1 is left.
+    bool removeLast() {
+        if (count() <= 1) return false;
+        if (held(count())) lose(count(), "removed");
+        spec_.points.pop_back();
+        state_.pop_back();
+        return true;
+    }
 
     // Whether (x, y) is on the floor plan. Unset: everywhere.
     void setInside(std::function<bool(float, float)> inside) { inside_ = std::move(inside); }

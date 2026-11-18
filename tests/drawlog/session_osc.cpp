@@ -166,6 +166,25 @@ int main() {
         run(2); sent();            frame("off the plan, refused; a second sender refused, answered");
         a.mousePressed(150, 150, 0);
         run(2); sent();            frame("the hand takes it back: the sender told it is lost");
+
+        // Round 3B-2g: more than one point. Two added at the mouse, the
+        // third set gliding while point 1 is chosen again and dragged; the
+        // third taken from outside, then removed: its sender told.
+        a.mouseMoved(90, 90);   key('a'); run(2);
+        frame("a: point 2 at the mouse, chosen -- every point drawn, numbered");
+        a.mouseMoved(220, 220); key('a'); run(2);
+        key('m'); key('m'); run(40);
+        frame("a again: point 3, gliding on its own");
+        key(OF_KEY_LEFT); key(OF_KEY_LEFT);
+        a.mousePressed(150, 150, 0);
+        for (int i = 0; i < 10; ++i) { a.mouseDragged(150 + 4 * i, 150, 0); app->update(); }
+        a.mouseReleased(190, 150, 0);
+        frame("left twice: point 1 chosen and dragged; point 3 still gliding");
+        sent();
+        send("/manifold/room/point/3/take", {}, {7, 0});
+        run(2); sent();            frame("point 3 taken from outside");
+        key('A'); run(2); sent();  frame("A: point 3 removed -- its sender told; its levels sent at 0 once");
+        key(OF_KEY_RIGHT);         frame("right: point 2 chosen");
     }
     key('?');                      frame("?: every key");
     key('?');                      frame("? again: no keys, the map and the 3D view larger");

@@ -183,6 +183,7 @@ int main(int argc, char** argv) {
             // Round 3B-2b: the shape the frames after a SHAPE line carry,
             // by output name; none after NOSHAPE.
             bool shaped = false;
+            std::vector<OscPoint> more;          // 3B-2g: after a MORE line
             std::vector<float> heights;
             std::map<std::string, OscOutput> places;
             std::size_t j = i + 1;
@@ -229,6 +230,7 @@ int main(int argc, char** argv) {
                             o.place = it->second.place;
                         }
                     }
+                    fr.more = more;
                     const std::size_t want = std::stoul(f[4]);
                     const auto msgs = out.frame(now, fr);
                     if (msgs.size() != want) {
@@ -290,8 +292,28 @@ int main(int argc, char** argv) {
                         }
                     }
                     out.setPoints(pts);
+                } else if (s.rfind("MORE ", 0) == 0) {
+                    // 3B-2g: n=l,l,...@x,y,z[,u] per point, space-separated
+                    more.clear();
+                    std::istringstream ms(s.substr(5));
+                    for (std::string item; ms >> item;) {
+                        if (item == "-") break;
+                        const std::size_t eq = item.find('='), at = item.find('@');
+                        OscPoint q;
+                        q.number = std::stoi(item.substr(0, eq));
+                        std::stringstream ls(item.substr(eq + 1, at - eq - 1));
+                        for (std::string x; std::getline(ls, x, ',');) q.levels.push_back(std::stof(x));
+                        std::vector<float> pos;
+                        std::stringstream ps(item.substr(at + 1));
+                        for (std::string x; std::getline(ps, x, ',');) pos.push_back(std::stof(x));
+                        q.position = {pos[0], pos[1], pos[2]};
+                        if (pos.size() > 3) { q.hasLevelPosition = true; q.levelPosition = pos[3]; }
+                        more.push_back(q);
+                    }
                 } else if (s.rfind("NOSHAPE", 0) == 0) {
                     shaped = false;
+                } else if (s == "RESET") {
+                    out.reset();
                 } else if (s.rfind("MAP ", 0) == 0) {
                     out.setMapName(s.substr(4));
                 } else if (s.rfind("RECV ", 0) == 0) {

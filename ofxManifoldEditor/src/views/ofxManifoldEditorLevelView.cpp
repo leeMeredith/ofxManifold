@@ -141,6 +141,14 @@ void drawLevelView(const Scene& s, ofEasyCam& cam, const ofRectangle& area) {
         }
     }
 
+    // A player's other points (3B-2g), each in its colour; the chosen one
+    // is the listening point above.
+    for (const PointMark& p : s.points) {
+        if (p.chosen) continue;
+        ofSetColor(p.colour);
+        ofDrawSphere(at(p.position, p.z), S * 0.010f);
+    }
+
     cam.end();
     ofPopStyle();
 }

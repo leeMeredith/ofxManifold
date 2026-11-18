@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 ofxManifold -- example-osc's receiver in plain Python (round 3B-2b,
-protocol 3: several maps at once, each telling its shape).
+protocol 3: several maps at once, each telling its shape). It reads protocol
+5 unchanged: it follows point 1, and lets the levels of points 2 and up
+(/point/<n>/levels, round 3B-2g) go by -- the SuperCollider patch plays them.
 
 No dependencies. Listens for the roll call, /manifold/map, and follows every
 map it hears: prints each map's outputs as it describes them, its shape --

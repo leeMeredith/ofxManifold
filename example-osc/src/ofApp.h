@@ -2,14 +2,14 @@
 
 // ofxManifold -- example-osc (rounds 3B-1 and 3B-2).
 //
-// The smallest player: one map, one point, and OSC out that grows and
+// The smallest player: one map, its points, and OSC out that grows and
 // shrinks with the map -- for SuperCollider, Max, Pd, TouchDesigner, a
 // script, whatever is listening. Drag the point; hold up or down to move it
 // through the levels. It starts on the room example: four corners on the
 // floor, the middle and the top. Beside the map, the column of level dots and
 // the editor's 3D view, where the point is a green ball with a line dropped
 // to the level below; the level it is on or above is the brighter one. What
-// goes out, and whether anyone answered, is on the right.
+// goes out, and whether anyone answered, is on the right, in sections.
 //
 // The map is drawn as the editor draws it, without the editing: node shapes
 // by kind, each node's share as a halo, values, links, and the outputs'
@@ -37,6 +37,14 @@
 // off it on the way, and step on a timer, on your clicks, or on the bridge's
 // beats: each armed step that sounds moves the point once.
 //
+// More than one point (3B-2g): a adds one, up to 16, at the mouse; A removes
+// the last. One is chosen at a time -- left / right, or a press on its dot --
+// and the keys of the point and of movement act on it; the others carry on
+// with what they were given. Each sends its own levels and position (point 1
+// under the addresses it always had, the others under /point/<n>/), and
+// SuperCollider decides what each sounds like. A map's control file says how
+// many it opens with.
+//
 // The receiver need not know how many outputs there are: the app describes
 // them (/manifold/outputs) on the first send, when they change, when asked,
 // and every two seconds. See ofxManifoldPlayer/OSC.md for the protocol, and
@@ -47,8 +55,15 @@
 // tested without openFrameworks; this file owns the window, the keys and the
 // two ofxOsc ends, and turns OscOut's messages into ofxOscMessages and back.
 //
-//   drag            move the point
+// The panel and the ? page are drawn in sections (3B-2g), each with its
+// header: sending, points, the point, movement, smoothing, from outside,
+// showing, maps. The panel shows what is true now, with the key that changes
+// it; the ? page every key.
+//
+//   drag            move the chosen point
 //   up / down       hold: move it through the levels (shift: slowly)
+//   a  A            add a point at the mouse / remove the last
+//   left / right    choose the last / next point (or press its dot)
 //   p               packed messages on or off
 //   i               per-output messages on or off
 //   [ ]             send rate down / up
@@ -72,7 +87,8 @@
 //   e               the room example: three levels
 //   E               the editor's flat example
 //
-// Movement:
+// Movement -- of the chosen point (m M r h { } < > n), or of every point
+// (, . c return b):
 //   m               the movement: your hand, the recording, jump, glide
 //   M               your hand again at once: anything moving stops there
 //   r               record: anything moving stops and your hand takes over,
@@ -90,7 +106,7 @@
 //   n               a new seed
 //   b               the clock: the app's own seconds, or SuperCollider's bars
 //
-//   ?               every key, on one page (again, or a click: away)
+//   ?               every key, on one page (again: none; again: the panel)
 
 #include "ofMain.h"
 #include "ofxManifold.h"
@@ -110,6 +126,7 @@ public:
     void draw() override;
 
     void mousePressed(int x, int y, int button) override;
+    void mouseReleased(int x, int y, int button) override;
     void mouseMoved(int x, int y) override;
     void mouseDragged(int x, int y, int button) override;
     void keyPressed(int key) override;
@@ -130,17 +147,6 @@ private:
     // here, and send the bridge here, to run both.
     static constexpr int kBridgePort = 9001;
 
-    void adopt(const std::string& name); // after the map changes: its name
-    void open();
-    void layoutWindow();                // the map, the column, the 3D view
-    void followLevel();                 // the point's level is current
-    ofxManifold::editor::Scene scene() const;
-    ofxManifold::player::OscFrame frameNow(const ofxManifold::editor::ChartLevels& lv) const;
-    // The map's levels at the point (routed, after trim, silence) and the
-    // node values, smoothed: what the faders show and what is sent.
-    void smooth(float dt);
-    void applySmoothing();              // smoothOn and halfLife to both
-
     // ---- movement (3B-2) ----
     enum class Moving { Hand, Recording, Jump, Glide };
     enum class Steps { Timer, Clicks, Beats };
@@ -154,16 +160,84 @@ private:
     // the same, free to carry on beyond them (silent out there). In units:
     // the height itself, as before.
     enum class HeightIn { Levels, Past, Units };
+
+    // ---- a point (3B-2g) ----
+    // Each is a whole point: where it is, how it moves, its own walks,
+    // recording and seed, and what it is heard as, smoothed. The clock, the
+    // step timing and how the height is measured are every point's.
+    struct PlayerPoint {
+        int       number = 1;            // from 1: its addresses
+        glm::vec2 xy{0.5f, 0.5f};
+        float     z = 0.0f;
+        float     u = 0.0f;              // the level position, kept in step with z
+        Moving    moving = Moving::Hand;
+        HeightBy  heightBy = HeightBy::Hand;
+        double    movedFrom = 0.0;       // the walks are asked count() - these
+        double    heightFrom = 0.0;
+        ofxManifold::RandomWalk     walk;
+        ofxManifold::RandomWalk     heightWalk;   // x and y held: only its height is used
+        ofxManifold::RecordedMotion recorded;
+        bool      hasRecording = false;
+        bool      recordedOnPhase = false;
+        bool      recordedInLevels = false;
+        std::uint64_t seed = 1;
+        std::uint64_t restarts = 0;      // walks started: each draws afresh
+        int       travelAt = 3;          // kTravels[]: 0.4
+        int       stepAt = 0;            // kSteps[]: anywhere
+        // From outside (3B-2f): held, and what drove it before.
+        bool      outsideHeld = false;
+        Moving    movingBefore = Moving::Hand;
+        HeightBy  heightBefore = HeightBy::Hand;
+        // Heard: its own evaluator (each keeps track of the region it was
+        // last in), the evaluation, and the levels and values smoothed.
+        std::shared_ptr<ofxManifold::Evaluator> evaluator;
+        ofxManifold::Evaluation evaluation;
+        ofxManifold::player::OutputSmoother levelSmoother, valueSmoother;
+        ofxManifold::editor::ChartLevels heard;
+        std::vector<std::pair<std::string, float>> heardValues;
+
+        bool floorWalks() const { return moving == Moving::Jump || moving == Moving::Glide; }
+        bool heightWalks() const { return heightBy != HeightBy::Hand; }
+    };
+    std::vector<PlayerPoint> points;     // at least point 1
+    std::size_t chosen = 0;              // the one the keys act on
+    PlayerPoint&       cur()       { return points[chosen]; }
+    const PlayerPoint& cur() const { return points[chosen]; }
+    static ofColor pointColour(int number);
+    PlayerPoint newPoint(int number, glm::vec2 xy, float u) const;
+    void addPoint();                    // a
+    void removePoint();                 // A
+    void choose(std::size_t k);         // left / right, a press on a dot
+    void describePoints();              // the points, to the description
+    int  dotAt(glm::vec2 screen) const; // a point's dot within 12 px; -1: none
+    int  grabbing = -1;                 // a dot pressed: dragging takes it by hand
+
+    void adopt(const std::string& name); // after the map changes: its name
+    void open();
+    void layoutWindow();                // the map, the column, the 3D view
+    void followLevel();                 // the chosen point's level is current
+    ofxManifold::editor::Scene scene() const;
+    ofxManifold::player::OscFrame frameNow() const;
+    // The map's levels at each point (routed, after trim, silence) and the
+    // node values, smoothed: what the faders show and what is sent.
+    void smooth(PlayerPoint& p, float dt, bool following);
+    void applySmoothing();              // smoothOn and halfLife to every point
+
     double count() const;               // the clock's count now
-    void   startMoving();               // the walks again, from where the point is
-    void   startHeight();               // the height's walk again
-    bool   floorWalks() const { return moving == Moving::Jump || moving == Moving::Glide; }
-    bool   heightWalks() const { return heightBy != HeightBy::Hand; }
-    void   step();                      // a click or a beat: one step
+    void   startMoving(PlayerPoint& p); // the walks again, from where it is
+    void   startHeight(PlayerPoint& p); // the height's walk again
+    void   startEvery();                // every point's walks: shared timing changed
+    void   step();                      // a click or a beat: every point one step
+    void   movePoint(PlayerPoint& p, bool isChosen, float dt);   // a frame of it
     void   readBridge(double now);      // /phase and /beat on kBridgePort
-    std::string movingName() const;
+    std::string movingName(const PlayerPoint& p) const;
+    std::string driverName(std::size_t k) const;   // the panel's word for who drives it
+    void finishRecording();             // r a second time
     void drawPaths() const;             // the path being recorded, or playing
     void drawKeySheet() const;          // ? : every key on one page
+    // The panel's and the ? page's sections (3B-2g): each its state lines,
+    // with the key that changes them, and its keys.
+    std::vector<ofxManifold::editor::KeyGroup> sections() const;
     // What ? shows, in turn (3B-2e): the panel beside the maps; every key
     // on one page; nothing -- the maps as large as the window allows, for
     // recording, only a small "?" left.
@@ -172,9 +246,7 @@ private:
     bool keySheet() const { return keys == Keys::Sheet; }
 
     ofxManifold::editor::Model                    model;
-    std::unique_ptr<ofxManifold::Evaluator>       evaluator;
     std::unique_ptr<ofxManifoldRenderer>          renderer;
-    ofxManifold::Evaluation                       evaluation;
 
     // Where things are, from the window's size (layoutWindow): the map, the
     // 3D view beside it when shown, and the panel's left edge.
@@ -183,10 +255,8 @@ private:
     float       panelX = 0.0f;
     float       chartTop = 0.0f;         // the faders' band, across the bottom
     ofxManifold::editor::ChartLayout chart;
-    ofxManifold::editor::ChartLevels heard;         // smoothed: shown and sent
-    std::vector<std::pair<std::string, float>> heardValues;
     // The node followed: the pinned one if there is one, else the loudest at
-    // the point. Drawn as the editor draws a selection.
+    // the chosen point. Drawn as the editor draws a selection.
     ofxManifold::NodeID            pinned = ofxManifold::InvalidNode;
     ofxManifold::editor::Selection followed;
     void follow();
@@ -198,70 +268,52 @@ private:
     bool        show3D = true;
     bool        aimed  = false;          // the camera aimed once, then dragged
     ofEasyCam   cam;
-    ofxManifold::editor::Text      text; // the column's label
+    ofxManifold::editor::Text      text; // the column's label, the panel
 
-    glm::vec2 point{0.5f, 0.5f};
-    float     z = 0.0f;
     int       glideDir = 0;             // -1, 0, +1 while down / up is held
 
     // Smoothing what is sent: the levels by channel (routed, after trim, and
     // silence, so the faders' bars and ticks move together) and the node
     // values, each a list as long as the map makes it. Reset when the map
     // changes.
-    ofxManifold::player::OutputSmoother levelSmoother, valueSmoother;
     bool  smoothOn = true;
     float halfLife = 0.05f;
 
-    // Movement. The walk and the recording are asked count() - movedFrom.
-    Moving      moving = Moving::Hand;
+    // Movement's shared settings, and the clock.
     Steps       steps = Steps::Timer;
+    int         intervalAt = 3;          // kIntervals[]: 0.5
     double      appSeconds = 0.0;        // summed frame times: the seconds clock
     ofxManifold::player::SecondsClock seconds;
     ofxManifold::player::PhaseClock   phase;
     bool        onPhase = false;         // b: bars from SuperCollider
     ofxOscReceiver bridge;
     bool        bridgeOpen = false;
-    double      movedFrom = 0.0;
-    ofxManifold::RandomWalk     walk;
-    ofxManifold::RecordedMotion recorded;
-    bool        hasRecording = false;
+    HeightIn    heightIn = HeightIn::Levels;
+    float       topLevel() const;        // count() - 1: u's top
+    std::vector<ofxManifold::WeightedNode> floorWeights(const PlayerPoint& p) const;
+    ofxManifold::Evaluation3D heardAt(const PlayerPoint& p) const;   // by u on the levels, z in units
+    // One recording at a time, of the point chosen when r was pressed.
     bool        recording = false;
-    bool        recordedOnPhase = false;
+    std::size_t recordingPoint = 0;
     ofxManifold::Trajectory     taking;  // being recorded
     double      takingFrom = 0.0;
-    std::uint64_t seed = 1;
-    std::uint64_t restarts = 0;          // walks started: each draws afresh
-    int         intervalAt = 3;          // kIntervals[]: 0.5
-    int         travelAt = 3;            // kTravels[]: 0.4
-    int         stepAt = 0;              // kSteps[]: anywhere
-    HeightBy    heightBy = HeightBy::Hand;
-    HeightIn    heightIn = HeightIn::Levels;
-    float       u = 0.0f;                // the level position, kept in step with z
-    bool        recordedInLevels = false;
-    std::vector<ofxManifold::WeightedNode> floorWeights() const;
-    float       topLevel() const;        // count() - 1: u's top
-    ofxManifold::Evaluation3D heardAt() const;   // by u on the levels, z in units
-    ofxManifold::RandomWalk heightWalk;  // x and y held: only its height is used
-    double      heightFrom = 0.0;
 
     ofxManifold::player::OscOut osc;
     ofxOscSender                sender;
     ofxOscReceiver              listener;
 
     // ---- points moved from outside (3B-2f) ----
-    // On the answer port: <prefix>/point/1/take, release, xy, z, u, xyz. The
-    // rule is PointControl's; this applies what it returns, and sends its
-    // answers. The map's control file, if it has one, beside the map pair.
+    // On the answer port: <prefix>/point/<n>/take, release, xy, z, u, xyz.
+    // The rule is PointControl's; this applies what it returns, and sends
+    // its answers. The map's control file, if it has one, beside the map
+    // pair: it says how many points the map opens with (3B-2g).
     ofxManifold::player::PointControl control;
     ofxManifold::player::ControlSpec  controlSpec;
     std::string controlPath;            // "": a built-in map, no file
-    bool        outsideHeld = false;    // point 1 driven from outside
-    Moving      movingBefore = Moving::Hand;   // what drove it before
-    HeightBy    heightBefore = HeightBy::Hand;
     std::map<std::string, std::unique_ptr<ofxOscSender>> replySenders;
     void readAnswers(double now);       // describe, hello -- and the points
     void applyControl();                // what PointControl returned
-    void useControl();                  // the spec, to the control and the roll call
+    void useControl();                  // the spec, to the control and the points
     void writeControl();                // C: the control file beside the map
     bool                        paused = false;
 
@@ -270,4 +322,5 @@ private:
     std::vector<std::string>    lastSent;                 // the last send
     std::string                 message;
     float                       messageUntil = 0.0f;
+    void say(const std::string& t, float seconds = 2.5f);
 };

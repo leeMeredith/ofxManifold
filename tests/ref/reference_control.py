@@ -314,6 +314,25 @@ class Control:
         if point in self.holders:
             self.lose(point, "hand")
 
+    def add(self):
+        """3B-2g: a point after the last, every inlet; holds kept."""
+        if len(self.spec) >= MAX_POINTS:
+            return False
+        self.spec.append(default_spec()[0])
+        return True
+
+    def remove(self):
+        """3B-2g: the last point only; its holder told "removed"; what it
+        last answered forgotten with it."""
+        n = len(self.spec)
+        if n <= 1:
+            return False
+        if n in self.holders:
+            self.lose(n, "removed")
+        self.log = [e for e in self.log if e[0] != n]
+        self.spec.pop()
+        return True
+
     def result(self):
         """One canonical line of everything since the last: moves, events,
         replies, counts -- as run_control.cpp prints it."""
@@ -381,6 +400,14 @@ class Script:
     def hand(self, point):
         self.c.hand(point)
         self.out.append(f"HAND {point} EXPECT {self.c.result()}")
+
+    def add(self):
+        ok = self.c.add()
+        self.out.append(f"ADD {int(ok)} EXPECT {self.c.result()}")
+
+    def remove(self):
+        ok = self.c.remove()
+        self.out.append(f"REMOVE {int(ok)} EXPECT {self.c.result()}")
 
     def end(self):
         self.out.append("END")
@@ -596,7 +623,42 @@ def main():
     t.recv(0.4, "/manifold/room/point/1/xyz", [("f", 0.5), ("f", 0.5), ("f", 0.5)], peer=other)
     t.recv(0.5, "/manifold/room/point/3/take", [("i", 1), ("i", 0)])
     t.end()
-    n += sum(1 for line in out if line.startswith(("RECV", "TICK", "HAND")))
+    # ---- round 3B-2g: points added and removed by the player ----
+    t = Script(out, "added_and_removed",
+               ["3B-2g: a point added takes every inlet and is held apart; a",
+                "hold on another is kept; only the last is removed, its holder",
+                "told; a point added again answers no old repeat; point 1 is",
+                "never removed"])
+    t.recv(0.0, "/manifold/room/point/1/take", [("i", 1), ("i", 0)])
+    t.recv(0.1, "/manifold/room/point/2/take", [("i", 1), ("i", 0)], peer=other)
+    t.add()
+    t.recv(0.2, "/manifold/room/point/2/take", [("i", 1), ("i", 0)], peer=other)
+    t.recv(0.3, "/manifold/room/point/2/u", [("f", 1.0)], peer=other)
+    t.recv(0.4, "/manifold/room/point/1/xy", [("f", 0.5), ("f", 0.5)])
+    t.add()
+    t.recv(0.5, "/manifold/room/point/3/xy", [("f", 0.5), ("f", 0.5)], peer=other)
+    t.remove()
+    t.recv(0.6, "/manifold/room/point/3/take", [("i", 1), ("i", 0)])
+    t.remove()
+    t.recv(0.7, "/manifold/room/point/2/u", [("f", 1.0)], peer=other)
+    t.add()
+    t.recv(0.8, "/manifold/room/point/2/take", [("i", 1), ("i", 0)], peer=other)
+    t.recv(0.9, "/manifold/room/point/1/xy", [("f", 0.25), ("f", 0.25)])
+    t.remove()
+    t.remove()
+    t.recv(1.0, "/manifold/room/point/1/release", [("i", 2)])
+    t.end()
+    t = Script(out, "sixteen_at_most",
+               ["3B-2g: added up to sixteen, never a seventeenth; the sixteenth",
+                "taken and moved like the first"])
+    for _ in range(15):
+        t.add()
+    t.add()
+    t.recv(0.0, "/manifold/room/point/16/take", [("i", 1), ("i", 0)])
+    t.recv(0.1, "/manifold/room/point/16/xyz", [("f", 0.5), ("f", 0.5), ("f", 0.25)])
+    t.recv(0.2, "/manifold/room/point/17/take", [("i", 1), ("i", 0)])
+    t.end()
+    n += sum(1 for line in out if line.startswith(("RECV", "TICK", "HAND", "ADD", "REMOVE")))
 
     with open(OUT, "w") as f:
         f.write("\n".join(out) + "\n")

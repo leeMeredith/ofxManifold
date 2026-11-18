@@ -19,6 +19,17 @@ namespace editor {
 
 class Text;
 
+// A player's point, when it has more than one (round 3B-2g): where it is,
+// its colour and its number; the chosen one ringed. The listening point is
+// the chosen one's place, drawn as always.
+struct PointMark {
+    glm::vec2 position{0.5f, 0.5f};
+    float     z = 0.0f;
+    ofColor   colour;
+    int       number = 1;
+    bool      chosen = false;
+};
+
 // Everything a view reads, gathered so each draw call takes one argument
 // rather than a dozen. All of it const: a view cannot change what it draws.
 struct Scene {
@@ -60,6 +71,9 @@ struct Scene {
     // The panel's bottom: no line of it below this (3A-10). < 0: the
     // window's bottom.
     float panelBottom = -1.0f;
+    // Every point of a player with several (3B-2g), on the map and in the
+    // 3D view. Empty: the listening point alone, as the editor has it.
+    std::vector<PointMark> points;
 };
 
 // The snapping grid, as it is drawn. A preference of the editing session,

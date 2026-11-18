@@ -8,6 +8,7 @@
 //   RECV t ip port address args OURS 0|1 EXPECT <result>
 //   TICK t EXPECT <result>
 //   HAND n EXPECT <result>
+//   ADD|REMOVE 0|1 EXPECT <result>   3B-2g: a point added after the last, the last removed
 //   END
 //
 // <result>: the moves, events and replies since the last, and the counts --
@@ -184,7 +185,8 @@ int main(int argc, char** argv) {
             control.setExtent(std::strtof(w[9].c_str(), nullptr),
                               std::strtof(w[10].c_str(), nullptr),
                               std::strtof(w[11].c_str(), nullptr));
-        } else if (kind == "RECV" || kind == "TICK" || kind == "HAND") {
+        } else if (kind == "RECV" || kind == "TICK" || kind == "HAND"
+                   || kind == "ADD" || kind == "REMOVE") {
             const std::size_t e = line.find(" EXPECT ");
             const std::string want = line.substr(e + 8);
             std::string what = script + ": " + line.substr(0, e);
@@ -202,6 +204,11 @@ int main(int argc, char** argv) {
                 ours = control.receive(now, m, OscPeer{w[2], std::stoi(w[3])});
             } else if (kind == "TICK") {
                 control.tick(std::strtof(w[1].c_str(), nullptr));
+            } else if (kind == "ADD" || kind == "REMOVE") {
+                // 3B-2g: ADD|REMOVE ok -- whether it was done
+                const bool done = kind == "ADD" ? control.addPoint() : control.removeLast();
+                ours = done;
+                wantOurs = w[1] == "1";
             } else {
                 control.handTook(std::stoi(w[1]));
             }

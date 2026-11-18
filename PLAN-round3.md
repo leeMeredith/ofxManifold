@@ -1422,6 +1422,17 @@ each, removes one, and shows the sections.
    *Recommended: each its own* -- point 2 gliding while your hand drives
    point 1 is the reason to have two.
 
+Answered 2026-11-18: 6, 7 and 8 yes; 1 to 5 as recommended -- the patch's
+roles a starting sound, tuned by ear once two points can be heard (a line at
+the top of the patch, nothing rebuilt). On 8, said to Lee and agreed: one
+point is chosen at a time (left / right, or a press on its dot); the one
+left keeps doing what it was given. **Each point's own**: `m` `M` (its
+movement), `r` (its recording), `h` (its height's movement), `{ }` `< >`
+(its step distance and glide time), `n` (its seed). **Shared by all**: the
+clock (`b`), when steps happen (`c`), how often (`, .`) and `return` -- a
+beat steps every moving point at once, so they keep time together. Dragging
+any point's dot takes that point by hand, as `M` does; the others carry on.
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
@@ -2570,6 +2581,89 @@ is decided rather than improvised -- said to Lee before building.
   One got through the first time -- "a move with too many numbers is taken":
   no vector sent one; now one does.
 
+### 3B-2g: more than one point; sections with headers
+
+Built 2026-11-18 as specified: 6, 7 and 8 yes, 1 to 5 as recommended, the
+split between each point's keys and every point's as agreed with Lee.
+
+- **Sections** (`ofxManifoldEditorKeys.h`): `KeyEntry::state` (a state line:
+  what is true now, its key the one that changes it), `KeyGroup::colour`
+  (`KeyColour`, moved from the key panel's view into the data:
+  `editorGroupColour`), `keyRows(groups, state)`, `keyGroupGap(lh)` -- three
+  quarters of a line above every header, where there was half. The note of
+  what did not fit now takes a header's place rather than leave it alone at
+  a column's foot -- `make panel` found that at small sizes, in the editor
+  as well, once it was asked. `drawKeyGroups(text, groups, flow, more)` in
+  the key panel's view draws a flowed list for anyone: each header bolder,
+  in its colour, with a thin rule in that colour across the column; a state
+  line's words in white. The editor's panel, its levels keys under the 3D
+  view and its `?` page draw through it; their groups and colours are as
+  they were.
+- **example-osc's panel and `?` page** are one list, `sections()`: sending,
+  points, the point, movement, smoothing, from outside, showing, maps --
+  each its state lines with their keys, and its keys. The panel flows the
+  state lines (a second column where the window leaves room), the last send
+  in what room is left, the message along the panel's foot; the `?` page
+  every key, the from-outside addresses among them. The panel's text is the
+  editor's `Text`, as the faders' is, no longer the bitmap font. At the
+  stand-in's 1024 x 640 the panel says "+ 3 lines more -- a larger window
+  shows them".
+- **Points in the player**: `PlayerPoint` in `ofApp.h` -- place, height,
+  movement, walks, recording, seed, travel, steps, outside hold, its own
+  evaluator, smoothers and what it is heard as. `a` adds at the mouse (the
+  middle otherwise) at the chosen point's level position; `A` removes the
+  last (a hold on it ends, "removed"); left / right or a press within 12
+  pixels of a dot chooses -- only with two or more, so one point is pressed
+  and dragged as before; a drag from a moving point's dot takes it by hand.
+  The clock, `c`, `, .`, `return`, `b` and `k` are every point's; the rest
+  the chosen one's. One recording at a time; choosing another point while
+  recording is refused, "r to stop first". Walks are seeded with the
+  point's number, point 1's draws unchanged. The faders, the followed node
+  and the level shown are the chosen point's. The map draws every point in
+  its colour (point 1 green, as the 3D view's ball), numbered, the chosen
+  one ringed; the 3D view the others as balls in their colours
+  (`Scene::points`, `PointMark`).
+- **The control file decides how many**: opening a map whose file has
+  three points gives three, the second and third on a small circle round
+  the middle; `C` writes as many as there are. `PointControl::addPoint` and
+  `removeLast`, every other hold kept. `loadControl` is now asked for 16.
+- **Sent** (`OscFrame::more`, `OscPoint`): points 2 and up after point 1's
+  position, in number order, `<prefix>/point/<n>/levels` (packed always)
+  and `/position` (with u). A number sent before and missing now is sent
+  once with every level 0, before the `points` list without it; kept across
+  `reset()` (the same map opened again), forgotten with a new prefix.
+  Protocol 5. Checked end to end once, outside the suites: the app in the
+  stand-in with time running, one point, `a`, `A` -- the messages on the
+  wire as the vectors say.
+- **The patch**: `\points` (`\together`, `\carrier`), `\players`,
+  `\carrier` (`\fm`, `\ring`), `\depth` (3: the modulation at a shaping
+  point's full level, held there), `\maxPoints`. `~manifold[\mix]` -- a
+  plain function, beside the musical ones -- gives every voice amp,
+  brightness (the loudest playing point's there, the lowest number on a
+  tie), FM index, ring mix and ratio (the level the loudest shaping point
+  there is on). The tone gains a modulator at `ratio` times the note, `fm`
+  and `ring` 0 by default. A map keeps every point heard; a frame's burst of
+  messages sets the voices once, 4 ms after its first; `/points` lets a
+  removed point go. With one point every setting sounds as before.
+- **Checked**: osc 6 vectors more (52; the zeroing across a `RESET` among
+  them, after a gate showed nothing tried it), control 37 more (138), 1230
+  in all; music 20 more (`MIX`: one, two, three and sixteen points, ties,
+  no u, below the floor, a silent shaper, short lists -- the reference
+  ranks by sorting, the patch by a running maximum): `make sc` 68,
+  `make sc-live` 10 -- the second point together, shaping, removed;
+  `make osc-live` sends three points over UDP, the third removed: 94
+  packets, each the reference's. Eight
+  breaks of `mix` by hand, each caught (not gates: CI has no sclang); one
+  more -- the floor under u -- caught only after a vector below the floor
+  was added. `make panel`: keyRows, the colours, and a player's sections in
+  three strip widths at every size, headers never alone and never without
+  room above. **Gates** 17 new, one re-anchored: 557; every gate on the
+  player's OSC and control files and the editor's keys run again.
+- **Drawlog**: example-osc's session adds two points at the mouse, sets
+  the third gliding, chooses point 1 and drags it while the third glides,
+  takes the third from outside, removes it -- its sender told `lost
+  removed` -- and chooses point 2.
+
 ---
 
 ## Answered
@@ -2612,6 +2706,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2d** | Levels that touch: `fits` at-or-beyond, a pinch shared at t = 0.5, `evaluateAtPosition`, the editor allowing touches, files versioned when they touch; the octahedron example | levels and editor vectors, gates, drawlog session |
 | **3B-2e** | Names by level (`Model::levelLabel`), the readout's numbers first; the editor follows its listening point (`levelReached`); `?` three ways, the views larger with no keys (`layoutEditorBare`) | editor and levels vectors, `make panel`, gates, drawlog session |
 | **3B-2f** | Points moved from outside: `PointControl`, take and release answered, moves from the holder, the same bounds as inside, loopback, counted refusals; protocol 4; the bridge port a setting | control vectors, gates, `make osc-live`, drawlog session |
+| **3B-2g** | More than one point: `a` / `A`, choosing, each point its own movement; points 2 and up sent under `/point/<n>/`, a removed one zeroed; protocol 5; the control file's count; the patch's `\together` and `\carrier` (FM, ring). Sections with headers in both apps: `KeyEntry::state`, `KeyGroup::colour`, `keyRows`, `drawKeyGroups` | osc and control vectors, music vectors in sclang, `make sc-live`, `make panel`, gates, drawlog session |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

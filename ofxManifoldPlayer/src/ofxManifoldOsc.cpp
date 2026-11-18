@@ -137,6 +137,7 @@ void OscOut::setMapName(const std::string& name) {
 void OscOut::rename() {
     const std::string p = root_ + "/" + mapName_;
     if (p == prefix_) return;
+    sentMore_.clear();                   // another map's points: nothing to zero here
     prefix_ = p;
     reset();
 }
@@ -191,6 +192,19 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
         lastDescribe_ = now;
         sentShape_.clear();              // the shape follows every description
         sentPoints_.clear();             // and the points
+    }
+    // 3B-2g: a point gone since the last send says every level 0 once,
+    // before the list without it -- what it fed fades, never sticks.
+    {
+        std::vector<int> numbers;
+        for (const OscPoint& q : f.more) numbers.push_back(q.number);
+        for (int n : sentMore_) {
+            if (std::find(numbers.begin(), numbers.end(), n) != numbers.end()) continue;
+            OscMessage m{p + "/point/" + std::to_string(n) + "/levels", {}};
+            for (std::size_t k = 0; k < f.outputs.size(); ++k) m.args.push_back(OscArg::number(0.0f));
+            msgs.push_back(std::move(m));
+        }
+        sentMore_ = std::move(numbers);
     }
     if (f.hasShape) {
         // i L, L heights; i N, then per output: s name, i channel, i level,
@@ -272,6 +286,23 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
                                           OscArg::number(f.position.y),
                                           OscArg::number(f.position.z)}});
         if (f.hasLevelPosition) msgs.back().args.push_back(OscArg::number(f.levelPosition));
+    }
+    // 3B-2g: points 2 and up, after point 1's: always packed, in number
+    // order -- their levels, then their position.
+    std::vector<const OscPoint*> more;
+    for (const OscPoint& q : f.more) more.push_back(&q);
+    std::stable_sort(more.begin(), more.end(),
+                     [](const OscPoint* a, const OscPoint* b) { return a->number < b->number; });
+    for (const OscPoint* q : more) {
+        const std::string at = p + "/point/" + std::to_string(q->number);
+        OscMessage lv{at + "/levels", {}};
+        for (float v : q->levels) lv.args.push_back(OscArg::number(v));
+        msgs.push_back(std::move(lv));
+        OscMessage pos{at + "/position", {OscArg::number(q->position.x),
+                                           OscArg::number(q->position.y),
+                                           OscArg::number(q->position.z)}};
+        if (q->hasLevelPosition) pos.args.push_back(OscArg::number(q->levelPosition));
+        msgs.push_back(std::move(pos));
     }
     return msgs;
 }
