@@ -272,6 +272,24 @@ int main(int argc, char** argv) {
                             places[o.name] = o;
                         }
                     }
+                } else if (s.rfind("POINTS ", 0) == 0) {
+                    // 3B-2f: number:name:inlets, inlets with _ for spaces
+                    std::vector<OscOut::PointInfo> pts;
+                    const std::string list = s.substr(7);
+                    if (list != "-") {
+                        std::stringstream ps(list);
+                        for (std::string item; std::getline(ps, item, ',');) {
+                            const std::size_t a = item.find(':');
+                            const std::size_t b = item.find(':', a + 1);
+                            OscOut::PointInfo pt;
+                            pt.number = std::stoi(item.substr(0, a));
+                            pt.name = item.substr(a + 1, b - a - 1);
+                            pt.inlets = item.substr(b + 1);
+                            for (char& c : pt.inlets) if (c == '_') c = ' ';
+                            pts.push_back(pt);
+                        }
+                    }
+                    out.setPoints(pts);
                 } else if (s.rfind("NOSHAPE", 0) == 0) {
                     shaped = false;
                 } else if (s.rfind("MAP ", 0) == 0) {

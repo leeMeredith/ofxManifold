@@ -177,7 +177,8 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
         msgs.push_back({root_ + "/map", {OscArg::text(p),
                                          OscArg::integer(std::int32_t(answerPort_)),
                                          OscArg::integer(std::int32_t(layout.size())),
-                                         OscArg::integer(kProtocol)}});
+                                         OscArg::integer(kProtocol),
+                                         OscArg::integer(std::int32_t(points_.size()))}});
         OscMessage m{p + "/outputs", {OscArg::integer(std::int32_t(layout.size()))}};
         for (const auto& nc : layout) {
             m.args.push_back(OscArg::text(nc.first));
@@ -189,6 +190,7 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
         describeAsked_ = false;
         lastDescribe_ = now;
         sentShape_.clear();              // the shape follows every description
+        sentPoints_.clear();             // and the points
     }
     if (f.hasShape) {
         // i L, L heights; i N, then per output: s name, i channel, i level,
@@ -211,6 +213,20 @@ std::vector<OscMessage> OscOut::frame(double now, const OscFrame& f) {
         if (bytes != sentShape_) {
             msgs.push_back(std::move(m));
             sentShape_ = std::move(bytes);
+        }
+    }
+    if (!points_.empty()) {
+        // i N, then per point: i number, s name, s inlets.
+        OscMessage m{p + "/points", {OscArg::integer(std::int32_t(points_.size()))}};
+        for (const PointInfo& pt : points_) {
+            m.args.push_back(OscArg::integer(pt.number));
+            m.args.push_back(OscArg::text(pt.name));
+            m.args.push_back(OscArg::text(pt.inlets));
+        }
+        std::vector<std::uint8_t> bytes = encode(m);
+        if (bytes != sentPoints_) {
+            msgs.push_back(std::move(m));
+            sentPoints_ = std::move(bytes);
         }
     }
     if (packed_) {

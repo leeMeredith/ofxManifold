@@ -226,7 +226,13 @@ chord progression up the levels, every chord in one register so only the
 harmony changes (`\progression`, the default; `\somber` in a minor key),
 each level the same chord a step higher (`\registers`), or the overtone
 series (`\series`); the point's height opening each voice; each output panned by
-its node's place. openFrameworks decides none of it. With SuperCollider
+its node's place. openFrameworks decides none of it. Anything on the
+same machine can also move the point -- your SuperCollider engine, a
+controller app -- by taking it over OSC (`/manifold/<map>/point/1/take`,
+then `xy`, `z`, `u`), answered as the SuperCollider Audio Engine answers;
+the `?` page shows the addresses and the port, the hand can always take the
+point back, and `C` writes the map's control file to narrow what a point
+takes (ofxManifoldPlayer/OSC.md). With SuperCollider
 installed, `make sc` checks the patch's music in sclang and `make sc-live`
 runs it whole on your sound card for a second.
 The protocol is `ofxManifoldPlayer/OSC.md`. It needs **`ofxManifoldPlayer`**
@@ -349,7 +355,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-1083 vectors across fifteen suites, plus 507 mutation gates that introduce known
+1187 vectors across sixteen suites, plus 540 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

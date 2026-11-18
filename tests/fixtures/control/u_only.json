@@ -1,0 +1,13 @@
+{
+  "control": 1,
+  "points": [
+    {
+      "number": 1,
+      "name": "drone",
+      "inlets": [
+        "u"
+      ],
+      "silence": 0
+    }
+  ]
+}

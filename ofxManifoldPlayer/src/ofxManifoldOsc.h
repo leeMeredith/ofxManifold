@@ -109,8 +109,10 @@ public:
     static constexpr double kHelloLasts    = 3.0;
     static constexpr float  kChanged       = 1e-6f;
     // The protocol, in every roll call (OSC.md): 2 puts the map's name in
-    // every address and adds the roll call; 3 adds the shape message.
-    static constexpr int    kProtocol      = 3;
+    // every address and adds the roll call; 3 adds the shape message; 4 the
+    // points a sender may move from outside -- counted in the roll call,
+    // listed in <prefix>/points (round 3B-2f).
+    static constexpr int    kProtocol      = 4;
 
     // ---- settings ----
     // The root every sender shares, "/manifold". Each map's messages go
@@ -127,6 +129,13 @@ public:
     // The port this map hears answers on, given in the roll call so a
     // receiver knows where to say hello; 0: not listening.
     void setAnswerPort(int port) { answerPort_ = port; }
+
+    // The points that take moves from outside (3B-2f; PointControl), as
+    // each description tells them: number, name ("" if none), inlets as
+    // words, "xy z u xyz". None: the roll call says 0, nothing listed.
+    struct PointInfo { int number = 1; std::string name; std::string inlets; };
+    void setPoints(std::vector<PointInfo> points) { points_ = std::move(points); }
+    const std::vector<PointInfo>& points() const { return points_; }
     int  answerPort() const { return answerPort_; }
     void setPacked(bool on) { packed_ = on; }
     bool packed() const { return packed_; }
@@ -176,6 +185,8 @@ private:
     double lastRefresh_ = 0.0;
     std::map<std::string, float> sentOut_, sentValue_;   // last sent, by name
     std::vector<std::uint8_t> sentShape_;              // encoded; empty: none
+    std::vector<PointInfo>    points_;
+    std::vector<std::uint8_t> sentPoints_;             // encoded; empty: none
     std::string peer_;
     bool   helloYet_ = false;
     double lastHello_ = 0.0;

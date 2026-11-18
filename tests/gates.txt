@@ -2278,8 +2278,8 @@ replace:                                          OscArg::integer(0),
 
 gate: The roll call leaves out the protocol
 file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
-find:                                          OscArg::integer(kProtocol)}});
-replace:                                          OscArg::integer(1)}});
+find:                                          OscArg::integer(kProtocol),
+replace:                                          OscArg::integer(1),
 
 gate: The root's describe is not heard
 file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
@@ -2624,10 +2624,10 @@ replace:     map_.moveLevel(0, -0.25f, n);
 
 # ---- round 3B-2b: the map's shape for SuperCollider ----
 
-gate: The roll call still says protocol 2
+gate: The roll call still says protocol 3
 file: ofxManifoldPlayer/src/ofxManifoldOsc.h
-find:     static constexpr int    kProtocol      = 3;
-replace:     static constexpr int    kProtocol      = 2;
+find:     static constexpr int    kProtocol      = 4;
+replace:     static constexpr int    kProtocol      = 3;
 
 gate: The shape is never sent
 file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
@@ -2714,3 +2714,174 @@ find:     return own == InvalidTarget ? manifold_.node(node).name\n             
 replace:     return own == InvalidTarget ? manifold_.node(node).name\n                                : manifold_.node(node).name;
 nl: yes
 
+
+# ---- round 3B-2f: points moved from outside ----
+
+gate: The roll call does not count the points
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:                                          OscArg::integer(std::int32_t(points_.size()))}});
+replace:                                          OscArg::integer(0)}});
+
+gate: The points are not listed again after a description
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         sentPoints_.clear();             // and the points
+replace:         // (not cleared)
+
+gate: The points are listed every frame
+file: ofxManifoldPlayer/src/ofxManifoldOsc.cpp
+find:         if (bytes != sentPoints_) {
+replace:         if (true) {
+
+gate: A sender on another machine may move a point
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     if (from.ip != "127.0.0.1") { refuse("not loopback"); return true; }
+replace:     (void)from;
+
+gate: A point number with a leading zero is read
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:             if (token[0] == '0' || token.size() > 2) return 0;
+replace:             if (token.size() > 2) return 0;
+
+gate: A point is never reached by its name
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:             if (!spec_.points[k].name.empty() && spec_.points[k].name == token) return k + 1;
+replace:             (void)token;
+
+gate: A request id of 0 is taken
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (m.args.empty() || m.args[0].type != 'i' || m.args[0].i < 1) {
+replace:         if (m.args.empty() || m.args[0].type != 'i' || m.args[0].i < 0) {
+
+gate: A reply port below 1024 is taken
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:             if (p.type != 'i' || !(p.i == 0 || (p.i >= 1024 && p.i <= 65535))) argsOk = false;
+replace:             if (p.type != 'i') argsOk = false;
+
+gate: A reply goes to the sender's own port, whatever the take asked
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:             else if (p.i != 0) replyTo.port = p.i;
+replace:             else (void)0;
+
+gate: A repeated request is done again
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (argsOk && h.answered && h.lastFrom == from && h.lastId == id
+replace:         if (false && h.answered && h.lastFrom == from && h.lastId == id
+
+gate: A command with the wrong arguments is carried out
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (!argsOk) {\n            refuse("wrong arguments");
+replace:         if (false) {\n            refuse("wrong arguments");
+nl: yes
+
+gate: A second sender takes a held point
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:             if (h.held && h.holder != from) {
+replace:             if (false) {
+
+gate: Anyone releases a held point
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (h.holder != from) {\n            refuse("not the holder");\n            answer(point, replyTo, id, false, command, "not the holder", from);
+replace:         if (false) {\n            refuse("not the holder");\n            answer(point, replyTo, id, false, command, "not the holder", from);
+nl: yes
+
+gate: A closed inlet takes moves
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     if (!(ps.inlets & inlet)) { refuse(command + " closed"); return true; }
+replace:     (void)ps;
+
+gate: Anyone moves a held point
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     if (h.holder != from) { refuse("not the holder"); return true; }
+replace:     (void)0;
+
+gate: A point moves without being taken
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     if (!h.held) { refuse("not held"); return true; }\n    if (h.holder != from)
+replace:     if (false) { refuse("not held"); return true; }\n    if (h.holder != from)
+nl: yes
+
+gate: A move with too many numbers is taken
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     if (m.args.size() != want) { refuse("wrong arguments"); return true; }
+replace:     if (m.args.size() < want) { refuse("wrong arguments"); return true; }
+
+gate: A move that is not finite is taken
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (a.type == 'f' && std::isfinite(a.f)) { v = a.f; return true; }
+replace:         if (a.type == 'f') { v = a.f; return true; }
+
+gate: An xy off the floor plan moves the point
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (inside_ && !inside_(mv.x, mv.y)) { refuse("off the plan"); return true; }
+replace:         (void)inside_;
+
+gate: A height from outside is not held to the levels
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     float heldZ(float z) const { return std::min(std::max(z, zLow_), zHigh_); }
+replace:     float heldZ(float z) const { return z; }
+
+gate: A level position from outside is not held to the levels
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:     float heldU(float u) const { return std::min(std::max(u, 0.0f), uTop_); }
+replace:     float heldU(float u) const { return std::max(u, 0.0f); }
+
+gate: A range is ignored
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (!r.set) return v;
+replace:         return v;
+
+gate: A held point never falls silent
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (h.held && s > 0.0f && now - h.heard > double(s)) lose(k + 1, "silent");
+replace:         (void)s; (void)now; (void)h;
+
+gate: A silence of 0 lets go at once
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (h.held && s > 0.0f && now - h.heard > double(s)) lose(k + 1, "silent");
+replace:         if (h.held && now - h.heard > double(s)) lose(k + 1, "silent");
+
+gate: A move does not keep the hold alive
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         if (!finiteArg(m.args[k], v[k])) { refuse("not finite"); return true; }\n    }\n    h.heard = now;
+replace:         if (!finiteArg(m.args[k], v[k])) { refuse("not finite"); return true; }\n    }
+nl: yes
+
+gate: The hand takes a point back without telling its holder
+file: ofxManifoldPlayer/src/ofxManifoldPointControl.h
+find:         replies_.push_back({h.replyTo, OscMessage{address(point, "lost"), {OscArg::text(why)}}});
+replace:         (void)why;
+
+gate: A control file may declare more points than the player has
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:     if (int(ps.size()) > points)
+replace:     if (false)
+
+gate: A control file's points may come in any order
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:         if (!p["number"].isNumber() || p["number"].asNumber() != double(k + 1))
+replace:         if (!p["number"].isNumber())
+
+gate: A control file may name two points alike
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:                 if (o.name == s.name) return fail(at + "the name " + s.name + " is taken");
+replace:                 (void)o;
+
+gate: A control file's unknown inlet is taken
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:                 if (bit == 0) return fail(at + "unknown inlet: " + name);
+replace:                 if (bit == 0) continue;
+
+gate: A control file's range may run backwards
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:                 if (!std::isfinite(lo) || !std::isfinite(hi) || !(lo < hi))
+replace:                 if (!std::isfinite(lo) || !std::isfinite(hi))
+
+gate: A control file's unknown key is ignored
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:         if (kv.first != "control" && kv.first != "points") return fail("unknown key: " + kv.first);
+replace:         (void)kv;
+
+gate: A control file's own form loses its ranges
+file: ofxManifoldPlayer/src/ofxManifoldControlFile.h
+find:         if (!ranges.empty()) o += ", \"range\": { " + ranges + " }";
+replace:         (void)ranges;

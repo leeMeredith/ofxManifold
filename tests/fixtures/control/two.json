@@ -1,0 +1,23 @@
+{
+  "control": 1,
+  "points": [
+    {
+      "number": 1,
+      "name": "lead"
+    },
+    {
+      "number": 2,
+      "name": "bass",
+      "inlets": [
+        "xyz",
+        "u"
+      ],
+      "range": {
+        "u": [
+          -1,
+          1
+        ]
+      }
+    }
+  ]
+}

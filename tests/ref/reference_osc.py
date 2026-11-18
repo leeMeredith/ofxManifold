@@ -171,7 +171,7 @@ class Sender:
     REFRESH_EVERY = 0.1
     HELLO_LASTS = 3.0
     CHANGED = 1e-6
-    PROTOCOL = 3        # 3B-2b: the shape message
+    PROTOCOL = 4        # 3B-2b: the shape message; 3B-2f: points from outside
 
     def __init__(self, prefix="/manifold", map_name="untitled", answer_port=0,
                  packed=True, per_output=False, rate=60.0):
@@ -184,6 +184,7 @@ class Sender:
         self.rate = rate
         self.peer = ""
         self.last_hello = None
+        self.points = []               # 3B-2f: [(number, name, inlets)], kept across starts
         self.start_again()
 
     def start_again(self):
@@ -196,6 +197,7 @@ class Sender:
         self.sent_out = {}             # name -> level last sent per output
         self.sent_value = {}
         self.sent_shape = None         # the shape last sent, as bytes
+        self.sent_points = None        # the points last listed, as bytes
 
     def set_map(self, name):
         """Another map's name: new addresses, so everything again."""
@@ -241,7 +243,7 @@ class Sender:
             # many outputs, which protocol.
             msgs.append((self.root + "/map",
                          [("s", p), ("i", self.answer_port), ("i", len(layout)),
-                          ("i", self.PROTOCOL)]))
+                          ("i", self.PROTOCOL), ("i", len(self.points))]))
             args = [("i", len(layout))]
             for n, c in layout:
                 args += [("s", n), ("i", c)]
@@ -250,6 +252,7 @@ class Sender:
             self.describe_asked = False
             self.last_describe = now
             self.sent_shape = None     # a description is followed by the shape
+            self.sent_points = None    # and by the points
         if shape is not None:
             heights, places = shape
             args = [("i", len(heights))] + [("f", h) for h in heights]
@@ -265,6 +268,14 @@ class Sender:
             if data != self.sent_shape:
                 msgs.append((p + "/shape", args))
                 self.sent_shape = data
+        if self.points:
+            args = [("i", len(self.points))]
+            for number, name, inlets in self.points:
+                args += [("i", number), ("s", name), ("s", inlets)]
+            data = encode(p + "/points", args)
+            if data != self.sent_points:
+                msgs.append((p + "/points", args))
+                self.sent_points = data
         if self.packed:
             msgs.append((p + "/levels", [("f", lv) for _, _, lv in outputs]))
         refresh = (self.last_refresh is None
@@ -325,6 +336,12 @@ def encode_vectors(out):
         ("utf8_name", "/manifold/out/café", [("f", 0.5)]),
         ("roll_call_protocol_3", "/manifold/map",
          [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 3)]),
+        ("roll_call_protocol_4", "/manifold/map",
+         [("s", "/manifold/room"), ("i", 57121), ("i", 12), ("i", 4), ("i", 1)]),
+        # 3B-2f: a point named, a point not, their inlets as words
+        ("points", "/manifold/room/points",
+         [("i", 2), ("i", 1), ("s", "lead"), ("s", "xy z"),
+          ("i", 2), ("s", ""), ("s", "xy z u xyz")]),
         # 3B-2b: two levels; FL on the floor, placed; FL-2 on the upper
         # level, placed over the same node; a send fed by none, unplaced
         ("shape", "/manifold/room/shape",
@@ -402,6 +419,13 @@ class Script:
                             f"{n}:{lv}:{lvs}:{int(pl)}:{fmtf(x)}:{fmtf(y)}:{fmtf(z)}"
                             for n, (lv, lvs, pl, x, y, z) in places.items())
                             or "-"))
+
+    def set_points(self, points):
+        """3B-2f: the points taking moves from outside, for the frames after
+        this: [(number, name, inlets)]."""
+        self.s.points = list(points)
+        self.out.append("POINTS " + (",".join(
+            f"{n}:{name}:{inlets.replace(' ', '_')}" for n, name, inlets in points) or "-"))
 
     def no_shape(self):
         self.shape_now = None
@@ -562,6 +586,23 @@ def send_vectors(out):
                     "mix": (-1, 0, False, 0.9, 0.9, 0.9)})
     t.frame(0.0, room[:2] + [("mix", 3, 0.0)])
     t.frame(1 / 60, room)
+    t.end()
+
+    # ---- round 3B-2f: points from outside, counted and listed ----
+    t = Script(out, "points_listed",
+               "the points a sender may move from outside: counted in the roll "
+               "call, listed after each description and when they change",
+               map_name="room")
+    t.set_points([(1, "", "xy z u xyz")])
+    t.frame(0.0, room)
+    t.frame(1 / 60, room)
+    t.set_points([(1, "lead", "xy z")])
+    t.frame(2 / 60, room)
+    t.frame(3 / 60, room)
+    t.recv(0.06, "/manifold/room/describe")
+    t.frame(4 / 60, room)
+    t.set_points([])
+    t.frame(5 / 60, room)
     t.end()
 
     t = Script(out, "maps_named_and_announced",

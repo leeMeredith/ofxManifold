@@ -1198,20 +1198,52 @@ refused with its reason; mutation gates on each rule; `make osc-live` sends
 the real messages over UDP to the real receiver; the drawlog session takes
 the point from outside, moves it, and lets it go.
 
-Open questions, each with a recommendation:
+Answered 2026-11-17, "yes, recommended": take before moving; replies to a
+port named in the take (0: the sender's own); an xy off the floor plan
+refused and counted; 5 seconds' silence; the hand always wins, the holder
+told; loopback only.
 
-1. **Must a sender take a point before moving it**, or does a move take an
-   idle point by itself? Recommended: take first -- the boundary is then
-   always explicit, as SAE's connect is.
-2. **Where answers go**: a reply port given in the take, 0 meaning the
-   sender's own port. Recommended -- sclang answers to 57120 by itself;
-   an app like the panel, sending from a passing port, names its own.
-3. **An xy off the floor plan**: refused and counted, the point staying.
-   Recommended -- SAE refuses rather than clamps.
-4. **Silence before a held point goes back**: 5 seconds. Recommended.
-5. **The hand always wins**, the holder told. Recommended.
-6. **Senders on other machines**: not in this slice -- loopback only, as
-   SAE. Recommended.
+##### The control file -- a primer, never a requirement (asked 2026-11-17)
+
+Lee: "a happy medium -- a strict number of inlets for OSC, but a JSON file
+as a primer?" and then: "someone wanting to make a map, then open the player
+... would have to understand how to select the right amount." So, agreed
+the same day:
+
+- **No file needed.** Without one, a map has point 1 taking every inlet --
+  `xy`, `z`, `u`, `xyz` -- and `take` and `release`, which are always open.
+- **The player writes it** when it saves: `<map>-control.json` beside the
+  map pair, as the editor writes the outputs file. Opening the map again
+  reads it. Most people never open it.
+- **Hand-editing narrows, it never widens**: a point's `inlets` (a subset),
+  its `name` (so `/point/lead/xy` reaches it as `/point/1/xy` does -- fixed
+  by the file, never by a sender), its `range` per axis (what a controller
+  sends, mapped onto the map's own extent: x and y onto 0..1, z onto the
+  lowest to highest level start, u onto 0 to the top level), and its
+  `silence` (0: held until released).
+- **Strict, as map and motion files are**: `"control": 1`; points numbered
+  1, 2 ... in order, at most 16; known inlets only; names a letter then
+  letters, digits, `-` or `_`, up to 32, unique; a range's low below its
+  high, both finite; silence 0 or more. A refused file says why, and the
+  player keeps the defaults -- never half of it.
+- **Shown and told.** The panel and the `?` page list each point's
+  addresses in full, with the port. Each description is followed by
+  `<prefix>/points`: `i` N, then per point `i` number, `s` name (empty if
+  none), `s` inlets (space-separated) -- so a receiver can find the inlets
+  without the file.
+- **This slice, one point.** The file, the control and the description are
+  written for up to 16; a file declaring more than the player has points
+  for is refused ("this player has 1 point"). Adding points with a key --
+  and what a second point sends and sounds like -- is 3B-2g.
+
+#### 3B-2g: more than one point (to be specced)
+
+A key in the player to add and remove points, up to 16; what each point
+sends -- its own position and levels, under `<prefix>/point/<n>/`, with
+today's `/position` and `/levels` staying point 1's -- and how the patch
+voices more than one point (SuperCollider's choice, by its settings). To be
+written and answered before any code; split from 3B-2f on 2026-11-17 so
+that a second point's sound is decided, not improvised.
 
 ## Done
 
@@ -2317,6 +2349,49 @@ recommended", built the same day:
   to 448 pixels; example-osc's map and 3D view grow likewise.
 - **Vectors**: levels 4, editor 2 (`labels_by_level`, `level_reached`):
   1083. **Gates**: 4 new, 1 re-anchored: 507.
+
+### 3B-2f: points moved from outside
+
+Built 2026-11-17 as specified, every recommendation taken ("yes,
+recommended"), with the control file as agreed; adding points with a key
+split off to 3B-2g first, so that what a second point sends and sounds like
+is decided rather than improvised -- said to Lee before building.
+
+- **`ofxManifoldPlayer/src/ofxManifoldPointControl.h`**, header-only, no
+  sockets: `PointControl::receive(now, message, from)` returns false for a
+  message not under `<prefix>/point/`, else handles it; `takeMoves`,
+  `takeEvents`, `takeReplies` give what to apply and send; `tick(now)` lets a
+  silent hold go; `handTook(n)` gives a point back to the hand. Counts by
+  reason and the last refusal. Loopback is checked before the point; a
+  command answers when its request id can be read, a move never; an unknown
+  point is counted, not answered -- there is no point to answer as.
+- **`ofxManifoldControlFile.h`**: `saveControl`, `loadControl(text, spec,
+  points)` -- strict, refusing with a reason and changing nothing; unknown
+  keys refused, at file and point level, as motion files are.
+- **The player's description**: protocol 4, the roll call's fifth argument
+  the point count, `<prefix>/points` after the shape, again when it changes.
+- **example-osc**: messages on the answer port go to `PointControl` first,
+  the rest to `OscOut` as before; taking stops the point's own movement and
+  keeps it to give back; a click on the map is the hand taking it back; the
+  panel says who has point 1 and what came in; the `?` page lists the
+  addresses and the port; `C` writes `<map>-control.json` beside an opened
+  map, and opening a map reads it -- refused, the defaults and why. The
+  bridge port is `kBridgePort` in `ofApp.h`, its "taken" line names it.
+- **Checked**: a new suite, `control`, 101 vectors from
+  `tests/ref/reference_control.py` -- holders kept in a dictionary, repeats
+  found in a log of every answer, addresses split by a regular expression,
+  the file read by Python's json -- every rule, every refusal, the file read,
+  refused and written back exactly. `make osc-live` sends from two real UDP
+  sockets with python-osc to `tests/control_udp.cpp` and decodes the
+  answers that come back. The drawlog session takes point 1 from outside,
+  moves it, is refused off the plan and as a second sender, and the hand
+  takes it back -- printing what the app sent: the take answered to port
+  9002, `held by 127.0.0.1:57120` to the second sender, `lost hand`. The
+  ofxOsc stand-in now carries messages both ways for this.
+- **Vectors** 1187 (osc 3 more, control 101), sixteen suites. **Gates** 33
+  new, two re-anchored: 540; every gate on the player's OSC files run again.
+  One got through the first time -- "a move with too many numbers is taken":
+  no vector sent one; now one does.
 
 ---
 

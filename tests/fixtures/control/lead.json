@@ -1,0 +1,28 @@
+{
+  "control": 1,
+  "points": [
+    {
+      "number": 1,
+      "name": "lead",
+      "inlets": [
+        "xy",
+        "z"
+      ],
+      "range": {
+        "x": [
+          0,
+          127
+        ],
+        "y": [
+          0,
+          127
+        ],
+        "z": [
+          0,
+          1
+        ]
+      },
+      "silence": 2
+    }
+  ]
+}

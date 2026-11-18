@@ -10,12 +10,15 @@ there are**, nor **how many maps are playing.** The sender tells it, and
 tells it again when that changes, so the messages grow and shrink with the
 maps.
 
-This is **protocol 3**: protocol 2 and a `shape` message, saying how the map
-is built -- its levels, and where each output sits -- so a receiver can
-decide what each output sounds like. Protocol 2 had the map's name in every
-address and the roll call; protocol 1 (the first 3B-1) sent everything under
-`/manifold` alone, one map at a time. A receiver written for 2 reads 3
-unchanged: it ignores the message it does not know.
+This is **protocol 4**: protocol 3 and **points moved from outside** -- a
+receiver, or anything else on this machine, may take a map's point and move
+it, by the messages under "Points moved from outside" below; the roll call
+counts the points and each description lists them. Protocol 3 added the
+`shape` message, saying how the map is built -- its levels, and where each
+output sits; protocol 2, the map's name in every address and the roll call;
+protocol 1 (the first 3B-1) sent everything under `/manifold` alone. A
+receiver written for 2 or 3 reads 4 unchanged: it ignores what it does not
+know, and the roll call's new last argument with it.
 
 ## Maps and their prefixes
 
@@ -33,7 +36,7 @@ Two maps with the same name cannot be told apart; give one another name.
 
 | Address | Arguments | When |
 |---|---|---|
-| `/manifold/map` | `s` prefix, `i` answer port, `i` N outputs, `i` protocol (3) | just before every `outputs` message (below): the first send, every change, when asked, every 2 seconds |
+| `/manifold/map` | `s` prefix, `i` answer port, `i` N outputs, `i` protocol (4), `i` points | just before every `outputs` message (below): the first send, every change, when asked, every 2 seconds |
 
 The roll call is always on the root, whatever the map's name, so a receiver
 listens to one address to find every map playing: what it is called, where
@@ -47,6 +50,7 @@ stopped.
 |---|---|---|
 | `/manifold/room/outputs` | `i` N, then N pairs of `s` name, `i` channel | with the roll call: the first send; whenever an output is added or removed or its channel changes; when asked; every 2 seconds |
 | `/manifold/room/shape` | `i` L, then L × `f` level heights; `i` N, then N × (`s` name, `i` channel, `i` level, `i` levels, `i` placed, `f` x, `f` y, `f` z) | right after every `outputs` message, and on its own whenever it changes -- a level moved, a node moved or raised, a binding |
+| `/manifold/room/points` | `i` P, then P × (`i` number, `s` name, `s` inlets) | after the shape on every description, and on its own when it changes: the points a sender may move, their names ("" if none) and the inlets each takes, as words -- `xy z u xyz` |
 | `/manifold/room/levels` | N × `f` | every send, if packed is on (the default) |
 | `/manifold/room/out/NAME` | `f` | per output, if that is on: what changed, at every send; all of them every 0.1 s |
 | `/manifold/room/values` | `i` M, then M pairs of `s` name, `f` value | every send, if packed is on and the map has values |
@@ -104,12 +108,67 @@ panel shows which. Both are set at the top of its `ofApp.h`. It does not
 share its port with another program (no SO_REUSEPORT): a second copy takes
 the next one rather than quietly splitting the first one's answers.
 
+## Points moved from outside
+
+Also to the map's answer port. A sender takes a point, moves it, and lets it
+go; while it holds it, the point's own movement -- a walk, a recording --
+stops, and the player's hand, by a click on the map, can always take it
+back. The rules are the SuperCollider Audio Engine's for OSC coming in:
+paths fixed by the map, never chosen by a sender; exact argument counts;
+finite numbers; senders on this machine only; every refusal counted, and the
+last one's reason shown on the player's panel.
+
+| Address | Arguments | Effect |
+|---|---|---|
+| `/manifold/room/point/1/take` | `i` request id, `i` reply port | the point is yours until you release it, or fall silent (5 seconds unless the control file says otherwise); answered. Reply port 0: your own port |
+| `/manifold/room/point/1/release` | `i` request id | back to what moved it before; answered |
+| `/manifold/room/point/1/xy` | `f` x, `f` y | where on the floor plan: refused if off it, the point staying |
+| `/manifold/room/point/1/z` | `f` z | its height, held to the levels |
+| `/manifold/room/point/1/u` | `f` u | its level position, held to the levels |
+| `/manifold/room/point/1/xyz` | `f` x, `f` y, `f` z | both at once |
+
+Moves are taken only from the sender holding the point, and are not
+answered: send them as often as you like. Request ids are positive int32s;
+send the same id again and you get the same answer again -- nothing is done
+twice -- so a lost reply can simply be asked again.
+
+| Answer, to your IP at the reply port | Arguments |
+|---|---|
+| `/manifold/room/point/1/reply` | `i` request id, `i` accepted (1 or 0), `s` command, `s` reason ("" when accepted; else e.g. `held by 127.0.0.1:57120`, `not held`, `not the holder`, `wrong arguments`) |
+| `/manifold/room/point/1/lost` | `s` reason: `hand` (taken back on the player) or `silent` |
+
+**The control file.** Nothing to set up: every map has point 1, taking
+every inlet. A map may have a control file beside it, `room-control.json`
+next to `room.json` -- the player writes it with `C` -- which narrows what a
+point takes, and never widens it:
+
+```json
+{
+  "control": 1,
+  "points": [
+    { "number": 1, "name": "lead", "inlets": ["xy", "z"],
+      "range": { "x": [0, 127], "y": [0, 127] }, "silence": 5 }
+  ]
+}
+```
+
+`name` reaches the point as `/point/lead/xy` as well as `/point/1/xy`;
+`inlets` are those it takes moves on (`take` and `release` are always open);
+`range` is what a controller sends on an axis, mapped onto the map -- x and
+y onto 0..1, z onto the lowest to highest level, u onto 0 to the top level;
+`silence`, the seconds before a silent hold ends, 0 for never. A file it
+cannot read, it refuses, saying why, and keeps the defaults. This version of
+example-osc has one point; more are to come.
+
 ## A clock from SuperCollider (example-osc)
 
 Not part of the protocol above, and nothing waits for it: example-osc also
-listens on port 9001 for the contract of ofxScPhaseBridge
-(github.com/leeMeredith/ofxScPhaseBridge), so its `bridge.scd` drives
-movement unchanged.
+listens on port 9001 (`kBridgePort` in its `ofApp.h`) for the contract of
+ofxScPhaseBridge (github.com/leeMeredith/ofxScPhaseBridge), so its
+`bridge.scd` drives movement unchanged. The port is not shared: the
+SuperCollider Audio Engine's panel listens on 9001 too, and whichever starts
+second hears no bridge -- the panel says "port 9001 taken". To run both,
+set `kBridgePort` to another port and send the bridge there.
 
 | Address | Arguments | Effect |
 |---|---|---|

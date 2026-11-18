@@ -125,6 +125,48 @@ int main() {
     frame("up half a level by the rim: the height barely moves, both levels heard");
     a.mousePressed(149, 149, 0);   // over the centre
     run(2);                        frame("over the centre: the same u, half way between the apexes");
+    // Round 3B-2f: point 1 moved from outside, on the answer port (57121,
+    // the first free here): taken, moved, refused off the plan, taken back
+    // by the hand. What the app sends back is printed as "# osc out".
+    {
+        auto send = [&](const std::string& address, std::vector<float> fs,
+                        std::vector<int> is, int fromPort = 57120) {
+            ofxOscMessage m;
+            m.setAddress(address);
+            for (int v : is) m.addIntArg(v);
+            for (float v : fs) m.addFloatArg(v);
+            m.setRemoteEndpoint("127.0.0.1", fromPort);
+            ofxOscStubInbox()[57121].push_back(m);
+        };
+        auto sent = [&]() {
+            for (const auto& o : ofxOscStubOutbox()) {
+                const std::string& a = o.second.getAddress();
+                if (a.find("/point/") == std::string::npos) continue;
+                std::printf("# osc out %s %s", o.first.c_str(), a.c_str());
+                for (std::size_t k = 0; k < o.second.getNumArgs(); ++k) {
+                    if (o.second.getArgType(k) == OFXOSC_TYPE_INT32)
+                        std::printf(" %d", o.second.getArgAsInt32(k));
+                    else if (o.second.getArgType(k) == OFXOSC_TYPE_FLOAT)
+                        std::printf(" %g", o.second.getArgAsFloat(k));
+                    else std::printf(" \"%s\"", o.second.getArgAsString(k).c_str());
+                }
+                std::printf("\n");
+            }
+            ofxOscStubOutbox().clear();
+        };
+        key('e');                  // the room again
+        ofxOscStubOutbox().clear();
+        send("/manifold/room/point/1/take", {}, {1, 9002});
+        run(2); sent();            frame("point 1 taken from outside: its own movement stops");
+        send("/manifold/room/point/1/xy", {0.3f, 0.7f}, {});
+        send("/manifold/room/point/1/u", {1.5f}, {});
+        run(2); sent();            frame("moved from outside: near FL, half way up the middle level");
+        send("/manifold/room/point/1/xy", {0.95f, 0.5f}, {});
+        send("/manifold/room/point/1/take", {}, {1, 0}, 57300);
+        run(2); sent();            frame("off the plan, refused; a second sender refused, answered");
+        a.mousePressed(150, 150, 0);
+        run(2); sent();            frame("the hand takes it back: the sender told it is lost");
+    }
     key('?');                      frame("?: every key");
     key('?');                      frame("? again: no keys, the map and the 3D view larger");
     key('?');                      frame("? a third time: the panel back");

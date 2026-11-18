@@ -99,6 +99,7 @@
 #include "ofxOsc.h"
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -123,6 +124,11 @@ private:
     int         sendPort   = 57120;
     static constexpr int kFirstAnswerPort = 57121, kAnswerPorts = 16;
     int         listenPort = 0;
+    // ofxScPhaseBridge's /phase and /beat. Not shared: another app on this
+    // port -- the SuperCollider Audio Engine's panel listens on 9001 too --
+    // leaves this one without a bridge, and the panel says so. Change it
+    // here, and send the bridge here, to run both.
+    static constexpr int kBridgePort = 9001;
 
     void adopt(const std::string& name); // after the map changes: its name
     void open();
@@ -213,7 +219,6 @@ private:
     ofxManifold::player::SecondsClock seconds;
     ofxManifold::player::PhaseClock   phase;
     bool        onPhase = false;         // b: bars from SuperCollider
-    static constexpr int kBridgePort = 9001;   // ofxScPhaseBridge's
     ofxOscReceiver bridge;
     bool        bridgeOpen = false;
     double      movedFrom = 0.0;
@@ -242,6 +247,22 @@ private:
     ofxManifold::player::OscOut osc;
     ofxOscSender                sender;
     ofxOscReceiver              listener;
+
+    // ---- points moved from outside (3B-2f) ----
+    // On the answer port: <prefix>/point/1/take, release, xy, z, u, xyz. The
+    // rule is PointControl's; this applies what it returns, and sends its
+    // answers. The map's control file, if it has one, beside the map pair.
+    ofxManifold::player::PointControl control;
+    ofxManifold::player::ControlSpec  controlSpec;
+    std::string controlPath;            // "": a built-in map, no file
+    bool        outsideHeld = false;    // point 1 driven from outside
+    Moving      movingBefore = Moving::Hand;   // what drove it before
+    HeightBy    heightBefore = HeightBy::Hand;
+    std::map<std::string, std::unique_ptr<ofxOscSender>> replySenders;
+    void readAnswers(double now);       // describe, hello -- and the points
+    void applyControl();                // what PointControl returned
+    void useControl();                  // the spec, to the control and the roll call
+    void writeControl();                // C: the control file beside the map
     bool                        paused = false;
 
     // What went out in the last second, for the panel.

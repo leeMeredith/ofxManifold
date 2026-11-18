@@ -25,6 +25,7 @@ LVL_RUN  := $(BUILD)/run_levels
 OSC_RUN  := $(BUILD)/run_osc
 SMOOTH_RUN := $(BUILD)/run_smooth
 MOTION_RUN := $(BUILD)/run_motion
+CONTROL_RUN := $(BUILD)/run_control
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -41,6 +42,7 @@ LVL_VEC  := tests/vectors/levels.vec
 OSC_VEC  := tests/vectors/osc.vec
 SMOOTH_VEC := tests/vectors/smooth.vec
 MOTION_VEC := tests/vectors/motion.vec
+CONTROL_VEC := tests/vectors/control.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -98,7 +100,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion headers workflow wrapper vectors clean sc sc-live
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion test-control headers workflow wrapper vectors clean sc sc-live
 
 all: test
 
@@ -106,7 +108,7 @@ all: test
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible door keys panel headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
-      test-levels test-osc osc-live test-smooth test-motion
+      test-levels test-osc osc-live test-smooth test-motion test-control
 	@echo ""
 	@echo "all suites green"
 
@@ -281,12 +283,29 @@ $(MOTION_RUN): tests/run_motion.cpp $(SOURCES) $(IO) $(PLAYER_CPP) $(PLAYER_H)
 $(MOTION_VEC): tests/ref/reference_motion.py
 	@python3 tests/ref/reference_motion.py
 
+# Points moved from outside (3B-2f): PointControl and the control file.
+test-control: $(CONTROL_RUN) $(CONTROL_VEC)
+	@./$(CONTROL_RUN) $(CONTROL_VEC)
+
+$(CONTROL_RUN): tests/run_control.cpp $(IO) $(PLAYER_CPP) $(PLAYER_H)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/run_control.cpp $(PLAYER_CPP)
+
+$(CONTROL_VEC): tests/ref/reference_control.py
+	@python3 tests/ref/reference_control.py
+
 $(SMOOTH_VEC): tests/ref/reference_smooth.py
 	@python3 tests/ref/reference_smooth.py
 
-osc-live: $(BUILD)/osc_udp $(BUILD)/phase_udp
+osc-live: $(BUILD)/osc_udp $(BUILD)/phase_udp $(BUILD)/control_udp
 	@python3 tests/check_osc_udp.py
 	@python3 tests/check_phase_udp.py
+	@python3 tests/check_control_udp.py
+
+# Points moved from outside over UDP (3B-2f): two real senders, answers back.
+$(BUILD)/control_udp: tests/control_udp.cpp $(PLAYER_CPP) $(PLAYER_H)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/control_udp.cpp $(PLAYER_CPP)
 
 # A stand-in for ofxScPhaseBridge over UDP (3B-2): /phase and /beat read as
 # example-osc reads them, into a PhaseClock and a walk.
@@ -317,6 +336,7 @@ vectors:
 	@python3 tests/ref/reference_osc.py
 	@python3 tests/ref/reference_smooth.py
 	@python3 tests/ref/reference_motion.py
+	@python3 tests/ref/reference_control.py
 	@python3 tests/ref/reference_music.py
 
 # example-osc's SuperCollider patch (round 3B-2b). `sc`: its musical

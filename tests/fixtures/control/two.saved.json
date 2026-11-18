@@ -1,0 +1,7 @@
+{
+  "control": 1,
+  "points": [
+    { "number": 1, "name": "lead", "inlets": ["xy", "z", "u", "xyz"], "silence": 5 },
+    { "number": 2, "name": "bass", "inlets": ["u", "xyz"], "range": { "u": [-1, 1] }, "silence": 5 }
+  ]
+}

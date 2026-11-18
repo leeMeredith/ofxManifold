@@ -1,5 +1,8 @@
 #include "ofApp.h"
 
+#include <fstream>
+#include <sstream>
+
 using namespace ofxManifold;
 using namespace ofxManifold::editor;
 using namespace ofxManifold::player;
@@ -53,6 +56,7 @@ const std::vector<OscKeyGroup>& keyGroups() {
         {"maps", {{"o", "open a map you saved in the editor"},
                   {"e", "the room: three levels"},
                   {"x", "the octahedron: two levels touching"},
+                  {"C", "write the map's control file beside it"},
                   {"E", "the editor's flat example"}}},
     };
     return groups;
@@ -246,6 +250,11 @@ void ofApp::adopt(const std::string& name) {
     pinned = InvalidNode;             // another map's nodes: follow the loudest
     followed.clear();
     osc.setMapName(name);             // its addresses, /manifold/<name>/...
+    // A built-in map, or one just opened: no control file until open() reads
+    // one. Point 1, taking every inlet; any hold from outside ends.
+    controlSpec = ControlSpec{};
+    controlPath.clear();
+    outsideHeld = false;
     evaluator = std::make_unique<Evaluator>(model.manifold());
     renderer = std::make_unique<ofxManifoldRenderer>(model.manifold());
     // Nodes are drawn here, by the editor's glyphs -- not the renderer too,
@@ -258,6 +267,108 @@ void ofApp::adopt(const std::string& name) {
     levelSmoother.reset();            // another map: taken at once, not glided into
     valueSmoother.reset();
     startMoving();                    // a walk on this map's own bounds
+    useControl();
+}
+
+// ---- points moved from outside (3B-2f) ----
+
+void ofApp::useControl() {
+    control.setPrefix(osc.prefix());
+    control.setSpec(controlSpec);
+    // An evaluator of its own, as the walk has: the app's must not be
+    // disturbed by a move it then refuses.
+    auto ev = std::make_shared<Evaluator>(model.manifold());
+    control.setInside([ev](float x, float y) { return ev->evaluate(glm::vec2(x, y)).inside; });
+    const Levels& lv = model.map3d().levels();
+    control.setExtent(lv.base(0), lv.base(LevelID(lv.count() - 1)), topLevel());
+    std::vector<OscOut::PointInfo> pts;
+    for (int k = 0; k < control.count(); ++k) {
+        const PointSpec& p = control.spec().points[k];
+        pts.push_back({k + 1, p.name, PointControl::inletNames(p.inlets)});
+    }
+    osc.setPoints(pts);
+}
+
+void ofApp::readAnswers(double now) {
+    for (int k = 0; k < 64 && listener.hasWaitingMessages(); ++k) {
+        ofxOscMessage in;
+        if (!listener.getNextMessage(in)) break;
+        OscMessage m;
+        if (!fromOfx(in, m)) continue;
+        if (!control.receive(now, m, OscPeer{in.getRemoteHost(), in.getRemotePort()})) {
+            osc.receive(now, m);          // describe, hello
+        }
+    }
+    control.tick(now);
+    applyControl();
+}
+
+void ofApp::applyControl() {
+    auto say = [&](const std::string& t) {
+        message = t;
+        messageUntil = ofGetElapsedTimef() + 3.0f;
+    };
+    for (const PointEvent& e : control.takeEvents()) {
+        if (e.kind == PointEvent::Taken) {
+            // Its own movement stops; the hand's state is kept to go back to.
+            movingBefore = moving;
+            heightBefore = heightBy;
+            recording = false;
+            moving = Moving::Hand;
+            heightBy = HeightBy::Hand;
+            outsideHeld = true;
+            startMoving();
+            say("point 1 taken from outside, by " + e.by.str());
+        } else {
+            outsideHeld = false;
+            if (e.why != "hand") {
+                moving = movingBefore;
+                heightBy = heightBefore;
+                startMoving();
+            }
+            say(e.why == "hand"   ? "point 1 back in your hand; " + e.by.str() + " told"
+              : e.why == "silent" ? "point 1 back: " + e.by.str() + " fell silent"
+                                  : "point 1 released by " + e.by.str());
+        }
+    }
+    const Levels& lv = model.map3d().levels();
+    const bool past = heightIn == HeightIn::Past;
+    for (const PointMove& m : control.takeMoves()) {
+        if (m.hasXY) point = glm::vec2(m.x, m.y);
+        if (!m.hasZ && !m.hasU) continue;
+        const Evaluation e = evaluator->evaluate(point);
+        const std::vector<WeightedNode> w = e.inside ? e.weights : std::vector<WeightedNode>{};
+        if (m.hasZ) {
+            if (heightIn == HeightIn::Units) z = m.z;
+            else u = lv.positionAt(w, m.z, past);
+        }
+        if (m.hasU) {
+            if (heightIn == HeightIn::Units) z = lv.heightAtPosition(w, m.u, true);
+            else u = m.u;
+        }
+    }
+    for (const PointReply& r : control.takeReplies()) {
+        const std::string key = r.to.str();
+        auto it = replySenders.find(key);
+        if (it == replySenders.end()) {
+            auto s = std::make_unique<ofxOscSender>();
+            s->setup(r.to.ip, r.to.port);
+            it = replySenders.emplace(key, std::move(s)).first;
+        }
+        it->second->sendMessage(toOfx(r.message), false);
+    }
+}
+
+void ofApp::writeControl() {
+    if (controlPath.empty()) {
+        message = "a built-in map has no file: open one (o) to write its control file";
+    } else {
+        std::ofstream f(controlPath, std::ios::binary);
+        f << saveControl(control.spec());
+        message = f ? "wrote " + controlPath.substr(controlPath.find_last_of("/\\") + 1)
+                    : "could not write " + controlPath;
+    }
+    messageUntil = ofGetElapsedTimef() + 3.0f;
 }
 
 void ofApp::applySmoothing() {
@@ -442,6 +553,9 @@ void ofApp::update() {
     const double now = ofGetElapsedTimef();
     appSeconds += ofGetLastFrameTime();
     readBridge(now);
+    // What came in -- describe, hello, and a point moved from outside --
+    // before moving: a move from outside lands this frame.
+    readAnswers(now);
 
     // Moving itself: the floor where its movement says at the count, the
     // height where its own says -- each on its own.
@@ -507,13 +621,6 @@ void ofApp::update() {
         linkSet.selectAll(model.manifold().nodeCount());
     }
 
-    // Answers: describe, hello.
-    for (int k = 0; k < 64 && listener.hasWaitingMessages(); ++k) {
-        ofxOscMessage in;
-        if (!listener.getNextMessage(in)) break;
-        OscMessage m;
-        if (fromOfx(in, m)) osc.receive(now, m);
-    }
 
     // Smoothed every frame, sent or not, so the glide keeps time with the
     // clock rather than with the send rate.
@@ -596,6 +703,17 @@ void ofApp::draw() {
     } else {
         line("smoothing off (s)", plain);
     }
+    // Point 1 from outside (3B-2f): who has it, and what came in.
+    if (outsideHeld) {
+        line("point 1: from outside, " + control.holder(1).str(), ofColor(255, 214, 90));
+    } else {
+        line("point 1: yours -- " + osc.prefix() + "/point/1/take", plain);
+    }
+    if (control.accepted() || control.refused()) {
+        line("outside: " + ofToString(control.accepted()) + " in, "
+             + ofToString(control.refused()) + " refused"
+             + (control.lastRefusal().empty() ? "" : " -- " + control.lastRefusal()), dim);
+    }
     if (osc.connected(now)) {
         line("answered by " + (osc.peer().empty() ? std::string("a receiver") : osc.peer()),
              ofColor(120, 200, 160));
@@ -648,7 +766,7 @@ void ofApp::draw() {
         } else {
             line("clock: seconds, " + ofToString(count(), 1) + " (b)", plain);
         }
-        if (!bridgeOpen) line("port 9001 taken: no bridge here", dim);
+        if (!bridgeOpen) line("port " + ofToString(kBridgePort) + " taken: no bridge here", dim);
 
         const char* whose[] = {"followed", "heard", "all", "off"};
         std::string out = "none";
@@ -728,6 +846,33 @@ void ofApp::drawKeySheet() const {
         }
         y += 14.0f;
     }
+    // Where a sender moves the point (3B-2f): the map's addresses, in full.
+    {
+        const std::string port = listenPort ? ofToString(listenPort) : std::string("no port free");
+        const std::string at = control.address(1, "");
+        const PointSpec& p = control.spec().points[0];
+        const std::vector<std::pair<std::string, std::string>> rows = {
+            {"take", "i id, i reply port (0: yours)"},
+            {"release", "i id"},
+            {"xy  z  u  xyz", "f ... -- open: " + PointControl::inletNames(p.inlets)},
+            {"reply  lost", "back to the taker"}};
+        const float need = 22.0f + 16.0f * float(rows.size() + 1) + 14.0f;
+        if (y + need > H - 30.0f && y > top) { y = top; x += column; }
+        ofSetColor(150, 200, 255);
+        ofDrawBitmapString("point 1 from outside, to port " + port, x, y);
+        y += 22.0f;
+        ofSetColor(255, 255, 255);
+        ofDrawBitmapString(at + "..." + (p.name.empty() ? "" : "  or /point/" + p.name + "/"),
+                           x, y);
+        y += 16.0f;
+        for (const auto& r : rows) {
+            ofSetColor(255, 255, 255);
+            ofDrawBitmapString(r.first, x, y);
+            ofSetColor(200, 205, 215);
+            ofDrawBitmapString(r.second, x + 112.0f, y);
+            y += 16.0f;
+        }
+    }
 }
 
 void ofApp::mousePressed(int x, int y, int) {
@@ -753,7 +898,11 @@ void ofApp::mousePressed(int x, int y, int) {
         messageUntil = ofGetElapsedTimef() + 2.5f;
         return;
     }
-    if (renderer->viewport().inside(x, y)) point = renderer->toManifold({float(x), float(y)});
+    if (renderer->viewport().inside(x, y)) {
+        // The hand always wins: held from outside, the point comes back.
+        if (outsideHeld) { control.handTook(1); applyControl(); }
+        point = renderer->toManifold({float(x), float(y)});
+    }
 }
 
 void ofApp::mouseMoved(int x, int y) { mouse = glm::vec2(float(x), float(y)); }
@@ -762,7 +911,10 @@ void ofApp::mouseDragged(int x, int y, int) {
     mouse = glm::vec2(float(x), float(y));
     if (ofGetKeyPressed(OF_KEY_SHIFT)) return;      // a pin, not a move
     if (moving != Moving::Hand) return;             // it moves itself
-    if (renderer->viewport().inside(x, y)) point = renderer->toManifold({float(x), float(y)});
+    if (renderer->viewport().inside(x, y)) {
+        if (outsideHeld) { control.handTook(1); applyControl(); }
+        point = renderer->toManifold({float(x), float(y)});
+    }
 }
 
 void ofApp::keyPressed(int key) {
@@ -830,6 +982,7 @@ void ofApp::keyPressed(int key) {
     }
     else if (key == 'e') { model.loadRoom(); adopt("room"); say("the room: floor, middle and top"); }
     else if (key == 'E') { model.loadExample(); adopt("example"); say("the editor's flat example"); }
+    else if (key == 'C') writeControl();
     else if (key == 'x') {
         model.loadOctahedron(); adopt("octahedron");
         say("the octahedron: two levels meeting at the rim");
@@ -951,5 +1104,21 @@ void ofApp::open() {
         // The map's name: the pair's, without its folder.
         const std::string base = pairFor(d.getPath()).base;
         adopt(base.substr(base.find_last_of("/\\") + 1));
+        // Its control file, if it has one: what a sender may move from
+        // outside. None: point 1, every inlet. Refused: the same, and why.
+        controlPath = base + "-control.json";
+        std::ifstream f(controlPath, std::ios::binary);
+        if (f) {
+            std::ostringstream text;
+            text << f.rdbuf();
+            ControlSpec spec;
+            const auto cr = loadControl(text.str(), spec, 1);
+            if (cr.ok) {
+                controlSpec = spec;
+                useControl();
+            } else {
+                message = r.message + " -- its control file refused: " + cr.error;
+            }
+        }
     }
 }

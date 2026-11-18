@@ -5,3 +5,5 @@
 #include "ofxManifoldOsc.h"
 #include "ofxManifoldOutputSmoother.h"
 #include "ofxManifoldClocks.h"
+#include "ofxManifoldPointControl.h"
+#include "ofxManifoldControlFile.h"

@@ -56,12 +56,15 @@ SUITES = {
     "panel":               ("check_panel",        ["tests/check_panel.cpp"] + EDITOR_CPP),
     # ofxManifoldPlayer's OSC out (3B-1): the vectors, and over a socket
     "test-osc":            ("run_osc",            ["tests/run_osc.cpp"] + PLAYER_CPP),
-    "osc-live":            (["osc_udp", "phase_udp"],
-                            ["tests/osc_udp.cpp", "tests/phase_udp.cpp"] + PLAYER_CPP),
+    "osc-live":            (["osc_udp", "phase_udp", "control_udp"],
+                            ["tests/osc_udp.cpp", "tests/phase_udp.cpp",
+                             "tests/control_udp.cpp"] + PLAYER_CPP),
     # ofxManifoldPlayer's output smoother (3B-1)
     "test-smooth":         ("run_smooth",         ["tests/run_smooth.cpp"] + PLAYER_CPP),
     # movement (3B-2)
     "test-motion":         ("run_motion",         ["tests/run_motion.cpp"] + PLAYER_CPP),
+    # points moved from outside (3B-2f)
+    "test-control":        ("run_control",        ["tests/run_control.cpp"] + PLAYER_CPP),
 }
 INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src", "-IofxManifoldPlayer/src"]
 

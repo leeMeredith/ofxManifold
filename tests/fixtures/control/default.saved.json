@@ -1,0 +1,6 @@
+{
+  "control": 1,
+  "points": [
+    { "number": 1, "inlets": ["xy", "z", "u", "xyz"], "silence": 5 }
+  ]
+}
