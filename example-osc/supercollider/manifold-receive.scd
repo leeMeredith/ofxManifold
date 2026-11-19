@@ -66,6 +66,10 @@
 // quiet tone at the root (~manifold[\quiet]). A map that sends no shape (an
 // older example-osc) climbs a pentatonic scale in channel order, as before.
 // Each map starts a fifth higher than the last, so maps can be told apart.
+// To try the settings while it plays, without reading this file, open
+// manifold-modes.scd beside it: its blocks start this patch, then choose the
+// notes, the sound and what several points do, each explained.
+//
 // Change a setting and run the block again. ~manifold[\sound] = \noise gives
 // the first version's pink noise bands instead of tones. The post window
 // lists each output's note.
@@ -96,6 +100,62 @@
 ~manifold[\carrier] = \fm;        // \carrier: \fm or \ring
 ~manifold[\depth] = 3;            // \carrier: the modulation at a shaping point's full level
 ~manifold[\maxPoints] = 16;       // the most points a map has (example-osc's kMaxPoints)
+
+// ---- choosing while it plays (round 3B-2h) ---------------------------------
+// manifold-modes.scd, beside this file, is the easy way in: blocks to pick
+// the notes, the sound and what several points do, each explained. They all
+// come here. The settings above, as this run starts with them, are what its
+// reset puts back.
+~manifold[\defaults] = (music: ~manifold[\music], span: ~manifold[\span],
+    fit: ~manifold[\fit], quiet: ~manifold[\quiet], sound: ~manifold[\sound],
+    bright: ~manifold[\bright], points: ~manifold[\points],
+    players: ~manifold[\players], carrier: ~manifold[\carrier],
+    depth: ~manifold[\depth]);
+
+// Where things stand, in a line for the post window.
+~manifold[\summary] = {
+    var notes = ~manifold[\music].asString ++ if (~manifold[\music] == \registers) {
+        if (~manifold[\fit]) { " sharing % semitones".format(~manifold[\span]) }
+                            { " an octave apart" }
+    } { "" };
+    var sound = if (~manifold[\sound] == \noise) { "noise bands" } {
+        if (~manifold[\bright]) { "tones, opening with height" } { "tones, height not heard" }
+    };
+    var points = if (~manifold[\points] == \carrier) {
+        "carrier: %%, the rest shape them by %, depth %".format(
+            ~manifold[\players], if (~manifold[\players] == 1) { " point plays" } { " points play" },
+            if (~manifold[\carrier] == \ring) { "ring modulation" } { "FM" },
+            ~manifold[\depth])
+    } { "together: every point plays" };
+    "notes %; sound %; points %".format(notes, sound, points);
+};
+
+// Choose: the settings given, each by its name above, and the voices
+// retuned -- or built again, for another sound -- on every map playing. The
+// points' settings need neither: they are read every frame. `what` is said
+// in the post window, with where things now stand.
+~manifold[\choose] = { |what, settings|
+    var known = ~manifold[\defaults].keys;
+    var build = settings[\sound].notNil and: { settings[\sound] != ~manifold[\sound] };
+    var tune = [\music, \span, \fit, \quiet, \bright].any { |k| settings[k].notNil };
+    settings.keysValuesDo { |k, v|
+        if (known.includes(k)) { ~manifold[k] = v } {
+            "manifold: no setting called % -- left alone".format(k).warn;
+        };
+    };
+    (~manifold[\maps] ? []).do { |m|
+        if (m[\names].notNil) {
+            if (build) { ~manifold[\build].(m) } { if (tune) { ~manifold[\tune].(m) } };
+        };
+    };
+    "manifold: % -- %".format(what, ~manifold[\summary].()).postln;
+};
+
+// Playing: started, and not stopped by cmd-period since -- the modes file's
+// START asks, so as not to start it twice.
+~manifold[\stopped] = false;
+CmdPeriod.doOnce { ~manifold[\stopped] = true };
+~manifold[\playing] = { ~manifold[\stopped].not };
 
 // ---- music: what each output sounds, from the map's shape -----------------
 // Plain functions, no server: tests/sc/check_music.scd runs them in sclang

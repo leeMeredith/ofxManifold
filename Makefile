@@ -359,6 +359,9 @@ sc-live:
 	@test -x "$(SCLANG)" || { echo "  sclang not found -- install SuperCollider, or make sc-live SCLANG=/path/to/sclang"; exit 1; }
 	@out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_patch_live.scd 2>&1); \
 	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
+	  echo "$$out" | grep -q GREEN && \
+	out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_modes_live.scd 2>&1); \
+	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
 	  echo "$$out" | grep -q GREEN
 
 $(TRI_RUN): tests/run_vectors.cpp $(CORE)

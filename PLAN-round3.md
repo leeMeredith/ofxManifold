@@ -1433,6 +1433,32 @@ clock (`b`), when steps happen (`c`), how often (`, .`) and `return` -- a
 beat steps every moving point at once, so they keep time together. Dragging
 any point's dot takes that point by hand, as `M` does; the others carry on.
 
+#### 3B-2h: the patch's choices, a block at a time (spec, 2026-11-19)
+
+Lee (2026-11-19): someone who wants to hear the work should not have to go
+through the dense patch to find a meaningful change -- a separate
+SuperCollider file, its parts selected and run with cmd-return to change
+between modes, each with a simple explanation of what it changes and what to
+expect, grouped so they are easily picked. Nothing on the openFrameworks
+side.
+
+- **`manifold-modes.scd`**, beside the patch: START (loads the patch from
+  beside it; already playing, it says so), STOP (cmd-period), RESET, then
+  four groups -- NOTES, SHARED OUTPUTS, SOUND, POINTS -- of short blocks,
+  each headed by what it is, what to do in example-osc, and what to expect.
+- **Groups combine**: a block sets every setting of its own group and none
+  of another's, so one from each group makes a whole.
+- **One helper in the patch**, `~manifold[\choose].(what, settings)`: sets
+  them, retunes every map (builds its voices again for another sound;
+  neither for the points' settings, read every frame), and posts what was
+  chosen and where everything stands. The patch keeps its own settings as
+  it starts (`\defaults`) for RESET, and knows whether it is playing.
+- **Choices last until the patch starts again**; the patch's file stays
+  the place for its defaults.
+
+Answered 2026-11-19: yes to all three recommendations -- groups combine,
+START loads the patch, choices last until it starts again.
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
@@ -2666,6 +2692,39 @@ split between each point's keys and every point's as agreed with Lee.
 
 ---
 
+### 3B-2h: the patch's choices, a block at a time
+
+Built 2026-11-19 as specified.
+
+- **`example-osc/supercollider/manifold-modes.scd`**: twenty blocks. START
+  loads `manifold-receive.scd` from beside it (`thisProcess.nowExecutingPath`;
+  an unsaved file is told to save first) unless the patch says it is
+  playing; STOP runs cmd-period; RESET chooses the patch's own settings.
+  NOTES: progression, somber, registers close, wide, an octave each,
+  series. SHARED OUTPUTS: soft, faint, full. SOUND: tones, tones even,
+  noise bands. POINTS: together, carrier gentle (FM, depth 1), deep (depth
+  6), ring, two play and the rest shape. Every choice says what it is, what
+  to try in example-osc and what to expect; one run before START warns
+  ("run START first") and does nothing.
+- **The patch**: `\defaults` (the settings as this run starts), `\summary`
+  (a line: notes, sound, points), `\choose` (a setting it does not know is
+  warned of and left alone), `\stopped` and `\playing` (set by
+  `CmdPeriod.doOnce`). Nothing it played before changes.
+- **Checked**: `tests/sc/check_modes_live.scd`, in `make sc-live` -- the
+  file read into its blocks as someone selects them, each run from the
+  file's own place: a choice before START warns; START starts it and a
+  second leaves it be; each choice calls `\choose` once, sets exactly its
+  group, every one as the test's own table of what each choice is said to
+  be, leaves the other groups alone, builds the voices again only for
+  another sound, and the server's voices then play what the patch's
+  voicing says; RESET puts back what it started with; STOP stops it -- 26
+  checks. Broken by hand, each caught: a block missing a setting of its
+  group, a block reaching into another group, a block that plays another
+  choice than it says (caught only once the table was added), another
+  depth than it says, `\choose` never building, never retuning, always
+  building, `\defaults` missing a setting, `\playing` always or never,
+  cmd-period not heard.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -2707,6 +2766,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2e** | Names by level (`Model::levelLabel`), the readout's numbers first; the editor follows its listening point (`levelReached`); `?` three ways, the views larger with no keys (`layoutEditorBare`) | editor and levels vectors, `make panel`, gates, drawlog session |
 | **3B-2f** | Points moved from outside: `PointControl`, take and release answered, moves from the holder, the same bounds as inside, loopback, counted refusals; protocol 4; the bridge port a setting | control vectors, gates, `make osc-live`, drawlog session |
 | **3B-2g** | More than one point: `a` / `A`, choosing, each point its own movement; points 2 and up sent under `/point/<n>/`, a removed one zeroed; protocol 5; the control file's count; the patch's `\together` and `\carrier` (FM, ring). Sections with headers in both apps: `KeyEntry::state`, `KeyGroup::colour`, `keyRows`, `drawKeyGroups` | osc and control vectors, music vectors in sclang, `make sc-live`, `make panel`, gates, drawlog session |
+| **3B-2h** | The patch's choices a block at a time: `manifold-modes.scd` -- START, STOP, RESET, and NOTES, SHARED OUTPUTS, SOUND, POINTS, each explained; `~manifold[\choose]` in the patch | every block run against the patch on a server (`make sc-live`), choices broken by hand |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

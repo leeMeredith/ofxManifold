@@ -232,4 +232,5 @@ what the shape sounds like in settings at its top: `\progression`,
 several points do: `\together` (every point plays the same voices, louder
 where they meet) or `\carrier` (the first `\players` points play; the rest
 shape them, by FM or ring modulation, `\fm` or `\ring`, their level at an
-output its depth, the level they are on its ratio).
+output its depth, the level they are on its ratio). `manifold-modes.scd`
+beside it chooses among these while it plays, a block at a time.

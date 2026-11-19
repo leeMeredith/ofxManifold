@@ -220,6 +220,10 @@ the same, and in both the map names each node as on the level shown (FL-2
 on level 2), as does the readout beside the point, its numbers first. With it a SuperCollider patch
 (`supercollider/manifold-receive.scd`) that builds a voice per output and
 plays it over headphones, and `receive.py`, a receiver with no dependencies.
+**To hear what it can do without reading the patch, open
+`supercollider/manifold-modes.scd`**: run its START block, start
+example-osc, and pick one block from each group -- notes, shared outputs,
+sound, points -- each explained, with what to try and what to expect.
 Each map also tells its shape -- its levels, and where each output sits --
 and the patch decides what that sounds like, in settings at its top: a
 chord progression up the levels, every chord in one register so only the

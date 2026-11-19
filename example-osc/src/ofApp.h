@@ -49,7 +49,8 @@
 // them (/manifold/outputs) on the first send, when they change, when asked,
 // and every two seconds. See ofxManifoldPlayer/OSC.md for the protocol, and
 // supercollider/manifold-receive.scd and receive.py beside this file for two
-// receivers.
+// receivers -- and supercollider/manifold-modes.scd to choose what the patch
+// plays, a block at a time.
 //
 // Everything that decides what to send is in ofxManifoldPlayer (OscOut),
 // tested without openFrameworks; this file owns the window, the keys and the
