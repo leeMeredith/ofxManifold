@@ -1459,6 +1459,90 @@ side.
 Answered 2026-11-19: yes to all three recommendations -- groups combine,
 START loads the patch, choices last until it starts again.
 
+#### 3B-2i: following, and keeping apart (spec, 2026-11-19)
+
+Lee (2026-11-19): "as I add a new moving node I would like to make it
+follow on the time -- if I add something, I would like it to wait for one
+movement then go to where the first one was; if I add a third, then it
+waits and then goes to where the last one went, so each follow each other.
+It would be good if it would be aware of where the other one was, so if it
+does get to the point that it's about to be on top of the other, that it
+waits a certain distance and then moves to where it was -- then if later on
+there is a shape that we create, such as circles or other shapes, they won't
+bunch up if there's not enough space on one spot."
+
+**Follow: a movement of its own.** `m` gains a fifth: your hand, the
+recording, jump, glide, **follow**. A point following goes, on each step,
+to where the point before it was at the step before -- point 2 after point
+1, point 3 after point 2: a chain, each one step behind the one ahead. Point
+1 has no one ahead, so `m` skips follow for it.
+
+- **On the steps everyone keeps**: the shared clock and step timing (`c`,
+  `, .`, the bridge's beats). At each step every point's place is noted; a
+  follower then glides, over its own travel (`< >`, at most the step
+  interval), to where its leader was at the step before. Added, it waits
+  one step -- nothing noted yet -- then goes.
+- **Whatever moves the leader**: your hand, a recording, a walk, a sender
+  from outside, another follow. The follower goes where it *was*, not
+  where it is going.
+- **Height too**: where the leader was includes its level position, so a
+  chain climbs the levels as its leader did.
+
+**Keeping apart: a rule of its own**, so shapes later use the same one. A
+point that moves itself never ends a step within the **gap** of another
+point:
+
+- **Measured** on the map, between where the others are as the step starts
+  and where the step would end -- and only between points on about the same
+  level: a level or more apart is apart, whatever the map says.
+- **Too close**: it goes as far along its way as it can and stops at the
+  gap -- waiting there -- and takes up the chase at the next step. Already
+  within the gap (added on top of another): it waits where it is.
+- **Never off the map**: stopping short where that would be off the map,
+  it waits instead.
+- **Your hand is never held**, nor a sender from outside: the rule holds
+  back only points moving themselves.
+- **The gap**: `g` steps through 0.04, 0.08 (the start), 0.15 of the
+  map's width, and off.
+
+**Where it lives**: `ofxManifoldFollow.h` in ofxManifoldPlayer, header-only,
+no openFrameworks -- the notes of each step, where a follower goes, and the
+keeping apart, as plain functions on numbers -- so it is checked like the
+rest of the player, and shapes reuse it. example-osc only asks it each step.
+Nothing new is sent: SuperCollider hears points where they are, as now.
+
+**Tested by**: a Python reference worked out another way, and vectors --
+the chain one step behind, the first step waited, height followed, the
+travel held to the interval, every leader kind, the gap stopping short,
+waiting when already close, a level apart not too close, off the map
+waiting, the gap off; gates on each; the drawlog session three points
+chained behind your hand.
+
+##### Open questions, with recommendations
+
+1. **Who follows whom**: each the point before it (a chain), or all of them
+   point 1, each a step later than the last? *Recommended: the chain* --
+   what Lee described; a point removed only ever the last, so no chain is
+   ever cut in the middle.
+2. **A point added starts following?** *Recommended: yes* -- a point added
+   while point 1 moves joins the line at once; `m` to choose another
+   movement, `M` for your hand.
+3. **One step behind, in steps -- or a smooth trail a set time behind?**
+   *Recommended: steps* -- "wait for one movement" is a step; it keeps time
+   with the bridge's beats; a smooth trail can come later as its own
+   movement.
+4. **Keeping apart from every point, or only from its leader?**
+   *Recommended: every point* -- so a chain folding back on itself, or a
+   shape later, never bunches.
+5. **Should jump and glide keep apart too?** *Recommended: not yet* --
+   their walks are seeded; held back they would no longer replay the same
+   for the same seed. Followers first; shapes next.
+6. **Too close: stop at the gap partway, or wait where it is?**
+   *Recommended: stop at the gap* -- "waits a certain distance and then
+   moves to where it was".
+7. **The gap's key**: `g`, through 0.04, 0.08, 0.15 and off? *Recommended:
+   yes* -- every point's, like the step timing.
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
