@@ -1,6 +1,7 @@
 // Round 3B-3a: the room on headphones, heard -- the patch run whole on a
 // server, a click played into one output's voice at a time, the two
-// headphone channels recorded and measured. Not what the numbers say: what
+// headphone channels recorded and measured -- the native room, and (3B-3b)
+// the ATK's when it is installed. Not what the numbers say: what
 // comes out. A speaker on the left arrives first, and loudest, on the left,
 // by the head's delay; one ahead the same in both ears; one behind duller
 // than one ahead; one near louder than one far; one overhead the same in
@@ -147,6 +148,55 @@ fork {
     0.5.wait;
     check.("head_speakers_again", m[\speakers].every { |sp| sp.defName == \manifoldHead },
         m[\speakers].collect(_.defName).asString);
+    // The ATK's room (3B-3b), when the ATK is installed: measured ears.
+    if (~manifold[\atkReady]) {
+        var head = click.(at.("ahead"));
+        ~manifold[\choose].("check: the ATK", (room: \atk, reverb: 0));
+        0.5.wait;
+        {
+            var left = click.(at.("left")), right = click.(at.("right"));
+            var ahead = click.(at.("ahead")), behind = click.(at.("behind"));
+            var near = click.(at.("near")), over = click.(at.("overhead")), mix = click.(at.("mix"));
+            check.("atk_speakers", m[\speakers].every { |sp| sp.defName == \manifoldAtk },
+                m[\speakers].collect(_.defName).asString);
+            check.("atk_left_on_the_left", left[\peakL] > (left[\peakR] * 3), left.asString);
+            check.("atk_right_on_the_right", right[\peakR] > (right[\peakL] * 3), right.asString);
+            check.("atk_ahead_about_even", (ahead[\peakL] / ahead[\peakR]).inclusivelyBetween(0.8, 1.25),
+                ahead.asString);
+            check.("atk_behind_unlike_ahead",
+                (behind[\peakL] + behind[\peakR]) < ((ahead[\peakL] + ahead[\peakR]) * 0.9),
+                "behind %, ahead %".format(behind, ahead));
+            check.("atk_near_louder_than_far", near[\peakR] > (right[\peakR] * 1.5),
+                "near %, far %".format(near[\peakR], right[\peakR]));
+            check.("atk_overhead_about_even", (over[\peakL] / over[\peakR]).inclusivelyBetween(0.9, 1.1),
+                over.asString);
+            check.("atk_no_place_in_the_middle_with_the_room",
+                mix[\onsetL] == mix[\onsetR] and: { mix[\peakL] == mix[\peakR] }
+                and: { (mix[\onsetL] - ahead[\onsetL]).abs < 250 },
+                "middle at %, the room at %".format(mix[\onsetL], ahead[\onsetL]));
+            check.("atk_as_loud_as_the_head",
+                ((ahead[\peakL] + ahead[\peakR]) / (head[\peakL] + head[\peakR])).inclusivelyBetween(0.67, 1.5),
+                "atk %, head %".format(ahead, head));
+        }.value;
+        ~manifold[\choose].("check: the ATK turned round", (facing: 180));
+        0.3.wait;
+        {
+            var left = click.(at.("left"));
+            check.("atk_turned_round_left_is_right", left[\peakR] > (left[\peakL] * 3), left.asString);
+        }.value;
+        ~manifold[\choose].("check: the head", (room: \head, facing: 0));
+        0.5.wait;
+    } { "  (the ATK is not installed: its room not checked)".postln };
+    // The ATK's room asked for without the ATK: the head, and a warning.
+    {
+        var was = ~manifold[\atkReady];
+        ~manifold[\atkReady] = false;
+        ~manifold[\choose].("check: the ATK, not there", (room: \atk));
+        0.5.wait;
+        check.("no_atk_stays_with_the_head", ~manifold[\room] == \head
+            and: { m[\speakers].every { |sp| sp.defName == \manifoldHead } }, ~manifold[\room].asString);
+        ~manifold[\atkReady] = was;
+    }.value;
     "%/% %".format(pass, pass + fail, if (fail == 0) { "GREEN" } { "RED" }).postln;
     0.exit;
 };

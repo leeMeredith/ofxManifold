@@ -16,7 +16,7 @@ var pass = 0, fail = 0;
 var close = { |a, b| (a - b).abs <= (1e-4 * b.abs.max(1)) };
 // An angle: the same direction, whichever way round it is said.
 var sameAngle = { |a, b| (a - b).wrap(-pi, pi).abs <= 1e-4 };
-var keys = [\az, \el, \dist, \delayL, \delayR, \gainL, \gainR, \shelfL, \shelfR,
+var keys = [\az, \el, \dist, \gain, \delayL, \delayR, \gainL, \gainR, \shelfL, \shelfR,
             \notch, \air, \wet];
 var check = { |name, ok, why|
     if (ok) { pass = pass + 1; "  pass  %".format(name).postln }

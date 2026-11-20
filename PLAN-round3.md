@@ -3014,6 +3014,49 @@ Built 2026-11-20 as planned.
 - **The patch's other checks**: `check_patch_live.scd` reads the pans from
   the speakers now, in the stereo room.
 
+### 3B-3b: the ATK's room
+
+Built 2026-11-20 as planned.
+
+- **`\atk`**: when the ATK is there -- its classes, and its kernels
+  (`~manifold[\atkThere]`) -- the patch loads the decoder's ears once at
+  boot (`FoaDecoderKernel.newCIPIC`, subject `~manifold[\ears]`, 21: the
+  KEMAR dummy head), makes a four-channel first-order bus every speaker
+  encodes into (`\manifoldAtk`: the head's distance -- level, air, the
+  reverb's share -- then `FoaPanB` at the speaker's direction, the ATK's
+  azimuth turning left where ours turns right) and one decoder to the
+  headphones after the speakers (`\manifoldAtkDecode`). An output with no
+  place goes to both ears alike, the middle of the head. What does not
+  pass through the ears -- the middle of the head, the reverb's share --
+  waits as long as the decoder's convolution does (a kernel: 512 frames at
+  48 kHz), so it arrives with the room; found by measuring, the first
+  version had it 15 ms early. Choosing another room builds the speakers
+  again, as before; the ears stay loaded.
+- **The patch runs without it**: the ATK's classes are named by symbol
+  (`\FoaPanB.asClass`), so the file compiles where it is not installed;
+  `\atk` asked for then -- at the patch's top, or chosen -- plays the head
+  and says, once each time, how to install it. `~manifold[\atkTrim]` (1):
+  measured, the ATK's level against the head's is already about even.
+- **The modes file**: ATK, MEASURED EARS and ATK, DRY in ROOM; at its end,
+  INSTALLING THE ATK -- the quark (needs git; restart after), then the ears
+  and matrices downloaded once; and where sc3-plugins come from.
+- **`~manifold[\hear]`** gains `gain` -- the distance's level alone, what
+  the ATK's room uses; the room's vectors carry it.
+- **Checked**: here with the ATK installed from its GitHub repositories
+  (two of its dependencies, SphericalDesign and PointView, are on GitLab
+  for `Quarks.install` and the sandbox cannot reach it; their GitHub copies
+  served; MatrixArray, for higher orders, was not needed). `make sc-live`
+  73: `check_room_live.scd` 28 -- the ATK's room measured from the
+  headphones as the head's is: left on the left and right on the right by
+  more than 3 to 1, ahead even within a quarter, behind unlike ahead,
+  near louder than far, overhead even, the middle of the head in both ears
+  alike and arriving with the room, as loud as the head within half again,
+  turned round left is right; and without the ATK, `\atk` playing the
+  head. The modes file's 35, ATK's blocks among them, with the ATK and with
+  its folder taken away; the patch's 10 both ways. Broken by hand, each
+  caught: the azimuth not turned, nothing waiting for the ears, no
+  fallback, the decoder a third as loud.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3058,6 +3101,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2h** | The patch's choices a block at a time: `manifold-modes.scd` -- START, STOP, RESET, and NOTES, SHARED OUTPUTS, SOUND, POINTS, each explained; `~manifold[\choose]` in the patch | every block run against the patch on a server (`make sc-live`), choices broken by hand |
 | **3B-2i** | Following, and keeping apart: `ofxManifoldFollow.h` (`keepApart`, `FollowChain`, `glideAt`); `m`'s follow, a point added following, `g` the gap | follow vectors, gates, drawlog session |
 | **3B-3a** | The stage -- a bus per voice, a speaker per output, the room's reverb -- and the native room: `\head` (a model of a head, core UGens only) and `\stereo`; `\facing`, `\reverb`, `\roomSize`; ROOM in the modes file | room vectors in sclang (`make sc`), clicks measured from the headphone channels (`make sc-live`), choices broken by hand |
+| **3B-3b** | The ATK's room: `\atk` -- first order, CIPIC ears, the head's distance and reverb, the middle of the head kept in time; runs without the ATK; install blocks in the modes file | clicks measured from the headphones with the ATK, and asked for without it (`make sc-live`), choices broken by hand |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

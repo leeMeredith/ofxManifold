@@ -224,7 +224,10 @@ plays it over headphones, and `receive.py`, a receiver with no dependencies.
 output at its node's place and its level's height, heard from the middle of
 the room through a model of a head -- the far ear later, duller and quieter,
 height as a change of tone, distance as level and air, one shared reverb --
-in core SuperCollider alone; or panned in stereo as before.
+in core SuperCollider alone; or, with the Ambisonic Toolkit installed
+(3B-3b), each speaker encoded at its direction and heard through measured
+ears, front and back, up and down far clearer; or panned in stereo as
+before. The modes file's last blocks install the toolkit.
 **To hear what it can do without reading the patch, open
 `supercollider/manifold-modes.scd`**: run its START block, start
 example-osc, and pick one block from each group -- notes, shared outputs,

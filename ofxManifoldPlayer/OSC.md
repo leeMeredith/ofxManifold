@@ -235,4 +235,5 @@ shape them, by FM or ring modulation, `\fm` or `\ring`, their level at an
 output its depth, the level they are on its ratio). `manifold-modes.scd`
 beside it chooses among these while it plays, a block at a time. On
 headphones it places every output with a place as a speaker in a room, from
-the shape's positions -- nothing more is sent for it.
+the shape's positions -- through a model of a head, or the Ambisonic
+Toolkit's measured ears -- and nothing more is sent for it.

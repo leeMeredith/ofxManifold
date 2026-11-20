@@ -71,6 +71,15 @@
 //                                    notch that rises with it; distance as
 //                                    level and air -- and one shared reverb.
 //                                    Core SuperCollider only.
+//   ~manifold[\room] = \atk           the Ambisonic Toolkit's room (3B-3b):
+//                                    each speaker encoded at its direction,
+//                                    heard through measured ears -- front and
+//                                    back, up and down, far clearer -- with
+//                                    the same distance and reverb. Needs the
+//                                    ATK installed (manifold-modes.scd says
+//                                    how); without it, \head, and a warning.
+//   ~manifold[\ears] = 21              \atk: whose ears -- a CIPIC subject;
+//                                    21 is the KEMAR dummy head.
 //   ~manifold[\room] = \stereo        panned left to right by place, as
 //                                    before the room.
 //   ~manifold[\facing] = 0             the way the listener faces, in degrees
@@ -120,10 +129,12 @@
 ~manifold[\carrier] = \fm;        // \carrier: \fm or \ring
 ~manifold[\depth] = 3;            // \carrier: the modulation at a shaping point's full level
 ~manifold[\maxPoints] = 16;       // the most points a map has (example-osc's kMaxPoints)
-~manifold[\room] = \head;         // the room: \head (native), or \stereo
+~manifold[\room] = \head;         // the room: \head (native), \atk (the ATK), or \stereo
+~manifold[\ears] = 21;            // \atk: the CIPIC subject whose ears -- 21, KEMAR
 ~manifold[\facing] = 0;           // the listener turned to the right, degrees
 ~manifold[\reverb] = 0.3;         // how much room: 0 dry
 ~manifold[\roomSize] = [8, 8, 4]; // width, depth, height in metres
+~manifold[\atkTrim] = 1;          // \atk: its level against the head's
 
 // ---- choosing while it plays (round 3B-2h) ---------------------------------
 // manifold-modes.scd, beside this file, is the easy way in: blocks to pick
@@ -153,7 +164,9 @@
             ~manifold[\depth])
     } { "together: every point plays" };
     var room = if (~manifold[\room] == \stereo) { "stereo" } {
-        "a head in the room, facing %, reverb %".format(
+        "% in the room, facing %, reverb %".format(
+            if (~manifold[\room] == \atk) { "the ATK's measured ears (CIPIC %)".format(~manifold[\ears]) }
+                                          { "a head" },
             if (~manifold[\facing] == 0) { "the front" } { "% degrees right".format(~manifold[\facing]) },
             ~manifold[\reverb])
     };
@@ -165,11 +178,16 @@
 // points' settings need neither: they are read every frame. `what` is said
 // in the post window, with where things now stand.
 ~manifold[\choose] = { |what, settings|
-    var known = ~manifold[\defaults].keys;
-    var build = settings[\sound].notNil and: { settings[\sound] != ~manifold[\sound] };
-    var tune = [\music, \span, \fit, \quiet, \bright].any { |k| settings[k].notNil };
-    var speak = settings[\room].notNil and: { settings[\room] != ~manifold[\room] };
-    var place = settings[\facing].notNil;
+    var known = ~manifold[\defaults].keys, build, tune, speak, place;
+    // The ATK's room without the ATK: the native one, and how to get it.
+    if (settings[\room] == \atk and: { (~manifold[\atkReady] ? false).not }) {
+        ~manifold[\atkMissing].();
+        settings = settings.copy.put(\room, \head);
+    };
+    build = settings[\sound].notNil and: { settings[\sound] != ~manifold[\sound] };
+    tune = [\music, \span, \fit, \quiet, \bright].any { |k| settings[k].notNil };
+    speak = settings[\room].notNil and: { settings[\room] != ~manifold[\room] };
+    place = settings[\facing].notNil;
     settings.keysValuesDo { |k, v|
         if (known.includes(k)) { ~manifold[k] = v } {
             "manifold: no setting called % -- left alone".format(k).warn;
@@ -389,7 +407,7 @@ CmdPeriod.doOnce { ~manifold[\stopped] = true };
     shade = -12 * lat.abs.sin;
     behind = -5 * (az.cos * el.cos).neg.max(0);
     gain = (2 / dist).min(1) * 0.5.sqrt;
-    (az: az, el: el, dist: dist,
+    (az: az, el: el, dist: dist, gain: gain,
      delayL: if (lat > 0) { itd } { 0 }, delayR: if (lat < 0) { itd } { 0 },
      gainL: gain * (if (lat > 0) { far } { 1 }), gainR: gain * (if (lat < 0) { far } { 1 }),
      shelfL: behind + (if (lat > 0) { shade } { 0 }),
@@ -399,6 +417,21 @@ CmdPeriod.doOnce { ~manifold[\stopped] = true };
      wet: dist / (dist + 3))
 };
 // ---- end of room -----------------------------------------------------------
+
+// The ATK (3B-3b): there if its classes are, and its kernels; said once how
+// to get it when it is asked for and is not.
+~manifold[\atkThere] = {
+    \Atk.asClass.notNil and: { \FoaDecoderKernel.asClass.notNil } and: {
+        File.exists(\Atk.asClass.userKernelDir +/+ "FOA" +/+ "decoders" +/+ "cipic")
+    }
+};
+~manifold[\atkMissing] = {
+    ("manifold: the ATK's room needs the Ambisonic Toolkit -- staying with the head. "
+     ++ "To install it, run once, then restart SuperCollider:\n"
+     ++ "    Quarks.install(\"https://github.com/ambisonictoolkit/atk-sc3.git\");\n"
+     ++ "and after the restart:  Atk.downloadKernels; Atk.downloadMatrices;\n"
+     ++ "It also needs sc3-plugins: https://supercollider.github.io/sc3-plugins").warn;
+};
 
 s.waitForBoot {
     // Every voice plays into a bus of its own (3B-3); a speaker reads it and
@@ -454,12 +487,54 @@ s.waitForBoot {
 
     // The stage (3B-3): voices first, then the speakers, then the room.
     // Anything from a run before goes first.
-    [\roomSynth, \speakersGroup, \voicesGroup, \roomBus].do { |k| ~manifold[k] !? (_.free) };
+    [\roomSynth, \atkDecoder, \speakersGroup, \voicesGroup, \roomBus, \atkBus,
+     \atkKernel].do { |k| ~manifold[k] !? (_.free); ~manifold[k] = nil };
     ~manifold[\voicesGroup] = Group.head(s);
     ~manifold[\speakersGroup] = Group.after(~manifold[\voicesGroup]);
     ~manifold[\roomBus] = Bus.audio(s, 2);
     ~manifold[\roomSynth] = Synth.after(~manifold[\speakersGroup], \manifoldRoom,
         [in: ~manifold[\roomBus], amount: ~manifold[\reverb]]);
+
+    // The ATK's room (3B-3b), if the ATK is there: the ears loaded, a
+    // first-order sound field every speaker is encoded into, and one
+    // decoder from it to the headphones, after the speakers. Its classes are
+    // named by symbol, so this file runs where the ATK is not installed.
+    ~manifold[\atkReady] = false;
+    if (~manifold[\atkThere].()) {
+        var panB = \FoaPanB.asClass, decode = \FoaDecode.asClass;
+        ~manifold[\atkKernel] = \FoaDecoderKernel.asClass.newCIPIC(~manifold[\ears], s);
+        s.sync;
+        // A speaker in the ATK's room: the distance as the head has it (level,
+        // air, the reverb's share); the direction encoded -- the ATK's
+        // azimuth turns to the left, ours to the right. With no place: both
+        // ears alike, in the middle of the head. What does not go through the
+        // ears -- the middle of the head, the reverb's share -- waits as long
+        // as the ears take (the decoder's convolution, a kernel long), so all
+        // of it arrives together.
+        ~manifold[\atkLatency] = ~manifold[\atkKernel].kernel[0][0].numFrames / s.sampleRate;
+        SynthDef(\manifoldAtk, { |in, out = 0, foa, rev, az = 0, el = 0, gain = 0.707,
+                                  air = 20000, wet = 0.25, inside = 0, latency = 0.0107|
+            var sig = LPF.ar(In.ar(in, 1), Lag.kr(air, 0.05)) * Lag.kr(gain, 0.05);
+            var mid = Lag.kr(inside, 0.05);
+            var late = DelayN.ar(sig, 0.1, latency);
+            Out.ar(foa, panB.ar(sig * (1 - mid), Lag.kr(az, 0.05).neg, Lag.kr(el, 0.05)));
+            Out.ar(out, (late * mid) ! 2);
+            Out.ar(rev, (late * Lag.kr(wet, 0.05)) ! 2);
+        }).add;
+        SynthDef(\manifoldAtkDecode, { |in, out = 0, trim = 1|
+            Out.ar(out, decode.ar(In.ar(in, 4), ~manifold[\atkKernel]) * trim);
+        }).add;
+        s.sync;
+        ~manifold[\atkBus] = Bus.audio(s, 4);
+        ~manifold[\atkDecoder] = Synth.after(~manifold[\speakersGroup], \manifoldAtkDecode,
+            [in: ~manifold[\atkBus], trim: ~manifold[\atkTrim]]);
+        ~manifold[\atkReady] = true;
+        "manifold: the ATK's room is ready -- ears: CIPIC %".format(~manifold[\ears]).postln;
+    };
+    if (~manifold[\room] == \atk and: { ~manifold[\atkReady].not }) {
+        ~manifold[\atkMissing].();
+        ~manifold[\room] = \head;
+    };
 
     // Everything in ~manifold is read and set by key -- ~manifold[\maps],
     // ~manifold[\drop].(p) -- never as ~manifold.maps. An Event answers
@@ -561,14 +636,20 @@ s.waitForBoot {
         var sh = ~manifold[\shapeFor].(m);
         vs = vs ?? { ~manifold[\voicing].(sh, m[\lowest], m[\names].size) };
         m[\speakers].do { |sp, i|
-            var h;
+            var h, at;
             if (~manifold[\room] == \stereo) { sp.set(\pan, vs[i][\pan]) } {
-                h = ~manifold[\hear].(~manifold[\speakerAt].(
+                at = ~manifold[\speakerAt].(
                     if (sh.notNil) { sh[\outputs][i] }, if (sh.notNil) { sh[\heights] } { [0] },
-                    ~manifold[\roomSize]), ~manifold[\facing]);
-                sp.set(\delayL, h[\delayL], \delayR, h[\delayR], \gainL, h[\gainL],
-                       \gainR, h[\gainR], \shelfL, h[\shelfL], \shelfR, h[\shelfR],
-                       \notch, h[\notch], \air, h[\air], \wet, h[\wet]);
+                    ~manifold[\roomSize]);
+                h = ~manifold[\hear].(at, ~manifold[\facing]);
+                if (~manifold[\room] == \atk) {
+                    sp.set(\az, h[\az], \el, h[\el], \gain, h[\gain], \air, h[\air],
+                           \wet, h[\wet], \inside, if (at[\inside]) { 1 } { 0 });
+                } {
+                    sp.set(\delayL, h[\delayL], \delayR, h[\delayR], \gainL, h[\gainL],
+                           \gainR, h[\gainR], \shelfL, h[\shelfL], \shelfR, h[\shelfR],
+                           \notch, h[\notch], \air, h[\air], \wet, h[\wet]);
+                };
             };
         };
     };
@@ -576,11 +657,13 @@ s.waitForBoot {
     ~manifold[\speak] = { |m|
         m[\speakers].do(_.free);
         m[\speakers] = m[\buses].collect { |b|
-            if (~manifold[\room] == \stereo) {
-                Synth(\manifoldStereo, [in: b], ~manifold[\speakersGroup])
-            } {
-                Synth(\manifoldHead, [in: b, rev: ~manifold[\roomBus]], ~manifold[\speakersGroup])
-            };
+            switch (~manifold[\room])
+            { \stereo } { Synth(\manifoldStereo, [in: b], ~manifold[\speakersGroup]) }
+            { \atk } {
+                Synth(\manifoldAtk, [in: b, foa: ~manifold[\atkBus], rev: ~manifold[\roomBus],
+                    latency: ~manifold[\atkLatency]], ~manifold[\speakersGroup])
+            }
+            { Synth(\manifoldHead, [in: b, rev: ~manifold[\roomBus]], ~manifold[\speakersGroup]) };
         };
         ~manifold[\place].(m);
     };

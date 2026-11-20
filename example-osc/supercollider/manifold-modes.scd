@@ -283,6 +283,27 @@ if (~manifold.isNil) { "manifold: run START first".warn } {
 };
 )
 
+// ATK, MEASURED EARS -- the Ambisonic Toolkit's room: each speaker
+// encoded at its direction and heard through ears measured on a dummy head
+// (CIPIC subject 21, KEMAR), with the same distance and room as HEAD.
+// Needs the ATK: see INSTALLING THE ATK, at the end of this file. Without
+// it, the post window says so and HEAD plays instead.
+// Expect: front and behind, above and below, far clearer than HEAD -- walk
+// the point round the room's corners, then climb a level.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: the ATK's measured ears", (room: \atk, facing: 0, reverb: 0.3));
+};
+)
+
+// ATK, DRY -- the same, with no room.
+// Expect: the plainest sense of where each speaker is.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: the ATK, dry", (room: \atk, facing: 0, reverb: 0));
+};
+)
+
 // STEREO (as before the room) -- each output panned left to right by its
 // place; no height, no distance, no room.
 // Expect: flat, between the ears; compare with HEAD to hear the room.
@@ -290,4 +311,27 @@ if (~manifold.isNil) { "manifold: run START first".warn } {
 if (~manifold.isNil) { "manifold: run START first".warn } {
     ~manifold[\choose].("room: stereo", (room: \stereo, facing: 0, reverb: 0));
 };
+)
+
+
+// ==== INSTALLING THE ATK: once, for the ATK's room ==========================
+// The Ambisonic Toolkit is SuperCollider's own spatial library, installed
+// apart. Everything else in this file works without it.
+//
+// It needs sc3-plugins too -- if SuperCollider says FoaPanB or AtkKernelConv
+// is not installed, get them from https://supercollider.github.io/sc3-plugins
+// (on a Mac: unzip, and put the SC3plugins folder in Platform.userExtensionDir).
+
+// THE TOOLKIT -- needs git. When it says it is done, restart SuperCollider
+// (Language > Recompile Class Library, or quit and open it again).
+(
+Quarks.install("https://github.com/ambisonictoolkit/atk-sc3.git");
+)
+
+// ITS EARS -- after the restart: the measured ears, downloaded once (and
+// its matrices, so it stops saying they are missing). Then run START
+// again, and choose ATK, MEASURED EARS.
+(
+Atk.downloadKernels;
+Atk.downloadMatrices;
 )
