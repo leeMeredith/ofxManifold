@@ -233,4 +233,6 @@ several points do: `\together` (every point plays the same voices, louder
 where they meet) or `\carrier` (the first `\players` points play; the rest
 shape them, by FM or ring modulation, `\fm` or `\ring`, their level at an
 output its depth, the level they are on its ratio). `manifold-modes.scd`
-beside it chooses among these while it plays, a block at a time.
+beside it chooses among these while it plays, a block at a time. On
+headphones it places every output with a place as a speaker in a room, from
+the shape's positions -- nothing more is sent for it.

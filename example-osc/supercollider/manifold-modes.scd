@@ -11,8 +11,11 @@
 //      beside this file -- you never need to open that one.
 //   2. Start example-osc. Move the point around: you hear the map.
 //   3. Pick one block from each group -- NOTES, SHARED OUTPUTS, SOUND,
-//      POINTS. A choice changes only its own group, so they combine: SOMBER
-//      with NOISE BANDS, REGISTERS with CARRIER, and so on.
+//      POINTS, ROOM. A choice changes only its own group, so they combine:
+//      SOMBER with NOISE BANDS, REGISTERS with CARRIER, and so on.
+//
+// Listen on headphones: the ROOM group places every output as a speaker
+// around you.
 //   4. RESET puts back the patch's own settings. STOP is cmd-period.
 //
 // Choices last until the patch is started again (START after STOP). To make
@@ -225,5 +228,66 @@ if (~manifold.isNil) { "manifold: run START first".warn } {
 (
 if (~manifold.isNil) { "manifold: run START first".warn } {
     ~manifold[\choose].("points: two play, the rest shape", (points: \carrier, players: 2, carrier: \fm, depth: 3));
+};
+)
+
+
+// ==== ROOM: where you hear it from -- on headphones =========================
+// Every output is a speaker in a room 8 metres across and 4 high, at its
+// node's place on the map and its level's height. You stand in the middle,
+// ears halfway up, facing the map's top. The room example (e in
+// example-osc) has a speaker in each corner on three levels: the floor, at
+// your ears, and the ceiling.
+
+// HEAD (the patch's own) -- each speaker heard through a model of a head:
+// the far ear a moment later, duller and quieter; height as a change in
+// tone; distance as level and air; a little of the room.
+// Expect: drag the point to a corner and the sound comes from that corner
+// -- left and right clearly, near and far; front and back, up and down,
+// more faintly.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: a head in the room", (room: \head, facing: 0, reverb: 0.3));
+};
+)
+
+// HEAD, DRY -- the same, with no room: only the speakers.
+// Expect: closer and plainer; where each speaker is, easier to point to.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: a head, dry", (room: \head, facing: 0, reverb: 0));
+};
+)
+
+// HEAD, A BIG ROOM -- much more of the room.
+// Expect: far speakers washed in it; near ones still clear.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: a head in a big room", (room: \head, facing: 0, reverb: 0.7));
+};
+)
+
+// HEAD, FACING RIGHT -- you turn a quarter to the right.
+// Expect: the map's top now on your left, its right side ahead of you.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: facing right", (room: \head, facing: 90, reverb: 0.3));
+};
+)
+
+// HEAD, TURNED ROUND -- you face the map's bottom.
+// Expect: left and right swapped; the front behind you, a little duller.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: turned round", (room: \head, facing: 180, reverb: 0.3));
+};
+)
+
+// STEREO (as before the room) -- each output panned left to right by its
+// place; no height, no distance, no room.
+// Expect: flat, between the ears; compare with HEAD to hear the room.
+(
+if (~manifold.isNil) { "manifold: run START first".warn } {
+    ~manifold[\choose].("room: stereo", (room: \stereo, facing: 0, reverb: 0));
 };
 )

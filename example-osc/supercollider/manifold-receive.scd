@@ -61,7 +61,27 @@
 //
 // With one point, every setting sounds as before.
 //
-// A placed output pans by its node's place on the map, left to right. An
+// The room (round 3B-3). Every placed output is a speaker in a room, at its
+// node's place on the floor plan and its level's height, and you listen on
+// headphones from the middle of it:
+//
+//   ~manifold[\room] = \head          the native room: each speaker heard
+//                                    through a model of a head -- the far ear
+//                                    later, duller and quieter; height as a
+//                                    notch that rises with it; distance as
+//                                    level and air -- and one shared reverb.
+//                                    Core SuperCollider only.
+//   ~manifold[\room] = \stereo        panned left to right by place, as
+//                                    before the room.
+//   ~manifold[\facing] = 0             the way the listener faces, in degrees
+//                                    turned to the right of the map's front
+//                                    (its top).
+//   ~manifold[\reverb] = 0.3           how much room: 0 dry.
+//   ~manifold[\roomSize] = [8, 8, 4]   width, depth and height, in metres --
+//                                    the levels spread from floor to ceiling,
+//                                    the listener's ears halfway up.
+//
+// An output with no place on the map is heard in the middle of the head. An
 // output fed by no level, or shared by several, is not any level's chord: a
 // quiet tone at the root (~manifold[\quiet]). A map that sends no shape (an
 // older example-osc) climbs a pentatonic scale in channel order, as before.
@@ -100,6 +120,10 @@
 ~manifold[\carrier] = \fm;        // \carrier: \fm or \ring
 ~manifold[\depth] = 3;            // \carrier: the modulation at a shaping point's full level
 ~manifold[\maxPoints] = 16;       // the most points a map has (example-osc's kMaxPoints)
+~manifold[\room] = \head;         // the room: \head (native), or \stereo
+~manifold[\facing] = 0;           // the listener turned to the right, degrees
+~manifold[\reverb] = 0.3;         // how much room: 0 dry
+~manifold[\roomSize] = [8, 8, 4]; // width, depth, height in metres
 
 // ---- choosing while it plays (round 3B-2h) ---------------------------------
 // manifold-modes.scd, beside this file, is the easy way in: blocks to pick
@@ -110,7 +134,8 @@
     fit: ~manifold[\fit], quiet: ~manifold[\quiet], sound: ~manifold[\sound],
     bright: ~manifold[\bright], points: ~manifold[\points],
     players: ~manifold[\players], carrier: ~manifold[\carrier],
-    depth: ~manifold[\depth]);
+    depth: ~manifold[\depth], room: ~manifold[\room], facing: ~manifold[\facing],
+    reverb: ~manifold[\reverb]);
 
 // Where things stand, in a line for the post window.
 ~manifold[\summary] = {
@@ -127,7 +152,12 @@
             if (~manifold[\carrier] == \ring) { "ring modulation" } { "FM" },
             ~manifold[\depth])
     } { "together: every point plays" };
-    "notes %; sound %; points %".format(notes, sound, points);
+    var room = if (~manifold[\room] == \stereo) { "stereo" } {
+        "a head in the room, facing %, reverb %".format(
+            if (~manifold[\facing] == 0) { "the front" } { "% degrees right".format(~manifold[\facing]) },
+            ~manifold[\reverb])
+    };
+    "notes %; sound %; points %; room %".format(notes, sound, points, room);
 };
 
 // Choose: the settings given, each by its name above, and the voices
@@ -138,6 +168,8 @@
     var known = ~manifold[\defaults].keys;
     var build = settings[\sound].notNil and: { settings[\sound] != ~manifold[\sound] };
     var tune = [\music, \span, \fit, \quiet, \bright].any { |k| settings[k].notNil };
+    var speak = settings[\room].notNil and: { settings[\room] != ~manifold[\room] };
+    var place = settings[\facing].notNil;
     settings.keysValuesDo { |k, v|
         if (known.includes(k)) { ~manifold[k] = v } {
             "manifold: no setting called % -- left alone".format(k).warn;
@@ -145,9 +177,14 @@
     };
     (~manifold[\maps] ? []).do { |m|
         if (m[\names].notNil) {
-            if (build) { ~manifold[\build].(m) } { if (tune) { ~manifold[\tune].(m) } };
+            case
+            { build } { ~manifold[\build].(m) }
+            { speak } { ~manifold[\speak].(m); if (tune) { ~manifold[\tune].(m) } }
+            { tune } { ~manifold[\tune].(m) }
+            { place } { ~manifold[\place].(m) };
         };
     };
+    if (~manifold[\roomSynth].notNil) { ~manifold[\roomSynth].set(\amount, ~manifold[\reverb]) };
     "manifold: % -- %".format(what, ~manifold[\summary].()).postln;
 };
 
@@ -307,17 +344,75 @@ CmdPeriod.doOnce { ~manifold[\stopped] = true };
 };
 // ---- end of music ----------------------------------------------------------
 
+// ---- room: where each output is heard from (round 3B-3) --------------------
+// Plain functions, checked against tests/ref/reference_room.py (make sc).
+
+// A speaker's place from the listener, in metres -- (right:, ahead:, up:,
+// inside:) -- from its output in the shape: x across the room's width, y its
+// depth (the map's top the front), its height between the lowest level (the
+// floor) and the highest (the ceiling); the ears halfway up. One level: all
+// at the ears' height. No place on the map: inside the head.
+~manifold[\speakerAt] = { |o, heights, size|
+    var lo, hi;
+    if (o.isNil or: { o[\placed].not }) {
+        (right: 0, ahead: 0, up: 0, inside: true)
+    } {
+        lo = heights.minItem ? 0;
+        hi = heights.maxItem ? 0;
+        (right: (o[\x] - 0.5) * size[0], ahead: (o[\y] - 0.5) * size[1],
+         up: if (hi > lo) { ((o[\z] - lo) / (hi - lo) - 0.5) * size[2] } { 0 },
+         inside: false)
+    };
+};
+
+// How a listener turned `facing` degrees right hears a speaker there,
+// through a head 17.5 cm across: its direction and distance, and what each
+// ear gets -- delay (seconds), gain, a high shelf (dB, at 2.5 kHz: the far
+// ear in the head's shadow, both ears for a sound behind), the notch the
+// outer ear makes (Hz, rising with elevation), the air (a low-pass, Hz),
+// and how much goes to the room's reverb.
+~manifold[\hear] = { |at, facing|
+    var flat, dist, az, el, lat, itd, far, shade, behind, gain;
+    if (at[\inside]) {
+        az = 0; el = 0; dist = 1;
+    } {
+        flat = at[\right].hypot(at[\ahead]);
+        dist = (flat.squared + at[\up].squared).sqrt;
+        az = if (flat > 0) { at[\right].atan2(at[\ahead]) } { 0 };
+        az = (az - facing.degrad).wrap(-pi, pi);
+        el = if (dist > 0) { at[\up].atan2(flat) } { 0 };
+    };
+    dist = dist.max(0.3);
+    lat = (az.sin * el.cos).asin;                    // towards the right ear
+    itd = 0.0875 / 343 * (lat.abs + lat.abs.sin);    // Woodworth
+    far = (-6 * lat.abs.sin).dbamp;
+    shade = -12 * lat.abs.sin;
+    behind = -5 * (az.cos * el.cos).neg.max(0);
+    gain = (2 / dist).min(1) * 0.5.sqrt;
+    (az: az, el: el, dist: dist,
+     delayL: if (lat > 0) { itd } { 0 }, delayR: if (lat < 0) { itd } { 0 },
+     gainL: gain * (if (lat > 0) { far } { 1 }), gainR: gain * (if (lat < 0) { far } { 1 }),
+     shelfL: behind + (if (lat > 0) { shade } { 0 }),
+     shelfR: behind + (if (lat < 0) { shade } { 0 }),
+     notch: 6000 * (2 ** (0.75 * el / 0.5pi)),
+     air: 20000 * (0.93 ** dist),
+     wet: dist / (dist + 3))
+};
+// ---- end of room -----------------------------------------------------------
+
 s.waitForBoot {
-    SynthDef(\manifoldVoice, { |out = 0, pan = 0, amp = 0, gain = 1, centre = 440|
+    // Every voice plays into a bus of its own (3B-3); a speaker reads it and
+    // places it in the room.
+    SynthDef(\manifoldVoice, { |out = 0, amp = 0, gain = 1, centre = 440|
         var sig = BPF.ar(PinkNoise.ar, centre, 0.4) * 2;
         sig = sig * Lag.kr(amp * gain, 0.02);
-        Out.ar(out, Pan2.ar(sig, Lag.kr(pan, 0.1)));
+        Out.ar(out, sig);
     }).add;
     // A soft tone: a sine and quiet overtones. `bright` 0 keeps little but
     // the sine; 1 lets every overtone through. A modulator at `ratio` times
     // the note (3B-2g): `fm` its index, `ring` how much ring modulation is
     // mixed in -- both 0 unless another point shapes this one.
-    SynthDef(\manifoldTone, { |out = 0, pan = 0, amp = 0, gain = 1, freq = 220, bright = 1,
+    SynthDef(\manifoldTone, { |out = 0, amp = 0, gain = 1, freq = 220, bright = 1,
                                fm = 0, ring = 0, ratio = 1|
         var f = Lag.kr(freq, 0.05);
         var mf = f * Lag.kr(ratio, 0.05);
@@ -328,9 +423,43 @@ s.waitForBoot {
         sig = LPF.ar(sig, (f * Lag.kr(bright, 0.05).linexp(0, 1, 1.2, 6)).clip(20, 20000));
         sig = (sig * (1 - rm)) + (sig * mod * rm);
         sig = sig * 0.3 * Lag.kr(amp * gain, 0.02);
-        Out.ar(out, Pan2.ar(sig, Lag.kr(pan, 0.1)));
+        Out.ar(out, sig);
+    }).add;
+    // The speakers (3B-3): one per output, reading its voice's bus. Stereo:
+    // panned, as before the room.
+    SynthDef(\manifoldStereo, { |in, out = 0, pan = 0|
+        Out.ar(out, Pan2.ar(In.ar(in, 1), Lag.kr(pan, 0.1)));
+    }).add;
+    // A head in the room: ~manifold[\hear]'s numbers, gliding as they change.
+    SynthDef(\manifoldHead, { |in, out = 0, rev, delayL = 0, delayR = 0,
+                               gainL = 0.707, gainR = 0.707, shelfL = 0, shelfR = 0,
+                               notch = 6000, air = 20000, wet = 0.25|
+        var sig = In.ar(in, 1), l, r, lag = 0.05;
+        sig = LPF.ar(sig, Lag.kr(air, lag));
+        sig = BPeakEQ.ar(sig, Lag.kr(notch, lag), 0.5, -12);
+        l = DelayC.ar(sig, 0.002, Lag.kr(delayL, lag));
+        r = DelayC.ar(sig, 0.002, Lag.kr(delayR, lag));
+        l = BHiShelf.ar(l, 2500, 1, Lag.kr(shelfL, lag)) * Lag.kr(gainL, lag);
+        r = BHiShelf.ar(r, 2500, 1, Lag.kr(shelfR, lag)) * Lag.kr(gainR, lag);
+        Out.ar(out, [l, r]);
+        Out.ar(rev, [l, r] * Lag.kr(wet, lag));
+    }).add;
+    // The room's reverb, one for every map: what the speakers send it.
+    SynthDef(\manifoldRoom, { |in, out = 0, amount = 0.3|
+        var sig = In.ar(in, 2);
+        sig = FreeVerb2.ar(sig[0], sig[1], 1, 0.85, 0.4);
+        Out.ar(out, sig * Lag.kr(amount, 0.1));
     }).add;
     s.sync;
+
+    // The stage (3B-3): voices first, then the speakers, then the room.
+    // Anything from a run before goes first.
+    [\roomSynth, \speakersGroup, \voicesGroup, \roomBus].do { |k| ~manifold[k] !? (_.free) };
+    ~manifold[\voicesGroup] = Group.head(s);
+    ~manifold[\speakersGroup] = Group.after(~manifold[\voicesGroup]);
+    ~manifold[\roomBus] = Bus.audio(s, 2);
+    ~manifold[\roomSynth] = Synth.after(~manifold[\speakersGroup], \manifoldRoom,
+        [in: ~manifold[\roomBus], amount: ~manifold[\reverb]]);
 
     // Everything in ~manifold is read and set by key -- ~manifold[\maps],
     // ~manifold[\drop].(p) -- never as ~manifold.maps. An Event answers
@@ -343,6 +472,8 @@ s.waitForBoot {
         var m = ~manifold[\maps][prefix];
         if (m.notNil) {
             m[\voices].do(_.free);
+            m[\speakers].do(_.free);
+            m[\buses].do(_.free);
             m[\funcs].do(_.free);
             ~manifold[\maps].removeAt(prefix);
             "manifold: % has gone".format(prefix).postln;
@@ -353,7 +484,10 @@ s.waitForBoot {
     // Dictionary, not an Event: their keys are prefixes, strings, and an Event
     // matches keys by identity -- the same text arriving again in a new
     // message would not find its map.
-    (~manifold[\maps] ? []).do { |m| m[\voices].do(_.free); m[\funcs].do(_.free) };
+    (~manifold[\maps] ? []).do { |m|
+        m[\voices].do(_.free); m[\speakers].do(_.free); m[\buses].do(_.free);
+        m[\funcs].do(_.free);
+    };
     ~manifold[\maps] = Dictionary.new;
     ~manifold[\count] = 0;
 
@@ -377,12 +511,13 @@ s.waitForBoot {
         var vs = ~manifold[\voicing].(sh, m[\lowest], m[\names].size);
         m[\voices].do { |v, i|
             if (~manifold[\sound] == \noise) {
-                v.set(\pan, vs[i][\pan], \gain, vs[i][\gain], \centre, vs[i][\freq] * 2);
+                v.set(\gain, vs[i][\gain], \centre, vs[i][\freq] * 2);
             } {
-                v.set(\pan, vs[i][\pan], \gain, vs[i][\gain], \freq, vs[i][\freq],
+                v.set(\gain, vs[i][\gain], \freq, vs[i][\freq],
                       \bright, if (~manifold[\bright]) { m[\bright] } { 1 });
             };
         };
+        ~manifold[\place].(m, vs);
         "manifold: % -- % outputs, %:".format(m[\prefix], m[\names].size,
             if (sh.notNil) { ~manifold[\music] } { "no shape: the climb" }).postln;
         m[\names].do { |name, i|
@@ -420,12 +555,48 @@ s.waitForBoot {
         p;
     };
 
-    // A map's voices: one per output, tuned.
+    // Where each speaker is (3B-3): \stereo its pan, \head what the head
+    // hears from there. `vs`: the voicing, if it has just been worked out.
+    ~manifold[\place] = { |m, vs|
+        var sh = ~manifold[\shapeFor].(m);
+        vs = vs ?? { ~manifold[\voicing].(sh, m[\lowest], m[\names].size) };
+        m[\speakers].do { |sp, i|
+            var h;
+            if (~manifold[\room] == \stereo) { sp.set(\pan, vs[i][\pan]) } {
+                h = ~manifold[\hear].(~manifold[\speakerAt].(
+                    if (sh.notNil) { sh[\outputs][i] }, if (sh.notNil) { sh[\heights] } { [0] },
+                    ~manifold[\roomSize]), ~manifold[\facing]);
+                sp.set(\delayL, h[\delayL], \delayR, h[\delayR], \gainL, h[\gainL],
+                       \gainR, h[\gainR], \shelfL, h[\shelfL], \shelfR, h[\shelfR],
+                       \notch, h[\notch], \air, h[\air], \wet, h[\wet]);
+            };
+        };
+    };
+    // A map's speakers, one per output, for the room chosen.
+    ~manifold[\speak] = { |m|
+        m[\speakers].do(_.free);
+        m[\speakers] = m[\buses].collect { |b|
+            if (~manifold[\room] == \stereo) {
+                Synth(\manifoldStereo, [in: b], ~manifold[\speakersGroup])
+            } {
+                Synth(\manifoldHead, [in: b, rev: ~manifold[\roomBus]], ~manifold[\speakersGroup])
+            };
+        };
+        ~manifold[\place].(m);
+    };
+    // A map's voices: one per output, each into a bus of its own, its
+    // speaker reading it; tuned and placed.
     ~manifold[\build] = { |m|
         m[\voices].do(_.free);
-        m[\voices] = m[\names].collect {
-            if (~manifold[\sound] == \noise) { Synth(\manifoldVoice) } { Synth(\manifoldTone) };
+        m[\speakers].do(_.free);
+        m[\buses].do(_.free);
+        m[\buses] = m[\names].collect { Bus.audio(s, 1) };
+        m[\voices] = m[\buses].collect { |b|
+            Synth(if (~manifold[\sound] == \noise) { \manifoldVoice } { \manifoldTone },
+                [out: b], ~manifold[\voicesGroup]);
         };
+        m[\speakers] = [];
+        ~manifold[\speak].(m);
         ~manifold[\tune].(m);
     };
 
@@ -434,7 +605,8 @@ s.waitForBoot {
     ~manifold[\start] = { |prefix, port|
         var m = (prefix: prefix, port: port, app: NetAddr("127.0.0.1", port),
                  names: nil, shape: nil, shapeMsg: nil, bright: 0.5,
-                 voices: [], seen: Main.elapsedTime, warned: false, due: false,
+                 voices: [], speakers: [], buses: [],
+                 seen: Main.elapsedTime, warned: false, due: false,
                  pts: Dictionary.new,
                  lowest: ~manifold[\lowest] + (7 * (~manifold[\count] % 4)));
         ~manifold[\count] = ~manifold[\count] + 1;

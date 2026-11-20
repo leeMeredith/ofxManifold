@@ -28,7 +28,8 @@ var groups = (
     'NOTES': [\music, \fit, \span],
     'SHARED OUTPUTS': [\quiet],
     'SOUND': [\sound, \bright],
-    'POINTS': [\points, \players, \carrier, \depth]);
+    'POINTS': [\points, \players, \carrier, \depth],
+    'ROOM': [\room, \facing, \reverb]);
 var every = groups.values.flatten;
 // What each choice is said to be, written again here: a block whose words
 // and settings part ways is caught.
@@ -49,7 +50,13 @@ var meant = (
     'CARRIER, GENTLE': (points: \carrier, players: 1, carrier: \fm, depth: 1),
     'CARRIER, DEEP': (points: \carrier, players: 1, carrier: \fm, depth: 6),
     'RING': (points: \carrier, players: 1, carrier: \ring, depth: 3),
-    'TWO PLAY, THE REST SHAPE': (points: \carrier, players: 2, carrier: \fm, depth: 3));
+    'TWO PLAY, THE REST SHAPE': (points: \carrier, players: 2, carrier: \fm, depth: 3),
+    'HEAD (the patch\'s own)': (room: \head, facing: 0, reverb: 0.3),
+    'HEAD, DRY': (room: \head, facing: 0, reverb: 0),
+    'HEAD, A BIG ROOM': (room: \head, facing: 0, reverb: 0.7),
+    'HEAD, FACING RIGHT': (room: \head, facing: 90, reverb: 0.3),
+    'HEAD, TURNED ROUND': (room: \head, facing: 180, reverb: 0.3),
+    'STEREO (as before the room)': (room: \stereo, facing: 0, reverb: 0));
 // The blocks, as someone would select them: "(" to ")", each with its group
 // (the last "// ====" heading) and its title (the first line of the comment
 // just above it).
@@ -149,6 +156,10 @@ fork {
             { own.any { |k| after[k] != call[k] } } { why = "not set: %".format(after) }
             { (every.asSet - own.asSet).any { |k| after[k] != before[k] } } {
                 why = "another group's setting changed";
+            }
+            { m[\speakers].any { |sp| sp.defName != if (~manifold[\room] == \stereo) {
+                \manifoldStereo } { \manifoldHead } } } {
+                why = "the speakers are not the room's: %".format(m[\speakers].collect(_.defName));
             }
             { (call[\sound].notNil and: { call[\sound] != before[\sound] })
                 != (m[\voices].collect(_.nodeID) != ids) } {

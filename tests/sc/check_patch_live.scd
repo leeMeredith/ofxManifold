@@ -21,17 +21,22 @@ var check = { |name, ok, why|
 };
 var close = { |a, b| (a - b).abs <= (1e-3 * b.abs.max(1)) };
 patch.interpret;
+// The pans are checked here, so the room is the stereo one (3B-3); the head's
+// room has checks of its own (check_room_live.scd).
+~manifold[\room] = \stereo;
 fork {
     var m, read, want, shape, timeout = 0;
     while { (s.serverRunning.not or: { ~manifold[\hello].isNil }) and: { timeout < 100 } } {
         0.2.wait; timeout = timeout + 1;
     };
     1.wait;
-    // Every voice's freq amp pan bright gain, as the server has them.
+    // Every voice's freq amp bright gain, and its speaker's pan, as the
+    // server has them.
     read = {
         var got = m[\voices].collect { () };
         m[\voices].do { |v, i|
-            [\freq, \amp, \pan, \bright, \gain, \fm, \ring, \ratio].do { |k| v.get(k, { |x| got[i][k] = x }) };
+            [\freq, \amp, \bright, \gain, \fm, \ring, \ratio].do { |k| v.get(k, { |x| got[i][k] = x }) };
+            m[\speakers][i].get(\pan, { |x| got[i][\pan] = x });
         };
         0.5.wait;
         got;

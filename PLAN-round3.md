@@ -1650,6 +1650,8 @@ not. CI has no SuperCollider, as now.
 8. **Head rotation**: *Recommended: a setting for which way the listener
    faces, nothing more* -- no head tracking.
 
+Answered 2026-11-20: "yes, all recommended".
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
@@ -2960,6 +2962,58 @@ Built 2026-11-19 as specified.
   closing to 0.08 and waiting; the gap off, all on one spot; then on the
   timer. The drawlog session does the same on screen.
 
+### 3B-3a: the stage, and the native room
+
+Built 2026-11-20 as planned.
+
+- **The stage**: every voice now plays into an audio bus of its own;
+  a speaker per output reads it, in a group after the voices; the room's
+  reverb (core `FreeVerb2`, one for every map) after the speakers, fed by
+  a stereo bus. A map's buses, voices and speakers go together when it
+  goes or is built again. Choosing another room builds the speakers again,
+  never the voices; turning the listener sets the speakers; the reverb's
+  amount is the room synth's.
+- **`\stereo`** (`\manifoldStereo`): `Pan2` by the voicing's pan, as
+  before. **`\head`** (`\manifoldHead`, the default): air (`LPF`), the
+  outer ear's notch (`BPeakEQ`, -12 dB), each ear's delay (`DelayC`) and
+  shelf (`BHiShelf` at 2.5 kHz) and gain, a send to the reverb -- every
+  number from `~manifold[\hear]`, gliding over 50 ms. Core UGens only.
+- **The numbers** (`// ---- room`, plain functions): `\speakerAt` -- a
+  speaker in metres from the listener: x across the width, y the depth
+  (the map's top the front), its height from the lowest level (the floor)
+  to the highest (the ceiling), the ears halfway; one level, all at the
+  ears; no place, inside the head. `\hear` -- direction and distance
+  (held 0.3 m off), the side the sound is on (lateral angle), the far
+  ear's delay (Woodworth, a head 17.5 cm across), the far ear 6 dB quieter
+  and 12 dB duller at the side, 5 dB duller for a sound behind, the notch
+  from about 3.6 kHz below to 10 kHz above, distance as level (1 within
+  2 m, then falling as 1/r) and air (a low-pass falling 7% a metre),
+  the reverb's share rising with distance.
+- **Settings at the patch's top**: `\room` (`\head`), `\facing` (0),
+  `\reverb` (0.3), `\roomSize` ([8, 8, 4]). The first three are in
+  `\defaults` and in the modes file's new ROOM group: head, head dry, a
+  big room, facing right, turned round, stereo. `\summary` says the room.
+- **Checked**: `make sc` 103 -- the room's 35 vectors from
+  `tests/ref/reference_room.py` (the listener as two unit vectors, the
+  speaker's direction as one, the side and "behind" from its components
+  along them; angles compared as directions). `make sc-live` 59 -- the
+  patch's 10, the modes file's 32 (ROOM among them, every choice's
+  speakers the room's), and `check_room_live.scd`'s 17: a click played
+  into one voice at a time, the headphones recorded and measured --
+  left first by the head's delay (to 3 samples) and loudest on the left,
+  right the mirror, ahead even, behind duller than ahead, near louder than
+  far, overhead even, no place in the middle, dry with no tail, turned
+  round left is right, turned right ahead is on the left, the reverb's
+  tail, stereo panned with no delay. The first run of it measured the
+  right ear wrong -- every other sample, not every second (`data[1, 2..]`)
+  -- and passed two checks it should not have; found when the left side
+  failed. Broken by hand, each caught: the ears' delays swapped, a shelf
+  gone, no reverb send, the turn the wrong way (by vectors; live only once
+  the quarter turn was added -- round is the same either way), no
+  distance, nothing behind, the stereo pan in the head's room.
+- **The patch's other checks**: `check_patch_live.scd` reads the pans from
+  the speakers now, in the stereo room.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3003,6 +3057,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2g** | More than one point: `a` / `A`, choosing, each point its own movement; points 2 and up sent under `/point/<n>/`, a removed one zeroed; protocol 5; the control file's count; the patch's `\together` and `\carrier` (FM, ring). Sections with headers in both apps: `KeyEntry::state`, `KeyGroup::colour`, `keyRows`, `drawKeyGroups` | osc and control vectors, music vectors in sclang, `make sc-live`, `make panel`, gates, drawlog session |
 | **3B-2h** | The patch's choices a block at a time: `manifold-modes.scd` -- START, STOP, RESET, and NOTES, SHARED OUTPUTS, SOUND, POINTS, each explained; `~manifold[\choose]` in the patch | every block run against the patch on a server (`make sc-live`), choices broken by hand |
 | **3B-2i** | Following, and keeping apart: `ofxManifoldFollow.h` (`keepApart`, `FollowChain`, `glideAt`); `m`'s follow, a point added following, `g` the gap | follow vectors, gates, drawlog session |
+| **3B-3a** | The stage -- a bus per voice, a speaker per output, the room's reverb -- and the native room: `\head` (a model of a head, core UGens only) and `\stereo`; `\facing`, `\reverb`, `\roomSize`; ROOM in the modes file | room vectors in sclang (`make sc`), clicks measured from the headphone channels (`make sc-live`), choices broken by hand |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

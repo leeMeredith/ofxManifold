@@ -352,9 +352,11 @@ vectors:
 	@python3 tests/ref/reference_control.py
 	@python3 tests/ref/reference_follow.py
 	@python3 tests/ref/reference_music.py
+	@python3 tests/ref/reference_room.py
 
 # example-osc's SuperCollider patch (round 3B-2b). `sc`: its musical
-# behaviours, run in sclang without a server, against tests/vectors/music.vec.
+# behaviours and its room's numbers (3B-3a), run in sclang without a server,
+# against tests/vectors/music.vec and room.vec.
 # `sc-live`: the whole patch on a server -- OSC in, synths read back; on a Mac
 # it sounds, quietly, for about a second. Neither is part of `make test`:
 # they need SuperCollider. sclang is looked for on the PATH, then in the app.
@@ -362,10 +364,16 @@ SCLANG ?= $(shell command -v sclang 2>/dev/null || echo /Applications/SuperColli
 MUSIC_VEC = tests/vectors/music.vec
 $(MUSIC_VEC): tests/ref/reference_music.py
 	@python3 tests/ref/reference_music.py
+ROOM_VEC = tests/vectors/room.vec
+$(ROOM_VEC): tests/ref/reference_room.py
+	@python3 tests/ref/reference_room.py
 
-sc: $(MUSIC_VEC)
+sc: $(MUSIC_VEC) $(ROOM_VEC)
 	@test -x "$(SCLANG)" || { echo "  sclang not found -- install SuperCollider, or make sc SCLANG=/path/to/sclang"; exit 1; }
 	@out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_music.scd 2>&1); \
+	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
+	  echo "$$out" | grep -q GREEN && \
+	out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_room.scd 2>&1); \
 	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
 	  echo "$$out" | grep -q GREEN
 
@@ -375,6 +383,9 @@ sc-live:
 	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
 	  echo "$$out" | grep -q GREEN && \
 	out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_modes_live.scd 2>&1); \
+	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
+	  echo "$$out" | grep -q GREEN && \
+	out=$$(QT_QPA_PLATFORM=offscreen "$(SCLANG)" tests/sc/check_room_live.scd 2>&1); \
 	  echo "$$out" | grep -E "^  (pass|FAIL)|GREEN|RED"; \
 	  echo "$$out" | grep -q GREEN
 
