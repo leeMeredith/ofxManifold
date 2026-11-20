@@ -2972,3 +2972,86 @@ gate: Two of the editor's sections share a colour
 file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
 find:     if (title == "values")           return {235, 150, 210};
 replace:     if (title == "values")           return {240, 220, 120};
+
+# ---- round 3B-2i: following, and keeping apart ----
+
+gate: Keeping apart ignores the levels
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:         if (llo > lo) lo = llo;
+replace:         (void)llo;
+
+gate: Points a level apart are kept apart anyway
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:             if (!(std::fabs(pu) < apart)) continue;
+replace:             (void)pu;
+
+gate: A level apart is half a level
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find: constexpr float kLevelApart = 1.0f;
+replace: constexpr float kLevelApart = 0.5f;
+
+gate: With the gap off nothing moves
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:     if (!(gap > 0.0f)) return 1.0f;
+replace:     if (!(gap > 0.0f)) return 0.0f;
+
+gate: Stepping back stops after one look
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:                 t = s.first;\n                moved = true;
+replace:                 t = s.first;\n                (void)moved;
+nl: yes
+
+gate: Stepping back goes past the stretch
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:                 t = s.first;
+replace:                 t = s.first - 0.01;
+
+gate: Waiting goes backwards
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:     return t > 0.0 ? float(t) : 0.0f;
+replace:     return float(t);
+
+gate: A glide is not smooth
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:     return along(a, b, float(s * s * (3.0 - 2.0 * s)));
+replace:     return along(a, b, float(s));
+
+gate: A glide not yet begun is already moving
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:     if (since <= 0.0) return a;
+replace:     if (since < -1.0) return a;
+
+gate: A point added follows at once
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:             if (k >= noted_.size()) continue;            // added since: it waits
+replace:             if (k > noted_.size()) continue;
+
+gate: Every point follows
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:             if (k >= follows.size() || !follows[k]) continue;
+replace:             if (k >= follows.size()) continue;
+
+gate: A follower goes where its leader is, not where it was
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:             const Place& was = noted_[k - 1];
+replace:             const Place& was = now[k - 1];
+
+gate: A follower keeps apart from all but its leader
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:                 if (j != k) others.push_back(now[j]);
+replace:                 if (j != k && j + 1 != k) others.push_back(now[j]);
+
+gate: Stopping short off the map is let be
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:             if (m.held && t > 0.0f && inside && !inside(m.to.x, m.to.y)) m.to = now[k];
+replace:             (void)inside;
+
+gate: A follower held is not said to be
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:             m.held = t < 1.0f;
+replace:             m.held = false;
+
+gate: Nothing is noted
+file: ofxManifoldPlayer/src/ofxManifoldFollow.h
+find:         noted_ = now;
+replace:         (void)now;

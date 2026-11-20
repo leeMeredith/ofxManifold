@@ -240,7 +240,12 @@ takes (ofxManifoldPlayer/OSC.md). A map can have more than one point: `a`
 adds one at the mouse, up to sixteen, `A` removes the last; ← → or a press on
 its dot chooses which the keys act on, each keeping its own movement -- point
 2 gliding while your hand drives point 1 -- and the control file says how
-many a map opens with. Each sends its own levels and position (point 1 as
+many a map opens with. A point added follows the one before it: on each
+step it goes where that one was at the step before, so the points move in a
+line, a step apart; it never ends a step within a gap of another point on
+its level (`g`: 0.04, 0.08, 0.15 of the map, or off), waiting there
+instead, so a line folding back on itself -- or a shape, later -- never
+bunches up. Each sends its own levels and position (point 1 as
 always, the others under `/point/2/` ...), and the patch decides what they
 are: every point playing the same voices, louder where they meet
 (`\together`), or the first playing and the rest shaping it by FM or ring
@@ -372,7 +377,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-1230 vectors across sixteen suites, plus 557 mutation gates that introduce known
+1292 vectors across seventeen suites, plus 573 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

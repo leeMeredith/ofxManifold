@@ -7,3 +7,4 @@
 #include "ofxManifoldClocks.h"
 #include "ofxManifoldPointControl.h"
 #include "ofxManifoldControlFile.h"
+#include "ofxManifoldFollow.h"

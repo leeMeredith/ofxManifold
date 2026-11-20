@@ -27,6 +27,9 @@ constexpr float kDotReach = 12.0f;
 constexpr double kIntervals[] = {0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0};
 constexpr double kTravels[]   = {0.05, 0.1, 0.2, 0.4, 0.8, 1.6};
 constexpr double kSteps[]     = {0.0, 0.5, 0.25, 0.1, 0.05};     // 0: anywhere
+// The gap a follower keeps from every other point on its level, as a share
+// of the map's width (3B-2i); 0: off.
+constexpr float  kGaps[]      = {0.04f, 0.08f, 0.15f, 0.0f};
 // The arrows on the levels: levels a second (shift: a quarter of that).
 constexpr float kLevelsPerSecond = 1.0f, kLevelsPerSecondFine = 0.25f;
 template <class T, std::size_t N> int stepIn(const T (&)[N], int at, int by) {
@@ -144,6 +147,7 @@ std::string ofApp::movingName(const PlayerPoint& p) const {
     case Moving::Recording: return "the recording";
     case Moving::Jump:      return "jump";
     case Moving::Glide:     return "glide";
+    case Moving::Follow:    return "follow point " + ofToString(p.number - 1);
     }
     return "";
 }
@@ -207,10 +211,12 @@ void ofApp::addPoint() {
     const glm::vec2 at = renderer->viewport().inside(mouse.x, mouse.y)
                        ? renderer->toManifold(mouse) : glm::vec2(0.5f, 0.5f);
     points.push_back(newPoint(int(points.size()) + 1, at, cur().u));
+    points.back().moving = Moving::Follow;   // it joins the line (3B-2i)
     startMoving(points.back());
     chosen = points.size() - 1;
     describePoints();
-    say("point " + ofToString(cur().number) + " added, chosen -- left / right to choose");
+    say("point " + ofToString(cur().number) + " added, following point "
+        + ofToString(cur().number - 1) + " -- m for another movement");
 }
 
 // A: the last point goes -- only the last, so no number changes under a
@@ -254,6 +260,7 @@ int ofApp::dotAt(glm::vec2 screen) const {
 // off it; the height's is its own.
 void ofApp::startMoving(PlayerPoint& p) {
     p.movedFrom = count();
+    p.gliding = false;                // a follower waits where it is for its next step
     startHeight(p);
     if (!p.floorWalks()) return;
     WalkSettings s;
@@ -316,6 +323,9 @@ void ofApp::startHeight(PlayerPoint& p) {
 
 void ofApp::startEvery() {
     for (PlayerPoint& p : points) startMoving(p);
+    // The timer's steps count again from now; what was noted stays.
+    followFrom = count();
+    followTicks = 0;
 }
 
 // A click or a beat: one step, at the clock's count -- of every point's
@@ -324,6 +334,37 @@ void ofApp::step() {
     for (PlayerPoint& p : points) {
         if (p.floorWalks()) p.walk.addStep(count() - p.movedFrom);
         if (p.heightWalks()) p.heightWalk.addStep(count() - p.heightFrom);
+    }
+    followStep();
+}
+
+ofxManifold::player::Place ofApp::placeOf(const PlayerPoint& p) const {
+    return {p.xy.x, p.xy.y, p.u};
+}
+
+// A step of the chain (3B-2i): every point's place noted, and each follower
+// sent gliding to where the one before it was at the last step -- kept
+// apart from the others, held on the map. Its glide takes its own travel,
+// on the timer no longer than the step.
+void ofApp::followStep() {
+    std::vector<Place> now;
+    std::vector<bool> follows;
+    for (const PlayerPoint& p : points) {
+        now.push_back(placeOf(p));
+        follows.push_back(p.moving == Moving::Follow && !p.outsideHeld);
+    }
+    auto ev = std::make_shared<Evaluator>(model.manifold());
+    const auto moves = chain.step(now, follows, kGaps[gapAt], [ev](float x, float y) {
+        return ev->evaluate(glm::vec2(x, y)).inside;
+    });
+    for (const FollowMove& m : moves) {
+        PlayerPoint& p = points[std::size_t(m.point - 1)];
+        p.glideFrom = m.from;
+        p.glideTo = m.to;
+        p.glideAt = count();
+        p.glideTravel = kTravels[p.travelAt];
+        if (steps == Steps::Timer) p.glideTravel = std::min(p.glideTravel, kIntervals[intervalAt]);
+        p.gliding = true;
     }
 }
 
@@ -380,6 +421,9 @@ void ofApp::adopt(const std::string& name) {
                                                 heightIn == HeightIn::Past);
     points.assign(1, first);
     chosen = 0;
+    chain.clear();                    // another map: nothing noted
+    followFrom = count();
+    followTicks = 0;
     osc.reset();                      // the new map's outputs, described at once
     startMoving(points.front());      // a walk on this map's own bounds
     useControl();
@@ -409,6 +453,7 @@ void ofApp::useControl() {
         glm::vec2 at(0.5f + 0.15f * std::cos(a), 0.5f + 0.15f * std::sin(a));
         if (!probe.evaluate(at).inside) at = glm::vec2(0.5f, 0.5f);
         points.push_back(newPoint(n, at, points.front().u));
+        points.back().moving = Moving::Follow;
         startMoving(points.back());
     }
     if (chosen >= points.size()) chosen = 0;
@@ -707,7 +752,15 @@ OscFrame ofApp::frameNow() const {
 void ofApp::movePoint(PlayerPoint& p, bool isChosen, float dt) {
     bool recordedHeight = false;
     float recordedValue = 0.0f;
-    if (p.moving == Moving::Recording && p.hasRecording) {
+    bool followed = false;              // following: the height is the leader's
+    if (p.moving == Moving::Follow) {
+        if (p.gliding) {
+            const Place q = glideAt(p.glideFrom, p.glideTo, count() - p.glideAt, p.glideTravel);
+            p.xy = glm::vec2(q.x, q.y);
+            recordedValue = q.u;
+            followed = true;
+        }
+    } else if (p.moving == Moving::Recording && p.hasRecording) {
         const glm::vec3 q = p.recorded.at(count() - p.movedFrom);
         p.xy = glm::vec2(q.x, q.y);
         recordedHeight = p.heightBy == HeightBy::Hand;   // the heights recorded
@@ -724,7 +777,14 @@ void ofApp::movePoint(PlayerPoint& p, bool isChosen, float dt) {
     const std::vector<WeightedNode> w = floorWeights(p);
     const bool past = heightIn == HeightIn::Past;
     const int dir = isChosen ? glideDir : 0;
-    if (heightIn != HeightIn::Units) {
+    if (followed) {
+        // Where the leader was includes its level position.
+        p.u = recordedValue;
+        if (heightIn != HeightIn::Past) p.u = std::min(std::max(p.u, 0.0f), topLevel());
+        p.z = lv.heightAtPosition(w, p.u, heightIn != HeightIn::Levels);
+    } else if (p.moving == Moving::Follow) {
+        // Waiting for its first step: where it is.
+    } else if (heightIn != HeightIn::Units) {
         if (p.heightWalks()) {
             p.u = p.heightWalk.at(count() - p.heightFrom).z;
         } else if (recordedHeight) {
@@ -756,6 +816,15 @@ void ofApp::update() {
     readAnswers(now);
 
     const float dt = float(ofGetLastFrameTime());
+    // On the timer, a step of the chain every interval of the count -- one,
+    // however many went by -- so followers keep time with the walks.
+    if (steps == Steps::Timer) {
+        const auto ticks = static_cast<long long>(std::floor((count() - followFrom) / kIntervals[intervalAt]));
+        if (ticks > followTicks) {
+            followTicks = ticks;
+            followStep();
+        }
+    }
     for (std::size_t k = 0; k < points.size(); ++k) movePoint(points[k], k == chosen, dt);
     // Recording takes the point wherever it is, on the clock running: its
     // level position on the levels, so it replays riding the shape.
@@ -922,11 +991,17 @@ std::vector<KeyGroup> ofApp::sections() const {
         } else {
             s.entries.push_back(now("b", "clock: seconds, " + ofToString(count(), 1)));
         }
+        bool anyFollows = false;
+        for (const PlayerPoint& q : points) anyFollows = anyFollows || q.moving == Moving::Follow;
+        if (anyFollows)
+            s.entries.push_back(now("g", kGaps[gapAt] > 0.0f
+                                             ? "followers keep " + ofToString(kGaps[gapAt]) + " apart"
+                                             : std::string("followers keep no gap")));
         if (!bridgeOpen)
             s.entries.push_back(now("", "port " + ofToString(kBridgePort) + " taken: no bridge here", false));
         const std::string mine = points.size() > 1 ? " (this point)" : "";
         const std::string every = points.size() > 1 ? " (every point)" : "";
-        s.entries.push_back(row("m", "your hand, the recording, jump, glide" + mine));
+        s.entries.push_back(row("m", "your hand, the recording, jump, glide, follow" + mine));
         s.entries.push_back(row("M", "your hand again, at once" + mine));
         s.entries.push_back(row("r", "record (stops anything moving); r: stop" + mine));
         s.entries.push_back(row("h", "height: by hand, jumps, glides" + mine));
@@ -937,6 +1012,7 @@ std::vector<KeyGroup> ofApp::sections() const {
         s.entries.push_back(row("c", "steps on a timer, clicks, the bridge's beats" + every));
         s.entries.push_back(row("return", "one step (with clicks; or click the map)" + every));
         s.entries.push_back(row("b", "clock: seconds / SuperCollider's bars" + every));
+        s.entries.push_back(row("g", "the gap followers keep: .04 .08 .15 off" + every));
         g.push_back(s);
     }
     // ---- smoothing ----
@@ -1288,9 +1364,11 @@ void ofApp::keyPressed(int key) {
     else if (key == 'o') open();
     // ---- movement: the chosen point's ----
     else if (key == 'm') {
+        // Follow after glide -- not for point 1: no one is ahead of it.
         p.moving = p.moving == Moving::Hand      ? (p.hasRecording ? Moving::Recording : Moving::Jump)
                  : p.moving == Moving::Recording ? Moving::Jump
                  : p.moving == Moving::Jump      ? Moving::Glide
+                 : p.moving == Moving::Glide     ? (p.number > 1 ? Moving::Follow : Moving::Hand)
                                                  : Moving::Hand;
         if (recording && recordingPoint == chosen) recording = false;
         startMoving(p);
@@ -1358,6 +1436,11 @@ void ofApp::keyPressed(int key) {
     }
     else if (key == OF_KEY_RETURN) {
         if (steps == Steps::Clicks) step();
+    }
+    else if (key == 'g') {
+        gapAt = (gapAt + 1) % int(sizeof kGaps / sizeof kGaps[0]);
+        say(kGaps[gapAt] > 0.0f ? "followers keep " + ofToString(kGaps[gapAt]) + " of the map apart"
+                                : std::string("followers keep no gap: they may meet"));
     }
     else if (key == 'k') {
         heightIn = heightIn == HeightIn::Levels ? HeightIn::Past

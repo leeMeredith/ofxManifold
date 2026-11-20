@@ -45,6 +45,11 @@
 // SuperCollider decides what each sounds like. A map's control file says how
 // many it opens with.
 //
+// Following (3B-2i): a point added follows the one before it -- on each
+// step it goes where that one was at the step before, so the points move in
+// a line, one step apart. It never ends a step within the gap of another on
+// its level (g: the gap): too close, it waits at the gap, then goes on.
+//
 // The receiver need not know how many outputs there are: the app describes
 // them (/manifold/outputs) on the first send, when they change, when asked,
 // and every two seconds. See ofxManifoldPlayer/OSC.md for the protocol, and
@@ -90,7 +95,8 @@
 //
 // Movement -- of the chosen point (m M r h { } < > n), or of every point
 // (, . c return b):
-//   m               the movement: your hand, the recording, jump, glide
+//   m               the movement: your hand, the recording, jump, glide,
+//                   follow (the point before it, a step behind)
 //   M               your hand again at once: anything moving stops there
 //   r               record: anything moving stops and your hand takes over,
 //                   the path drawn as you go; r again stops, and it loops
@@ -106,6 +112,7 @@
 //                   height wanders, or hold up / down while the floor does
 //   n               a new seed
 //   b               the clock: the app's own seconds, or SuperCollider's bars
+//   g               the gap followers keep: 0.04, 0.08, 0.15 of the map, off
 //
 //   ?               every key, on one page (again: none; again: the panel)
 
@@ -149,7 +156,7 @@ private:
     static constexpr int kBridgePort = 9001;
 
     // ---- movement (3B-2) ----
-    enum class Moving { Hand, Recording, Jump, Glide };
+    enum class Moving { Hand, Recording, Jump, Glide, Follow };
     enum class Steps { Timer, Clicks, Beats };
     // The height moves on its own: by hand (the arrows; or, while a
     // recording plays, the heights recorded), or jumping or gliding at
@@ -194,6 +201,12 @@ private:
         std::shared_ptr<ofxManifold::Evaluator> evaluator;
         ofxManifold::Evaluation evaluation;
         ofxManifold::player::OutputSmoother levelSmoother, valueSmoother;
+        // Following (3B-2i): the glide of its last step -- from, to, when it
+        // began and how long it takes, on the clock's count.
+        ofxManifold::player::Place glideFrom, glideTo;
+        double    glideAt = 0.0;
+        double    glideTravel = 0.0;
+        bool      gliding = false;
         ofxManifold::editor::ChartLevels heard;
         std::vector<std::pair<std::string, float>> heardValues;
 
@@ -229,6 +242,14 @@ private:
     void   startHeight(PlayerPoint& p); // the height's walk again
     void   startEvery();                // every point's walks: shared timing changed
     void   step();                      // a click or a beat: every point one step
+    // Following (3B-2i): the places noted each step, and the followers'
+    // glides from them; on the timer, a step every interval of the count.
+    ofxManifold::player::FollowChain chain;
+    int    gapAt = 1;                   // kGaps[]: 0.08
+    double followFrom = 0.0;
+    long long followTicks = 0;
+    void   followStep();
+    ofxManifold::player::Place placeOf(const PlayerPoint& p) const;
     void   movePoint(PlayerPoint& p, bool isChosen, float dt);   // a frame of it
     void   readBridge(double now);      // /phase and /beat on kBridgePort
     std::string movingName(const PlayerPoint& p) const;

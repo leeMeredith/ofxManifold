@@ -26,6 +26,7 @@ OSC_RUN  := $(BUILD)/run_osc
 SMOOTH_RUN := $(BUILD)/run_smooth
 MOTION_RUN := $(BUILD)/run_motion
 CONTROL_RUN := $(BUILD)/run_control
+FOLLOW_RUN := $(BUILD)/run_follow
 
 TRI_VEC  := tests/vectors/triangle.vec
 MAN_VEC  := tests/vectors/manifold.vec
@@ -43,6 +44,7 @@ OSC_VEC  := tests/vectors/osc.vec
 SMOOTH_VEC := tests/vectors/smooth.vec
 MOTION_VEC := tests/vectors/motion.vec
 CONTROL_VEC := tests/vectors/control.vec
+FOLLOW_VEC := tests/vectors/follow.vec
 # Sentinel for the generated fixture directory. Without this as a real
 # prerequisite, a tree with the .vec file but no fixtures fails to run rather
 # than regenerating -- and the runner's exit code for that is indistinguishable
@@ -100,7 +102,7 @@ IO       := src/io/ofxManifoldJSON.h \
 
 BENCH    := $(BUILD)/bench
 
-.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion test-control headers workflow wrapper vectors clean sc sc-live
+.PHONY: keys panel fma all test reproducible door drawlog bench test-triangle test-manifold test-interpretation test-mapping test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor test-levels test-osc osc-live test-smooth test-motion test-control test-follow headers workflow wrapper vectors clean sc sc-live
 
 all: test
 
@@ -108,7 +110,7 @@ all: test
 # binary so a failure names which layer broke: the solve, or the manifold.
 test: reproducible door keys panel headers workflow wrapper test-triangle test-manifold test-interpretation test-mapping \
       test-serialize test-trajectory test-smoother test-regions test-grids test-outputs test-editor \
-      test-levels test-osc osc-live test-smooth test-motion test-control
+      test-levels test-osc osc-live test-smooth test-motion test-control test-follow
 	@echo ""
 	@echo "all suites green"
 
@@ -294,6 +296,17 @@ $(CONTROL_RUN): tests/run_control.cpp $(IO) $(PLAYER_CPP) $(PLAYER_H)
 $(CONTROL_VEC): tests/ref/reference_control.py
 	@python3 tests/ref/reference_control.py
 
+# Following, and keeping apart (3B-2i).
+test-follow: $(FOLLOW_RUN) $(FOLLOW_VEC)
+	@./$(FOLLOW_RUN) $(FOLLOW_VEC)
+
+$(FOLLOW_RUN): tests/run_follow.cpp $(PLAYER_H)
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/run_follow.cpp
+
+$(FOLLOW_VEC): tests/ref/reference_follow.py
+	@python3 tests/ref/reference_follow.py
+
 $(SMOOTH_VEC): tests/ref/reference_smooth.py
 	@python3 tests/ref/reference_smooth.py
 
@@ -337,6 +350,7 @@ vectors:
 	@python3 tests/ref/reference_smooth.py
 	@python3 tests/ref/reference_motion.py
 	@python3 tests/ref/reference_control.py
+	@python3 tests/ref/reference_follow.py
 	@python3 tests/ref/reference_music.py
 
 # example-osc's SuperCollider patch (round 3B-2b). `sc`: its musical

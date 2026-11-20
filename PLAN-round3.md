@@ -1543,6 +1543,8 @@ chained behind your hand.
 7. **The gap's key**: `g`, through 0.04, 0.08, 0.15 and off? *Recommended:
    yes* -- every point's, like the step timing.
 
+Answered 2026-11-19: "all yes".
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
@@ -2809,6 +2811,50 @@ Built 2026-11-19 as specified.
   building, `\defaults` missing a setting, `\playing` always or never,
   cmd-period not heard.
 
+### 3B-2i: following, and keeping apart
+
+Built 2026-11-19 as specified.
+
+- **`ofxManifoldPlayer/src/ofxManifoldFollow.h`**, header-only, no
+  openFrameworks: `Place` (x, y, level position u), `along`,
+  `keepApart(from, to, others, gap)` -- for each other point the open
+  stretch of the way where an end would be too close, on the map (a
+  quadratic) and on the level (within `kLevelApart`, 1), both at once; the
+  answer the largest t in [0, 1] in none of them, found stepping back from
+  the far end -- `glideAt` (smooth, as the walks' glides) and `FollowChain`:
+  `step(now, follows, gap, inside)` notes every place and returns each
+  follower's move to where the point before it was at the last step, kept
+  apart from every other point where it is now; one added since waits; one
+  stopping short off the map waits instead. Included by
+  `ofxManifoldPlayer.h`.
+- **One reading of the spec made plain**: "already within the gap, it
+  waits" is when nowhere along its way is clear. A point may always leave a
+  crowd for an end that is clear -- or one added on top of another would
+  never move. And a step all the way to where the leader was is not checked
+  against the map: the leader was there. The way between may cross a bay
+  of the map's outline; only stopping short is held on it.
+- **example-osc**: `Moving::Follow` -- `m` after glide, for points 2 and
+  up; a point added with `a`, or by a control file, starts following. Each
+  `PlayerPoint` keeps the glide of its last step; its height is the glide's
+  level position (the arrows and `h` wait while it follows). The chain steps
+  with every point's steps: a click, `return`, a beat, or on the timer once
+  each interval of the count -- noted every step, follower or not, so a
+  point turned to follow goes at the next. A glide takes the point's travel,
+  on the timer no longer than the step. `g` steps the gap (0.04, 0.08, 0.15,
+  off; every point's); the movement section says it while any point
+  follows. A new map forgets what was noted.
+- **Checked**: `make test-follow`, 62 vectors from
+  `tests/ref/reference_follow.py` (the stretches from the closest approach
+  and half the chord; the farthest end the largest candidate no stretch
+  covers; the map a polygon by counting crossings) -- seventeen suites,
+  1292 vectors. **Gates** 16 new: 573; every one caught -- one, "stepping
+  back stops after one look", only once vectors listed the points in an
+  order that needs a second look. Once outside the suites: example-osc in
+  the stand-in with time running, three points on clicks behind point 1
+  dragged a step at a time -- each a step behind; point 1 still, the others
+  closing to 0.08 and waiting; the gap off, all on one spot; then on the
+  timer. The drawlog session does the same on screen.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -2851,6 +2897,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2f** | Points moved from outside: `PointControl`, take and release answered, moves from the holder, the same bounds as inside, loopback, counted refusals; protocol 4; the bridge port a setting | control vectors, gates, `make osc-live`, drawlog session |
 | **3B-2g** | More than one point: `a` / `A`, choosing, each point its own movement; points 2 and up sent under `/point/<n>/`, a removed one zeroed; protocol 5; the control file's count; the patch's `\together` and `\carrier` (FM, ring). Sections with headers in both apps: `KeyEntry::state`, `KeyGroup::colour`, `keyRows`, `drawKeyGroups` | osc and control vectors, music vectors in sclang, `make sc-live`, `make panel`, gates, drawlog session |
 | **3B-2h** | The patch's choices a block at a time: `manifold-modes.scd` -- START, STOP, RESET, and NOTES, SHARED OUTPUTS, SOUND, POINTS, each explained; `~manifold[\choose]` in the patch | every block run against the patch on a server (`make sc-live`), choices broken by hand |
+| **3B-2i** | Following, and keeping apart: `ofxManifoldFollow.h` (`keepApart`, `FollowChain`, `glideAt`); `m`'s follow, a point added following, `g` the gap | follow vectors, gates, drawlog session |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

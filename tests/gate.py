@@ -65,6 +65,8 @@ SUITES = {
     "test-motion":         ("run_motion",         ["tests/run_motion.cpp"] + PLAYER_CPP),
     # points moved from outside (3B-2f)
     "test-control":        ("run_control",        ["tests/run_control.cpp"] + PLAYER_CPP),
+    # following, and keeping apart (3B-2i)
+    "test-follow":         ("run_follow",         ["tests/run_follow.cpp"]),
 }
 INCLUDES = ["-Ilibs", "-Isrc", "-IofxManifoldEditor/src", "-IofxManifoldPlayer/src"]
 

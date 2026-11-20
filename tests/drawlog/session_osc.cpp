@@ -173,7 +173,7 @@ int main() {
         a.mouseMoved(90, 90);   key('a'); run(2);
         frame("a: point 2 at the mouse, chosen -- every point drawn, numbered");
         a.mouseMoved(220, 220); key('a'); run(2);
-        key('m'); key('m'); run(40);
+        key('m'); key('m'); key('m'); run(40);   // follow -> hand -> jump -> glide
         frame("a again: point 3, gliding on its own");
         key(OF_KEY_LEFT); key(OF_KEY_LEFT);
         a.mousePressed(150, 150, 0);
@@ -185,6 +185,28 @@ int main() {
         run(2); sent();            frame("point 3 taken from outside");
         key('A'); run(2); sent();  frame("A: point 3 removed -- its sender told; its levels sent at 0 once");
         key(OF_KEY_RIGHT);         frame("right: point 2 chosen");
+
+        // Round 3B-2i: following. Steps on clicks; point 3 added behind
+        // point 2, which follows point 1: point 1 dragged a step at a time,
+        // the line a step behind; then point 1 still, the others closing up
+        // to the gap and waiting there.
+        key('c');                  // steps on your clicks
+        key(OF_KEY_LEFT);          // point 1
+        a.mouseMoved(60, 200); key('a'); run(2);
+        frame("a: point 3, following point 2 -- it waits a step");
+        key(OF_KEY_LEFT); key(OF_KEY_LEFT);
+        const int path[][2] = {{80, 80}, {140, 90}, {200, 120}, {240, 180}};
+        for (const auto& at : path) {
+            a.mousePressed(at[0], at[1], 0);
+            a.mouseDragged(at[0], at[1], 0);
+            a.mouseReleased(at[0], at[1], 0);
+            key(OF_KEY_RETURN); run(40);
+        }
+        frame("point 1 dragged, a step each time: points 2 and 3 a step behind, in a line");
+        key(OF_KEY_RETURN); run(40); key(OF_KEY_RETURN); run(40); key(OF_KEY_RETURN); run(40);
+        frame("point 1 still: the others close up and wait at the gap");
+        key('g'); key(OF_KEY_RETURN); run(40);
+        frame("g: a wider gap -- they keep further back");
     }
     key('?');                      frame("?: every key");
     key('?');                      frame("? again: no keys, the map and the 3D view larger");
