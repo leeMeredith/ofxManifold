@@ -1545,6 +1545,111 @@ chained behind your hand.
 
 Answered 2026-11-19: "all yes".
 
+#### 3B-3: the virtual room on headphones -- two renderers (plan, 2026-11-20)
+
+Lee (2026-11-20): "Now we are doing the spatial audio. I would like to do it
+two versions: one native to SuperCollider, and then the best libraries that
+are most used by the community -- so some part is independent of any major
+library."
+
+**What the room is.** Every placed output is a loudspeaker in a room: its
+node's place on the floor plan and its level's height -- what `/shape`
+already sends (3B-2b). The map decides how loud each speaker is, as it does
+now; the room decides where each is heard from, by a listener in the room,
+on headphones. So nothing new comes from openFrameworks: SuperCollider
+places the speakers from the shape, and decides the rest.
+
+**One stage, swappable.** The voices stop panning themselves to stereo:
+each plays into a bus of its own, one per output, and a **renderer** turns
+those buses, with the speakers' places and the listener's, into the two
+headphone channels. The music, the points, the modes file are untouched.
+Choosing a renderer is a group in `manifold-modes.scd` -- ROOM -- like the
+others.
+
+- **`\stereo`**: what it does today -- each output panned left to right by
+  its place. Kept, to compare against.
+- **`\head` -- the native one**: core SuperCollider only, no quark, no
+  plugin, no data file. Each speaker is placed relative to the listener --
+  its direction (azimuth, elevation) and distance -- and heard through a
+  model of a head: the far ear later (interaural time, a delay by the
+  head's size and the angle) and duller and quieter (interaural level, a
+  shelf); the speaker's height as a pinna-like notch that moves with
+  elevation; its distance as level (1/r, held near) and as air (a gentle
+  low-pass farther off); and one room reverb all the speakers share, more
+  of it the farther a speaker is. Good at left and right, near and far;
+  front and back, up and down, only roughly -- no model without measured
+  ears does them well. It always works, everywhere SuperCollider does.
+- **`\atk` -- the library one**: the Ambisonic Toolkit, the SuperCollider
+  community's own spatial library (the atk-sc3 quark, with sc3-plugins).
+  Each speaker encoded at its direction, the sound field decoded for
+  headphones through measured ears (its binaural kernels, CIPIC or Listen
+  heads, one chosen). Front and back, up and down, as real as a fixed
+  binaural render gets. The room's distance and reverb as in `\head`, so
+  the two differ only in the ears.
+- **The patch runs without the library.** Asked for `\atk` without the ATK
+  installed, it says how to install it and stays on `\head`.
+
+**Comparing against SuperCollider's own panning** -- what 3B's plan asked
+of the room. A second choice in ROOM: **the map** (the speakers as the map
+drives them, as above) or **one source** (the sound placed directly at the
+point's own position in the room, through the same renderer, the map's
+weights set aside). Switching between them, the same point in the same
+room, is the comparison: what the manifold does against what a panner does.
+
+**Where it lives.** In the patch, beside the music: the room's settings at
+its top (size, listener, renderer, ears), the geometry (a speaker's
+direction and distance from the listener) and the head model's numbers as
+plain functions -- checked against a Python reference, as the music is --
+and one SynthDef per renderer. openFrameworks: unchanged.
+
+**Slices.**
+
+- **3B-3a: the stage and the native room** -- the buses, `\stereo` and
+  `\head`, the shared reverb, ROOM in the modes file.
+- **3B-3b: the ATK room** -- `\atk`, its install noted in the modes file
+  and the README; the same room around it.
+- **3B-3c: one source against the map** -- the comparison.
+
+**Tested by**: the geometry and the head model's numbers in Python and
+sclang, as the music is (`make sc`); on a server (`make sc-live`), a click
+from a speaker on the left heard first and loudest on the left, one ahead
+the same in both ears, one far quieter than one near, one above duller in
+the notch's band -- measured from the headphone channels, not assumed;
+`\atk` the same checks when the ATK is installed, skipped and said so when
+not. CI has no SuperCollider, as now.
+
+##### Open questions, with recommendations
+
+1. **Where is the listener?** *Recommended: standing still in the middle
+   of the room, ears at the middle level's height, facing the front of the
+   map* -- every speaker around them, the levels above and below. Riding
+   the point (hearing from where it is) could come later, as its own
+   choice.
+2. **How big is the room?** *Recommended: 8 by 8 metres, the levels
+   spread over 4 metres of height* -- a setting at the patch's top.
+3. **The room's sound: dry, a shared reverb, or early reflections too?**
+   *Recommended: a shared reverb (core FreeVerb), more of it farther off;
+   reflections later* -- a room you can hear, without a model of its walls
+   yet.
+4. **Should the native version also take measured ears from a file (an
+   HRIR set, played by core convolution)?** *Recommended: no* -- the native
+   one needs nothing but SuperCollider; measured ears are what the library
+   brings.
+5. **Which library: the ATK, or the IEM plug-ins (BinauralDecoder,
+   RoomEncoder) hosted through VSTPlugin?** *Recommended: the ATK* --
+   installed as a quark, running inside the server like everything else,
+   what SuperCollider users reach for first; the IEM suite is excellent and
+   its RoomEncoder models walls, but it means hosting plug-ins -- a later
+   choice if the room needs walls.
+6. **The ATK's order: first-order with its binaural kernels, or
+   higher-order through another decoder?** *Recommended: first order, its
+   own kernels* -- the ATK's binaural decoders are first-order; higher
+   orders mean another library again.
+7. **Outputs with no place** (an aggregator, a mix): *Recommended: heard in
+   the middle of the head, as now* -- they have nowhere in the room to be.
+8. **Head rotation**: *Recommended: a setting for which way the listener
+   faces, nothing more* -- no head tracking.
+
 ## Done
 
 ### 3A-1: derived outputs after the fader, outputs v3, rig files
