@@ -3057,6 +3057,171 @@ Built 2026-11-20 as planned.
   caught: the azimuth not turned, nothing waiting for the ears, no
   fallback, the decoder a third as loud.
 
+### Between 3B-3b and 3B-3c: the core, and the extras (spec)
+
+Lee, 2026-11-20: if everything stays in the two files, the parts that need
+an add-on or a download may keep people from using the two files the
+inner audio was built in.
+
+**Today.** Nothing breaks without the ATK -- its classes are named by
+symbol, and `\atk` falls back to `\head` -- but the patch carries about 70
+lines about it and the modes file two ATK blocks and an install section.
+Someone reading meets a library they do not have and may think they need
+it; each library after it would add more.
+
+**The rule.** `supercollider/` is the core: the two files, and only what
+ships with SuperCollider -- no quark, no sc3-plugins, no download. Anything
+that needs one lives in a folder of its own under `supercollider/extras/`,
+one per library, with its own addition to the patch, its own choices file
+and a short README. The core never names an extra.
+
+**A room plugs in.** The patch keeps its rooms in `~manifold[\rooms]`, a
+name to an event: `ready` (is what it needs there?), `prepare` (once at
+boot: buses, ears), `speaker` (one speaker's synth from its voice's bus),
+`place` (move it), `free`. `\stereo` and `\head` register themselves in the
+core; the speaker code asks the room instead of switching on its name. A
+room asked for that is not there: the patch names the rooms it has, says
+others live in `supercollider/extras`, and stays on `\head`.
+
+**`extras/atk/`**: `manifold-atk.scd` registers `\atk` -- 3B-3b's room,
+moved, the same in sound; `manifold-atk-modes.scd` -- its own START (the
+core patch, then the ATK), ATK, MEASURED EARS, ATK, DRY, back to HEAD, and
+INSTALLING THE ATK; `README.md`. The core modes file keeps everything else.
+
+**Tested by**: a check that the core files name no extra and use nothing a
+bare SuperCollider lacks (run with the ATK's folder taken away); the
+core's checks, all of them, the same; the ATK's live checks loading it
+from `extras/atk`; every modes block, both files, with and without the ATK.
+
+##### Open questions, with recommendations
+
+1. **Where?** *Recommended: `supercollider/extras/atk/`* -- one folder per
+   library, the next beside it.
+2. **How is it started?** *Recommended: its own choices file, whose START
+   loads the core and then the ATK* -- not the core loading whatever
+   extras it finds, which would run code nobody asked for.
+3. **What counts as an extra?** *Recommended: anything needing a quark,
+   sc3-plugins, or a download* -- the core's head, reverb and stereo are
+   built-in UGens only, and the check holds them to it.
+4. **Two choices files open at once?** *Recommended: yes* -- the ATK's
+   file holds only the ATK's choices; NOTES, POINTS and the rest stay in
+   `manifold-modes.scd`, used alongside it.
+5. **When?** *Recommended: now, before 3B-3c*, so the comparison is built
+   on rooms that plug in.
+
+### 3B-4 plan: your speakers, from your map (spec)
+
+Lee, 2026-11-22: not notes on speakers, but a setup that does not care what
+hardware it meets -- someone downloads it, puts a node where each of their
+speakers stands, and hears their map on those speakers, even with nothing
+but a test tone. As easy as possible, and apart from the music, so it is
+clear what they have.
+
+**What there is.** The map already does the hard part: each output's level
+is a gain -- what share of the sound that output gets at the point -- and
+each output has a channel, given in order as outputs are made (0, 1, 2 ...;
+the editor gives each new node its own). The player sends both. The music
+patch turns levels into notes and never uses the channel.
+
+**`supercollider/manifold-speakers.scd`** -- a file of its own: built-in
+SuperCollider only, loading nothing else, short enough to read through,
+run a block at a time like the modes file.
+
+- **SETUP**: the Mac's audio devices listed, one chosen (or the default);
+  the server started with as many outputs as the device has.
+- **CHECK THE SPEAKERS**: no map needed -- each speaker in turn plays short
+  pulses, one for speaker 1, two for speaker 2 ..., so the wiring can be
+  checked by ear.
+- **A SOUND THROUGH THE MAP**: one sound; each speaker plays it at the
+  level of the output on its channel -- channel 0 the device's first
+  output. TEST TONE, PINK NOISE, A SOUND FILE (a path), THE INPUT (a
+  microphone or line in). Nothing else: no notes, no reverb, no panning --
+  the map is the panner and the room is real.
+- **ON HEADPHONES**: before there are speakers, every speaker folded to two
+  channels by where it is on the map, left to right -- a check, not a
+  room; the room lives in the music patch.
+- **STOP**.
+
+**In the editor, and the tutorial**: a node where each speaker stands, on
+the floor plan; each node its own output; the order they were placed is
+the order of the speakers. A section, "Your speakers", in the tutorial.
+
+**Slices.**
+
+- **3B-4a: the speakers file** -- every block above.
+- **3B-4b: renumbering** -- a key in the editor to set the picked output's
+  channel, so speakers placed out of order can be put right.
+
+**Tested by**: on a server with a many-channel dummy device, each block run
+as someone would; the check's pulses counted on each channel; the sound on
+each channel measured against its output's level as the player sends it --
+a gap silent, a level of 0 silent, a level of 1 the sound itself; more
+outputs than the device has, said; the headphones fold measured left and
+right. Broken by hand, each caught.
+
+##### Open questions, with recommendations
+
+1. **Its own file, beside the music's?** *Recommended: yes,
+   `supercollider/manifold-speakers.scd`, sharing nothing with the music
+   patch* -- one can be read without the other.
+2. **Several points?** *Recommended: the first point only, for now* -- one
+   sound, one point; each point its own sound later, if wanted.
+3. **More outputs than the device has?** *Recommended: the file says which
+   outputs have no speaker; they are silent.*
+4. **Headphones**: *Recommended: the plain left-to-right fold above* -- the
+   music patch's rooms stay where they are.
+5. **Renumbering now?** *Recommended: yes, as 3B-4b* -- placing nodes in
+   the right order is easy to get wrong, and the fix should not need a
+   file edited by hand.
+6. **Order?** *Recommended: 3B-4a, 3B-4b, then the core and the extras,
+   then 3B-3c and the tightening.*
+
+### 3B-4a: your speakers, from your map
+
+Built 2026-11-22 as planned (all recommended, 2026-11-22).
+
+- **`supercollider/manifold-speakers.scd`**: built-in SuperCollider only;
+  loads nothing, shares nothing with the music patch (`~speakers`, not
+  `~manifold`). One sound on a bus; per output a synth taking it at that
+  output's level (`\speakersOut`, a 20 ms lag) to the device output its
+  channel names. An output on a channel past the last speaker gets no synth
+  and is named in the post window, once per change of outputs.
+- **SETUP**: DEVICES lists the devices (or says this SuperCollider cannot,
+  as on Linux); START takes three lines -- the device, **how many speakers**,
+  the volume -- and starts the server with that many outputs, again if the
+  device or count changed. *Changed from the plan*: the plan said "as many
+  outputs as the device has"; SuperCollider cannot ask a device before the
+  server starts, so the reader says how many speakers there are. START run
+  again with nothing changed sets only the volume. STOP is cmd-period.
+- **CHECK THE SPEAKERS**: speaker k plays k pulses of 880 Hz, 0.2 s apart,
+  then a pause, the post window naming each.
+- **A SOUND THROUGH THE MAP**: TEST TONE (440 Hz, START's own), PINK NOISE,
+  A SOUND FILE (its first channel, looped; an empty or missing path said),
+  THE INPUT (input 1 of the device), NOTHING. The first point's levels.
+- **WHERE IT PLAYS**: ON THE SPEAKERS (START's own); ON HEADPHONES -- every
+  output, those past the last speaker too, panned left to right by its
+  node's x on the map (`\speakersFold`), the middle for one with no node;
+  moved when the node is.
+- **Checked**: `tests/sc/check_speakers_live.scd`, 30, in `make sc-live`
+  (now 103): the blocks and their groups; nothing loaded; a choice before
+  START warns; START told 4 has four outputs, and again leaves it; a map on
+  channels 0, 1, 3 and 6 -- three synths, the fourth output said; CHECK's
+  pulses counted on each channel, 1 2 3 4; each sound -- tone, noise, a
+  file written for the check, a signal put on the input -- at levels 1,
+  0.5, 0.25 on speakers 1, 2 and 4 and nothing on speaker 3, measured;
+  levels followed; NOTHING silent; on headphones left, right, the middle,
+  the output past the last speaker heard, a node moved; back on the
+  speakers; STOP silent, START again playing; START told 7 starting the
+  server again -- the server asked how many outputs it has -- and the
+  fourth output then on speaker 7. Broken by hand fifteen ways (a channel
+  off by one, speakers by order not channel, the level ignored, past the
+  last speaker playing, the pulses miscounted, the fold reversed, node
+  moves ignored, levels not followed, the input ignored, the volume
+  ignored, a count change not restarting the server, STOP unheard,
+  headphones not built, the file's wrong channel), each caught; the count
+  change at first survived, the check reading the setting rather than the
+  server, and now asks the server.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3102,6 +3267,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-2i** | Following, and keeping apart: `ofxManifoldFollow.h` (`keepApart`, `FollowChain`, `glideAt`); `m`'s follow, a point added following, `g` the gap | follow vectors, gates, drawlog session |
 | **3B-3a** | The stage -- a bus per voice, a speaker per output, the room's reverb -- and the native room: `\head` (a model of a head, core UGens only) and `\stereo`; `\facing`, `\reverb`, `\roomSize`; ROOM in the modes file | room vectors in sclang (`make sc`), clicks measured from the headphone channels (`make sc-live`), choices broken by hand |
 | **3B-3b** | The ATK's room: `\atk` -- first order, CIPIC ears, the head's distance and reverb, the middle of the head kept in time; runs without the ATK; install blocks in the modes file | clicks measured from the headphones with the ATK, and asked for without it (`make sc-live`), choices broken by hand |
+| **3B-4a** | `manifold-speakers.scd`: one sound on every speaker at its output's level, by channel; SETUP, CHECK THE SPEAKERS, the sounds, ON HEADPHONES; built-in SuperCollider only | every block run on a four-speaker server, each speaker recorded and measured (`make sc-live`), broken by hand |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

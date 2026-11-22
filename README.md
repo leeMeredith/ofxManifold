@@ -232,6 +232,14 @@ before. The modes file's last blocks install the toolkit.
 `supercollider/manifold-modes.scd`**: run its START block, start
 example-osc, and pick one block from each group -- notes, shared outputs,
 sound, points, room -- each explained, with what to try and what to expect.
+**For your own speakers, open `supercollider/manifold-speakers.scd`**
+(3B-4a): no music, nothing installed, nothing else loaded -- one sound (a
+test tone, pink noise, a sound file or a live input) on every speaker at the
+level the map gives it, so the map pans it. Put a node in the editor where
+each speaker stands; the outputs' channels choose the speakers (channel 0 is
+speaker 1). Its blocks: SETUP (the device and how many speakers), CHECK THE
+SPEAKERS (one pulse for speaker 1, two for speaker 2 ...), the sounds, and ON
+HEADPHONES, every speaker folded left to right by where its node is.
 Each map also tells its shape -- its levels, and where each output sits --
 and the patch decides what that sounds like, in settings at its top: a
 chord progression up the levels, every chord in one register so only the
