@@ -171,6 +171,13 @@ public:
         return ok;
     }
 
+    // Two channels' owners exchanged (3B-4b), on every level.
+    bool swapChannels(int from, int to) {
+        bool ok = true;
+        for (Mapping& m : routing_) ok = m.swapChannels(from, to) && ok;
+        return ok;
+    }
+
     void setTrim(TargetID id, float trim) {
         for (Mapping& m : routing_) m.setTargetTrim(id, trim);
     }

@@ -264,6 +264,11 @@ public:
     // a current output once any exist.
     Result toggleOutput(TargetID t);
     Result trimCurrent(float dB);
+    // The one picked output to the speaker before (-1) or after (+1) its own
+    // (3B-4b): its channel down or up one. Whatever was on that channel -- an
+    // output or a derived output -- takes the one it left, so speakers placed
+    // out of order are put right a step at a time, and no channel is lost.
+    Result stepChannel(int dir);
     Result removeCurrentOutput();
     Result toggleAutoOutput();
 

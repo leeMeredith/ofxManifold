@@ -337,6 +337,14 @@ int main() {
     key('?');
     frame("? a third time: the panel back");
 
+    // round 3B-4b: S moves the picked output to the next speaker
+    hold(OF_KEY_COMMAND); key('e'); release(OF_KEY_COMMAND);
+    key(OF_KEY_TAB);
+    hold(OF_KEY_SHIFT); key('S'); release(OF_KEY_SHIFT);
+    frame("S: the picked output on the next speaker, its neighbour on the one it left");
+    key('s');
+    frame("s: back");
+
     std::fwrite(drawlog().data(), 1, drawlog().size(), stdout);
     return 0;
 }

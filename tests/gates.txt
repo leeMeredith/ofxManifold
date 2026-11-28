@@ -3055,3 +3055,51 @@ gate: Nothing is noted
 file: ofxManifoldPlayer/src/ofxManifoldFollow.h
 find:         noted_ = now;
 replace:         (void)now;
+
+# ---- round 3B-4b: the picked output to another speaker ----
+
+gate: Swapping channels leaves the other where it was
+file: src/mapping/ofxManifoldMapping.h
+find:         for (int& c : channels_) c = (c == from) ? to : (c == to) ? from : c;
+replace:         for (int& c : channels_) c = (c == from) ? to : c;
+
+gate: Swapping channels forgets derived outputs
+file: src/mapping/ofxManifoldMapping.h
+find:             a.channel = (a.channel == from) ? to : (a.channel == to) ? from : a.channel;
+replace:             (void)a;
+
+gate: A channel swapped on the first level only
+file: src/mapping/ofxManifoldMap3D.h
+find:         for (Mapping& m : routing_) ok = m.swapChannels(from, to) && ok;
+replace:         ok = routing_[0].swapChannels(from, to);
+
+gate: s steps the same way as S
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     const int to = from + (dir < 0 ? -1 : 1);
+replace:     const int to = from + 1;
+
+gate: A step below the first speaker allowed
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (to < 0) return refusal(nm + " is on the first speaker", 2.0f);
+replace:     if (to < -9) return refusal(nm + " is on the first speaker", 2.0f);
+
+gate: Moving speakers with several picked
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     if (outputSel_.size() >= 2) {
+replace:     if (outputSel_.size() >= 99) {
+
+gate: The speaker's message names the wrong speaker
+file: ofxManifoldEditor/src/ofxManifoldEditorModel.cpp
+find:     std::string msg = nm + " on speaker " + std::to_string(to + 1)
+replace:     std::string msg = nm + " on speaker " + std::to_string(to)
+
+gate: The speaker key lit with several picked
+file: ofxManifoldEditor/src/ofxManifoldEditorKeys.cpp
+find:               picked == 1 && !drag,
+replace:               picked >= 1 && !drag,
+
+gate: The speaker key answers neither s nor S
+file: example-editor/src/ofApp.cpp
+find:     case 's': case 'S':                             return "channel";
+replace:     case '\x07':                                    return "channel";
+

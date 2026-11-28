@@ -239,6 +239,18 @@ public:
         if (id < trims_.size()) trims_[id] = trim;
     }
 
+    // Round 3B-4b: whatever is on channel `from` -- an output or a derived
+    // output -- goes to `to`, and whatever was on `to` comes to `from`. False,
+    // changing nothing, when nothing is on `from` or either is negative.
+    bool swapChannels(int from, int to) {
+        if (from < 0 || to < 0 || from == to || !channelInUse(from)) return false;
+        for (int& c : channels_) c = (c == from) ? to : (c == to) ? from : c;
+        for (auto& a : aggregators_) {
+            a.channel = (a.channel == from) ? to : (a.channel == to) ? from : a.channel;
+        }
+        return true;
+    }
+
     bool channelInUse(int ch) const {
         for (int c : channels_) if (c == ch) return true;
         for (const auto& a : aggregators_) if (a.channel == ch) return true;

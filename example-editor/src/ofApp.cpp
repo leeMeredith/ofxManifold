@@ -579,6 +579,7 @@ std::string ofApp::keyId(int key) const {
     case 'C':                                       return "silence";
     case OF_KEY_TAB:                                return "nextoutput";
     case '9': case '(': case '0': case ')':         return "trim";
+    case 's': case 'S':                             return "channel";
     case 'O':                                       return "removeoutput";
     case 'p':                                       return "autooutput";
     case ' ':                                       return "audition";
@@ -864,6 +865,12 @@ void ofApp::keyPressed(int key) {
         const float dB = key == '9' ? -1.0f : key == '0' ? +1.0f
                        : key == '(' ? -0.1f : +0.1f;
         act("trim", [dB](Model& m) { return m.trimCurrent(dB); });
+        return;
+    }
+    if (id == "channel") {
+        // s S: the picked output to the speaker before, after (3B-4b).
+        const int dir = key == 's' ? -1 : +1;
+        act("channel", [dir](Model& m) { return m.stepChannel(dir); });
         return;
     }
     if (id == "removeoutput") {

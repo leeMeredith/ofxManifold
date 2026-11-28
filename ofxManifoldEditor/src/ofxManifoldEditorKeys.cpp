@@ -161,6 +161,11 @@ std::vector<KeyGroup> keyMap(const KeyContext& ctx) {
               unlessDrag("select the nodes a derived output should sum")),
         entry("trim", "9 0", "trim -/+ 1 dB (shift 0.1)", !drag && picked > 0,
               unlessDrag("no outputs yet")),
+        entry("channel", "s S", "to the speaker before / after",
+              picked == 1 && !drag,
+              unlessDrag(picked == 0 ? "no outputs yet"
+                         : "select one output to move -- "
+                           + std::to_string(picked) + " are selected")),
         entry("removeoutput", "O", "remove the output",
               !drag && picked == 1,
               unlessDrag(picked == 0 ? "no outputs yet"

@@ -237,7 +237,8 @@ sound, points, room -- each explained, with what to try and what to expect.
 test tone, pink noise, a sound file or a live input) on every speaker at the
 level the map gives it, so the map pans it. Put a node in the editor where
 each speaker stands; the outputs' channels choose the speakers (channel 0 is
-speaker 1). Its blocks: SETUP (the device and how many speakers), CHECK THE
+speaker 1; in the editor, `s` and `S` move the picked output to the speaker
+before or after, the two changing places). Its blocks: SETUP (the device and how many speakers), CHECK THE
 SPEAKERS (one pulse for speaker 1, two for speaker 2 ...), the sounds, and ON
 HEADPHONES, every speaker folded left to right by where its node is.
 Each map also tells its shape -- its levels, and where each output sits --
@@ -393,7 +394,7 @@ Vectors are classed by where their authority comes from:
 | `CROSS` | an independent implementation | the two disagree |
 | `SPEC` | a rule we invented | we are inconsistent with ourselves |
 
-1292 vectors across seventeen suites, plus 573 mutation gates that introduce known
+1293 vectors across seventeen suites, plus 582 mutation gates that introduce known
 faults and require each to be caught — because a suite that has never gone red
 is an assertion rather than a check. Each gate runs only the suites that compile
 the file it mutates, found by asking the compiler (`tests/gate.py`): a suite

@@ -257,7 +257,7 @@ std::string label(const std::string& op) {
         {"derivedafter", "derived output"}, {"userig", "use rig"},
         {"bindall", "bind to every output"}, {"fill", "fill"},
         {"clear", "back to own output"}, {"silence", "silence"},
-        {"trim", "trim"},
+        {"trim", "trim"}, {"channel", "speaker"},
         {"removeoutput", "remove output"}, {"example", "example map"},
         {"room", "room example"}, {"octahedron", "octahedron example"},
         {"empty", "new map"}, {"move", "move"}, {"openpair", "open"},
@@ -375,6 +375,10 @@ int main(int argc, char** argv) {
             else if (lastOp == "trim") {
                 float db; in >> db;
                 op = [&, db](Model& m) { return m.trimCurrent(db); };
+            }
+            else if (lastOp == "channel") {
+                int dir; in >> dir;
+                op = [&, dir](Model& m) { return m.stepChannel(dir); };
             }
             else if (lastOp == "removeoutput") op = [&](Model& m) { return m.removeCurrentOutput(); };
             else if (lastOp == "pick") {

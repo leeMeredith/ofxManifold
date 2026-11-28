@@ -886,6 +886,28 @@ class Editor:
                 o[2] = min(o[2] * 10 ** (db / 20.0), 3.9810717)
         return (1, 0, "")
 
+    def channel(self, d):
+        """Round 3B-4b, restated: the one picked output a channel down or up;
+        whoever is on that channel takes the one it left."""
+        if self.current is None:
+            return (0, 0, "")
+        if len(self.out_sel) > 1:
+            return (0, 1, "select one output to move to another speaker -- "
+                    f"{len(self.out_sel)} are selected")
+        mine = next(o for o in self.outputs if o[0] == self.current)
+        frm = mine[1]
+        to = frm - 1 if d < 0 else frm + 1
+        if to < 0:
+            return (0, 1, f"{mine[0]} is on the first speaker")
+        there = [x for x in self.outputs + self.derived if x[1] == to]
+        for x in there:
+            x[1] = frm
+        mine[1] = to
+        msg = f"{mine[0]} on speaker {to + 1} (channel {to})"
+        if there:
+            msg += f", {there[0][0]} on speaker {frm + 1} (channel {frm})"
+        return (1, 0, msg)
+
     def remove_current(self):
         if self.current is None:
             return (0, 0, "")
@@ -1686,6 +1708,7 @@ class Editor:
             ("silence", nd and bool(any_bound)),
             ("derivedafter", nd and picked > 0),
             ("derived", nd and bool(sel)), ("trim", nd and picked > 0),
+            ("channel", nd and picked == 1),
             ("removeoutput", nd and picked == 1), ("autooutput", nd),
             # round 3A-6: while auditioning, up and down move the listening
             # point, so they work with one level too
@@ -1853,6 +1876,7 @@ LABELS = {"place": "place", "join": "join", "unjoin": "unjoin",
           "derived": "derived output", "bind": "binding",
           "bindall": "bind to every output", "fill": "fill",
           "clear": "back to own output", "silence": "silence", "trim": "trim",
+          "channel": "speaker",
           "removeoutput": "remove output", "example": "example map",
           "room": "room example", "octahedron": "octahedron example",
           "empty": "new map", "move": "move", "openpair": "open",
@@ -1938,6 +1962,7 @@ class Script:
             "clear":    lambda: e.clear(s), "cycle": e.cycle,
             "silence":  lambda: e.silence(s),
             "trim":     lambda: e.trim(args[0]),
+            "channel":  lambda: e.channel(args[0]),
             "pick":     lambda: e.pick(args[0]),
             "toggleout": lambda: e.toggle_output(args[0]),
             "removeoutput": e.remove_current, "auto": e.toggle_auto,
@@ -1971,6 +1996,8 @@ class Script:
             argtxt = f" {1 if args[0] else 0}"
         elif op == "trim":
             argtxt = f" {fmt(args[0])}"
+        elif op == "channel":
+            argtxt = f" {args[0]}"
         elif op in ("pick", "toggleout"):
             argtxt = f" {args[0]}"
         elif op == "golevel" or op == "pickvalue":
@@ -3047,6 +3074,39 @@ def build_levels(out):
     out.append("# it on the ground, so two nodes no longer reach it")
     t.do("levelup")
     t.do("removeoutput")
+    t.end()
+
+    t = Script(out, "speaker_order",
+               "3B-4b: s and S move the one picked output to the speaker "
+               "before or after -- its channel down or up one -- and whoever "
+               "is there, an output or a derived output, takes the channel it "
+               "left; the first speaker is the end; a gap is stepped into; "
+               "several picked is refused; undo puts both back; the levels "
+               "follow")
+    t.do("place", (0.2, 0.2)); t.do("place", (0.8, 0.2)); t.do("place", (0.5, 0.8))
+    t.do("pick", "n0")
+    out.append("# n0 is on the first speaker: s is refused, nothing changes")
+    t.do("channel", -1)
+    out.append("# S: n0 and n1 change places")
+    t.do("channel", 1)
+    t.do("channel", 1)
+    out.append("# a step past the last output: channel 3, nobody there")
+    t.do("channel", 1)
+    t.do("channel", -1)
+    t.do("undo"); t.do("undo"); t.do("redo")
+    out.append("# a derived output is on a channel too, and changes places")
+    t.select("n1", "n2"); t.do("derived")
+    t.do("pick", "n2")
+    t.do("channel", 1)
+    t.do("channel", 1)
+    out.append("# two picked: refused")
+    t.do("toggleout", "n1")
+    t.do("channel", 1)
+    out.append("# a second level's outputs, and what the point sends there")
+    t.do("pick", "n1")
+    t.do("newlevel", 1)
+    t.do("pick", "n0-2"); t.do("channel", -1)
+    t.do("savepair", "order"); t.do("empty"); t.do("openpair", "order")
     t.end()
 
     t = Script(out, "levels_files",

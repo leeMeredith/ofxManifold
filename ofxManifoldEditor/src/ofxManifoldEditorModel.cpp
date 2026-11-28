@@ -1390,6 +1390,35 @@ Result Model::trimCurrent(float dB) {
     return r;
 }
 
+Result Model::stepChannel(int dir) {
+    if (currentOutput_ == InvalidTarget) return Result{};
+    if (outputSel_.size() >= 2) {
+        return refusal("select one output to move to another speaker -- "
+                       + std::to_string(outputSel_.size())
+                       + " are selected", 2.5f);
+    }
+    const std::string nm = mapping().targetName(currentOutput_);
+    const int from = mapping().targetChannel(currentOutput_);
+    const int to = from + (dir < 0 ? -1 : 1);
+    if (to < 0) return refusal(nm + " is on the first speaker", 2.0f);
+    // Who is there now, to say where it went.
+    std::string other;
+    for (TargetID t = 0; t < mapping().targetCount(); ++t) {
+        if (mapping().targetChannel(t) == to) other = mapping().targetName(t);
+    }
+    for (const Aggregator& ag : mapping().aggregators()) {
+        if (ag.channel == to) other = ag.name;
+    }
+    map_.swapChannels(from, to);
+    std::string msg = nm + " on speaker " + std::to_string(to + 1)
+                    + " (channel " + std::to_string(to) + ")";
+    if (!other.empty()) {
+        msg += ", " + other + " on speaker " + std::to_string(from + 1)
+             + " (channel " + std::to_string(from) + ")";
+    }
+    return changed(msg, 3.0f);
+}
+
 // TargetIDs after a removed output shift down by one, so the current output
 // has to follow -- the same rule removeNodes() taught for NodeIDs.
 void Model::afterOutputRemoved(TargetID t) {

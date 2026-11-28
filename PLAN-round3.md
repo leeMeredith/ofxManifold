@@ -3222,6 +3222,112 @@ Built 2026-11-22 as planned (all recommended, 2026-11-22).
   change at first survived, the check reading the setting rather than the
   server, and now asks the server.
 
+### 3B-5 plan: a node's own place on each level (spec)
+
+Lee, 2026-11-23 and 27: an hourglass, a funnel, a stadium -- and by the
+same power heights have: one node, several, or all, on one level, moved in
+or out without its copies above and below. Not a level scaled as a whole
+(the first draft of this plan, withdrawn); not nodes narrowed onto each
+other.
+
+**What there is.** A node's (x, y) is kept once, on the floor plan; a level
+adds only heights. So a node is a column, and every slice the same shape.
+
+**A node's place on a level.** Each node on each level may sit **off its
+column**: an (x, y) offset, zero as today. A level's own plan is the floor
+plan -- the same nodes, regions and order -- with each node at its column
+plus its offset there. Moving the column moves every copy, offsets kept.
+
+**How a point is weighted.** Between levels k and k + 1 the slice at t has
+node i at the straight line between its two places, and at the blend of its
+two heights. For a point (x, y, z): find the t whose slice, weighted at
+(x, y) as a floor plan is (mean value coordinates, unchanged), has height z
+under the point; node i on k then weighs w_i (1 - t), on k + 1 w_i t, as
+now. The weights reproduce the point exactly -- the slice's weights
+reproduce (x, y) and its height, and each node's slice place is linear in
+t. t is found by bisection. Inside or outside is asked of the slice: the
+map's edge is where it is at that height.
+
+**Never crossing, never folding, never overlapping.** Every slice from one
+level to the next must be a sound floor plan: no region crossing itself or
+turned over, none over another, no two nodes closer than the floor plan
+allows -- and the height under a point must rise with t. Any change that
+would break this refuses, changing nothing, and says which nodes and
+between which levels: checked on each level and at steps between.
+
+**The rest follows the places.** Outputs, bindings and values are
+untouched. Each output's place is its node's on its level, in `/shape` and
+so in the room: the same protocol. A map with no offsets is today's map
+exactly, by vector.
+
+**In the editor.** The map shows the current level's plan, the others
+faint. A key turns **this level only** on and off, shown in the panel:
+off, a drag moves the column, as today; on, a drag -- or the grid's snap --
+moves the selected nodes on the current level alone. Keys bring the
+selected nodes on this level in toward, or out from, their own centre (all
+selected: the whole level, a stadium's tier in one press), and put them
+back over their columns. Undo as one step. `n` copies the current level's
+places as well as its heights.
+
+**Slices.**
+
+- **3B-5a: the geometry** -- places per node per level; the slice, the
+  weights, t by bisection, inside by slice; Python reference, vectors, gates.
+- **3B-5b: sound slices** -- crossing, folding, overlapping refused by
+  every operation that could cause them: moves, heights, level moves,
+  removals.
+- **3B-5c: files and Map3D** -- map file version 5 when any node is off its
+  column (D-022); outputs' places; derived outputs read the slice.
+- **3B-5d: the editor's model** -- this level only, in and out, back to the
+  column, snap, undo, scripts.
+- **3B-5e: the editor's views** -- the map by level, the 3D view, the
+  panel and keys, the drawlog.
+- **3B-5f: the player** -- drawing by level, the point kept inside the
+  slice at its height, movements and following.
+- **3B-5g: the room, the tutorial, the docs** -- places checked through
+  SuperCollider; a tutorial section; counts.
+
+##### Open questions, with recommendations
+
+1. **A drag: the column, or this level?** *Recommended: the column, as
+   today, until `t` turns "this level only" on* -- one key, said in the
+   panel, rather than a held modifier.
+2. **In and out about what?** *Recommended: the selected nodes' own centre
+   on that level*, 5% a step (shift 1%): `5` in, `6` out; `x` back over
+   the columns.
+3. **Between two levels?** *Recommended: a straight line per node*, like
+   heights.
+4. **How is "sound" checked between levels?** *Recommended: on both levels
+   and at eight steps between, plus each region's turning checked exactly*
+   (it is a quadratic in t) -- stated in the header as what is and is not
+   proven.
+5. **How close may nodes come?** *Recommended: the floor plan's own rule,
+   on every level and between* -- never onto each other.
+6. **A new node, on a map already shaped?** *Recommended: on its column on
+   every level; refused, with the reason, where that would break a slice.*
+7. **Order?** *Recommended: 3B-4b, the core and the extras, then 3B-5a to
+   g; 3B-3c and the tightening after.*
+
+### 3B-4b: the picked output to another speaker
+
+Built 2026-11-27 as planned.
+
+- **`s` and `S`** in the editor (outputs group): the one picked output to
+  the speaker before or after -- its channel down or up one. Whatever is on
+  that channel, an output or a derived output, takes the one it left: the
+  two change places, so no channel is lost and a wrong order is put right
+  a step at a time. A step into a gap, or past the last output, just
+  moves. On the first speaker `s` is refused; several picked is refused,
+  the key dimmed with the reason. The status says both: "n0 on speaker 2
+  (channel 1), n1 on speaker 1 (channel 0)". One undo step.
+- `Mapping::swapChannels`, `Map3D::swapChannels` (every level),
+  `Model::stepChannel`.
+- **Checked**: a script, `speaker_order` (25 steps: the first speaker, a
+  swap, a gap, undo and redo, a derived output, two picked, a second
+  level, saved and opened) -- 76 scripts, 955 steps; the key reaches the
+  app (54 keys); the panel holds at every size; two drawlog frames. 9
+  gates: 582, each caught.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3268,6 +3374,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-3a** | The stage -- a bus per voice, a speaker per output, the room's reverb -- and the native room: `\head` (a model of a head, core UGens only) and `\stereo`; `\facing`, `\reverb`, `\roomSize`; ROOM in the modes file | room vectors in sclang (`make sc`), clicks measured from the headphone channels (`make sc-live`), choices broken by hand |
 | **3B-3b** | The ATK's room: `\atk` -- first order, CIPIC ears, the head's distance and reverb, the middle of the head kept in time; runs without the ATK; install blocks in the modes file | clicks measured from the headphones with the ATK, and asked for without it (`make sc-live`), choices broken by hand |
 | **3B-4a** | `manifold-speakers.scd`: one sound on every speaker at its output's level, by channel; SETUP, CHECK THE SPEAKERS, the sounds, ON HEADPHONES; built-in SuperCollider only | every block run on a four-speaker server, each speaker recorded and measured (`make sc-live`), broken by hand |
+| **3B-4b** | `s` `S`: the picked output to the speaker before or after, the two changing places; every level; undo | an editor script, the key panel and app checks, 9 gates |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.
