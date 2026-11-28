@@ -29,6 +29,13 @@ Formulated differently from the C++ on purpose:
     looks a cell, halving. The plainest cases are not searched for at all:
     flat levels scaled about the centre have a closed form, written out here
     and emitted as ANALYTIC.
+  - Sound slices (3B-5b). A region's area between two levels is fitted here
+    through three slices (the bottom, the middle, the top) and its least
+    value taken from the fit; the C++ multiplies the quadratic out from the
+    nodes' moves. A fold is decided here from the sign of the volume's
+    Jacobian -- the triple product of a triangle's two edges and the way its
+    points travel -- at 65 slices; the C++ compares the height under a point
+    at one slice and the next. Crossing is the textbook segment test.
 
 The property that makes it a 3D map is checked in the runner, not assumed:
 the weights reproduce the point. Sum over (node, level) of weight times
@@ -288,6 +295,7 @@ class Shaped:
 
     def __init__(self, st, nodes, tris, offs):
         self.st, self.tris = st, tris
+        self.floor = dict(nodes)
         self.n = len(nodes)
         self.P = [[tuple(nodes[i]) for i in range(self.n)] for _ in st.H]
         for (k, i), (dx, dy) in offs.items():
@@ -425,6 +433,63 @@ class Shaped:
             k, t = k + 1, 0.0
         return (k, t, self.lam_at(k, t, p))
 
+    def fault(self):
+        """None if sound, else (kind, cell, region)."""
+        L = len(self.P)
+        eps = 1e-6
+        for k in (range(L - 1) if L > 1 else [0]):
+            def ring(r, t):
+                pl, _ = self.cut(k, t)
+                return [pl[i] for i in self.tris[r]]
+
+            def area2(q):
+                return sum(q[i][0] * q[(i + 1) % len(q)][1]
+                           - q[(i + 1) % len(q)][0] * q[i][1]
+                           for i in range(len(q)))
+            for r, ids in enumerate(self.tris):
+                sign = 1.0 if area2([self.floor[i] for i in ids]) > 0 else -1.0
+                f0, fh, f1 = (sign * area2(ring(r, t)) for t in (0.0, 0.5, 1.0))
+                c2, c1 = 2.0 * (f0 - 2.0 * fh + f1), -3.0 * f0 + 4.0 * fh - f1
+                least = min(f0, f1)
+                if c2 != 0.0 and 0.0 < -c1 / (2.0 * c2) < 1.0:
+                    t = -c1 / (2.0 * c2)
+                    least = min(least, f0 + c1 * t + c2 * t * t)
+                if abs(least) < eps:
+                    return ("FLAT", k, r)
+                if least < 0.0:
+                    return ("TURNED", k, r)
+                if len(ids) > 3:
+                    for j in range(65):
+                        if crosses(ring(r, j / 64.0)):
+                            return ("CROSSING", k, r)
+            if L == 1:
+                continue
+            for r, ids in enumerate(self.tris):
+                if len(ids) != 3:
+                    continue                    # folds: triangles only, here
+                sign = 1.0 if area2([self.floor[i] for i in ids]) > 0 else -1.0
+                A = [self.P[k][i] + (self.st.H[k][i],) for i in ids]
+                B = [self.P[k + 1][i] + (self.st.H[k + 1][i],) for i in ids]
+                V = [tuple(b[j] - a[j] for j in range(3)) for a, b in zip(A, B)]
+                for j in range(65):
+                    t = j / 64.0
+                    X = [tuple(a[q] + t * v[q] for q in range(3))
+                         for a, v in zip(A, V)]
+                    e1 = tuple(X[1][q] - X[0][q] for q in range(3))
+                    e2 = tuple(X[2][q] - X[0][q] for q in range(3))
+                    for lam in ((1 / 3, 1 / 3, 1 / 3), (0.8, 0.1, 0.1),
+                                (0.1, 0.8, 0.1), (0.1, 0.1, 0.8),
+                                (0.45, 0.45, 0.1), (0.1, 0.45, 0.45),
+                                (0.45, 0.1, 0.45)):
+                        ft = tuple(sum(l * v[q] for l, v in zip(lam, V))
+                                   for q in range(3))
+                        det = (e1[0] * (e2[1] * ft[2] - e2[2] * ft[1])
+                               - e1[1] * (e2[0] * ft[2] - e2[2] * ft[0])
+                               + e1[2] * (e2[0] * ft[1] - e2[1] * ft[0]))
+                        if sign * det < -1e-9:
+                            return ("FOLDED", k, r)
+        return None
+
     def weigh(self, p, z):
         L = len(self.P)
         if L == 1:
@@ -438,6 +503,22 @@ class Shaped:
         if f is None:
             return position_at(self.st, {}, z)
         return f[0] + f[1]
+
+
+def crosses(q):
+    """Do two edges of the ring that share no corner cross?"""
+    def side(a, b, c):
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    n = len(q)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):
+                continue
+            a, b, c, d = q[i], q[(i + 1) % n], q[j], q[(j + 1) % n]
+            if side(a, b, c) * side(a, b, d) < 0 and \
+                    side(c, d, a) * side(c, d, b) < 0:
+                return True
+    return False
 
 
 def offs_s(sh, nodes):
@@ -1208,6 +1289,138 @@ def build():
     out.append("")
 
     out.append("#" + "-" * 68)
+    out.append("# SOUND SLICES (round 3B-5b). SOUND: the first fault of a shaped")
+    out.append("# stack -- FLAT, TURNED, CROSSING or FOLDED, the cell and the")
+    out.append("# region -- or OK. STRY: a change tried through the checked doors;")
+    out.append("# refused, nothing may have changed.")
+    out.append("#" + "-" * 68)
+    quad = [(0, 1, 2, 3)]
+    out.append("NODES quad " + " ".join(f"{i}:{fmt(x)},{fmt(y)}"
+                                        for i, (x, y) in sorted(sq.items())))
+    out.append("TRIS quad 0,1,2,3")
+    stack_rec("qpair", [("COPY", 0, 1.0)], ["one four-sided region, two levels"],
+              plan="quad")
+    stack_rec("ramp", [("COPY", 0, 1.0), ("RAISE", 0, 0.5, [1, 2])],
+              ["two levels, the lower a ramp: nodes 1 and 2 raised half way"])
+    stack_rec("steep", [("COPY", 0, 1.0), ("RAISE", 0, 0.9, [1, 2])],
+              ["the same, steeper: raised to 0.9"])
+
+    def rot(k, deg, f=1.0):
+        c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+        o = {}
+        for i in sq:
+            x, y = sq[i][0] - C[0], sq[i][1] - C[1]
+            o[(k, i)] = (f * (c * x - s_ * y) - x, f * (s_ * x + c * y) - y)
+        return o
+
+    def shaped_on(name, frm, offs, note, regions=tris):
+        for line in note:
+            out.append("# " + line)
+        sh = Shaped(stacks[frm], sq, regions, offs)
+        shapes[name] = sh
+        out.append(f"SHAPED {name} FROM {frm} OFFS " + " ".join(
+            f"{k}:{i}={fmt(d[0])},{fmt(d[1])}"
+            for (k, i), d in sorted(offs.items())))
+        return sh
+
+    shift = {(1, i): (0.5, 0.0) for i in sq}
+    shaped_on("turned", "pair", {(1, 2): (-0.9, -0.9)},
+              ["node 2 dragged past the opposite corner on the top level"])
+    shaped_on("spun", "pair", rot(1, 180.0, 1.5),
+              ["the top level turned half round and half as wide again: each",
+               "level is sound, but 0.4 of the way up every node is at the",
+               "centre -- between two of the slices the C++ looks at"])
+    shaped_on("quarter", "pair", rot(1, 90.0),
+              ["turned a quarter round: narrower half way, never flat"])
+    shaped_on("onto", "pair", {(1, 2): (0.0, -0.8)},
+              ["node 2 put onto node 1 on the top level"])
+    shaped_on("qfunnel", "qpair", scaled(1, 1.5),
+              ["the four-sided region as a funnel"], quad)
+    shaped_on("bowtie", "qpair", {(1, 2): (-0.9, -0.4)},
+              ["node 2 pulled across the far edge on the top level"], quad)
+    shaped_on("sheared", "ramp", shift,
+              ["a ramp below, the top level half a map to the right: the",
+               "columns lean, but less steeply than the ramp climbs"])
+    shaped_on("folded", "steep", shift,
+              ["the same lean over the steeper ramp: on the right the columns",
+               "lean flatter than the ramp, and the volume folds over itself"])
+    shaped_on("oneflat", "flat", {(0, 2): (0.2, 0.1)},
+              ["one level, node 2 off its column"])
+    shaped_on("oneturned", "flat", {(0, 2): (-0.9, -0.9)}, ["and turned over"])
+    spin3 = rot(1, 90.0); spin3.update(rot(2, 180.0))
+    shaped_on("spiral", "three", spin3,
+              ["three levels, each a quarter turn on from the one below"])
+
+    shaped_on("plainpair", "pair", {}, ["two levels, nothing off its column"])
+
+    def fault_s(f):
+        return "OK" if f is None else f"{f[0]} {f[1]} {f[2]}"
+
+    for nm in ["funnel", "hourglass", "onenode", "bentshape", "touchshape",
+               "turned", "spun", "quarter", "onto", "qfunnel", "bowtie",
+               "sheared", "folded", "oneflat", "oneturned", "spiral"]:
+        out.append(f"SOUND sound_{nm} CROSS {nm} EXPECT "
+                   + fault_s(shapes[nm].fault()))
+    assert shapes["spun"].fault()[0] == "FLAT"
+    assert shapes["bowtie"].fault()[0] == "CROSSING"
+    assert shapes["folded"].fault()[0] == "FOLDED"
+    assert shapes["turned"].fault()[0] == "TURNED"
+    assert shapes["sheared"].fault() is None and shapes["spiral"].fault() is None
+
+    import copy as _copy
+
+    def stry(name, sname, op, note=None):
+        if note:
+            for line in note:
+                out.append("# " + line)
+        sh = _copy.deepcopy(shapes[sname])
+        ok = True
+        if op[0] == "OFFS":
+            for i, d in op[2].items():
+                sh.P[op[1]][i] = (sq[i][0] + d[0], sq[i][1] + d[1])
+            txt = f"OFFS {op[1]} " + ";".join(
+                f"{i}={fmt(d[0])},{fmt(d[1])}" for i, d in sorted(op[2].items()))
+        elif op[0] == "RAISE":
+            ok = not sh.st.raise_(op[1], op[3], op[2])
+            txt = f"RAISE {op[1]} {fmt(op[2])} " + ",".join(map(str, op[3]))
+        elif op[0] == "MOVE":
+            ok = not sh.st.move(op[1], op[2])
+            txt = f"MOVE {op[1]} {fmt(op[2])}"
+        elif op[0] == "REMOVE":
+            ok = sh.st.remove(op[1])
+            del sh.P[op[1]]
+            txt = f"REMOVE {op[1]}"
+        f = sh.fault() if ok else None
+        res = "REFUSED -" if not ok else ("OK" if f is None
+                                          else "REFUSED " + fault_s(f))
+        out.append(f"STRY {name} CROSS {sname} OP {txt} EXPECT {res}")
+        return res
+
+    assert stry("try_push_further", "onenode", ("OFFS", 1, {2: (0.3, 0.2)}),
+                ["a node pushed further out: taken"]) == "OK"
+    assert stry("try_drag_across", "onenode", ("OFFS", 1, {2: (-0.9, -0.9)}),
+                ["dragged across the map: refused, and still where it was"]
+                ).startswith("REFUSED")
+    assert stry("try_all_together", "plainpair", ("OFFS", 1, dict(
+        (i, d) for (k, i), d in rot(1, 90.0).items()))) == "OK"
+    stry("try_one_of_a_turn", "plainpair", ("OFFS", 1, {0: rot(1, 90.0)[(1, 0)]}),
+         ["one node of that quarter turn on its own: node 0 lands on node 1's",
+          "column -- the group is judged by where it ends, a single move too"])
+    assert stry("try_steepen_the_ramp", "sheared", ("RAISE", 0, 0.4, [1, 2]),
+                ["a height changed: the ramp steepened under leaning columns",
+                 "folds the volume, and is refused"]).startswith("REFUSED FOLDED")
+    assert stry("try_steepen_a_little", "sheared", ("RAISE", 0, 0.1, [1, 2])) == "OK"
+    assert stry("try_lower_the_top", "sheared", ("MOVE", 1, -0.4),
+                ["a level moved: the top brought down flattens the lean past",
+                 "the ramp's climb"]).startswith("REFUSED FOLDED")
+    assert stry("try_remove_the_middle", "spiral", ("REMOVE", 1),
+                ["a level removed: its neighbours meet, a half turn apart"]
+                ).startswith("REFUSED FLAT")
+    stry("try_height_refused_first", "sheared", ("RAISE", 0, 5.0, [1, 2]),
+         ["a height refused by the levels' own rule, before any slice"])
+    out.append("")
+
+    out.append("#" + "-" * 68)
     out.append("# NODES ADDED AND REMOVED. A new node needs nothing: on every")
     out.append("# level it sits at that level's start. Removing node 1 of four")
     out.append("# renumbers 2 and 3; the bend on old node 2 must follow it to")
@@ -1905,6 +2118,7 @@ def main():
                                             "REFUSE2D", "UPOS", "ZPOS",
                                             "EVALSU", "UPOSS", "ZPOSS",
                                             "SCOPY", "SREMAP",
+                                            "SOUND", "STRY",
                                             "EVALU", "REFUSEOLD"):
             counts[parts[2]] = counts.get(parts[2], 0) + 1
     print(f"wrote {OUT}")

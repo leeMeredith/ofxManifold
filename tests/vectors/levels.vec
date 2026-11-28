@@ -455,6 +455,87 @@ SCOPY copy_takes_shape ANALYTIC bentshape FROM 2 BASE 1.5 EXPECT 3 OFFS L0 0,0;0
 SREMAP remove_node_1 ANALYTIC bentshape TABLE 0,-,1,2 OFFS L0 0,0;0,0;0,0 L1 -0.05,-0.05;0,0;0,0 L2 -0.1,-0.1;0.1,0.1;-0.1,0.1
 
 #--------------------------------------------------------------------
+# SOUND SLICES (round 3B-5b). SOUND: the first fault of a shaped
+# stack -- FLAT, TURNED, CROSSING or FOLDED, the cell and the
+# region -- or OK. STRY: a change tried through the checked doors;
+# refused, nothing may have changed.
+#--------------------------------------------------------------------
+NODES quad 0:0.1,0.1 1:0.9,0.1 2:0.9,0.9 3:0.1,0.9
+TRIS quad 0,1,2,3
+# one four-sided region, two levels
+STACK qpair NODES quad OPS COPY 0 1 =1
+HEIGHTS heights_qpair ANALYTIC qpair L0 0,0,0,0 L1 1,1,1,1
+# two levels, the lower a ramp: nodes 1 and 2 raised half way
+STACK ramp NODES square OPS COPY 0 1 =1 ; RAISE 0 0.5 1,2 =OK
+HEIGHTS heights_ramp ANALYTIC ramp L0 0,0.5,0.5,0 L1 1,1,1,1
+# the same, steeper: raised to 0.9
+STACK steep NODES square OPS COPY 0 1 =1 ; RAISE 0 0.9 1,2 =OK
+HEIGHTS heights_steep ANALYTIC steep L0 0,0.9,0.9,0 L1 1,1,1,1
+# node 2 dragged past the opposite corner on the top level
+SHAPED turned FROM pair OFFS 1:2=-0.9,-0.9
+# the top level turned half round and half as wide again: each
+# level is sound, but 0.4 of the way up every node is at the
+# centre -- between two of the slices the C++ looks at
+SHAPED spun FROM pair OFFS 1:0=1,1 1:1=-1,1 1:2=-1,-1 1:3=1,-1
+# turned a quarter round: narrower half way, never flat
+SHAPED quarter FROM pair OFFS 1:0=0.8,0 1:1=0,0.8 1:2=-0.8,0 1:3=0,-0.8
+# node 2 put onto node 1 on the top level
+SHAPED onto FROM pair OFFS 1:2=0,-0.8
+# the four-sided region as a funnel
+SHAPED qfunnel FROM qpair OFFS 1:0=-0.2,-0.2 1:1=0.2,-0.2 1:2=0.2,0.2 1:3=-0.2,0.2
+# node 2 pulled across the far edge on the top level
+SHAPED bowtie FROM qpair OFFS 1:2=-0.9,-0.4
+# a ramp below, the top level half a map to the right: the
+# columns lean, but less steeply than the ramp climbs
+SHAPED sheared FROM ramp OFFS 1:0=0.5,0 1:1=0.5,0 1:2=0.5,0 1:3=0.5,0
+# the same lean over the steeper ramp: on the right the columns
+# lean flatter than the ramp, and the volume folds over itself
+SHAPED folded FROM steep OFFS 1:0=0.5,0 1:1=0.5,0 1:2=0.5,0 1:3=0.5,0
+# one level, node 2 off its column
+SHAPED oneflat FROM flat OFFS 0:2=0.2,0.1
+# and turned over
+SHAPED oneturned FROM flat OFFS 0:2=-0.9,-0.9
+# three levels, each a quarter turn on from the one below
+SHAPED spiral FROM three OFFS 1:0=0.8,0 1:1=0,0.8 1:2=-0.8,0 1:3=0,-0.8 2:0=0.8,0.8 2:1=-0.8,0.8 2:2=-0.8,-0.8 2:3=0.8,-0.8
+# two levels, nothing off its column
+SHAPED plainpair FROM pair OFFS 
+SOUND sound_funnel CROSS funnel EXPECT OK
+SOUND sound_hourglass CROSS hourglass EXPECT OK
+SOUND sound_onenode CROSS onenode EXPECT OK
+SOUND sound_bentshape CROSS bentshape EXPECT OK
+SOUND sound_touchshape CROSS touchshape EXPECT OK
+SOUND sound_turned CROSS turned EXPECT TURNED 0 0
+SOUND sound_spun CROSS spun EXPECT FLAT 0 0
+SOUND sound_quarter CROSS quarter EXPECT OK
+SOUND sound_onto CROSS onto EXPECT FLAT 0 0
+SOUND sound_qfunnel CROSS qfunnel EXPECT OK
+SOUND sound_bowtie CROSS bowtie EXPECT CROSSING 0 0
+SOUND sound_sheared CROSS sheared EXPECT OK
+SOUND sound_folded CROSS folded EXPECT FOLDED 0 0
+SOUND sound_oneflat CROSS oneflat EXPECT OK
+SOUND sound_oneturned CROSS oneturned EXPECT TURNED 0 0
+SOUND sound_spiral CROSS spiral EXPECT OK
+# a node pushed further out: taken
+STRY try_push_further CROSS onenode OP OFFS 1 2=0.3,0.2 EXPECT OK
+# dragged across the map: refused, and still where it was
+STRY try_drag_across CROSS onenode OP OFFS 1 2=-0.9,-0.9 EXPECT REFUSED TURNED 0 0
+STRY try_all_together CROSS plainpair OP OFFS 1 0=0.8,0;1=0,0.8;2=-0.8,0;3=0,-0.8 EXPECT OK
+# one node of that quarter turn on its own: node 0 lands on node 1's
+# column -- the group is judged by where it ends, a single move too
+STRY try_one_of_a_turn CROSS plainpair OP OFFS 1 0=0.8,0 EXPECT REFUSED FLAT 0 0
+# a height changed: the ramp steepened under leaning columns
+# folds the volume, and is refused
+STRY try_steepen_the_ramp CROSS sheared OP RAISE 0 0.4 1,2 EXPECT REFUSED FOLDED 0 0
+STRY try_steepen_a_little CROSS sheared OP RAISE 0 0.1 1,2 EXPECT OK
+# a level moved: the top brought down flattens the lean past
+# the ramp's climb
+STRY try_lower_the_top CROSS sheared OP MOVE 1 -0.4 EXPECT REFUSED FOLDED 0 0
+# a level removed: its neighbours meet, a half turn apart
+STRY try_remove_the_middle CROSS spiral OP REMOVE 1 EXPECT REFUSED FLAT 0 0
+# a height refused by the levels' own rule, before any slice
+STRY try_height_refused_first CROSS sheared OP RAISE 0 5 1,2 EXPECT REFUSED -
+
+#--------------------------------------------------------------------
 # NODES ADDED AND REMOVED. A new node needs nothing: on every
 # level it sits at that level's start. Removing node 1 of four
 # renumbers 2 and 3; the bend on old node 2 must follow it to

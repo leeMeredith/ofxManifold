@@ -3395,6 +3395,43 @@ nothing in the editor, the player or a file uses it yet.
   between the last look inside and the edge; two added), and one over a
   line that turned out to do nothing (removed, with its gate).
 
+### 3B-5b: sound slices
+
+Built 2026-11-28. The core only, as 3B-5a.
+
+- **`Levels::unsound(plan)`** gives the first fault -- `Flat`, `TurnedOver`,
+  `Crossing` or `Folded`, with the cell and the region -- or none. A
+  region's area between two levels is a quadratic in t and its least value
+  is taken exactly, so a region that flattens BETWEEN two sound levels is
+  caught wherever it happens; crossing is looked at on 9 slices a cell;
+  folding by the height under points across each region, one slice to the
+  next. One level alone: its own plan.
+- **`attempt(plan, change, &why)`** makes any change -- heights, a level
+  moved or removed, places -- and keeps it only if the map is still sound;
+  **`setOffsets(plan, k, list, &why)`** is the checked door for places, a
+  group judged by where it ends. `setOffset()` stays unchecked, for a
+  loader that asks `unsound()` afterwards.
+- *Changed from the plan.* (1) "None over another, no two nodes closer than
+  the floor plan allows": the floor plan has never refused overlapping
+  regions or near nodes, only a region flattened, turned or crossing -- so a
+  level's plan is held to exactly the floor plan's rule, and the header says
+  so. Nodes cannot land on each other where that flattens a region. (2) A
+  refusal names the cell and the region, not the nodes. (3) A column moved
+  on the floor plan is checked by whoever moves it, with `unsound()`: wired
+  in 3B-5c and d, where the floor plan and the levels are held together.
+- **The reference** fits the area through three slices; decides a fold from
+  the sign of the volume's Jacobian at 65 slices, not from heights; the
+  textbook segment test for crossing.
+- **Vectors** 28 new (`levels` 291; 1376 in all): 16 stacks' first fault --
+  the five from 3B-5a sound, a quarter turn, a three-level spiral, a
+  four-sided funnel, a lean over a ramp; turned, flat on a level, flat 0.4
+  of the way between two sound levels, a bow-tie, a fold -- and 9 changes
+  tried: a node pushed, dragged across, a group that only works together,
+  one of that group alone, a ramp steepened into a fold and a little, the
+  top lowered into a fold, a middle level removed, a height refused first;
+  each refusal leaving every height and place as it was. **Gates** 9 new:
+  607, each caught first time.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3444,6 +3481,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-4b** | `s` `S`: the picked output to the speaker before or after, the two changing places; every level; undo | an editor script, the key panel and app checks, 9 gates |
 | **core / extras** | Rooms plug into the patch (`~manifold[\\rooms]`); the ATK's room, its choices and its install steps in `supercollider/extras/atk`; the core names no extra | every live check with and without the ATK, the core's files read for any extra's name, broken by hand |
 | **3B-5a** | A node's own place on each level, the geometry: `evaluateMoved`, offsets per level, the slice, weights by the slice at the point's height, the map's edge by height | Python reference with closed forms, 55 vectors, 16 gates |
+| **3B-5b** | Sound slices: `unsound`, `attempt`, `setOffsets` -- flattened, turned over, crossing, folded refused, nothing changed | reference by fitted area and Jacobian, 28 vectors, 9 gates |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

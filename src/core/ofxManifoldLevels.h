@@ -257,8 +257,10 @@ public:
     // round 3B-5b on). A part of the map thinner than a step in t, with the
     // point outside at the looks either side of it, is not found: outside.
     //
-    // setOffset() checks nothing yet: round 3B-5b makes every change that
-    // would cross, fold or overlap a slice refuse, as heights do.
+    // setOffset() checks nothing: it is for a loader, which asks unsound()
+    // once everything is in place. An editor changes places through
+    // setOffsets() and heights through attempt(), which refuse ("sound
+    // slices", below).
 
     static constexpr int kSliceSteps = 8;
 
@@ -287,6 +289,7 @@ public:
     }
 
     // Put node n at `off` from its column on level k. Unchecked (see above).
+    // [setOffsets(), below, is the checked one.]
     bool setOffset(LevelID k, NodeID n, glm::vec2 off) {
         if (k >= levels_.size() || n == InvalidNode) return false;
         Level& l = levels_[k];
@@ -370,6 +373,153 @@ public:
         Found f;
         if (find(plan, xy, z, hint, f)) return float(f.cell) + f.t;
         return positionAt(std::vector<WeightedNode>{}, z);
+    }
+
+    // ---- sound slices (round 3B-5b) -------------------------------------------
+    //
+    // A shaped map is SOUND when every slice, from each level to the next, is
+    // a floor plan the floor plan's own rule would accept -- setNodePositions()
+    // in ofxManifold2D.h: no region flattened (its area under kAreaEpsilon),
+    // turned over, or crossing itself -- and the volume does not FOLD: under
+    // any (x, y) the height rises, or holds, as the slice goes up. Folding is
+    // what the search for a height (find(), below) cannot survive.
+    //
+    // The rule is the floor plan's and no stricter: it has never refused one
+    // region lying over another, or two nodes close together short of
+    // flattening a region, and a level's own plan does not either.
+    //
+    // What is proven and what is looked at. A region's area between two
+    // levels is a quadratic in t, since every node moves in a straight line:
+    // flattened and turned over are decided EXACTLY, at the quadratic's least
+    // value, not at samples. Crossing (regions of four or more) is looked at
+    // on kSliceSteps + 1 slices a cell, both levels among them. Folding is
+    // looked at between each pair of those slices, under points across each
+    // region -- its middle, and near each corner and each edge. A cross or a
+    // fold that comes and goes between two looks is not seen.
+    //
+    // A map with no node off its column is sound by the rules it already
+    // had, and is not looked at.
+
+    struct SliceFault {
+        enum Kind { None, Flat, TurnedOver, Crossing, Folded };
+        Kind     kind = None;
+        LevelID  below = 0;                 // between this level and the next
+        RegionID region = InvalidRegion;
+        explicit operator bool() const { return kind != None; }
+    };
+
+    // The first fault, by cell from the bottom and then by region: each
+    // region's shape first, then folds. None: sound.
+    SliceFault unsound(const Manifold2D& plan) const {
+        SliceFault f;
+        if (!shaped()) return f;
+        const std::size_t n = levels_.size();
+        const bool one = n == 1;                  // its own plan, no cell
+        for (LevelID k = 0; k + 1 < n || (one && k == 0); ++k) {
+            const int steps = one ? 0 : kSliceSteps;
+            std::vector<std::vector<glm::vec2>> cut;
+            for (int j = 0; j <= steps; ++j) {
+                cut.push_back(slice(k, one ? 0.0f : float(j) / float(steps)));
+            }
+            auto ringAt = [&](RegionID r, int j) {
+                std::vector<glm::vec2> ring;
+                for (NodeID id : plan.region(r).ids()) {
+                    const glm::vec2 off = id < cut[j].size() ? cut[j][id]
+                                                             : glm::vec2(0.0f);
+                    ring.push_back(plan.node(id).position + off);
+                }
+                return ring;
+            };
+            for (RegionID r = 0; r < plan.regionCount(); ++r) {
+                f.below = k;
+                f.region = r;
+                // The area's quadratic: c0 + c1 t + c2 t^2.
+                const std::vector<glm::vec2> a = ringAt(r, 0);
+                const std::vector<glm::vec2> b = ringAt(r, steps);
+                float c0 = 0.0f, c1 = 0.0f, c2 = 0.0f;
+                for (std::size_t i = 0; i < a.size(); ++i) {
+                    const std::size_t j = (i + 1) % a.size();
+                    const glm::vec2 di = b[i] - a[i], dj = b[j] - a[j];
+                    c0 += cross2(a[i], a[j]);
+                    c1 += cross2(a[i], dj) + cross2(di, a[j]);
+                    c2 += cross2(di, dj);
+                }
+                const float sign = float(plan.region(r).constructionSign());
+                float least = std::min(sign * c0, sign * (c0 + c1 + c2));
+                if (c2 != 0.0f) {
+                    const float t = -c1 / (2.0f * c2);
+                    if (t > 0.0f && t < 1.0f) {
+                        least = std::min(least, sign * (c0 + t * (c1 + t * c2)));
+                    }
+                }
+                if (std::fabs(least) < kAreaEpsilon) { f.kind = SliceFault::Flat; return f; }
+                if (least < 0.0f) { f.kind = SliceFault::TurnedOver; return f; }
+                if (a.size() > 3) {
+                    for (int j = 0; j <= steps; ++j) {
+                        if (ringSelfIntersects(ringAt(r, j))) {
+                            f.kind = SliceFault::Crossing;
+                            return f;
+                        }
+                    }
+                }
+            }
+            // Folds: under each point, the height at one slice and the next.
+            for (RegionID r = 0; r < plan.regionCount() && !one; ++r) {
+                f.below = k;
+                f.region = r;
+                for (int j = 0; j < steps; ++j) {
+                    const std::vector<glm::vec2> ring = ringAt(r, j);
+                    glm::vec2 mid(0.0f);
+                    for (const glm::vec2& v : ring) mid += v / float(ring.size());
+                    std::vector<glm::vec2> under{mid};
+                    for (std::size_t i = 0; i < ring.size(); ++i) {
+                        const glm::vec2 edge =
+                            0.5f * (ring[i] + ring[(i + 1) % ring.size()]);
+                        under.push_back(ring[i] + 0.08f * (mid - ring[i]));
+                        under.push_back(edge + 0.08f * (mid - edge));
+                    }
+                    for (const glm::vec2& q : under) {
+                        float h0 = 0.0f, h1 = 0.0f;
+                        if (!heightIn(plan, q, k, cut[j], float(j) / float(steps), r, h0)
+                         || !heightIn(plan, q, k, cut[j + 1], float(j + 1) / float(steps), r, h1)) {
+                            continue;
+                        }
+                        if (h1 < h0 - 1e-5f) { f.kind = SliceFault::Folded; return f; }
+                    }
+                }
+            }
+        }
+        return SliceFault{};
+    }
+
+    // Make a change -- to heights, levels or places -- and keep it only if
+    // the map is still sound. `change` is given this Levels and says whether
+    // it did anything; refused or unsound, nothing is changed, and `why`
+    // says what would have broken.
+    template <typename Change>
+    bool attempt(const Manifold2D& plan, Change change,
+                 SliceFault* why = nullptr) {
+        if (why) *why = SliceFault{};
+        const std::vector<Level> before = levels_;
+        if (!change(*this)) { levels_ = before; return false; }
+        const SliceFault fault = unsound(plan);
+        if (why) *why = fault;
+        if (fault) { levels_ = before; return false; }
+        return true;
+    }
+
+    // Put several nodes of level k at their offsets as ONE change: all, or
+    // none. The final places are what is checked, as the floor plan checks a
+    // group move.
+    bool setOffsets(const Manifold2D& plan, LevelID k,
+                    const std::vector<std::pair<NodeID, glm::vec2>>& offs,
+                    SliceFault* why = nullptr) {
+        return attempt(plan, [&](Levels& l) {
+            for (const auto& o : offs) {
+                if (!l.setOffset(k, o.first, o.second)) return false;
+            }
+            return true;
+        }, why);
     }
 
     // ---- making levels ----------------------------------------------------
@@ -666,6 +816,21 @@ private:
         std::vector<glm::vec2> places = {};  // offsets by NodeID; past the end, none
     };
     std::vector<Level> levels_;
+
+    static float cross2(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
+
+    // The height under q in the slice `cut`, t of the way up cell k; false
+    // where q is outside it.
+    bool heightIn(const Manifold2D& plan, glm::vec2 q, LevelID k,
+                  const std::vector<glm::vec2>& cut, float t, RegionID hint,
+                  float& h) const {
+        const Evaluation e = plan.evaluateMoved(q, cut, hint);
+        if (!e.inside) return false;
+        const float lo = heightAt(k, e.weights);
+        const float hi = heightAt(k + 1, e.weights);
+        h = lo + t * (hi - lo);
+        return true;
+    }
 
     // ---- finding a height in a shaped map (3B-5a) ----------------------------
 

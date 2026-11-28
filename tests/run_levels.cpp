@@ -814,6 +814,88 @@ int main(int argc, char** argv) {
                        << ", expected " << want;
             record(cls, name, ok, d.str());
 
+        } else if (kind == "SOUND" || kind == "STRY") {
+            // Sound slices (3B-5b): a stack's first fault; or a change tried
+            // through the checked doors, which refused must change nothing.
+            std::string sn; in >> sn;
+            Stack st = stacks[sn];
+            const Manifold2D& fl = floors[st.plan];
+            const std::size_t nodes = plans[st.plan].pos.size();
+            auto say = [](const Levels::SliceFault& f) {
+                static const char* names[] = {"OK", "FLAT", "TURNED", "CROSSING", "FOLDED"};
+                std::string out = names[f.kind];
+                if (f) out += " " + std::to_string(f.below) + " " + std::to_string(f.region);
+                return out;
+            };
+            auto dump = [&](const Levels& l) {
+                std::ostringstream o;
+                o << l.count();
+                for (LevelID k = 0; k < l.count(); ++k) {
+                    o << " |" << l.base(k);
+                    for (NodeID i = 0; i < nodes; ++i) {
+                        o << " " << l.height(k, i) << "," << l.offset(k, i).x
+                          << "," << l.offset(k, i).y;
+                    }
+                }
+                return o.str();
+            };
+            std::string got;
+            if (kind == "SOUND") {
+                got = say(st.levels.unsound(fl));
+            } else {
+                expectKeyword(in, "OP");
+                std::string verb; in >> verb;
+                const std::string before = dump(st.levels);
+                Levels::SliceFault why;
+                bool done = false;
+                std::vector<std::pair<NodeID, glm::vec2>> asked;
+                LevelID k = 0;
+                if (verb == "OFFS") {
+                    std::string list; in >> k >> list;
+                    for (const auto& one : splitOn(list, ';')) {
+                        const std::size_t eq = one.find('='), cm = one.find(',');
+                        asked.emplace_back(
+                            static_cast<NodeID>(std::stoul(one.substr(0, eq))),
+                            glm::vec2(std::stof(one.substr(eq + 1, cm - eq - 1)),
+                                      std::stof(one.substr(cm + 1))));
+                    }
+                    done = st.levels.setOffsets(fl, k, asked, &why);
+                } else if (verb == "RAISE") {
+                    float dz; std::string ns; in >> k >> dz >> ns;
+                    std::vector<NodeID> ids;
+                    for (const auto& w : splitOn(ns, ',')) {
+                        ids.push_back(static_cast<NodeID>(std::stoul(w)));
+                    }
+                    done = st.levels.attempt(fl, [&](Levels& l) {
+                        return l.raise(k, ids, dz); }, &why);
+                } else if (verb == "MOVE") {
+                    float dz; in >> k >> dz;
+                    done = st.levels.attempt(fl, [&](Levels& l) {
+                        return l.moveLevel(k, dz, nodes); }, &why);
+                } else if (verb == "REMOVE") {
+                    in >> k;
+                    done = st.levels.attempt(fl, [&](Levels& l) {
+                        return l.removeLevel(k); }, &why);
+                }
+                got = done ? "OK" : (why ? "REFUSED " + say(why) : "REFUSED -");
+                if (!done && dump(st.levels) != before) {
+                    got += " (but something changed)";
+                }
+                if (done && dump(st.levels) == before) got += " (but nothing changed)";
+                for (const auto& o : asked) {
+                    const glm::vec2 at = st.levels.offset(k, o.first);
+                    if (done && !(close(at.x, o.second.x) && close(at.y, o.second.y))) {
+                        got += " (but a node is not where it was put)";
+                    }
+                }
+            }
+            expectKeyword(in, "EXPECT");
+            std::string want, w;
+            while (in >> w) want += (want.empty() ? "" : " ") + w;
+            const bool ok = got == want;
+            if (!ok) d << "got " << got << ", expected " << want;
+            record(cls, name, ok, d.str());
+
         } else if (kind == "SCOPY" || kind == "SREMAP") {
             // A copied level takes its places; a removed node's follow.
             std::string sn; in >> sn;

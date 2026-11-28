@@ -3187,3 +3187,50 @@ file: src/core/ofxManifoldLevels.h
 find:                 placed[to] = l.places[old];
 replace:                 placed[to] = l.places[to];
 
+# ---- round 3B-5b: sound slices ----
+
+gate: A flattened slice is sound
+file: src/core/ofxManifoldLevels.h
+find:                 if (std::fabs(least) < kAreaEpsilon) { f.kind = SliceFault::Flat; return f; }
+replace:                 if (false) { f.kind = SliceFault::Flat; return f; }
+
+gate: A turned-over slice is sound
+file: src/core/ofxManifoldLevels.h
+find:                 if (least < 0.0f) { f.kind = SliceFault::TurnedOver; return f; }
+replace:                 if (false) { f.kind = SliceFault::TurnedOver; return f; }
+
+gate: A region's area is looked at on the two levels only
+file: src/core/ofxManifoldLevels.h
+find:                     if (t > 0.0f && t < 1.0f) {
+replace:                     if (false) {
+
+gate: The upper level's shape is taken for the lower's
+file: src/core/ofxManifoldLevels.h
+find:                 const std::vector<glm::vec2> b = ringAt(r, steps);
+replace:                 const std::vector<glm::vec2> b = ringAt(r, 0);
+
+gate: A crossing slice is sound
+file: src/core/ofxManifoldLevels.h
+find:                         if (ringSelfIntersects(ringAt(r, j))) {
+replace:                         if (false) {
+
+gate: A folded volume is sound
+file: src/core/ofxManifoldLevels.h
+find:                         if (h1 < h0 - 1e-5f) { f.kind = SliceFault::Folded; return f; }
+replace:                         if (false) { f.kind = SliceFault::Folded; return f; }
+
+gate: One level's own shape is never looked at
+file: src/core/ofxManifoldLevels.h
+find:         for (LevelID k = 0; k + 1 < n || (one && k == 0); ++k) {
+replace:         for (LevelID k = 0; k + 1 < n; ++k) {
+
+gate: An unsound change is refused but kept
+file: src/core/ofxManifoldLevels.h
+find:         if (fault) { levels_ = before; return false; }
+replace:         if (fault) { return false; }
+
+gate: A change is never checked for soundness
+file: src/core/ofxManifoldLevels.h
+find:         const SliceFault fault = unsound(plan);
+replace:         const SliceFault fault{};
+
