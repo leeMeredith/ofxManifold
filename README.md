@@ -227,7 +227,10 @@ height as a change of tone, distance as level and air, one shared reverb --
 in core SuperCollider alone; or, with the Ambisonic Toolkit installed
 (3B-3b), each speaker encoded at its direction and heard through measured
 ears, front and back, up and down far clearer; or panned in stereo as
-before. The modes file's last blocks install the toolkit.
+before. The patch and its modes file need nothing installed: the toolkit's
+room is an extra, in `supercollider/extras/atk`, with a choices file of its
+own (`manifold-atk-modes.scd`: START, the room, what is installed and how
+to install the rest) -- rooms plug into the patch, a folder each.
 **To hear what it can do without reading the patch, open
 `supercollider/manifold-modes.scd`**: run its START block, start
 example-osc, and pick one block from each group -- notes, shared outputs,

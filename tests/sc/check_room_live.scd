@@ -17,6 +17,10 @@
 (
 var root = thisProcess.nowExecutingPath.dirname.dirname.dirname;
 var patch = File.readAllString(root +/+ "example-osc/supercollider/manifold-receive.scd");
+var atkModes = root +/+ "example-osc/supercollider/extras/atk/manifold-atk-modes.scd";
+var atkThere = \Atk.asClass.notNil and: { \FoaDecoderKernel.asClass.notNil }
+    and: { \FoaPanB.asClass.notNil }
+    and: { File.exists(\Atk.asClass.userKernelDir +/+ "FOA" +/+ "decoders" +/+ "cipic") };
 var me = NetAddr.localAddr;
 var pass = 0, fail = 0;
 var check = { |name, ok, why|
@@ -148,8 +152,35 @@ fork {
     0.5.wait;
     check.("head_speakers_again", m[\speakers].every { |sp| sp.defName == \manifoldHead },
         m[\speakers].collect(_.defName).asString);
-    // The ATK's room (3B-3b), when the ATK is installed: measured ears.
-    if (~manifold[\atkReady]) {
+    // A room that is not here, asked for: the head, and a warning. The patch
+    // alone has two rooms, and nothing of any extra.
+    check.("the_patch_has_two_rooms", ~manifold[\rooms].keys.asArray.sort == [\head, \stereo],
+        ~manifold[\rooms].keys.asString);
+    ~manifold[\choose].("check: a room not here", (room: \elsewhere));
+    0.5.wait;
+    check.("no_such_room_stays_with_the_head", ~manifold[\room] == \head
+        and: { m[\speakers].every { |sp| sp.defName == \manifoldHead } }, ~manifold[\room].asString);
+    // The ATK's room (3B-3b), an extra: its file run after the patch, as its
+    // START does -- by its START, the patch already playing. Without the ATK
+    // it says so and adds nothing.
+    {
+        var text = File.readAllString(atkModes);
+        var from = text.find("(\nvar here = thisProcess.nowExecutingPath");
+        var start = text.copyRange(from, text.find("\n)\n", offset: from) + 2);
+        var before = m[\voices].collect(_.nodeID);
+        start.replace("thisProcess.nowExecutingPath", atkModes.asCompileString).interpret;
+        0.5.wait;
+        check.("atk_start_leaves_the_patch_playing", m[\voices].collect(_.nodeID) == before
+            and: { ~manifold[\maps]["/manifold/check"] === m }, "the patch started again");
+    }.value;
+    timeout = 0;
+    while { atkThere and: { ~manifold[\rooms][\atk].isNil } and: { timeout < 100 } } {
+        0.2.wait; timeout = timeout + 1;
+    };
+    0.5.wait;
+    check.("atk_room_added_only_with_the_atk", ~manifold[\rooms][\atk].notNil == atkThere,
+        "there % added %".format(atkThere, ~manifold[\rooms][\atk].notNil));
+    if (~manifold[\rooms][\atk].notNil) {
         var head = click.(at.("ahead"));
         ~manifold[\choose].("check: the ATK", (room: \atk, reverb: 0));
         0.5.wait;
@@ -186,17 +217,42 @@ fork {
         }.value;
         ~manifold[\choose].("check: the head", (room: \head, facing: 0));
         0.5.wait;
-    } { "  (the ATK is not installed: its room not checked)".postln };
-    // The ATK's room asked for without the ATK: the head, and a warning.
-    {
-        var was = ~manifold[\atkReady];
-        ~manifold[\atkReady] = false;
-        ~manifold[\choose].("check: the ATK, not there", (room: \atk));
-        0.5.wait;
-        check.("no_atk_stays_with_the_head", ~manifold[\room] == \head
+        // Its choices file, each block as someone would run it.
+        {
+            var blocks = Dictionary.new, title, body, blank = true;
+            File.readAllString(atkModes).split($\n).do { |line|
+                case
+                { line.beginsWith("// ") and: { blank } and: { body.isNil } } {
+                    title = line.copyRange(3, (line.find(" -- ") ? line.size) - 1);
+                }
+                { line == "(" } { body = List.new }
+                { line == ")" } { blocks[title] = body.join("\n"); body = nil }
+                { body.notNil } { body.add(line) };
+                blank = line.stripWhiteSpace.isEmpty;
+            };
+            check.("atk_modes_blocks", blocks.keys == Set["START", "ATK, MEASURED EARS", "ATK, DRY",
+                "BACK TO THE HEAD", "WHERE THINGS STAND", "THE TOOLKIT", "ITS EARS"], blocks.keys.asString);
+            [["ATK, MEASURED EARS", \atk, 0.3, \manifoldAtk], ["ATK, DRY", \atk, 0, \manifoldAtk],
+             ["BACK TO THE HEAD", \head, 0.3, \manifoldHead]].do { |c|
+                blocks[c[0]].interpret;
+                0.4.wait;
+                check.("atk_modes / %".format(c[0]), ~manifold[\room] == c[1]
+                    and: { ~manifold[\reverb] == c[2] } and: { ~manifold[\facing] == 0 }
+                    and: { m[\speakers].every { |sp| sp.defName == c[3] } },
+                    "room % reverb %".format(~manifold[\room], ~manifold[\reverb]));
+            };
+            blocks["WHERE THINGS STAND"].interpret;
+            check.("atk_where_things_stand_runs", true, "");
+        }.value;
+        // Let go while it is the room: every map back with the head.
+        ~manifold[\choose].("check: the ATK", (room: \atk));
+        0.4.wait;
+        ~manifold[\rooms][\atk][\free].();
+        0.4.wait;
+        check.("atk_let_go_back_to_the_head", ~manifold[\room] == \head
+            and: { ~manifold[\rooms][\atk].isNil }
             and: { m[\speakers].every { |sp| sp.defName == \manifoldHead } }, ~manifold[\room].asString);
-        ~manifold[\atkReady] = was;
-    }.value;
+    } { "  (the ATK is not installed: its room not checked)".postln };
     "%/% %".format(pass, pass + fail, if (fail == 0) { "GREEN" } { "RED" }).postln;
     0.exit;
 };

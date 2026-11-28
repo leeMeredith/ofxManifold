@@ -3328,6 +3328,34 @@ Built 2026-11-27 as planned.
   app (54 keys); the panel holds at every size; two drawlog frames. 9
   gates: 582, each caught.
 
+### The core, and the extras
+
+Built 2026-11-27 as planned (the recommendations, taken with the order).
+
+- **The rule holds**: `manifold-receive.scd`, `manifold-modes.scd` and
+  `manifold-speakers.scd` name no extra and nothing to install -- checked
+  (`core_names_no_extra`, three files) -- and run on a bare SuperCollider:
+  every live check run here with the quarks taken out of sclang's paths.
+- **Rooms plug in**: `~manifold[\rooms]`, a name to an event -- `says`,
+  `flat`, `speaker`, `place`, `free`. `\stereo` and `\head` are made in the
+  patch; `\speak` and `\place` ask the room. *Changed from the plan*:
+  `ready` and `prepare` are not needed -- an extra adds itself once the
+  patch says `~manifold[\staged]`, or says why it cannot. A room asked for
+  that is not there: the rooms here named, the extras folder pointed to,
+  and the head.
+- **`extras/atk/`**: `manifold-atk.scd` (3B-3b's room, the same in sound;
+  let go, it puts any map in it back with the head), `manifold-atk-modes.scd`
+  (START -- the patch if it is not playing, then the room; ATK, MEASURED
+  EARS; ATK, DRY; BACK TO THE HEAD; WHERE THINGS STAND, yes or NO for each
+  thing it needs and what to do next; THE TOOLKIT; ITS EARS), `README.md`
+  with the download addresses. The modes file ends with MORE ROOMS, a
+  pointer.
+- **Checked** (`make sc-live`, now 112): the patch alone has two rooms; a
+  room not here stays with the head; the ATK's START leaves the patch
+  playing; its room is added only with the ATK; its clicks measured as
+  before; each of its choices run; let go while in use. Broken by hand
+  seven ways, each caught.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3375,6 +3403,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-3b** | The ATK's room: `\atk` -- first order, CIPIC ears, the head's distance and reverb, the middle of the head kept in time; runs without the ATK; install blocks in the modes file | clicks measured from the headphones with the ATK, and asked for without it (`make sc-live`), choices broken by hand |
 | **3B-4a** | `manifold-speakers.scd`: one sound on every speaker at its output's level, by channel; SETUP, CHECK THE SPEAKERS, the sounds, ON HEADPHONES; built-in SuperCollider only | every block run on a four-speaker server, each speaker recorded and measured (`make sc-live`), broken by hand |
 | **3B-4b** | `s` `S`: the picked output to the speaker before or after, the two changing places; every level; undo | an editor script, the key panel and app checks, 9 gates |
+| **core / extras** | Rooms plug into the patch (`~manifold[\\rooms]`); the ATK's room, its choices and its install steps in `supercollider/extras/atk`; the core names no extra | every live check with and without the ATK, the core's files read for any extra's name, broken by hand |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

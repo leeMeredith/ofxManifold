@@ -25,7 +25,7 @@ var close = { |a, b| (a - b).abs <= (1e-3 * b.abs.max(1)) };
 // Each group's settings: a choice sets all of its own, and none of another's.
 var groups = (
     'START AND STOP': [],
-    'INSTALLING THE ATK': [],
+    'MORE ROOMS': [],
     'NOTES': [\music, \fit, \span],
     'SHARED OUTPUTS': [\quiet],
     'SOUND': [\sound, \bright],
@@ -57,9 +57,7 @@ var meant = (
     'HEAD, A BIG ROOM': (room: \head, facing: 0, reverb: 0.7),
     'HEAD, FACING RIGHT': (room: \head, facing: 90, reverb: 0.3),
     'HEAD, TURNED ROUND': (room: \head, facing: 180, reverb: 0.3),
-    'STEREO (as before the room)': (room: \stereo, facing: 0, reverb: 0),
-    'ATK, MEASURED EARS': (room: \atk, facing: 0, reverb: 0.3),
-    'ATK, DRY': (room: \atk, facing: 0, reverb: 0));
+    'STEREO (as before the room)': (room: \stereo, facing: 0, reverb: 0));
 // The blocks, as someone would select them: "(" to ")", each with its group
 // (the last "// ====" heading) and its title (the first line of the comment
 // just above it).
@@ -97,8 +95,7 @@ fork {
     var start = blocks.detect { |b| b[\title] == "START" };
     var stop = blocks.detect { |b| b[\title] == "STOP" };
     var reset = blocks.detect { |b| b[\title] == "RESET" };
-    // Installing is never run here: it reaches the network, once, on purpose.
-    var choices = blocks.select { |b| ['START AND STOP', 'INSTALLING THE ATK'].includes(b[\group]).not };
+    var choices = blocks.select { |b| b[\group] != 'START AND STOP' };
     var m, calls = List.new, timeout = 0, settings, read, initial;
     settings = { every.collect { |k| [k, ~manifold[k]] }.flatten.asDict };
     // What the server's voices are playing.
@@ -157,15 +154,12 @@ fork {
             { meant[b[\title].asSymbol] != call } {
                 why = "sets % -- said to be %".format(call, meant[b[\title].asSymbol]);
             }
-            { own.any { |k|
-                // The ATK's room without the ATK: the head, as the patch says.
-                after[k] != if (k == \room and: { call[k] == \atk } and: { ~manifold[\atkReady].not }) {
-                    \head } { call[k] } } } { why = "not set: %".format(after) }
+            { own.any { |k| after[k] != call[k] } } { why = "not set: %".format(after) }
             { (every.asSet - own.asSet).any { |k| after[k] != before[k] } } {
                 why = "another group's setting changed";
             }
-            { m[\speakers].any { |sp| sp.defName != (stereo: \manifoldStereo, head: \manifoldHead,
-                atk: \manifoldAtk)[~manifold[\room]] } } {
+            { m[\speakers].any { |sp| sp.defName != (stereo: \manifoldStereo,
+                head: \manifoldHead)[~manifold[\room]] } } {
                 why = "the speakers are not the room's: %".format(m[\speakers].collect(_.defName));
             }
             { (call[\sound].notNil and: { call[\sound] != before[\sound] })
@@ -191,8 +185,14 @@ fork {
         check.("reset_puts_back", settings.() == initial,
             "% -- want %".format(settings.(), initial));
         check.("every_group_chosen", groups.keys.every { |g|
-            g == 'START AND STOP' or: { g == 'INSTALLING THE ATK' } or: { choices.any { |b| b[\group] == g } } }, "");
-        check.("atk_install_blocks", blocks.count { |b| b[\group] == 'INSTALLING THE ATK' } == 2, "");
+            g == 'START AND STOP' or: { g == 'MORE ROOMS' } or: { choices.any { |b| b[\group] == g } } }, "");
+        // The core: the patch, its choices and the speakers file name no
+        // extra and nothing that has to be installed.
+        ["manifold-receive.scd", "manifold-modes.scd", "manifold-speakers.scd"].do { |f|
+            var text = File.readAllString(modesPath.dirname +/+ f).toLower;
+            var found = ["atk", "foa", "quark", "sc3-plugins", "kernel", "ambisonic"].select { |w| text.contains(w) };
+            check.("core_names_no_extra / %".format(f), found.isEmpty, found.asString);
+        };
         check.("every_choice_run", meant.keys == choices.collect { |b| b[\title].asSymbol }.asSet,
             choices.collect(_[\title]).asString);
     };
