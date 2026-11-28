@@ -3432,6 +3432,41 @@ Built 2026-11-28. The core only, as 3B-5a.
   each refusal leaving every height and place as it was. **Gates** 9 new:
   607, each caught first time.
 
+### 3B-5c: a shaped map in a file, and through Map3D
+
+Built 2026-11-28. Still nothing in the editor or the player.
+
+- **The map file, version 5** when any node is off its column, and only
+  then (D-022): each level lists `"places"` -- a node and its `dx`, `dy` --
+  for the nodes off their columns there. A map with a node pushed out and
+  put back is version 3 again. Refused: places in an older version
+  ("a node off its column needs version 5"), a place for an unknown node,
+  and a file whose places leave the map unsound ("unsound: region 0 is
+  turned over between levels 1 and 2"). An older reader refuses version 5
+  by its number.
+- **`Map3D`**: sound doors that take the floor plan and say why they
+  refuse -- `setOffsets`, `raise`, `setHeight`, `moveLevel`, `copyLevel`,
+  `removeLevel` (bindings and values kept in step) -- and `moveColumns`,
+  which moves nodes on the floor plan and puts them back if the floor plan
+  or a slice would break. `nodePlace(plan, k, n)`: a node's column, offset
+  and height on a level -- an output's place in the room.
+  `evaluate(plan, xyz)`. The doors from before are untouched; the editor
+  moves over in 3B-5d.
+- *From the plan*: "derived outputs read the slice" needed nothing -- they
+  read the weights they are given, and those now come from the slice.
+- **Found by a vector**: one level with a node off its column saved as a
+  2D map, the place lost. `needs3D` now counts it.
+- **Vectors** 23 new (`levels` 314; 1399 in all): a stadium built by
+  operations, a refused drag in the middle of them; its files written by
+  the reference and loaded, saved at version 5, byte-stable; five points
+  through it to its outputs; every node's place on every level; unshaped
+  again, one level shaped, touching and shaped; a spiral whose middle
+  cannot be removed, its top copied, the copy moved, the original removed,
+  three points through what is left; four column moves; three refused
+  files. **Gates** 14 new: 621 -- two survived first (the bindings of a
+  level copied or removed through the new doors: no vector read them;
+  three added), each caught now.
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3482,6 +3517,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **core / extras** | Rooms plug into the patch (`~manifold[\\rooms]`); the ATK's room, its choices and its install steps in `supercollider/extras/atk`; the core names no extra | every live check with and without the ATK, the core's files read for any extra's name, broken by hand |
 | **3B-5a** | A node's own place on each level, the geometry: `evaluateMoved`, offsets per level, the slice, weights by the slice at the point's height, the map's edge by height | Python reference with closed forms, 55 vectors, 16 gates |
 | **3B-5b** | Sound slices: `unsound`, `attempt`, `setOffsets` -- flattened, turned over, crossing, folded refused, nothing changed | reference by fitted area and Jacobian, 28 vectors, 9 gates |
+| **3B-5c** | A shaped map in the map file (version 5, `places`), unsound files refused; Map3D's sound doors, `moveColumns`, `nodePlace` | reference-written fixtures, 23 vectors, 14 gates |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

@@ -2593,7 +2593,7 @@ replace:         && false) {
 
 gate: Version 4 map files refused by the 3D reader
 file: src/io/ofxManifoldSerialize3D.h
-find:         const LoadResult fr = detail::loadFloor(mapText, floor, 4);
+find:         const LoadResult fr = detail::loadFloor(mapText, floor, 5);
 replace:         const LoadResult fr = detail::loadFloor(mapText, floor, 3);
 
 gate: A height settles on a level a step away
@@ -3233,4 +3233,79 @@ gate: A change is never checked for soundness
 file: src/core/ofxManifoldLevels.h
 find:         const SliceFault fault = unsound(plan);
 replace:         const SliceFault fault{};
+
+# ---- round 3B-5c: a shaped map in a file and through Map3D ----
+
+gate: A shaped map saved as an unshaped version
+file: src/io/ofxManifoldSerialize3D.h
+find:     if (map.levels().shaped()) return 5;
+replace:     if (false) return 5;
+
+gate: One shaped level saved as a 2D map
+file: src/io/ofxManifoldSerialize3D.h
+find:     if (lv.shaped()) return true;              // a node off its column (3B-5c)
+replace:     if (false) return true;
+
+gate: Places left out of the file
+file: src/io/ofxManifoldSerialize3D.h
+find:                 if (!lv.shaped(k, n)) continue;
+replace:                 continue;
+
+gate: Places written across instead of deep
+file: src/io/ofxManifoldSerialize3D.h
+find:                   << json::number(off.x) << ", \"dy\": "
+replace:                   << json::number(off.y) << ", \"dy\": "
+
+gate: Places in a file are not read
+file: src/io/ofxManifoldSerialize3D.h
+find:     for (const Placed& pl : placed) geometry.setOffset(pl.level, pl.node, pl.off);
+replace:     (void)placed;
+
+gate: Places allowed in an older version
+file: src/io/ofxManifoldSerialize3D.h
+find:         if (static_cast<int>(root["version"].asNumber()) < 5) {
+replace:         if (static_cast<int>(root["version"].asNumber()) < 4) {
+
+gate: An unsound file is opened
+file: src/io/ofxManifoldSerialize3D.h
+find:         if (fault) {\n            res.error = "unsound: " + detail::faultText(fault);
+replace:         if (false) {\n            res.error = "unsound: " + detail::faultText(fault);
+nl: yes
+
+gate: A place for an unknown node is dropped
+file: src/io/ofxManifoldSerialize3D.h
+find:                         res.error = "place on level " + std::to_string(k)
+replace:                         continue; res.error = "place on level " + std::to_string(k)
+
+gate: A copied level through the sound door loses its bindings
+file: src/mapping/ofxManifoldMap3D.h
+find:         routing_.insert(std::next(routing_.begin(), where), bindings);
+replace:         routing_.insert(std::next(routing_.begin(), where), Mapping{});
+
+gate: A level removed through the sound door keeps its bindings
+file: src/mapping/ofxManifoldMap3D.h
+find:         routing_.erase(std::next(routing_.begin(), where));
+replace:         routing_.erase(std::next(routing_.begin(), 0));
+
+gate: A column move that breaks a slice is kept
+file: src/mapping/ofxManifoldMap3D.h
+find:         std::reverse(back.begin(), back.end());\n        plan.setNodePositions(back);
+replace:         std::reverse(back.begin(), back.end());
+nl: yes
+
+gate: A column move is never checked against the slices
+file: src/mapping/ofxManifoldMap3D.h
+find:         if (!fault) return true;\n        if (why) *why = fault;
+replace:         return true;\n        if (why) *why = fault;
+nl: yes
+
+gate: A node's place forgets its offset
+file: src/mapping/ofxManifoldMap3D.h
+find:         const glm::vec2 xy = levels_.place(plan, k, n);
+replace:         const glm::vec2 xy = plan.node(n).position;
+
+gate: A node's place forgets its height
+file: src/mapping/ofxManifoldMap3D.h
+find:         return glm::vec3(xy.x, xy.y, levels_.height(k, n));
+replace:         return glm::vec3(xy.x, xy.y, levels_.base(k));
 

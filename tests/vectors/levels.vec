@@ -706,6 +706,52 @@ SAVE3 save3_touching ANALYTIC touching MAPV 4 OUTV 3
 FILE3 file3_touching ANALYTIC map3_touching.json map3_touching-outputs.json AS touching
 REFUSEOLD refuseold_touching ANALYTIC map3_touching.json unsupported version 4
 
+# A NODE'S OWN PLACE, IN A FILE AND THROUGH THE MAP (3B-5c).
+# PLACE and the S- operations go through Map3D's sound doors:
+# =OK, or =REFUSED: and what would have broken.
+# a stadium: three levels, each wider than the one below, one
+# corner of the top pushed further out; then dragged across
+# the map (refused, and still where it was); then bent
+MAP3 stadium NODES square OPS OUT L 1 1 ; OUT R 2 1 ; OUT up 3 1 ; BIND 0 0 L 1 ; BIND 0 1 R 1 ; BIND 0 2 R 1 ; BIND 0 3 L 1 ; COPY 0 0.5 =1 ; COPY 1 1 =2 ; BIND 2 0 up 1 ; BIND 2 2 up 1 ; PLACE 1 0=-0.1,-0.1/1=0.1,-0.1/2=0.1,0.1/3=-0.1,0.1 =OK ; PLACE 2 0=-0.2,-0.2/1=0.2,-0.2/2=0.2,0.2/3=-0.2,0.2 =OK ; PLACE 2 2=0.3,0.35 =OK ; PLACE 2 2=-1.3,-1.3 =REFUSED:TURNED,1,0 ; SSETH 1 2 0.7 =OK
+FILE3 file3_stadium ANALYTIC map3_stadium.json map3_stadium-outputs.json AS stadium
+SAVE3 save3_stadium ANALYTIC stadium MAPV 5 OUTV 3
+REFUSEOLD refuseold_stadium ANALYTIC map3_stadium.json unsupported version 5
+# the whole path on the stadium: the point through the floor
+# plan at its own height, then the bindings
+CH3XYZ stadium_low CROSS stadium SQUARE P 0.6 0.3 0.2 ROUTED 0 0.3853453163 0.6146546837 0 SILENCE 0 LEVELS 0 0.3853453163 0.6146546837 0
+CH3XYZ stadium_mid CROSS stadium SQUARE P 0.3 0.7 0.6 ROUTED 0 0.6851940302 0.2872598914 0.02754607839 SILENCE 0 LEVELS 0 0.6851940302 0.2872598914 0.02754607839
+CH3XYZ stadium_rim CROSS stadium SQUARE P 1.02 0.5 0.95 ROUTED 0 0.0511940471 0.7113375023 0.2374684506 SILENCE 0 LEVELS 0 0.0511940471 0.7113375023 0.2374684506
+CH3XYZ stadium_rim_too_low CROSS stadium SQUARE P 1.02 0.5 0.3 ROUTED 0 0 0 0 SILENCE 0 LEVELS 0 0 0 0
+CH3XYZ stadium_corner CROSS stadium SQUARE P 1.1 1.15 0.99 ROUTED 0 0.0395050092 0.4784620453 0.4820329455 SILENCE 0 LEVELS 0 0.0395050092 0.4784620453 0.4820329455
+# each node's place on each level: its column, its offset, its
+# height there -- where an output is in the room
+PLACES3 places_stadium ANALYTIC stadium 0:0=0.1,0.1,0 0:1=0.9,0.1,0 0:2=0.9,0.9,0 0:3=0.1,0.9,0 1:0=0,0,0.5 1:1=1,0,0.5 1:2=1,1,0.7 1:3=0,1,0.5 2:0=-0.1,-0.1,1 2:1=1.1,-0.1,1 2:2=1.2,1.25,1 2:3=-0.1,1.1,1
+# a node pushed out and put back: no node off its column,
+# and the file is version 3 again
+MAP3 unshaped_again NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 1 =1 ; PLACE 1 2=0.2,0.1 =OK ; PLACE 1 2=0,0 =OK
+SAVE3 save3_unshaped_again ANALYTIC unshaped_again MAPV 3 OUTV 3
+# one level, one node off its column: version 5 on its own
+MAP3 one_shaped NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; PLACE 0 2=0.2,0.1 =OK
+SAVE3 save3_one_shaped ANALYTIC one_shaped MAPV 5 OUTV 2
+# touching and shaped: version 5 says both
+MAP3 touch_shaped NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 1 =1 ; SETH 1 2 0 =OK ; PLACE 1 0=-0.1,-0.1 =OK
+SAVE3 save3_touch_shaped ANALYTIC touch_shaped MAPV 5 OUTV 3
+# three levels a quarter turn apart. The middle cannot be
+# removed -- its neighbours are a half turn apart; a level
+# copied, the copy moved, the original removed: the copy has
+# its shape and its bindings, the others keep theirs
+MAP3 spiral3 NODES square OPS OUT L 1 1 ; BIND 0 0 L 1 ; COPY 0 0.5 =1 ; COPY 1 1 =2 ; PLACE 1 0=0.8,0/1=0,0.8/2=-0.8,0/3=0,-0.8 =OK ; PLACE 2 0=0.8,0.8/1=-0.8,0.8/2=-0.8,-0.8/3=0.8,-0.8 =OK ; BIND 2 1 L 0.5 ; SREMOVELEVEL 1 =REFUSED:FLAT,0,0 ; SCOPY 2 1.5 =3 ; SMOVE 3 -0.2 =OK ; SREMOVELEVEL 2 =OK
+SAVE3 save3_spiral ANALYTIC spiral3 MAPV 5 OUTV 3
+CH3XYZ spiral_low CROSS spiral3 SQUARE P 0.3 0.3 0.05 ROUTED 0 0.743902439 SILENCE 0.256097561 LEVELS 0 0.743902439
+CH3XYZ spiral_mid CROSS spiral3 SQUARE P 0.8 0.7 0.5 ROUTED 0 0.25 SILENCE 0.75 LEVELS 0 0.25
+CH3XYZ spiral_top CROSS spiral3 SQUARE P 0.7 0.4 1.3 ROUTED 0 0.375 SILENCE 0.625 LEVELS 0 0.375
+# a column moved on the floor plan: every level's copy with it;
+# refused, and put back, if the floor plan or a slice would break
+COLUMN3 column_ok CROSS stadium MOVE 0=0.15,0.05 EXPECT OK
+COLUMN3 column_breaks_floor CROSS stadium MOVE 2=0,0 EXPECT REFUSED -
+COLUMN3 column_group CROSS stadium MOVE 0=0.2,0.1;1=1,0.1;2=1,0.9;3=0.2,0.9 EXPECT OK
+COLUMN3 column_breaks_slice CROSS spiral3 MOVE 0=-0.37,-0.38 EXPECT REFUSED TURNED 1 1
+
 # REFUSED, each for its own reason, leaving nothing half-read
 # a binding on level 3 of a three-level map
 REFUSE3 map3_forest__bad3_level_too_high-outputs ANALYTIC map3_forest.json bad3_level_too_high-outputs.json level 3
@@ -713,6 +759,12 @@ REFUSE3 map3_forest__bad3_level_too_high-outputs ANALYTIC map3_forest.json bad3_
 REFUSE3 bad3_cross__map3_forest-outputs ANALYTIC bad3_cross.json map3_forest-outputs.json cross
 # starting heights out of order
 REFUSE3 bad3_bases__map3_forest-outputs ANALYTIC bad3_bases.json map3_forest-outputs.json increasing
+# nodes off their columns in a version 4 file
+REFUSE3 bad3_places_v4__map3_stadium-outputs ANALYTIC bad3_places_v4.json map3_stadium-outputs.json needs version 5
+# a place for a node the floor plan does not have
+REFUSE3 bad3_place_unknown__map3_stadium-outputs ANALYTIC bad3_place_unknown.json map3_stadium-outputs.json unknown node
+# a node dragged across the map on the top level
+REFUSE3 bad3_place_unsound__map3_stadium-outputs ANALYTIC bad3_place_unsound.json map3_stadium-outputs.json unsound
 # a value set that was never declared
 REFUSE3 bad3_undeclared__map3_forest-outputs ANALYTIC bad3_undeclared.json map3_forest-outputs.json never declared
 # a value declared twice

@@ -1469,6 +1469,31 @@ class Map3:
         self.maps = [OutMap()]
         self.defs = []                 # [name, fallback, lo, hi]
         self.vals = [{}]               # per level: {(value, node): x}
+        self.places = [{}]             # per level: {node: (dx, dy)} (3B-5c)
+        self.plan = None               # (nodes, regions), once shaped
+
+    def shape(self):
+        """The map as a Shaped: its stack, and each node where it is."""
+        nodes, regions = self.plan
+        return Shaped(self.stack, nodes, regions,
+                      {(k, i): d for k, row in enumerate(self.places)
+                       for i, d in row.items()})
+
+    def is_shaped(self):
+        return any(d != (0.0, 0.0) for row in self.places for d in row.values())
+
+    def soundly(self, change):
+        """3B-5c: make a change on a copy; keep it only if still sound.
+        change(m) -> None if done, or the levels' own refusal."""
+        trial = _copy.deepcopy(self)
+        refused = change(trial)
+        if refused is not None:
+            return "REFUSED:" + refused
+        f = trial.shape().fault() if trial.is_shaped() else None
+        if f is not None:
+            return f"REFUSED:{f[0]},{f[1]},{f[2]}"
+        self.__dict__.update(trial.__dict__)
+        return "OK"
 
     def value(self, k, node, name):
         d = next(d for d in self.defs if d[0] == name)
@@ -1499,7 +1524,37 @@ class Map3:
             self.maps.insert(at, _copy.deepcopy(self.maps[frm if frm < at
                                                           else frm]))
             self.vals.insert(at, dict(self.vals[frm]))
+            self.places.insert(at, dict(self.places[frm]))
             return str(at)
+        elif v == "PLACE":
+            # 3B-5c: PLACE k i=dx,dy/i=dx,dy -- nodes of a level off their
+            # columns, all or none.
+            k = int(w[1])
+
+            def put(m):
+                for one in w[2].split("/"):
+                    i, d = one.split("=")
+                    m.places[k][int(i)] = tuple(float(x) for x in d.split(","))
+            return self.soundly(put)
+        elif v == "SSETH":
+            return self.soundly(lambda m: None if m.stack.set(
+                int(w[1]), int(w[2]), float(w[3])) else "-")
+        elif v == "SMOVE":
+            return self.soundly(lambda m: None if not m.stack.move(
+                int(w[1]), float(w[2])) else "-")
+        elif v == "SCOPY":
+            before = len(self.stack.bases)
+            got = []
+
+            def cp(m):
+                r = m.op(["COPY", w[1], w[2]])
+                got.append(r)
+                return "-" if r.startswith("REFUSED") else None
+            r = self.soundly(cp)
+            return got[0] if r == "OK" else r
+        elif v == "SREMOVELEVEL":
+            return self.soundly(lambda m: None if m.op(
+                ["REMOVELEVEL", w[1]]) == "OK" else "-")
         elif v == "RAISE":
             bad = self.stack.raise_(int(w[1]), [int(x) for x in w[3].split(",")],
                                     float(w[2]))
@@ -1567,6 +1622,7 @@ class Map3:
                 return "REFUSED"
             del self.maps[int(w[1])]
             del self.vals[int(w[1])]
+            del self.places[int(w[1])]
             return "OK"
         elif v == "USERIG":
             # The rig is another map's room, as rigOf() makes it: outputs,
@@ -1867,7 +1923,8 @@ def files_of(m3, sq, tris):
     """The pair of files for a Map3 model, as plain JSON."""
     names = [f"n{i}" for i in range(len(sq))]
     mp = {
-        "version": 4 if m3.stack.touches() else 3, "space": "normalized",
+        "version": 5 if m3.is_shaped() else 4 if m3.stack.touches() else 3,
+        "space": "normalized",
         "nodes": [{"id": names[i], "position": [sq[i][0], sq[i][1]],
                    "weight": 1.0} for i in sorted(sq)],
         "regions": [[names[a], names[b], names[c]] for a, b, c in tris],
@@ -1877,6 +1934,10 @@ def files_of(m3, sq, tris):
     }
     for k, base in enumerate(m3.stack.bases):
         lv = {"base": base, "heights": [], "values": []}
+        if m3.is_shaped():
+            lv["places"] = [{"node": names[i], "dx": d[0], "dy": d[1]}
+                            for i, d in sorted(m3.places[k].items())
+                            if d != (0.0, 0.0)]
         for i in range(m3.stack.n):
             if m3.stack.H[k][i] != base:
                 lv["heights"].append({"node": names[i],
@@ -2033,6 +2094,169 @@ def build_files3(out, sq, tris, maps):
                "unsupported version 4")
     out.append("")
 
+    out.append("# A NODE'S OWN PLACE, IN A FILE AND THROUGH THE MAP (3B-5c).")
+    out.append("# PLACE and the S- operations go through Map3D's sound doors:")
+    out.append("# =OK, or =REFUSED: and what would have broken.")
+    C = (0.5, 0.5)
+
+    def ring(k, f):
+        return f"PLACE {k} " + "/".join(
+            f"{i}={fmt((f - 1.0) * (sq[i][0] - C[0]))},"
+            f"{fmt((f - 1.0) * (sq[i][1] - C[1]))}" for i in sorted(sq))
+
+    def map3(name, ops, note):
+        for line in note:
+            out.append("# " + line)
+        m = Map3(4)
+        m.plan = (sq, tris)
+        shown = []
+        for o in ops:
+            r = m.op(o.split())
+            shown.append(o + (f" ={r}" if r is not None else ""))
+        maps[name] = m
+        Map3.registry[name] = m
+        out.append(f"MAP3 {name} NODES square OPS " + " ; ".join(shown))
+        return m, shown
+
+    _, sh = map3("stadium",
+                 ["OUT L 1 1", "OUT R 2 1", "OUT up 3 1", "BIND 0 0 L 1",
+                  "BIND 0 1 R 1", "BIND 0 2 R 1", "BIND 0 3 L 1", "COPY 0 0.5",
+                  "COPY 1 1", "BIND 2 0 up 1", "BIND 2 2 up 1",
+                  ring(1, 1.25), ring(2, 1.5), "PLACE 2 2=0.3,0.35",
+                  "PLACE 2 2=-1.3,-1.3", "SSETH 1 2 0.7"],
+                 ["a stadium: three levels, each wider than the one below, one",
+                  "corner of the top pushed further out; then dragged across",
+                  "the map (refused, and still where it was); then bent"])
+    assert "=REFUSED:TURNED" in sh[-2] and sh[-1].endswith("=OK"), sh
+    mp, outs = files_of(maps["stadium"], sq, tris)
+    assert mp["version"] == 5
+    write_fixture("map3_stadium.json", mp)
+    write_fixture("map3_stadium-outputs.json", outs)
+    out.append("FILE3 file3_stadium ANALYTIC map3_stadium.json "
+               "map3_stadium-outputs.json AS stadium")
+    out.append("SAVE3 save3_stadium ANALYTIC stadium MAPV 5 OUTV 3")
+    out.append("REFUSEOLD refuseold_stadium ANALYTIC map3_stadium.json "
+               "unsupported version 5")
+    out.append("# the whole path on the stadium: the point through the floor")
+    out.append("# plan at its own height, then the bindings")
+    for name, p, z in (("stadium_low", (0.6, 0.3), 0.2),
+                       ("stadium_mid", (0.3, 0.7), 0.6),
+                       ("stadium_rim", (1.02, 0.5), 0.95),
+                       ("stadium_rim_too_low", (1.02, 0.5), 0.3),
+                       ("stadium_corner", (1.1, 1.15), 0.99)):
+        m = maps["stadium"]
+        w3 = m.shape().weigh(p, z)
+        routed, sil = m.channels(w3, False)
+        levels, _ = m.channels(w3, True)
+        out.append(f"CH3XYZ {name} CROSS stadium SQUARE P {fmt(p[0])} "
+                   f"{fmt(p[1])} {fmt(z)} "
+                   f"ROUTED {' '.join(fmt(x) for x in routed)} "
+                   f"SILENCE {fmt(sil)} "
+                   f"LEVELS {' '.join(fmt(x) for x in levels)}")
+    out.append("# each node's place on each level: its column, its offset, its")
+    out.append("# height there -- where an output is in the room")
+    m = maps["stadium"]
+    shp = m.shape()
+    out.append("PLACES3 places_stadium ANALYTIC stadium " + " ".join(
+        f"{k}:{i}={fmt(shp.P[k][i][0])},{fmt(shp.P[k][i][1])},"
+        f"{fmt(m.stack.H[k][i])}"
+        for k in range(len(shp.P)) for i in sorted(sq)))
+
+    _, sh = map3("unshaped_again",
+                 ["OUT L 1 1", "BIND 0 0 L 1", "COPY 0 1", "PLACE 1 2=0.2,0.1",
+                  "PLACE 1 2=0,0"],
+                 ["a node pushed out and put back: no node off its column,",
+                  "and the file is version 3 again"])
+    out.append("SAVE3 save3_unshaped_again ANALYTIC unshaped_again MAPV 3 OUTV 3")
+    map3("one_shaped", ["OUT L 1 1", "BIND 0 0 L 1", "PLACE 0 2=0.2,0.1"],
+         ["one level, one node off its column: version 5 on its own"])
+    out.append("SAVE3 save3_one_shaped ANALYTIC one_shaped MAPV 5 OUTV 2")
+    map3("touch_shaped",
+         ["OUT L 1 1", "BIND 0 0 L 1", "COPY 0 1", "SETH 1 2 0",
+          "PLACE 1 0=-0.1,-0.1"],
+         ["touching and shaped: version 5 says both"])
+    out.append("SAVE3 save3_touch_shaped ANALYTIC touch_shaped MAPV 5 OUTV 3")
+
+    def turn(k, deg):
+        c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+        return f"PLACE {k} " + "/".join(
+            f"{i}={fmt(c * (sq[i][0] - .5) - s_ * (sq[i][1] - .5) - (sq[i][0] - .5))},"
+            f"{fmt(s_ * (sq[i][0] - .5) + c * (sq[i][1] - .5) - (sq[i][1] - .5))}"
+            for i in sorted(sq))
+
+    _, sh = map3("spiral3",
+                 ["OUT L 1 1", "BIND 0 0 L 1", "COPY 0 0.5", "COPY 1 1",
+                  turn(1, 90), turn(2, 180), "BIND 2 1 L 0.5",
+                  "SREMOVELEVEL 1", "SCOPY 2 1.5", "SMOVE 3 -0.2",
+                  "SREMOVELEVEL 2"],
+                 ["three levels a quarter turn apart. The middle cannot be",
+                  "removed -- its neighbours are a half turn apart; a level",
+                  "copied, the copy moved, the original removed: the copy has",
+                  "its shape and its bindings, the others keep theirs"])
+    assert sh[7].endswith("=REFUSED:FLAT,0,0"), sh
+    assert sh[8].endswith("=3") and sh[9].endswith("=OK") and sh[10].endswith("=OK"), sh
+    out.append("SAVE3 save3_spiral ANALYTIC spiral3 MAPV 5 OUTV 3")
+    for name, p, z in (("spiral_low", (0.3, 0.3), 0.05),
+                       ("spiral_mid", (0.8, 0.7), 0.5),
+                       ("spiral_top", (0.7, 0.4), 1.3)):
+        m = maps["spiral3"]
+        w3 = m.shape().weigh(p, z)
+        assert w3 is not None, name
+        routed, sil = m.channels(w3, False)
+        levels, _ = m.channels(w3, True)
+        out.append(f"CH3XYZ {name} CROSS spiral3 SQUARE P {fmt(p[0])} "
+                   f"{fmt(p[1])} {fmt(z)} "
+                   f"ROUTED {' '.join(fmt(x) for x in routed)} "
+                   f"SILENCE {fmt(sil)} "
+                   f"LEVELS {' '.join(fmt(x) for x in levels)}")
+
+    out.append("# a column moved on the floor plan: every level's copy with it;")
+    out.append("# refused, and put back, if the floor plan or a slice would break")
+    for nm, mv in (("column_ok", "0=0.15,0.05"),
+                   ("column_breaks_floor", "2=0,0"),
+                   ("column_group", "0=0.2,0.1;1=1,0.1;2=1,0.9;3=0.2,0.9")):
+        m = _copy.deepcopy(maps["stadium"])
+        nodes2 = dict(sq)
+        for one in mv.split(";"):
+            i, d = one.split("=")
+            nodes2[int(i)] = tuple(float(x) for x in d.split(","))
+
+        def a2(ids, nd):
+            q = [nd[i] for i in ids]
+            return sum(q[i][0] * q[(i + 1) % 3][1] - q[(i + 1) % 3][0] * q[i][1]
+                       for i in range(3))
+        floor_ok = all(a2(t, nodes2) > 1e-6 for t in tris)
+        m.plan = (nodes2, tris)
+        f = m.shape().fault() if floor_ok else None
+        res = "REFUSED -" if not floor_ok else (
+            "OK" if f is None else f"REFUSED {f[0]} {f[1]} {f[2]}")
+        out.append(f"COLUMN3 {nm} CROSS stadium MOVE {mv} EXPECT {res}")
+    # A column move that only a slice refuses: the floor plan itself takes
+    # it. Looked for on a grid, the first found.
+    def a2f(ids, nd):
+        q = [nd[i] for i in ids]
+        return sum(q[i][0] * q[(i + 1) % 3][1] - q[(i + 1) % 3][0] * q[i][1]
+                   for i in range(3))
+    found = None
+    for mname in ("spiral3", "stadium"):
+        for i in sorted(sq):
+            for gx in range(-4, 15):
+                for gy in range(-4, 15):
+                    nodes2 = dict(sq)
+                    nodes2[i] = (gx / 10.0 + 0.03, gy / 10.0 + 0.02)
+                    if not all(a2f(t, nodes2) > 1e-3 for t in tris):
+                        continue
+                    m = _copy.deepcopy(maps[mname])
+                    m.plan = (nodes2, tris)
+                    f = m.shape().fault()
+                    if f is not None and found is None:
+                        found = (mname, i, nodes2[i], f)
+    assert found is not None
+    mname, i, q, f = found
+    out.append(f"COLUMN3 column_breaks_slice CROSS {mname} MOVE "
+               f"{i}={fmt(q[0])},{fmt(q[1])} EXPECT REFUSED {f[0]} {f[1]} {f[2]}")
+    out.append("")
+
     out.append("# REFUSED, each for its own reason, leaving nothing half-read")
     base_map, base_out = files_of(maps["forest"], sq, tris)
 
@@ -2058,6 +2282,20 @@ def build_files3(out, sq, tris, maps):
     m4["levels"][1]["base"] = 1.5
     bad("bad3_bases.json", m4, "map3_forest-outputs.json", None,
         "increasing", "starting heights out of order")
+    st_map, st_out = files_of(maps["stadium"], sq, tris)
+    write_fixture("map3_stadium-outputs.json", st_out)
+    s1 = _json.loads(_json.dumps(st_map))
+    s1["version"] = 4
+    bad("bad3_places_v4.json", s1, "map3_stadium-outputs.json", None,
+        "needs version 5", "nodes off their columns in a version 4 file")
+    s2 = _json.loads(_json.dumps(st_map))
+    s2["levels"][1]["places"].append({"node": "nobody", "dx": 0.1, "dy": 0.0})
+    bad("bad3_place_unknown.json", s2, "map3_stadium-outputs.json", None,
+        "unknown node", "a place for a node the floor plan does not have")
+    s3 = _json.loads(_json.dumps(st_map))
+    s3["levels"][2]["places"] = [{"node": "n2", "dx": -1.3, "dy": -1.3}]
+    bad("bad3_place_unsound.json", s3, "map3_stadium-outputs.json", None,
+        "unsound", "a node dragged across the map on the top level")
     m5 = _json.loads(_json.dumps(base_map))
     m5["levels"][0]["values"].append({"value": "wet", "node": "n0", "x": 1})
     bad("bad3_undeclared.json", m5, "map3_forest-outputs.json", None,
@@ -2119,6 +2357,7 @@ def main():
                                             "EVALSU", "UPOSS", "ZPOSS",
                                             "SCOPY", "SREMAP",
                                             "SOUND", "STRY",
+                                            "PLACES3", "COLUMN3",
                                             "EVALU", "REFUSEOLD"):
             counts[parts[2]] = counts.get(parts[2], 0) + 1
     print(f"wrote {OUT}")

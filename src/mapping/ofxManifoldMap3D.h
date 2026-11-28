@@ -31,6 +31,7 @@
 #include "ofxManifoldRig.h"
 
 #include <algorithm>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -105,6 +106,110 @@ public:
 
     bool setHeight(LevelID k, NodeID n, float h) {
         return levels_.setHeight(k, n, h);
+    }
+
+    // ---- a shaped map: the same doors, kept sound (round 3B-5c) ------------
+    //
+    // Once any node is off its column on a level (Levels, "a node's own
+    // place"), a change to heights or levels can break a slice as well as
+    // cross a level. These take the floor plan and refuse, changing nothing,
+    // what would leave the map unsound; `why` says what. On a map with no
+    // node off its column they are the doors above exactly.
+
+    // Put nodes of level k at their offsets from their columns: all or none.
+    bool setOffsets(const Manifold2D& plan, LevelID k,
+                    const std::vector<std::pair<NodeID, glm::vec2>>& offs,
+                    Levels::SliceFault* why = nullptr) {
+        if (k >= routing_.size()) return false;
+        return levels_.setOffsets(plan, k, offs, why);
+    }
+
+    bool raise(const Manifold2D& plan, LevelID k,
+               const std::vector<NodeID>& nodes, float dz,
+               std::vector<NodeID>* blocked = nullptr,
+               Levels::SliceFault* why = nullptr) {
+        return levels_.attempt(plan, [&](Levels& l) {
+            return l.raise(k, nodes, dz, blocked); }, why);
+    }
+
+    bool setHeight(const Manifold2D& plan, LevelID k, NodeID n, float h,
+                   Levels::SliceFault* why = nullptr) {
+        return levels_.attempt(plan, [&](Levels& l) {
+            return l.setHeight(k, n, h); }, why);
+    }
+
+    bool moveLevel(const Manifold2D& plan, LevelID k, float dz,
+                   std::vector<NodeID>* blocked = nullptr,
+                   Levels::SliceFault* why = nullptr) {
+        return levels_.attempt(plan, [&](Levels& l) {
+            return l.moveLevel(k, dz, plan.nodeCount(), blocked); }, why);
+    }
+
+    LevelID copyLevel(const Manifold2D& plan, LevelID from, float newBase,
+                      std::vector<NodeID>* blocked = nullptr,
+                      Levels::SliceFault* why = nullptr) {
+        if (from >= routing_.size()) return routing_.size();
+        const Mapping bindings = routing_[from];
+        const auto vals = values_[from];
+        LevelID at = routing_.size();
+        if (!levels_.attempt(plan, [&](Levels& l) {
+                at = l.copyLevel(from, newBase, plan.nodeCount(), blocked);
+                return at < l.count(); }, why)) {
+            return routing_.size();
+        }
+        const auto where = static_cast<std::ptrdiff_t>(at);
+        routing_.insert(std::next(routing_.begin(), where), bindings);
+        values_.insert(std::next(values_.begin(), where), vals);
+        return at;
+    }
+
+    bool removeLevel(const Manifold2D& plan, LevelID k,
+                     Levels::SliceFault* why = nullptr) {
+        if (!levels_.attempt(plan, [&](Levels& l) {
+                return l.removeLevel(k); }, why)) {
+            return false;
+        }
+        const auto where = static_cast<std::ptrdiff_t>(k);
+        routing_.erase(std::next(routing_.begin(), where));
+        values_.erase(std::next(values_.begin(), where));
+        return true;
+    }
+
+    // Move nodes on the floor plan -- their columns, every level's copy with
+    // them -- as Manifold2D::setNodePositions() does, and refused as it
+    // refuses; refused too, the nodes put back, if a shaped map would be
+    // left unsound.
+    bool moveColumns(Manifold2D& plan,
+                     const std::vector<std::pair<NodeID, glm::vec2>>& moves,
+                     Levels::SliceFault* why = nullptr) const {
+        if (why) *why = Levels::SliceFault{};
+        std::vector<std::pair<NodeID, glm::vec2>> back;
+        for (const auto& mv : moves) {
+            if (mv.first >= plan.nodeCount()) return false;
+            back.emplace_back(mv.first, plan.node(mv.first).position);
+        }
+        if (!plan.setNodePositions(moves)) return false;
+        const Levels::SliceFault fault = levels_.unsound(plan);
+        if (!fault) return true;
+        if (why) *why = fault;
+        std::reverse(back.begin(), back.end());
+        plan.setNodePositions(back);
+        return false;
+    }
+
+    // Where node n is on level k, in the map's three dimensions: its column,
+    // its offset there, its height there. An output's place is its node's.
+    glm::vec3 nodePlace(const Manifold2D& plan, LevelID k, NodeID n) const {
+        const glm::vec2 xy = levels_.place(plan, k, n);
+        return glm::vec3(xy.x, xy.y, levels_.height(k, n));
+    }
+
+    // The point (x, y, z), through the floor plan at its own height: what
+    // every reader below takes. On an unshaped map, levels().evaluate() of
+    // the floor plan's evaluation, exactly.
+    Evaluation3D evaluate(const Manifold2D& plan, glm::vec3 p,
+                          RegionID hint = InvalidRegion) const {
+        return levels_.evaluate(plan, p, hint);
     }
 
     // Nodes removed from the floor plan: heights, every level's bindings and

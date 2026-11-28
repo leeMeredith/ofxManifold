@@ -131,11 +131,11 @@ inline LoadResult loadFloor(const std::string& text, Manifold2D& out,
     }
     const int v = static_cast<int>(root["version"].asNumber());
     if (v < 1 || v > maxVersion) {
-        // Versions 3 and 4 are a 3D map. Read as a flat one, its levels,
+        // Versions 3 to 5 are a 3D map. Read as a flat one, its levels,
         // bends and values would be dropped without a word, so it is refused
         // here.
         res.error = "unsupported version " + std::to_string(v)
-                  + ((v == 3 || v == 4) && maxVersion < 3
+                  + (v >= 3 && v <= 5 && maxVersion < 3
                      ? ": a 3D map, opened with loadMap3D" : "");
         return res;
     }

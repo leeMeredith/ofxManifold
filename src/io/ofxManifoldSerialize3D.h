@@ -9,7 +9,11 @@
 //                                  "levels": each level's starting height,
 //                                  the heights of its bent nodes, its node
 //                                  values. That makes it version 3 --
-//                                  version 4 when levels touch (3B-2d).
+//                                  version 4 when levels touch (3B-2d),
+//                                  version 5 when any node is off its
+//                                  column on a level (3B-5c): each such
+//                                  level then lists "places", a node and
+//                                  how far off its column it is there.
 //   the outputs file               outputs and derived outputs, as always;
 //   (name-outputs.json)            each binding on a level other than the
 //                                  first carries "level": k. That makes it
@@ -24,6 +28,13 @@
 // refuse a touch as a crossing -- by version it refuses plainly instead. A
 // version 3 file with a touch is refused here for the same reason, as levels
 // in a version 2 file are.
+//
+// A node off its column (round 3B-5c) is written at version 5, and only
+// then, for the same reason: an older reader would open the map with every
+// level the floor plan's own shape, without a word. A file whose places
+// leave the map unsound -- a region flattened, turned over or crossing
+// between two levels, or the volume folded -- is refused, as crossing
+// heights are.
 //
 // Each file refuses the other's reader rather than being half-read:
 // loadManifold() refuses a version 3 map file, loadMapping() a binding with a
@@ -44,10 +55,11 @@ namespace io {
 namespace detail {
 
 // Is there anything only version 3 can say? More than one level, a level not
-// starting at 0, a bent node, or a declared value.
+// starting at 0, a bent node, a node off its column, or a declared value.
 inline bool needs3D(const Map3D& map, std::size_t nodeCount) {
     const Levels& lv = map.levels();
     if (lv.count() > 1 || !map.valueSet().empty()) return true;
+    if (lv.shaped()) return true;              // a node off its column (3B-5c)
     if (lv.base(0) != 0.0f) return true;
     for (NodeID n = 0; n < nodeCount; ++n) {
         if (lv.bent(0, n)) return true;
@@ -55,9 +67,22 @@ inline bool needs3D(const Map3D& map, std::size_t nodeCount) {
     return false;
 }
 
-// The map file's version for a 3D map: 4 only where levels touch.
+// The map file's version for a 3D map: 5 only where a node is off its
+// column, 4 only where levels touch.
 inline int map3Version(const Map3D& map, std::size_t nodeCount) {
+    if (map.levels().shaped()) return 5;
     return map.levels().touches(nodeCount) ? 4 : 3;
+}
+
+// What broke, in a file's words.
+inline std::string faultText(const Levels::SliceFault& f) {
+    const char* what = f.kind == Levels::SliceFault::Flat ? "flattened"
+                     : f.kind == Levels::SliceFault::TurnedOver ? "turned over"
+                     : f.kind == Levels::SliceFault::Crossing ? "crossing itself"
+                     : "folded";
+    return "region " + std::to_string(f.region) + " is " + what
+         + " between levels " + std::to_string(f.below) + " and "
+         + std::to_string(f.below + 1);
 }
 
 } // namespace detail
@@ -95,6 +120,21 @@ inline std::string saveManifold3D(const Manifold2D& m, const Map3D& map) {
             first = false;
         }
         o << "],\n";
+        // Only in a shaped map, and only the nodes off their columns here.
+        if (lv.shaped()) {
+            o << "      \"places\": [";
+            first = true;
+            for (NodeID n = 0; n < m.nodeCount(); ++n) {
+                if (!lv.shaped(k, n)) continue;
+                const glm::vec2 off = lv.offset(k, n);
+                o << (first ? "" : ", ") << "{ \"node\": "
+                  << json::quote(m.node(n).name) << ", \"dx\": "
+                  << json::number(off.x) << ", \"dy\": "
+                  << json::number(off.y) << " }";
+                first = false;
+            }
+            o << "],\n";
+        }
         // Only values that differ from the fallback: a node at its fallback
         // reloads the same either way.
         o << "      \"values\": [";
@@ -164,7 +204,8 @@ inline std::string saveMapping3D(const Map3D& map, const Manifold2D& m) {
 // Refused, with the reason, and leaving `m` and `out` untouched, if either
 // file is refused on its own, if the outputs file binds on a level the map
 // file does not have, if levels cross -- or touch in a file older than
-// version 4 --, if a value is set that was
+// version 4 --, if a node is off its column in a file older than version 5
+// or the places leave the map unsound, if a value is set that was
 // never declared or declared twice, or if a height or value names a node the
 // floor plan does not have.
 inline LoadResult loadMap3D(const std::string& mapText,
@@ -173,7 +214,7 @@ inline LoadResult loadMap3D(const std::string& mapText,
     LoadResult res;
     Manifold2D floor;
     {
-        const LoadResult fr = detail::loadFloor(mapText, floor, 4);
+        const LoadResult fr = detail::loadFloor(mapText, floor, 5);
         if (!fr.ok) { res.error = fr.error; return res; }
     }
     const json::ParseResult pr = json::parse(mapText);
@@ -189,6 +230,8 @@ inline LoadResult loadMap3D(const std::string& mapText,
     // ---- levels: starting heights and bends --------------------------------
     std::vector<float> bases{0.0f};
     std::vector<std::vector<std::pair<NodeID, float>>> bends(1);
+    struct Placed { LevelID level; NodeID node; glm::vec2 off; };
+    std::vector<Placed> placed;
     struct SetValue { LevelID level; NodeID node; std::string name; float x; };
     std::vector<SetValue> sets;
     if (root.has("levels")) {
@@ -216,6 +259,19 @@ inline LoadResult loadMap3D(const std::string& mapText,
                         return res;
                     }
                     bends.back().emplace_back(n, h["height"].asFloat());
+                }
+            }
+            if (lv.has("places")) {
+                for (const json::Value& pl : lv["places"].asArray()) {
+                    const NodeID n = floor.findNode(pl["node"].asString());
+                    if (n == InvalidNode) {
+                        res.error = "place on level " + std::to_string(k)
+                                  + " for unknown node: "
+                                  + pl["node"].asString();
+                        return res;
+                    }
+                    placed.push_back({k, n, glm::vec2(pl["dx"].asFloat(),
+                                                      pl["dy"].asFloat())});
                 }
             }
             if (lv.has("values")) {
@@ -246,6 +302,20 @@ inline LoadResult loadMap3D(const std::string& mapText,
         && geometry.touches(floor.nodeCount())) {
         res.error = "levels that touch need version 4";
         return res;
+    }
+
+    // ---- places: nodes off their columns (3B-5c) -------------------------------
+    for (const Placed& pl : placed) geometry.setOffset(pl.level, pl.node, pl.off);
+    if (geometry.shaped()) {
+        if (static_cast<int>(root["version"].asNumber()) < 5) {
+            res.error = "a node off its column needs version 5";
+            return res;
+        }
+        const Levels::SliceFault fault = geometry.unsound(floor);
+        if (fault) {
+            res.error = "unsound: " + detail::faultText(fault);
+            return res;
+        }
     }
 
     // ---- bindings, per level ---------------------------------------------------

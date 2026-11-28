@@ -1,0 +1,123 @@
+{
+  "version": 5,
+  "space": "normalized",
+  "nodes": [
+    {
+      "id": "n0",
+      "position": [
+        0.1,
+        0.1
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n1",
+      "position": [
+        0.9,
+        0.1
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n2",
+      "position": [
+        0.9,
+        0.9
+      ],
+      "weight": 1.0
+    },
+    {
+      "id": "n3",
+      "position": [
+        0.1,
+        0.9
+      ],
+      "weight": 1.0
+    }
+  ],
+  "regions": [
+    [
+      "n0",
+      "n1",
+      "n2"
+    ],
+    [
+      "n0",
+      "n2",
+      "n3"
+    ]
+  ],
+  "values": [],
+  "levels": [
+    {
+      "base": 0.0,
+      "heights": [],
+      "values": [],
+      "places": []
+    },
+    {
+      "base": 0.5,
+      "heights": [
+        {
+          "node": "n2",
+          "height": 0.7
+        }
+      ],
+      "values": [],
+      "places": [
+        {
+          "node": "n0",
+          "dx": -0.1,
+          "dy": -0.1
+        },
+        {
+          "node": "n1",
+          "dx": 0.1,
+          "dy": -0.1
+        },
+        {
+          "node": "n2",
+          "dx": 0.1,
+          "dy": 0.1
+        },
+        {
+          "node": "n3",
+          "dx": -0.1,
+          "dy": 0.1
+        },
+        {
+          "node": "nobody",
+          "dx": 0.1,
+          "dy": 0.0
+        }
+      ]
+    },
+    {
+      "base": 1.0,
+      "heights": [],
+      "values": [],
+      "places": [
+        {
+          "node": "n0",
+          "dx": -0.2,
+          "dy": -0.2
+        },
+        {
+          "node": "n1",
+          "dx": 0.2,
+          "dy": -0.2
+        },
+        {
+          "node": "n2",
+          "dx": 0.3,
+          "dy": 0.35
+        },
+        {
+          "node": "n3",
+          "dx": -0.2,
+          "dy": 0.2
+        }
+      ]
+    }
+  ]
+}

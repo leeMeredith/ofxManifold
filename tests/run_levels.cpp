@@ -204,6 +204,15 @@ bool sameMap3(const Map3D& a, const Map3D& b, std::size_t nodes,
                   << b.levels().height(k, n);
                 return false;
             }
+            // and where it is off its column there (3B-5c)
+            const glm::vec2 oa = a.levels().offset(k, n);
+            const glm::vec2 ob = b.levels().offset(k, n);
+            if (!close(oa.x, ob.x) || !close(oa.y, ob.y)) {
+                d << "node " << n << " on level " << k << " is off its column by ("
+                  << oa.x << ", " << oa.y << "), expected (" << ob.x << ", "
+                  << ob.y << ")";
+                return false;
+            }
         }
     }
     // Every level holds the room's outputs: the same names, channels and
@@ -595,6 +604,45 @@ int main(int argc, char** argv) {
                     m.removeOutput(target(w[1]));
                 } else if (v == "TRIM") {
                     m.setTrim(target(w[1]), std::stof(w[2]));
+                } else if (v == "PLACE" || v == "SSETH" || v == "SMOVE"
+                           || v == "SCOPY" || v == "SREMOVELEVEL") {
+                    // Map3D's sound doors (3B-5c): =OK (or where a copy
+                    // went), =REFUSED:- by the levels' own rule, or
+                    // =REFUSED:KIND,cell,region by a slice.
+                    const Manifold2D& fl = floors[pn];
+                    Levels::SliceFault why;
+                    bool done = false;
+                    const LevelID k = std::stoul(w[1]);
+                    if (v == "PLACE") {
+                        std::vector<std::pair<NodeID, glm::vec2>> offs;
+                        for (const auto& one : splitOn(w[2], '/')) {
+                            const std::size_t eq = one.find('='), cm = one.find(',');
+                            offs.emplace_back(
+                                static_cast<NodeID>(std::stoul(one.substr(0, eq))),
+                                glm::vec2(std::stof(one.substr(eq + 1, cm - eq - 1)),
+                                          std::stof(one.substr(cm + 1))));
+                        }
+                        done = m.setOffsets(fl, k, offs, &why);
+                    } else if (v == "SSETH") {
+                        done = m.setHeight(fl, k, std::stoul(w[2]), std::stof(w[3]), &why);
+                    } else if (v == "SMOVE") {
+                        done = m.moveLevel(fl, k, std::stof(w[2]), nullptr, &why);
+                    } else if (v == "SREMOVELEVEL") {
+                        done = m.removeLevel(fl, k, &why);
+                    } else {
+                        const LevelID at = m.copyLevel(fl, k, std::stof(w[2]), nullptr, &why);
+                        done = at < m.count();
+                        if (done) got = "=" + std::to_string(at);
+                    }
+                    static const char* kinds[] = {"-", "FLAT", "TURNED", "CROSSING", "FOLDED"};
+                    if (!done) {
+                        got = std::string("=REFUSED:") + kinds[why.kind];
+                        if (why) got += "," + std::to_string(why.below) + ","
+                                      + std::to_string(why.region);
+                    } else if (got.empty()) {
+                        got = "=OK";
+                    }
+                    if (m.count() != m.levels().count()) got += " (levels out of step)";
                 } else if (v == "REMOVELEVEL") {
                     got = m.removeLevel(std::stoul(w[1])) ? "=OK" : "=REFUSED";
                 } else if (v == "USERIG") {
@@ -1068,7 +1116,9 @@ int main(int argc, char** argv) {
                 expectKeyword(in, "P");
                 float x, y, z; in >> x >> y >> z;
                 expectKeyword(in, "ROUTED");
-                e = m.levels().evaluate(floors["square"].evaluate({x, y}), z);
+                // Through the floor plan at the point's own height (3B-5c):
+                // on an unshaped map, what it always was.
+                e = m.evaluate(floors["square"], glm::vec3(x, y, z));
             }
             const std::vector<float> routed = readFloatsUntil(in, "SILENCE");
             float sil; in >> sil;
@@ -1083,6 +1133,68 @@ int main(int argc, char** argv) {
                               << ", expected " << sil;
             }
             if (ok) ok = map3Properties(m, e, d);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "PLACES3") {
+            // Every node's place on every level: column, offset, height.
+            std::string mn; in >> mn;
+            const Map3D& m = maps3[mn];
+            const Manifold2D& fl = floors["square"];
+            bool ok = true;
+            std::string tok;
+            std::size_t seen = 0;
+            while (ok && in >> tok) {
+                const std::size_t c = tok.find(':'), eq = tok.find('=');
+                const auto xyz = splitOn(tok.substr(eq + 1), ',');
+                const LevelID k = std::stoul(tok.substr(0, c));
+                const NodeID n = std::stoul(tok.substr(c + 1, eq - c - 1));
+                const glm::vec3 at = m.nodePlace(fl, k, n);
+                ++seen;
+                if (!close(at.x, std::stof(xyz[0])) || !close(at.y, std::stof(xyz[1]))
+                    || !close(at.z, std::stof(xyz[2]))) {
+                    ok = false;
+                    d << "node " << n << " on level " << k << " is at (" << at.x
+                      << ", " << at.y << ", " << at.z << "), expected " << tok;
+                }
+            }
+            if (ok && seen != m.count() * fl.nodeCount()) { ok = false; d << seen << " places"; }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "COLUMN3") {
+            // Columns moved on the floor plan, through the map: refused,
+            // nothing moves.
+            std::string mn; in >> mn;
+            expectKeyword(in, "MOVE");
+            std::string list; in >> list;
+            expectKeyword(in, "EXPECT");
+            std::string want, w;
+            while (in >> w) want += (want.empty() ? "" : " ") + w;
+            const Map3D& m = maps3[mn];
+            Manifold2D fl = floors["square"];
+            std::vector<std::pair<NodeID, glm::vec2>> moves;
+            for (const auto& one : splitOn(list, ';')) {
+                const std::size_t eq = one.find('='), cm = one.find(',');
+                moves.emplace_back(
+                    static_cast<NodeID>(std::stoul(one.substr(0, eq))),
+                    glm::vec2(std::stof(one.substr(eq + 1, cm - eq - 1)),
+                              std::stof(one.substr(cm + 1))));
+            }
+            Levels::SliceFault why;
+            const bool done = m.moveColumns(fl, moves, &why);
+            static const char* kinds[] = {"-", "FLAT", "TURNED", "CROSSING", "FOLDED"};
+            std::string got = done ? "OK" : std::string("REFUSED ") + kinds[why.kind];
+            if (why) got += " " + std::to_string(why.below) + " " + std::to_string(why.region);
+            bool moved = true, still = true;
+            for (const auto& mv : moves) {
+                const glm::vec2 at = fl.node(mv.first).position;
+                const glm::vec2 was = floors["square"].node(mv.first).position;
+                moved = moved && close(at.x, mv.second.x) && close(at.y, mv.second.y);
+                still = still && at.x == was.x && at.y == was.y;
+            }
+            if (done && !moved) got += " (but a column is not where it was put)";
+            if (!done && !still) got += " (but a column moved)";
+            const bool ok = got == want;
+            if (!ok) d << "got " << got << ", expected " << want;
             record(cls, name, ok, d.str());
 
         } else if (kind == "FILE3") {
