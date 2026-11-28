@@ -26,9 +26,12 @@
 // plan's weights reproduce (x, y), and the vertical blend is linear between
 // the two heights at (x, y). Checked by vector.
 //
-// Shape. Every level has the same floor plan, so every horizontal slice of the
-// volume is the same shape: it cannot narrow to a waist or a point -- no
-// hourglass, no double pyramid. Levels may touch but never cross (round
+// Shape. Every level has the same floor plan -- the same nodes and regions --
+// but since round 3B-5a a node may sit off its column on a level, so a slice
+// of the volume may be wider, narrower or another shape than the floor plan:
+// a funnel, an hourglass, a stadium ("a node's own place on a level", below).
+// With no node off its column every slice is the floor plan, as before.
+// Levels may touch but never cross (round
 // 3B-2d): each node is at least as high on each level as on the one below,
 // and each level starts no lower than the one below it. Where two levels are
 // one height, they PINCH: a closed shape -- a bipyramid, the octahedron --
@@ -43,7 +46,11 @@
 // One level is today's map: z is ignored, and the weights are the floor
 // plan's, on level 0.
 
+#include "ofxManifold2D.h"
 #include "ofxManifoldTypes.h"
+
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -216,6 +223,155 @@ public:
         return false;
     }
 
+    // ---- a node's own place on a level (round 3B-5a) ------------------------
+    //
+    // Each node on each level may sit OFF ITS COLUMN: an (x, y) offset from
+    // its place on the floor plan, zero until set. A level's own plan is the
+    // floor plan -- the same nodes and regions -- with every node at its
+    // column plus its offset there: a stadium's tiers, a funnel, an
+    // hourglass, or one node pushed out on one level. Moving a node on the
+    // floor plan moves its column, offsets kept.
+    //
+    // Between two levels the SLICE at t has each node on the straight line
+    // between its two places, and at the blend of its two heights. A point
+    // (x, y, z) is weighted by the slice at its own height: the t whose
+    // slice, weighted at (x, y) as a floor plan is, has height z under the
+    // point. Node i on the lower level then weighs w_i (1 - t), on the upper
+    // w_i t, as on an unshaped map -- and the weights still reproduce the
+    // point exactly, because the slice's weights reproduce (x, y) and its
+    // height, and every node's slice place is linear in t. Checked by vector.
+    //
+    // Inside and outside are the slice's: the map's edge is where it is at
+    // that height.
+    //
+    // These take the floor plan, not its Evaluation, since the floor plan
+    // must be asked again at each height. On a map with no offsets each one
+    // gives exactly what its Evaluation-taking twin above gives -- by vector
+    // -- so a caller may use these always.
+    //
+    // What is and is not found. A level position u needs no search: its
+    // slice is known. A height z does: each cell is looked at kSliceSteps + 1
+    // times, the map's edge between two looks is closed in on by halving,
+    // and the height by halving again -- which takes the height under a
+    // point to rise with t (never folding; refused by every operation from
+    // round 3B-5b on). A part of the map thinner than a step in t, with the
+    // point outside at the looks either side of it, is not found: outside.
+    //
+    // setOffset() checks nothing yet: round 3B-5b makes every change that
+    // would cross, fold or overlap a slice refuse, as heights do.
+
+    static constexpr int kSliceSteps = 8;
+
+    // Node n's offset from its column on level k.
+    glm::vec2 offset(LevelID k, NodeID n) const {
+        if (k >= levels_.size()) return glm::vec2(0.0f);
+        const Level& l = levels_[k];
+        return n < l.places.size() ? l.places[n] : glm::vec2(0.0f);
+    }
+
+    // Is this node off its column on this level? A file writes only these.
+    bool shaped(LevelID k, NodeID n) const {
+        const glm::vec2 o = offset(k, n);
+        return o.x != 0.0f || o.y != 0.0f;
+    }
+
+    // Is any node off its column on any level? If not, this is a map as it
+    // was before round 3B-5.
+    bool shaped() const {
+        for (const Level& l : levels_) {
+            for (const glm::vec2& o : l.places) {
+                if (o.x != 0.0f || o.y != 0.0f) return true;
+            }
+        }
+        return false;
+    }
+
+    // Put node n at `off` from its column on level k. Unchecked (see above).
+    bool setOffset(LevelID k, NodeID n, glm::vec2 off) {
+        if (k >= levels_.size() || n == InvalidNode) return false;
+        Level& l = levels_[k];
+        if (l.places.size() <= n) l.places.resize(n + 1, glm::vec2(0.0f));
+        l.places[n] = off;
+        return true;
+    }
+
+    // Where node n is on level k: its column plus its offset there.
+    glm::vec2 place(const Manifold2D& plan, LevelID k, NodeID n) const {
+        return plan.node(n).position + offset(k, n);
+    }
+
+    // Every node's offset in the slice t of the way from level k to k + 1.
+    std::vector<glm::vec2> slice(LevelID k, float t) const {
+        std::vector<glm::vec2> out;
+        if (k >= levels_.size()) return out;
+        const std::vector<glm::vec2>& lo = levels_[k].places;
+        static const std::vector<glm::vec2> none;
+        const std::vector<glm::vec2>& hi =
+            k + 1 < levels_.size() ? levels_[k + 1].places : none;
+        out.resize(std::max(lo.size(), hi.size()), glm::vec2(0.0f));
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            const glm::vec2 a = i < lo.size() ? lo[i] : glm::vec2(0.0f);
+            const glm::vec2 b = i < hi.size() ? hi[i] : glm::vec2(0.0f);
+            out[i] = a + t * (b - a);
+        }
+        return out;
+    }
+
+    // The floor plan's evaluation of (x, y) in the slice at level position
+    // u, held to the levels there are. One level: that level's own plan.
+    Evaluation floorAtPosition(const Manifold2D& plan, glm::vec2 xy, float u,
+                               RegionID hint = InvalidRegion) const {
+        const std::size_t n = levels_.size();
+        if (!shaped()) return plan.evaluate(xy, hint);
+        if (n == 1) return plan.evaluateMoved(xy, slice(0, 0.0f), hint);
+        u = std::min(std::max(u, 0.0f), float(n - 1));
+        const LevelID k = cellBelow(u, n);
+        return plan.evaluateMoved(xy, slice(k, u - float(k)), hint);
+    }
+
+    // The height at level position u under (x, y), restrained to the levels:
+    // heightAtPosition() above, for a shaped map. Outside the slice there,
+    // the levels are taken flat, at their bases, as above.
+    float heightAtPosition(const Manifold2D& plan, glm::vec2 xy, float u,
+                           RegionID hint = InvalidRegion) const {
+        return heightAtPosition(floorAtPosition(plan, xy, u, hint).weights, u);
+    }
+
+    // The weights at level position u: evaluateAtPosition() above, for a
+    // shaped map. No search: the slice at u is asked directly.
+    Evaluation3D evaluateAtPosition(const Manifold2D& plan, glm::vec2 xy,
+                                    float u,
+                                    RegionID hint = InvalidRegion) const {
+        // Past the ends the twin above says outside, whatever the slice.
+        return evaluateAtPosition(floorAtPosition(plan, xy, u, hint), u);
+    }
+
+    // The point (x, y, z): evaluate() above, for a shaped map.
+    Evaluation3D evaluate(const Manifold2D& plan, glm::vec3 p,
+                          RegionID hint = InvalidRegion) const {
+        const glm::vec2 xy(p.x, p.y);
+        const std::size_t n = levels_.size();
+        if (!shaped()) return evaluate(plan.evaluate(xy, hint), p.z);
+        if (n == 1) return evaluate(plan.evaluateMoved(xy, slice(0, 0.0f), hint), p.z);
+        Found f;
+        if (!find(plan, xy, p.z, hint, f)) return Evaluation3D{};
+        return share(f.floor, f.cell, f.t);
+    }
+
+    // The level position of height z under (x, y): positionAt() above, for
+    // a shaped map, restrained. Below everything 0, above everything the top;
+    // where the point is outside the map at that height, the levels are
+    // taken flat, at their bases, as above.
+    float positionAt(const Manifold2D& plan, glm::vec2 xy, float z,
+                     RegionID hint = InvalidRegion) const {
+        const std::size_t n = levels_.size();
+        if (n == 1) return 0.0f;
+        if (!shaped()) return positionAt(plan.evaluate(xy, hint).weights, z);
+        Found f;
+        if (find(plan, xy, z, hint, f)) return float(f.cell) + f.t;
+        return positionAt(std::vector<WeightedNode>{}, z);
+    }
+
     // ---- making levels ----------------------------------------------------
 
     // Copy level `from` to a new level starting at `newBase`: every node's
@@ -242,6 +398,7 @@ public:
         const std::size_t n = std::max(nodeCount, levels_[from].heights.size());
         made.heights.resize(n);
         for (NodeID i = 0; i < n; ++i) made.heights[i] = height(from, i) + shift;
+        made.places = levels_[from].places;      // its shape too (3B-5a)
 
         std::vector<NodeID> bad;
         for (NodeID i = 0; i < n; ++i) {
@@ -437,6 +594,14 @@ public:
                 moved[now] = l.heights[old];
             }
             l.heights = std::move(moved);
+            std::vector<glm::vec2> placed;
+            for (NodeID old = 0; old < l.places.size(); ++old) {
+                if (old >= table.size() || table[old] == InvalidNode) continue;
+                const NodeID to = table[old];
+                if (placed.size() <= to) placed.resize(to + 1, glm::vec2(0.0f));
+                placed[to] = l.places[old];
+            }
+            l.places = std::move(placed);
         }
     }
 
@@ -498,8 +663,104 @@ private:
     struct Level {
         float              base = 0.0f;
         std::vector<float> heights;   // by NodeID; past the end, `base`
+        std::vector<glm::vec2> places = {};  // offsets by NodeID; past the end, none
     };
     std::vector<Level> levels_;
+
+    // ---- finding a height in a shaped map (3B-5a) ----------------------------
+
+    // Where a height was found: the cell, how far up it, and the slice's
+    // evaluation there.
+    struct Found {
+        LevelID    cell = 0;
+        float      t = 0.0f;
+        Evaluation floor;
+    };
+
+    // One look at cell k, t of the way up: is (x, y) inside the slice, and
+    // how far is its height there above z?
+    struct Look {
+        float      t = 0.0f;
+        bool       inside = false;
+        float      over = 0.0f;       // the slice's height at (x, y), less z
+        float      gap = 0.0f;        // between the two levels there
+        Evaluation floor;
+    };
+    Look look(const Manifold2D& plan, glm::vec2 xy, float z, RegionID hint,
+              LevelID k, float t) const {
+        Look l;
+        l.t = t;
+        l.floor = plan.evaluateMoved(xy, slice(k, t), hint);
+        l.inside = l.floor.inside;
+        if (!l.inside) return l;
+        const float lo = heightAt(k, l.floor.weights);
+        const float hi = heightAt(k + 1, l.floor.weights);
+        l.gap = hi - lo;
+        l.over = lo + t * (hi - lo) - z;
+        return l;
+    }
+
+    // The look nearest `out` that is still inside, between an inside look
+    // and an outside one: the map's edge at this point, closed in on.
+    Look edge(const Manifold2D& plan, glm::vec2 xy, float z, RegionID hint,
+              LevelID k, Look in, Look out) const {
+        for (int i = 0; i < 24; ++i) {
+            const Look mid = look(plan, xy, z, hint, k, 0.5f * (in.t + out.t));
+            if (mid.inside) in = mid; else out = mid;
+        }
+        return in;
+    }
+
+    // The height z under (x, y): each cell from the bottom, looked at
+    // kSliceSteps + 1 times; between two looks with the height at or below z
+    // at the lower and at or above it at the upper, closed in on by halving.
+    // Within `on` of a level, on it -- as evaluate() above -- and at a pinch,
+    // shared equally, by the same rules.
+    bool find(const Manifold2D& plan, glm::vec2 xy, float z, RegionID hint,
+              Found& found) const {
+        const float on = 1e-6f;
+        const std::size_t n = levels_.size();
+        for (LevelID k = 0; k + 1 < n; ++k) {
+            Look a = look(plan, xy, z, hint, k, 0.0f);
+            for (int s = 1; s <= kSliceSteps; ++s) {
+                Look b = look(plan, xy, z, hint, k, float(s) / float(kSliceSteps));
+                Look lo = a, hi = b;
+                const Look next = b;
+                bool any = a.inside || b.inside;
+                if (a.inside && !b.inside) hi = edge(plan, xy, z, hint, k, a, b);
+                if (!a.inside && b.inside) lo = edge(plan, xy, z, hint, k, b, a);
+                a = next;
+                if (!any || !(lo.over <= on && hi.over >= -on)) continue;
+                for (int i = 0; i < 30 && hi.t - lo.t > 0.0f; ++i) {
+                    const Look mid = look(plan, xy, z, hint, k, 0.5f * (lo.t + hi.t));
+                    if (!mid.inside) return false;      // a fold: not ours
+                    if (mid.over <= 0.0f) lo = mid; else hi = mid;
+                }
+                Look at = (std::fabs(lo.over) <= std::fabs(hi.over)) ? lo : hi;
+                // On a level: exactly.
+                if (at.t < on) at = look(plan, xy, z, hint, k, 0.0f);
+                else if (at.t > 1.0f - on) at = look(plan, xy, z, hint, k, 1.0f);
+                if (!at.inside) return false;
+                found.cell = k;
+                found.t = at.t;
+                found.floor = at.floor;
+                // A pinch: no gap here -- shared equally, t = 0.5.
+                if (!(at.gap > 0.0f)) {
+                    found.t = 0.5f;
+                    return true;
+                }
+                // On the level above: its own cell, from the bottom -- and
+                // where the level above THAT touches it here, that pinch.
+                if (at.t == 1.0f && k + 2 < n) {
+                    const Look up = look(plan, xy, z, hint, k + 1, 0.0f);
+                    found.cell = k + 1;
+                    found.t = (up.inside && !(up.gap > 0.0f)) ? 0.5f : 0.0f;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
 
     // A level's height under the point; its base off the floor plan.
     float levelHeight(LevelID k, const std::vector<WeightedNode>& w) const {

@@ -176,6 +176,42 @@ public:
         return e;                              // inside == false, empty
     }
 
+    // evaluate(), with every node moved first: node i taken at its position
+    // plus moved[i] -- nothing where `moved` is too short (round 3B-5a). The
+    // 3D map asks this of the floor plan at each height, where a node's
+    // place on a level may be off its column. The floor plan itself is not
+    // changed. With nothing moved, exactly evaluate().
+    Evaluation evaluateMoved(glm::vec2 p, const std::vector<glm::vec2>& moved,
+                             RegionID hint = InvalidRegion) const {
+        Evaluation e;
+        // True once a region holding p is found, weighted or not.
+        auto holds = [&](RegionID r) {
+            const auto& ids = regions_[r].ids();
+            std::vector<glm::vec2> at;
+            std::vector<float>     bias;
+            for (NodeID id : ids) {
+                const glm::vec2 off = id < moved.size() ? moved[id]
+                                                        : glm::vec2(0.0f);
+                at.push_back(nodes_[id].position + off);
+                bias.push_back(nodes_[id].weight);
+            }
+            if (!regions_[r].contains(at, p)) return false;
+            const RingResult ring = regions_[r].evaluate(at, p, bias);
+            if (!ring.valid) return true;      // as fill(): outside
+            e.regionID = r;
+            e.inside   = true;
+            for (std::size_t i = 0; i < ids.size(); ++i) {
+                e.weights.push_back({ids[i], ring.w[i]});
+            }
+            return true;
+        };
+        if (hint < regions_.size() && holds(hint)) return e;
+        for (RegionID r = 0; r < regions_.size(); ++r) {
+            if (r != hint && holds(r)) return e;
+        }
+        return e;
+    }
+
     // ---- inverse evaluation ---------------------------------------------
 
     // A position recovered from a weight vector, plus whether the recovery was

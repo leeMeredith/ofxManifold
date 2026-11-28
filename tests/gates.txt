@@ -3103,3 +3103,87 @@ file: example-editor/src/ofApp.cpp
 find:     case 's': case 'S':                             return "channel";
 replace:     case '\x07':                                    return "channel";
 
+# ---- round 3B-5a: a node's own place on each level ----
+
+gate: A moved floor plan forgets the moves
+file: src/core/ofxManifold2D.h
+find:                 at.push_back(nodes_[id].position + off);
+replace:                 at.push_back(nodes_[id].position);
+
+gate: A moved floor plan forgets the bias
+file: src/core/ofxManifold2D.h
+find:                 bias.push_back(nodes_[id].weight);\n            }\n            if (!regions_[r].contains(at, p)) return false;
+replace:                 bias.push_back(1.0f);\n            }\n            if (!regions_[r].contains(at, p)) return false;
+nl: yes
+
+gate: A moved floor plan gives the weights to the wrong nodes
+file: src/core/ofxManifold2D.h
+find:                 e.weights.push_back({ids[i], ring.w[i]});
+replace:                 e.weights.push_back({ids[(i + 1) % ids.size()], ring.w[i]});
+
+gate: A moved floor plan ignores the hint's region
+file: src/core/ofxManifold2D.h
+find:             if (r != hint && holds(r)) return e;
+replace:             if (r != hint + 1 && holds(r)) return e;
+
+gate: The slice is the lower level's shape all the way up
+file: src/core/ofxManifoldLevels.h
+find:             out[i] = a + t * (b - a);
+replace:             out[i] = a;
+
+gate: The slice forgets nodes only the upper level moved
+file: src/core/ofxManifoldLevels.h
+find:         out.resize(std::max(lo.size(), hi.size()), glm::vec2(0.0f));
+replace:         out.resize(lo.size(), glm::vec2(0.0f));
+
+gate: A shaped map weighed through the unshaped floor plan
+file: src/core/ofxManifoldLevels.h
+find:         if (!shaped()) return evaluate(plan.evaluate(xy, hint), p.z);
+replace:         if (true) return evaluate(plan.evaluate(xy, hint), p.z);
+
+gate: A shaped map's height found at the cell's foot
+file: src/core/ofxManifoldLevels.h
+find:         l.over = lo + t * (hi - lo) - z;
+replace:         l.over = lo - z;
+
+gate: The map's edge between two looks not closed in on
+file: src/core/ofxManifoldLevels.h
+find:                 if (a.inside && !b.inside) hi = edge(plan, xy, z, hint, k, a, b);
+replace:                 if (a.inside && !b.inside) hi = a;
+
+gate: The map's edge from above not closed in on
+file: src/core/ofxManifoldLevels.h
+find:                 if (!a.inside && b.inside) lo = edge(plan, xy, z, hint, k, b, a);
+replace:                 if (!a.inside && b.inside) lo = b;
+
+gate: A height in a shaped map closed in on the wrong way
+file: src/core/ofxManifoldLevels.h
+find:                     if (mid.over <= 0.0f) lo = mid; else hi = mid;
+replace:                     if (mid.over <= 0.0f) hi = mid; else lo = mid;
+
+gate: A shaped pinch not shared
+file: src/core/ofxManifoldLevels.h
+find:                 if (!(at.gap > 0.0f)) {\n                    found.t = 0.5f;
+replace:                 if (!(at.gap > 0.0f)) {\n                    found.t = at.t;
+nl: yes
+
+gate: By level position a shaped map uses the floor plan unmoved
+file: src/core/ofxManifoldLevels.h
+find:         return plan.evaluateMoved(xy, slice(k, u - float(k)), hint);
+replace:         return plan.evaluate(xy, hint);
+
+gate: A level position found outside the map is not taken flat
+file: src/core/ofxManifoldLevels.h
+find:         return positionAt(std::vector<WeightedNode>{}, z);
+replace:         return 0.0f;
+
+gate: A copied level leaves its shape behind
+file: src/core/ofxManifoldLevels.h
+find:         made.places = levels_[from].places;      // its shape too (3B-5a)
+replace:         (void)from;
+
+gate: Removing nodes does not renumber places
+file: src/core/ofxManifoldLevels.h
+find:                 placed[to] = l.places[old];
+replace:                 placed[to] = l.places[to];
+

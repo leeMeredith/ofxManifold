@@ -140,7 +140,10 @@ bool check(const Evaluation3D& e, bool wantInside,
     glm::vec3 p(0.0f);
     for (const auto& kv : got) {
         sum += kv.second;
-        const glm::vec2 q = plan.pos[kv.first.first];
+        // Each node where it is on ITS level (3B-5a): its column, and its
+        // offset there.
+        const glm::vec2 q = plan.pos[kv.first.first]
+                          + lv.offset(kv.first.second, kv.first.first);
         p += kv.second * glm::vec3(q.x, q.y,
                                    lv.height(kv.first.second, kv.first.first));
     }
@@ -375,6 +378,26 @@ int main(int argc, char** argv) {
                 plans[name].tris.push_back(t);
             }
             floors[name] = buildFloor(plans[name]);
+            continue;
+        }
+        if (kind == "SHAPED") {
+            // name FROM stack OFFS k:i=dx,dy ... (round 3B-5a)
+            std::string name; in >> name;
+            expectKeyword(in, "FROM");
+            std::string from; in >> from;
+            expectKeyword(in, "OFFS");
+            Stack st = stacks[from];
+            std::string tok;
+            while (in >> tok) {
+                const std::size_t c = tok.find(':'), eq = tok.find('='),
+                                  cm = tok.find(',', eq);
+                st.levels.setOffset(
+                    static_cast<LevelID>(std::stoul(tok.substr(0, c))),
+                    static_cast<NodeID>(std::stoul(tok.substr(c + 1, eq - c - 1))),
+                    glm::vec2(std::stof(tok.substr(eq + 1, cm - eq - 1)),
+                              std::stof(tok.substr(cm + 1))));
+            }
+            stacks[name] = st;
             continue;
         }
         if (kind == "STACK") {
@@ -733,9 +756,113 @@ int main(int argc, char** argv) {
             const std::string plan = fp == "SQUARE" ? "square" : fp;
             const Stack& st = stacks[sn];
             const Evaluation floor = floors[plan].evaluate(glm::vec2(x, y));
-            const Evaluation3D e = st.levels.evaluate(floor, z);
-            const bool ok = check(e, inside, want, st.levels, plans[plan],
-                                  x, y, z, st.levels.count() == 1, d);
+            // A shaped stack (3B-5a) asks the floor plan at each height. An
+            // unshaped one must get from that door exactly what it gets from
+            // the floor plan's evaluation -- the same weights, bit for bit.
+            const Evaluation3D byPlan =
+                st.levels.evaluate(floors[plan], glm::vec3(x, y, z));
+            const Evaluation3D e = st.levels.shaped()
+                ? byPlan : st.levels.evaluate(floor, z);
+            bool ok = check(e, inside, want, st.levels, plans[plan],
+                            x, y, z, st.levels.count() == 1, d);
+            if (ok && !st.levels.shaped()) {
+                bool same = byPlan.inside == e.inside
+                    && byPlan.weights.size() == e.weights.size()
+                    && byPlan.below == e.below && byPlan.t == e.t;
+                for (std::size_t i = 0; same && i < e.weights.size(); ++i) {
+                    same = byPlan.weights[i].node == e.weights[i].node
+                        && byPlan.weights[i].level == e.weights[i].level
+                        && byPlan.weights[i].weight == e.weights[i].weight;
+                }
+                if (!same) { ok = false; d << "the floor plan's door differs on an unshaped map"; }
+            }
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "EVALSU") {
+            // Weights by level position on a shaped stack: the slice at u.
+            std::string sn; in >> sn;
+            expectKeyword(in, "P");
+            float x, y, u; in >> x >> y;
+            expectKeyword(in, "U");
+            in >> u;
+            expectKeyword(in, "EXPECT");
+            std::map<std::pair<NodeID, LevelID>, float> want;
+            const bool inside = readExpect(in, want);
+            const Stack& st = stacks[sn];
+            const Manifold2D& fl = floors[st.plan];
+            const Evaluation3D e = st.levels.evaluateAtPosition(fl, glm::vec2(x, y), u);
+            const float z = st.levels.heightAtPosition(fl, glm::vec2(x, y), u);
+            const bool ok = check(e, inside, want, st.levels, plans[st.plan],
+                                  x, y, z, false, d);
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "UPOSS" || kind == "ZPOSS") {
+            std::string sn; in >> sn;
+            expectKeyword(in, "P");
+            float x, y, given, want; in >> x >> y;
+            expectKeyword(in, kind == "UPOSS" ? "U" : "Z");
+            in >> given;
+            expectKeyword(in, "EXPECT");
+            in >> want;
+            const Stack& st = stacks[sn];
+            const Manifold2D& fl = floors[st.plan];
+            const float got = kind == "UPOSS"
+                ? st.levels.heightAtPosition(fl, glm::vec2(x, y), given)
+                : st.levels.positionAt(fl, glm::vec2(x, y), given);
+            const bool ok = close(got, want);
+            if (!ok) d << (kind == "UPOSS" ? "height " : "position ") << got
+                       << ", expected " << want;
+            record(cls, name, ok, d.str());
+
+        } else if (kind == "SCOPY" || kind == "SREMAP") {
+            // A copied level takes its places; a removed node's follow.
+            std::string sn; in >> sn;
+            Stack st = stacks[sn];
+            const std::size_t nodes = plans[st.plan].pos.size();
+            std::size_t count = nodes;
+            bool ok = true;
+            if (kind == "SCOPY") {
+                expectKeyword(in, "FROM");
+                std::size_t from, wantAt; float base;
+                in >> from;
+                expectKeyword(in, "BASE");
+                in >> base;
+                expectKeyword(in, "EXPECT");
+                in >> wantAt;
+                const LevelID at = st.levels.copyLevel(from, base, nodes);
+                if (at != wantAt) { ok = false; d << "copied to " << at; }
+            } else {
+                expectKeyword(in, "TABLE");
+                std::string t; in >> t;
+                std::vector<NodeID> table;
+                count = 0;
+                for (const auto& w : splitOn(t, ',')) {
+                    table.push_back(w == "-" ? InvalidNode
+                                             : static_cast<NodeID>(std::stoul(w)));
+                    if (w != "-") ++count;
+                }
+                st.levels.remapNodes(table);
+            }
+            expectKeyword(in, "OFFS");
+            std::string tok;
+            LevelID k = 0; bool any = false;
+            while (ok && in >> tok) {
+                if (tok[0] == 'L') { k = std::stoul(tok.substr(1)); any = true; continue; }
+                const auto cells = splitOn(tok, ';');
+                if (cells.size() != count) { ok = false; d << "level " << k << ": " << cells.size() << " nodes"; break; }
+                for (NodeID i = 0; ok && i < cells.size(); ++i) {
+                    const auto xy = splitOn(cells[i], ',');
+                    const glm::vec2 o = st.levels.offset(k, i);
+                    if (!close(o.x, std::stof(xy[0])) || !close(o.y, std::stof(xy[1]))) {
+                        ok = false;
+                        d << "node " << i << " on level " << k << " is off by ("
+                          << o.x << ", " << o.y << "), expected " << cells[i];
+                    }
+                }
+            }
+            if (ok && (!any || k + 1 != st.levels.count())) {
+                ok = false; d << st.levels.count() << " levels";
+            }
             record(cls, name, ok, d.str());
 
         } else if (kind == "CONT") {
@@ -760,8 +887,10 @@ int main(int argc, char** argv) {
                 const float u = static_cast<float>(s) / steps;
                 const float x = ax + (bx - ax) * u, y = ay + (by - ay) * u;
                 const float z = az + (bz - az) * u;
-                const Evaluation3D e = st.levels.evaluate(
-                    floors[plan].evaluate(glm::vec2(x, y)), z);
+                const Evaluation3D e = st.levels.shaped()
+                    ? st.levels.evaluate(floors[plan], glm::vec3(x, y, z))
+                    : st.levels.evaluate(
+                          floors[plan].evaluate(glm::vec2(x, y)), z);
                 std::map<std::pair<NodeID, LevelID>, float> now;
                 // Weights within the tolerance of zero are dropped, as
                 // check() drops them: on the square's diagonal the floor plan

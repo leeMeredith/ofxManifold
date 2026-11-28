@@ -350,6 +350,111 @@ CONT sweep_diagonal CROSS bent SQUARE FROM 0.3 0.6 0.1 TO 0.7 0.4 0.95 STEPS 200
 CONT sweep_under_bend CROSS bent SQUARE FROM 0.2 0.2 0.45 TO 0.85 0.85 0.45 STEPS 200 MAXSTEP 0.007676115271
 
 #--------------------------------------------------------------------
+# A NODE'S OWN PLACE ON EACH LEVEL (round 3B-5a). SHAPED: a stack
+# with nodes off their columns, k:i=dx,dy. EVALXYZ and CONT on a
+# shaped stack go through the floor plan at each height; EVALSU
+# weighs by level position, UPOSS and ZPOSS are height and level
+# position, SCOPY and SREMAP what a copied level and a removed
+# node do to the places. Every weight record reproduces its point
+# from each node's place on its level.
+#--------------------------------------------------------------------
+# two flat levels, at 0 and 1
+STACK pair NODES square OPS COPY 0 1 =1
+HEIGHTS heights_pair ANALYTIC pair L0 0,0,0,0 L1 1,1,1,1
+# two levels touching at node 0: the lower raised to the upper
+STACK touch NODES square OPS COPY 0 0.5 =1 ; RAISE 0 0.5 0 =OK
+HEIGHTS heights_touch ANALYTIC touch L0 0.5,0,0,0 L1 0.5,0.5,0.5,0.5
+# a funnel: the top level half as wide again about the centre
+SHAPED funnel FROM pair OFFS 1:0=-0.2,-0.2 1:1=0.2,-0.2 1:2=0.2,0.2 1:3=-0.2,0.2
+# an hourglass: the middle of three levels half as wide
+SHAPED hourglass FROM three OFFS 1:0=0.2,0.2 1:1=-0.2,0.2 1:2=-0.2,-0.2 1:3=0.2,-0.2
+# one node, node 2, pushed out on the top level alone
+SHAPED onenode FROM pair OFFS 1:2=0.2,0.1
+# bent and shaped: node 2 raised on the middle level, node 0 out
+# on it, the top level a quarter wider
+SHAPED bentshape FROM bent OFFS 1:0=-0.05,-0.05 2:0=-0.1,-0.1 2:1=0.1,-0.1 2:2=0.1,0.1 2:3=-0.1,0.1
+# levels touching at node 0, the upper's node 2 pushed out
+SHAPED touchshape FROM touch OFFS 1:2=0.1,0.1
+# half way up the funnel the slice is 1.25 wide: the point is
+# weighed where it falls on the floor plan through that slice
+EVALXYZ funnel_mid ANALYTIC funnel SQUARE P 0.3 0.6 0.5 EXPECT 0@0=0.2 0@1=0.2 2@0=0.15 2@1=0.15 3@0=0.15 3@1=0.15
+EVALXYZ funnel_low ANALYTIC funnel SQUARE P 0.7 0.2 0.2 EXPECT 0@0=0.2181818182 0@1=0.05454545455 1@0=0.4545454545 1@1=0.1136363636 2@0=0.1272727273 2@1=0.03181818182
+EVALXYZ funnel_high ANALYTIC funnel SQUARE P 0.25 0.8 0.9 EXPECT 0@0=0.02413793103 0@1=0.2172413793 2@0=0.02844827586 2@1=0.2560344828 3@0=0.0474137931 3@1=0.4267241379
+# on the bottom level: its own plan, that level alone
+EVALXYZ funnel_bottom ANALYTIC funnel SQUARE P 0.3 0.6 0 EXPECT 0@0=0.375 2@0=0.25 3@0=0.375
+EVALXYZ funnel_top ANALYTIC funnel SQUARE P 0.3 0.6 1 EXPECT 0@1=0.4166666667 2@1=0.3333333333 3@1=0.25
+# past the floor plan's edge, but inside the wider top level
+EVALXYZ funnel_wide_top ANALYTIC funnel SQUARE P 0.95 0.95 1 EXPECT 0@1=0.125 2@1=0.875
+# outside the slice at this height: the funnel is not yet that wide
+EVALXYZ funnel_edge_outside ANALYTIC funnel SQUARE P 0.05 0.5 0.1 EXPECT OUTSIDE
+# the same (x, y), higher: inside now
+EVALXYZ funnel_edge_inside ANALYTIC funnel SQUARE P 0.05 0.5 0.5 EXPECT 0@0=0.25 0@1=0.25 2@0=0.025 2@1=0.025 3@0=0.225 3@1=0.225
+EVALXYZ funnel_above ANALYTIC funnel SQUARE P 0.3 0.6 1.01 EXPECT OUTSIDE
+EVALXYZ funnel_below ANALYTIC funnel SQUARE P 0.3 0.6 -0.1 EXPECT OUTSIDE
+EVALXYZ hourglass_centre_low ANALYTIC hourglass SQUARE P 0.5 0.5 0.25 EXPECT 0@0=0.25 0@1=0.25 2@0=0.25 2@1=0.25
+# on the waist: the middle level alone, at half its width
+EVALXYZ hourglass_waist ANALYTIC hourglass SQUARE P 0.45 0.6 0.5 EXPECT 0@1=0.25 2@1=0.375 3@1=0.375
+EVALXYZ hourglass_upper ANALYTIC hourglass SQUARE P 0.4 0.55 0.8 EXPECT 0@1=0.16875 0@2=0.253125 2@1=0.1375 2@2=0.20625 3@1=0.09375 3@2=0.140625
+# a corner: inside near the bottom, where the hourglass is wide
+EVALXYZ hourglass_corner_low ANALYTIC hourglass SQUARE P 0.2 0.2 0.1 EXPECT 0@0=0.7333333333 0@1=0.1833333333 2@0=0.06666666667 2@1=0.01666666667
+# the same corner near the waist: outside
+EVALXYZ hourglass_corner_waist ANALYTIC hourglass SQUARE P 0.2 0.2 0.4 EXPECT OUTSIDE
+EVALXYZ hourglass_corner_high ANALYTIC hourglass SQUARE P 0.2 0.2 0.95 EXPECT 0@1=0.08947368421 0@2=0.8052631579 2@1=0.01052631579 2@2=0.09473684211
+# just inside the narrowing wall: the map's edge at this (x, y) is
+# at 0.3, between the look that finds the point inside and the next,
+# which finds it outside -- the edge has to be closed in on
+EVALXYZ hourglass_just_inside_below ANALYTIC hourglass SQUARE P 0.22 0.3 0.29 EXPECT 0@0=0.3578873239 0@1=0.4942253521 2@0=0.002957746479 2@1=0.004084507042 3@0=0.05915492958 3@1=0.08169014085
+# the same, above the waist: the edge at 0.7, from above
+EVALXYZ hourglass_just_inside_above ANALYTIC hourglass SQUARE P 0.22 0.3 0.71 EXPECT 0@1=0.4942253521 0@2=0.3578873239 2@1=0.004084507042 2@2=0.002957746479 3@1=0.08169014085 3@2=0.05915492958
+EVALXYZ hourglass_just_outside_below ANALYTIC hourglass SQUARE P 0.22 0.3 0.31 EXPECT OUTSIDE
+# one node pushed out, bends, a pinch: searched for, CROSS
+EVALXYZ onenode_mid CROSS onenode SQUARE P 0.6 0.6 0.5 EXPECT 0@0=0.2048611111 0@1=0.2048611111 2@0=0.2777777778 2@1=0.2777777778 3@0=0.01736111111 3@1=0.01736111111
+EVALXYZ onenode_near CROSS onenode SQUARE P 0.85 0.8 0.7 EXPECT 0@0=0.05844414894 0@1=0.1363696809 2@0=0.2393617021 2@1=0.5585106383 3@0=0.002194148936 3@1=0.005119680851
+# where only the pushed-out corner reaches: outside low down
+EVALXYZ onenode_out_low CROSS onenode SQUARE P 1 0.92 0.2 EXPECT OUTSIDE
+EVALXYZ onenode_out_high CROSS onenode SQUARE P 1 0.92 0.9 EXPECT 0@0=0.007831632653 0@1=0.07048469388 2@0=0.09183673469 2@1=0.8265306122 3@0=0.0003316326531 3@1=0.002984693878
+# in the triangle the moved node is no part of: as unshaped
+EVALXYZ onenode_other_side CROSS onenode SQUARE P 0.2 0.4 0.6 EXPECT 0@0=0.2532608696 0@1=0.3798913043 2@0=0.04347826087 2@1=0.0652173913 3@0=0.1032608696 3@1=0.1548913043
+EVALXYZ bentshape_lower CROSS bentshape SQUARE P 0.6 0.5 0.3 EXPECT 0@0=0.197096854 0@1=0.1674382551 1@0=0.06758500385 1@1=0.05741499615 2@0=0.275998173 2@1=0.234466718
+EVALXYZ bentshape_near_bend CROSS bentshape SQUARE P 0.8 0.8 0.7 EXPECT 0@0=0.009979492214 0@1=0.1082545956 2@0=0.07442503445 2@1=0.8073408778
+EVALXYZ bentshape_upper CROSS bentshape SQUARE P 0.3 0.4 0.8 EXPECT 0@1=0.2889590763 0@2=0.3058006121 2@1=0.143069551 2@2=0.15140814 3@1=0.05381310331 3@2=0.05694951735
+# at node 3, on the middle level: that level alone
+EVALXYZ bentshape_on_middle CROSS bentshape SQUARE P 0.1 0.9 0.5 EXPECT 3@1=1
+EVALXYZ bentshape_wide_top CROSS bentshape SQUARE P 0.05 0.5 0.97 EXPECT 0@1=0.03075419163 0@2=0.4676888862 2@1=0.002834181725 2@2=0.0431003133 3@1=0.02811213568 3@2=0.4275102915
+# at node 0, where the levels touch: shared equally
+EVALXYZ touchshape_pinch CROSS touchshape SQUARE P 0.1 0.1 0.5 EXPECT 0@0=0.5 0@1=0.5
+EVALXYZ touchshape_open CROSS touchshape SQUARE P 0.8 0.7 0.3 EXPECT 0@0=0.08226882423 0@1=0.08831824277 1@0=0.06028360303 1@1=0.06471639697 2@0=0.339716397 2@1=0.364696536
+
+# by level position: the slice at u, no search
+EVALSU u_funnel_half CROSS funnel P 0.3 0.6 U 0.5 EXPECT 0@0=0.2 0@1=0.2 2@0=0.15 2@1=0.15 3@0=0.15 3@1=0.15
+EVALSU u_funnel_top CROSS funnel P 0.95 0.95 U 1 EXPECT 0@1=0.125 2@1=0.875
+EVALSU u_funnel_outside_slice CROSS funnel P 0.05 0.5 U 0.1 EXPECT OUTSIDE
+EVALSU u_funnel_past_top CROSS funnel P 0.3 0.6 U 1.2 EXPECT OUTSIDE
+EVALSU u_hourglass_upper CROSS hourglass P 0.45 0.6 U 1.5 EXPECT 0@1=0.1666666667 0@2=0.1666666667 2@1=0.2083333333 2@2=0.2083333333 3@1=0.125 3@2=0.125
+EVALSU u_bentshape CROSS bentshape P 0.8 0.8 U 0.75 EXPECT 0@0=0.02985074627 0@1=0.08955223881 2@0=0.2201492537 2@1=0.6604477612
+EVALSU u_onenode CROSS onenode P 1 0.92 U 0.9 EXPECT 0@0=0.007831632653 0@1=0.07048469388 2@0=0.09183673469 2@1=0.8265306122 3@0=0.0003316326531 3@1=0.002984693878
+# a height to a level position, and back to the height
+ZPOSS pos_funnel CROSS funnel P 0.3 0.6 Z 0.35 EXPECT 0.35
+UPOSS pos_funnel_back CROSS funnel P 0.3 0.6 U 0.35 EXPECT 0.35
+ZPOSS pos_bentshape_lower CROSS bentshape P 0.8 0.8 Z 0.6 EXPECT 0.78507934
+UPOSS pos_bentshape_lower_back CROSS bentshape P 0.8 0.8 U 0.78507934 EXPECT 0.6
+ZPOSS pos_bentshape_upper CROSS bentshape P 0.8 0.8 Z 0.9 EXPECT 1.601761295
+UPOSS pos_bentshape_upper_back CROSS bentshape P 0.8 0.8 U 1.601761295 EXPECT 0.9
+ZPOSS pos_hourglass CROSS hourglass P 0.45 0.6 Z 0.75 EXPECT 1.5
+UPOSS pos_hourglass_back CROSS hourglass P 0.45 0.6 U 1.5 EXPECT 0.75
+# outside the slice at that height: the levels taken flat
+ZPOSS pos_outside_flat CROSS hourglass P 0.2 0.2 Z 0.4 EXPECT 0.8
+UPOSS pos_outside_flat_back CROSS hourglass P 0.2 0.2 U 0.8 EXPECT 0.4
+
+CONT cont_funnel CROSS funnel SQUARE FROM 0.2 0.3 0.05 TO 0.8 0.7 0.95 STEPS 240 MAXSTEP 0.007796208416
+CONT cont_bentshape CROSS bentshape SQUARE FROM 0.3 0.3 0.1 TO 0.75 0.7 0.9 STEPS 240 MAXSTEP 0.01335428371
+CONT cont_onenode CROSS onenode SQUARE FROM 0.5 0.4 0.1 TO 0.9 0.85 0.95 STEPS 240 MAXSTEP 0.006263839212
+# a level copied takes its shape with it; a node removed, the
+# places follow the renumbering
+SCOPY copy_takes_shape ANALYTIC bentshape FROM 2 BASE 1.5 EXPECT 3 OFFS L0 0,0;0,0;0,0;0,0 L1 -0.05,-0.05;0,0;0,0;0,0 L2 -0.1,-0.1;0.1,-0.1;0.1,0.1;-0.1,0.1 L3 -0.1,-0.1;0.1,-0.1;0.1,0.1;-0.1,0.1
+SREMAP remove_node_1 ANALYTIC bentshape TABLE 0,-,1,2 OFFS L0 0,0;0,0;0,0 L1 -0.05,-0.05;0,0;0,0 L2 -0.1,-0.1;0.1,0.1;-0.1,0.1
+
+#--------------------------------------------------------------------
 # NODES ADDED AND REMOVED. A new node needs nothing: on every
 # level it sits at that level's start. Removing node 1 of four
 # renumbers 2 and 3; the bend on old node 2 must follow it to

@@ -81,6 +81,23 @@ void runQuery(Fixture& fx, std::istringstream& in) {
 
     const Evaluation e = fx.manifold.evaluate({px, py});
 
+    // evaluateMoved() with nothing moved (round 3B-5a) is evaluate(), bit for
+    // bit: region, bias and all.
+    {
+        const Evaluation mv = fx.manifold.evaluateMoved({px, py}, {});
+        bool same = mv.inside == e.inside && mv.regionID == e.regionID
+                 && mv.weights.size() == e.weights.size();
+        for (std::size_t i = 0; same && i < e.weights.size(); ++i) {
+            same = mv.weights[i].id == e.weights[i].id
+                && mv.weights[i].weight == e.weights[i].weight;
+        }
+        if (!same) {
+            record(cls, name, false,
+                   "evaluateMoved() with nothing moved differs from evaluate()");
+            return;
+        }
+    }
+
     if (expectRegion == "NONE") {
         if (!e.inside && e.weights.empty()
             && e.regionID == InvalidRegion) {

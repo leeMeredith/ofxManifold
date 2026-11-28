@@ -3356,6 +3356,45 @@ Built 2026-11-27 as planned (the recommendations, taken with the order).
   before; each of its choices run; let go while in use. Broken by hand
   seven ways, each caught.
 
+### 3B-5a: a node's own place on each level -- the geometry
+
+Built 2026-11-27 as planned (all recommended, 2026-11-27). The core only:
+nothing in the editor, the player or a file uses it yet.
+
+- **`Manifold2D::evaluateMoved(p, moved, hint)`**: evaluate() with each node
+  taken at its position plus `moved[i]`; the floor plan unchanged. With
+  nothing moved it is evaluate() bit for bit -- checked on every vector of
+  the manifold suite, bias and regions included.
+- **`Levels`**: each level keeps offsets by node (`offset`, `shaped`,
+  `setOffset`, `place`, `slice(k, t)`). Doors that take the floor plan,
+  each exactly its Evaluation-taking twin on an unshaped map (checked bit
+  for bit on every EVALXYZ vector): `evaluate(plan, xyz)`,
+  `evaluateAtPosition(plan, xy, u)`, `heightAtPosition(plan, xy, u)`,
+  `positionAt(plan, xy, z)`, `floorAtPosition`. A copied level takes its
+  shape; removed nodes renumber the places.
+- **Finding a height** (`find`): cells from the bottom, 9 looks a cell;
+  between a look inside the map and one outside, the map's edge is closed
+  in on (24 halvings); between two looks with the height at or below z and
+  at or above it, the height (30 halvings). On a level: that level alone.
+  A pinch: shared equally, as before. By level position there is no search.
+- **Said in the header, not hidden**: `setOffset()` checks nothing until
+  3B-5b; a part of the map thinner than an eighth of a cell in t, outside
+  at the looks either side, is not found; the search takes the height under
+  a point to rise with t.
+- **The reference** keeps a full table of absolute places, scans cells from
+  the top with 64 looks and false position on the distance to the upper
+  level -- and for flat levels scaled about the centre searches not at all:
+  a closed form, emitted as ANALYTIC, which its own search must agree with.
+- **Vectors** 55 new in `levels` (263): a funnel, an hourglass, one node
+  pushed out, bent and shaped together, a pinch; inside one height and
+  outside another at the same (x, y); just inside the wall from below and
+  from above; by level position; height to position and back; three sweeps,
+  every step reproducing its point from each node's place on its level; a
+  copied level; a removed node. 1348 in all. **Gates** 16 new: 598, each
+  caught -- three survived first: two edge gates (no vector had the height
+  between the last look inside and the edge; two added), and one over a
+  line that turned out to do nothing (removed, with its gate).
+
 ## Answered
 
 All as recommended (2026-11-03): the rig is copied into each map; a ring is
@@ -3404,6 +3443,7 @@ the slice that builds the feature, before any file of the new kind exists.
 | **3B-4a** | `manifold-speakers.scd`: one sound on every speaker at its output's level, by channel; SETUP, CHECK THE SPEAKERS, the sounds, ON HEADPHONES; built-in SuperCollider only | every block run on a four-speaker server, each speaker recorded and measured (`make sc-live`), broken by hand |
 | **3B-4b** | `s` `S`: the picked output to the speaker before or after, the two changing places; every level; undo | an editor script, the key panel and app checks, 9 gates |
 | **core / extras** | Rooms plug into the patch (`~manifold[\\rooms]`); the ATK's room, its choices and its install steps in `supercollider/extras/atk`; the core names no extra | every live check with and without the ATK, the core's files read for any extra's name, broken by hand |
+| **3B-5a** | A node's own place on each level, the geometry: `evaluateMoved`, offsets per level, the slice, weights by the slice at the point's height, the map's edge by height | Python reference with closed forms, 55 vectors, 16 gates |
 
 A slice that adds a `.cpp` file says so, and a Project Generator Update comes
 before the build.

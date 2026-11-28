@@ -21,6 +21,14 @@ Formulated differently from the C++ on purpose:
     looks one level down from the cell its walk found.
   - Weights by level position (3B-2d) are a hat over the levels, each level j
     weighing max(0, 1 - |u - j|); the C++ splits one cell by u's fraction.
+  - A shaped map (3B-5a) -- nodes off their columns on a level -- keeps every
+    node's place on every level as a full table of absolute positions, where
+    the C++ keeps offsets that were set. A height is found by scanning the
+    cells from the TOP, 64 looks a cell, and closing in by false position on
+    the distance to the UPPER level; the C++ walks up from the bottom, 8
+    looks a cell, halving. The plainest cases are not searched for at all:
+    flat levels scaled about the centre have a closed form, written out here
+    and emitted as ANALYTIC.
 
 The property that makes it a 3D map is checked in the runner, not assumed:
 the weights reproduce the point. Sum over (node, level) of weight times
@@ -269,6 +277,174 @@ def weigh_at_position(st, lam, u):
             if w * hat != 0.0:
                 out[(i, j)] = w * hat
     return out
+
+
+# ---------------------------------------------------------------------------
+# round 3B-5a: a node's own place on each level
+# ---------------------------------------------------------------------------
+
+class Shaped:
+    """A stack, a floor plan, and P[k][i]: node i's place on level k."""
+
+    def __init__(self, st, nodes, tris, offs):
+        self.st, self.tris = st, tris
+        self.n = len(nodes)
+        self.P = [[tuple(nodes[i]) for i in range(self.n)] for _ in st.H]
+        for (k, i), (dx, dy) in offs.items():
+            self.P[k][i] = (nodes[i][0] + dx, nodes[i][1] + dy)
+
+    def cut(self, k, t):
+        """The slice t of the way from level k up: places and heights."""
+        if k + 1 >= len(self.P):
+            return self.P[k], self.st.H[k]
+        pl = [(a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
+              for a, b in zip(self.P[k], self.P[k + 1])]
+        hs = [a + t * (b - a) for a, b in zip(self.st.H[k], self.st.H[k + 1])]
+        return pl, hs
+
+    def lam_at(self, k, t, p):
+        pl, _ = self.cut(k, t)
+        return floor_weights(dict(enumerate(pl)), self.tris, p)
+
+    def split(self, lam, k, t):
+        out = {}
+        for i, w in lam.items():
+            if w * (1.0 - t) != 0.0:
+                out[(i, k)] = w * (1.0 - t)
+            if w * t != 0.0:
+                out[(i, k + 1)] = w * t
+        return out
+
+    def weigh_u(self, p, u):
+        """By level position: the slice at u, no search."""
+        L = len(self.P)
+        if L == 1:
+            lam = self.lam_at(0, 0.0, p)
+            return None if lam is None else self.split(lam, 0, 0.0)
+        if not 0.0 <= u <= L - 1:
+            return None
+        k = min(int(math.floor(u)), L - 2)
+        lam = self.lam_at(k, u - k, p)
+        return None if lam is None else self.split(lam, k, u - k)
+
+    def height_u(self, p, u):
+        L = len(self.P)
+        u = min(max(u, 0.0), float(L - 1))
+        k = min(int(math.floor(u)), max(L - 2, 0))
+        lam = self.lam_at(k, u - k, p)
+        if lam is None:
+            return height_at_position(self.st, {}, u)
+        _, hs = self.cut(k, u - k)
+        return sum(w * hs[i] for i, w in lam.items())
+
+    def find(self, p, z):
+        """(k, t, lam) for the height z under p, or None. Cells from the
+        top; in each, 64 looks; the short of the upper level, 'under', falls
+        as t rises, and its zero is closed in on by false position."""
+        L = len(self.P)
+        eps = 1e-6
+
+        def under(k, t):
+            lam = self.lam_at(k, t, p)
+            if lam is None:
+                return None
+            _, hs = self.cut(k, t)
+            return z - sum(w * hs[i] for i, w in lam.items())
+
+        def gap(k, t):
+            lam = self.lam_at(k, t, p)
+            return sum(w * (self.st.H[k + 1][i] - self.st.H[k][i])
+                       for i, w in lam.items())
+
+        def inner(k, a, b):
+            """a inside, b outside: the last t inside toward b."""
+            for _ in range(60):
+                m = 0.5 * (a + b)
+                if under(k, m) is None:
+                    b = m
+                else:
+                    a = m
+            return a
+
+        hits = []
+        for k in range(L - 2, -1, -1):
+            N = 64
+            for s in range(N):
+                a, b = s / N, (s + 1) / N
+                ua, ub = under(k, a), under(k, b)
+                if ua is None and ub is None:
+                    continue
+                if ub is None:
+                    b = inner(k, a, b); ub = under(k, b)
+                if ua is None:
+                    a = inner(k, b, a); ua = under(k, a)
+                if not (ua >= -eps and ub <= eps):
+                    continue
+                for _ in range(200):
+                    if b - a < 1e-15 or ua == ub:
+                        break
+                    m = a + (b - a) * ua / (ua - ub)
+                    m = min(max(m, a), b)
+                    um = under(k, m)
+                    if um is None:
+                        return None
+                    if abs(um) < 1e-15:
+                        a = b = m; ua = ub = um
+                        break
+                    if um > 0:
+                        # keep false position from stalling: halve as well
+                        a, ua = m, um
+                        h = 0.5 * (a + b); uh = under(k, h)
+                        if uh is not None and uh > 0:
+                            a, ua = h, uh
+                        elif uh is not None:
+                            b, ub = h, uh
+                    else:
+                        b, ub = m, um
+                        h = 0.5 * (a + b); uh = under(k, h)
+                        if uh is not None and uh <= 0:
+                            b, ub = h, uh
+                        elif uh is not None:
+                            a, ua = h, uh
+                t = a if abs(ua) <= abs(ub) else b
+                if t < eps:
+                    t = 0.0
+                if t > 1.0 - eps:
+                    t = 1.0
+                hits.append((k, t))
+                break
+        if not hits:
+            return None
+        # Every hit is the same height; where levels touch, the pinch: the
+        # two levels with no gap between them here share the point.
+        for k, t in hits:
+            if not gap(k, t) > 0.0:
+                return (k, 0.5, self.lam_at(k, 0.5, p) or self.lam_at(k, t, p))
+        k, t = max(hits) if any(t == 0.0 for _, t in hits) else hits[0]
+        if t == 1.0 and k + 2 < L:
+            k, t = k + 1, 0.0
+        return (k, t, self.lam_at(k, t, p))
+
+    def weigh(self, p, z):
+        L = len(self.P)
+        if L == 1:
+            lam = self.lam_at(0, 0.0, p)
+            return None if lam is None else self.split(lam, 0, 0.0)
+        f = self.find(p, z)
+        return None if f is None or f[2] is None else self.split(f[2], f[0], f[1])
+
+    def position(self, p, z):
+        f = self.find(p, z)
+        if f is None:
+            return position_at(self.st, {}, z)
+        return f[0] + f[1]
+
+
+def offs_s(sh, nodes):
+    return " ".join(
+        f"L{k} " + ";".join(f"{fmt(q[0] - nodes[i][0])},{fmt(q[1] - nodes[i][1])}"
+                            for i, q in enumerate(row))
+        for k, row in enumerate(sh.P))
 
 
 def floor_weights(nodes, tris, p):
@@ -815,6 +991,220 @@ def build():
         out.append(f"CONT {name} CROSS {sname} SQUARE FROM {fmt(a[0])} "
                    f"{fmt(a[1])} {fmt(a[2])} TO {fmt(b[0])} {fmt(b[1])} "
                    f"{fmt(b[2])} STEPS {steps} MAXSTEP {fmt(worst * 1.5 + 1e-4)}")
+    out.append("")
+
+    out.append("#" + "-" * 68)
+    out.append("# A NODE'S OWN PLACE ON EACH LEVEL (round 3B-5a). SHAPED: a stack")
+    out.append("# with nodes off their columns, k:i=dx,dy. EVALXYZ and CONT on a")
+    out.append("# shaped stack go through the floor plan at each height; EVALSU")
+    out.append("# weighs by level position, UPOSS and ZPOSS are height and level")
+    out.append("# position, SCOPY and SREMAP what a copied level and a removed")
+    out.append("# node do to the places. Every weight record reproduces its point")
+    out.append("# from each node's place on its level.")
+    out.append("#" + "-" * 68)
+    stack_rec("pair", [("COPY", 0, 1.0)], ["two flat levels, at 0 and 1"])
+    stack_rec("touch", [("COPY", 0, 0.5), ("RAISE", 0, 0.5, [0])],
+              ["two levels touching at node 0: the lower raised to the upper"])
+    C = (0.5, 0.5)
+    shapes = {}
+
+    def scaled(k, f):
+        return {(k, i): ((f - 1.0) * (sq[i][0] - C[0]),
+                         (f - 1.0) * (sq[i][1] - C[1])) for i in sq}
+
+    def shaped(name, frm, offs, note):
+        for line in note:
+            out.append("# " + line)
+        sh = Shaped(stacks[frm], sq, tris, offs)
+        shapes[name] = sh
+        out.append(f"SHAPED {name} FROM {frm} OFFS " + " ".join(
+            f"{k}:{i}={fmt(d[0])},{fmt(d[1])}"
+            for (k, i), d in sorted(offs.items())))
+        return sh
+
+    shaped("funnel", "pair", scaled(1, 1.5),
+           ["a funnel: the top level half as wide again about the centre"])
+    shaped("hourglass", "three", scaled(1, 0.5),
+           ["an hourglass: the middle of three levels half as wide"])
+    shaped("onenode", "pair", {(1, 2): (0.2, 0.1)},
+           ["one node, node 2, pushed out on the top level alone"])
+    bs = scaled(2, 1.25)
+    bs[(1, 0)] = (-0.05, -0.05)
+    shaped("bentshape", "bent", bs,
+           ["bent and shaped: node 2 raised on the middle level, node 0 out",
+            "on it, the top level a quarter wider"])
+    shaped("touchshape", "touch", {(1, 2): (0.1, 0.1)},
+           ["levels touching at node 0, the upper's node 2 pushed out"])
+
+    def closed(sname, scales, p, z):
+        """Flat levels each scaled about the centre: no search. t from z,
+        the slice's scale from t, the point carried back onto the floor
+        plan through it."""
+        st = stacks[sname]
+        L = len(st.bases)
+        if z < st.bases[0] or z > st.bases[-1]:
+            return None
+        k = max(j for j in range(L - 1) if st.bases[j] <= z)
+        t = (z - st.bases[k]) / (st.bases[k + 1] - st.bases[k])
+        f = scales[k] + t * (scales[k + 1] - scales[k])
+        q = (C[0] + (p[0] - C[0]) / f, C[1] + (p[1] - C[1]) / f)
+        lam = floor_weights(sq, tris, q)
+        if lam is None:
+            return None
+        outw = {}
+        for i, w in lam.items():
+            if w * (1 - t) > 1e-12:
+                outw[(i, k)] = w * (1 - t)
+            if w * t > 1e-12:
+                outw[(i, k + 1)] = w * t
+        return outw
+
+    def same(a, b):
+        if a is None or b is None:
+            return a is None and b is None
+        keys = {k for k, v in a.items() if abs(v) > 1e-7} \
+            | {k for k, v in b.items() if abs(v) > 1e-7}
+        return all(abs(a.get(k, 0.0) - b.get(k, 0.0)) < 1e-7 for k in keys)
+
+    def sxyz(name, sname, p, z, scales=None, base=None, note=None):
+        if note:
+            for line in note:
+                out.append("# " + line)
+        w = shapes[sname].weigh(p, z)
+        cls = "CROSS"
+        if scales is not None:
+            c = closed(base, scales, p, z)
+            assert same(c, w), (name, c, w)
+            w, cls = c, "ANALYTIC"
+        if w is not None:
+            w = {k: v for k, v in w.items() if abs(v) > 1e-9}
+        out.append(f"EVALXYZ {name} {cls} {sname} SQUARE P {fmt(p[0])} "
+                   f"{fmt(p[1])} {fmt(z)} EXPECT {w3_s(w)}")
+
+    fs, hs = [1.0, 1.5], [1.0, 0.5, 1.0]
+    sxyz("funnel_mid", "funnel", (0.3, 0.6), 0.5, fs, "pair",
+         ["half way up the funnel the slice is 1.25 wide: the point is",
+          "weighed where it falls on the floor plan through that slice"])
+    sxyz("funnel_low", "funnel", (0.7, 0.2), 0.2, fs, "pair")
+    sxyz("funnel_high", "funnel", (0.25, 0.8), 0.9, fs, "pair")
+    sxyz("funnel_bottom", "funnel", (0.3, 0.6), 0.0, fs, "pair",
+         ["on the bottom level: its own plan, that level alone"])
+    sxyz("funnel_top", "funnel", (0.3, 0.6), 1.0, fs, "pair")
+    sxyz("funnel_wide_top", "funnel", (0.95, 0.95), 1.0, fs, "pair",
+         ["past the floor plan's edge, but inside the wider top level"])
+    sxyz("funnel_edge_outside", "funnel", (0.05, 0.5), 0.1, fs, "pair",
+         ["outside the slice at this height: the funnel is not yet that wide"])
+    sxyz("funnel_edge_inside", "funnel", (0.05, 0.5), 0.5, fs, "pair",
+         ["the same (x, y), higher: inside now"])
+    sxyz("funnel_above", "funnel", (0.3, 0.6), 1.01, fs, "pair")
+    sxyz("funnel_below", "funnel", (0.3, 0.6), -0.1, fs, "pair")
+    sxyz("hourglass_centre_low", "hourglass", (0.5, 0.5), 0.25, hs, "three")
+    sxyz("hourglass_waist", "hourglass", (0.45, 0.6), 0.5, hs, "three",
+         ["on the waist: the middle level alone, at half its width"])
+    sxyz("hourglass_upper", "hourglass", (0.4, 0.55), 0.8, hs, "three")
+    sxyz("hourglass_corner_low", "hourglass", (0.2, 0.2), 0.1, hs, "three",
+         ["a corner: inside near the bottom, where the hourglass is wide"])
+    sxyz("hourglass_corner_waist", "hourglass", (0.2, 0.2), 0.4, hs, "three",
+         ["the same corner near the waist: outside"])
+    sxyz("hourglass_corner_high", "hourglass", (0.2, 0.2), 0.95, hs, "three")
+    sxyz("hourglass_just_inside_below", "hourglass", (0.22, 0.3), 0.29, hs,
+         "three",
+         ["just inside the narrowing wall: the map's edge at this (x, y) is",
+          "at 0.3, between the look that finds the point inside and the next,",
+          "which finds it outside -- the edge has to be closed in on"])
+    sxyz("hourglass_just_inside_above", "hourglass", (0.22, 0.3), 0.71, hs,
+         "three", ["the same, above the waist: the edge at 0.7, from above"])
+    sxyz("hourglass_just_outside_below", "hourglass", (0.22, 0.3), 0.31, hs,
+         "three")
+    out.append("# one node pushed out, bends, a pinch: searched for, CROSS")
+    sxyz("onenode_mid", "onenode", (0.6, 0.6), 0.5)
+    sxyz("onenode_near", "onenode", (0.85, 0.8), 0.7)
+    sxyz("onenode_out_low", "onenode", (1.0, 0.92), 0.2,
+         note=["where only the pushed-out corner reaches: outside low down"])
+    sxyz("onenode_out_high", "onenode", (1.0, 0.92), 0.9)
+    sxyz("onenode_other_side", "onenode", (0.2, 0.4), 0.6,
+         note=["in the triangle the moved node is no part of: as unshaped"])
+    sxyz("bentshape_lower", "bentshape", (0.6, 0.5), 0.3)
+    sxyz("bentshape_near_bend", "bentshape", (0.8, 0.8), 0.7)
+    sxyz("bentshape_upper", "bentshape", (0.3, 0.4), 0.8)
+    sxyz("bentshape_on_middle", "bentshape", (0.1, 0.9), 0.5,
+         note=["at node 3, on the middle level: that level alone"])
+    sxyz("bentshape_wide_top", "bentshape", (0.05, 0.5), 0.97)
+    sxyz("touchshape_pinch", "touchshape", (0.1, 0.1), 0.5,
+         note=["at node 0, where the levels touch: shared equally"])
+    sxyz("touchshape_open", "touchshape", (0.8, 0.7), 0.3)
+    out.append("")
+
+    def su(name, sname, p, u, note=None):
+        if note:
+            for line in note:
+                out.append("# " + line)
+        w = shapes[sname].weigh_u(p, u)
+        if w is not None:
+            w = {k: v for k, v in w.items() if abs(v) > 1e-9}
+        out.append(f"EVALSU {name} CROSS {sname} P {fmt(p[0])} {fmt(p[1])} "
+                   f"U {fmt(u)} EXPECT {w3_s(w)}")
+
+    su("u_funnel_half", "funnel", (0.3, 0.6), 0.5,
+       ["by level position: the slice at u, no search"])
+    su("u_funnel_top", "funnel", (0.95, 0.95), 1.0)
+    su("u_funnel_outside_slice", "funnel", (0.05, 0.5), 0.1)
+    su("u_funnel_past_top", "funnel", (0.3, 0.6), 1.2)
+    su("u_hourglass_upper", "hourglass", (0.45, 0.6), 1.5)
+    su("u_bentshape", "bentshape", (0.8, 0.8), 0.75)
+    su("u_onenode", "onenode", (1.0, 0.92), 0.9)
+
+    def pos(name, sname, p, z, note=None):
+        if note:
+            for line in note:
+                out.append("# " + line)
+        sh = shapes[sname]
+        u = sh.position(p, z)
+        out.append(f"ZPOSS {name} CROSS {sname} P {fmt(p[0])} {fmt(p[1])} "
+                   f"Z {fmt(z)} EXPECT {fmt(u)}")
+        out.append(f"UPOSS {name}_back CROSS {sname} P {fmt(p[0])} "
+                   f"{fmt(p[1])} U {fmt(u)} EXPECT {fmt(sh.height_u(p, u))}")
+
+    pos("pos_funnel", "funnel", (0.3, 0.6), 0.35,
+        ["a height to a level position, and back to the height"])
+    pos("pos_bentshape_lower", "bentshape", (0.8, 0.8), 0.6)
+    pos("pos_bentshape_upper", "bentshape", (0.8, 0.8), 0.9)
+    pos("pos_hourglass", "hourglass", (0.45, 0.6), 0.75)
+    pos("pos_outside_flat", "hourglass", (0.2, 0.2), 0.4,
+        ["outside the slice at that height: the levels taken flat"])
+    out.append("")
+
+    for name, sname, a, b, steps in [
+            ("cont_funnel", "funnel", (0.2, 0.3, 0.05), (0.8, 0.7, 0.95), 240),
+            ("cont_bentshape", "bentshape", (0.3, 0.3, 0.1), (0.75, 0.7, 0.9), 240),
+            ("cont_onenode", "onenode", (0.5, 0.4, 0.1), (0.9, 0.85, 0.95), 240)]:
+        prev, worst = None, 0.0
+        for q in range(steps + 1):
+            f = q / steps
+            p = tuple(a[j] + (b[j] - a[j]) * f for j in range(3))
+            w = shapes[sname].weigh(p[:2], p[2])
+            assert w is not None, (name, q)
+            if prev is not None:
+                for key in set(w) | set(prev):
+                    worst = max(worst, abs(w.get(key, 0.0) - prev.get(key, 0.0)))
+            prev = w
+        out.append(f"CONT {name} CROSS {sname} SQUARE FROM {fmt(a[0])} "
+                   f"{fmt(a[1])} {fmt(a[2])} TO {fmt(b[0])} {fmt(b[1])} "
+                   f"{fmt(b[2])} STEPS {steps} MAXSTEP {fmt(worst * 1.5 + 1e-4)}")
+
+    out.append("# a level copied takes its shape with it; a node removed, the")
+    out.append("# places follow the renumbering")
+    sh = shapes["bentshape"]
+    cp = Shaped(sh.st, sq, tris, {})
+    cp.P = [list(r) for r in sh.P]
+    cp.P.insert(3, list(sh.P[2]))
+    out.append(f"SCOPY copy_takes_shape ANALYTIC bentshape FROM 2 BASE 1.5 "
+               f"EXPECT 3 OFFS {offs_s(cp, sq)}")
+    rm = Shaped(sh.st, sq, tris, {})
+    keep = [0, 2, 3]
+    rm.P = [[r[i] for i in keep] for r in sh.P]
+    out.append(f"SREMAP remove_node_1 ANALYTIC bentshape TABLE 0,-,1,2 "
+               f"OFFS {offs_s(rm, {j: sq[i] for j, i in enumerate(keep)})}")
     out.append("")
 
     out.append("#" + "-" * 68)
@@ -1513,6 +1903,8 @@ def main():
                                             "CH3", "CH3XYZ", "VAL3",
                                             "FILE3", "SAVE3", "REFUSE3",
                                             "REFUSE2D", "UPOS", "ZPOS",
+                                            "EVALSU", "UPOSS", "ZPOSS",
+                                            "SCOPY", "SREMAP",
                                             "EVALU", "REFUSEOLD"):
             counts[parts[2]] = counts.get(parts[2], 0) + 1
     print(f"wrote {OUT}")
